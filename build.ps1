@@ -44,7 +44,7 @@ $sln = Join-Path $root 'backend/Zentriq.slnx'
 Write-Section 'Backend: restore'
 Invoke-Native dotnet restore $sln
 Write-Section 'Backend: build'
-Invoke-Native dotnet build $sln --configuration $Configuration --no-restore "-p:Version=$Version" -warnaserror:NU1901,NU1902,NU1903,NU1904
+Invoke-Native dotnet build $sln --configuration $Configuration --no-restore "-p:Version=$Version" '-warnaserror:NU1901;NU1902;NU1903;NU1904'
 
 Write-Section 'Vulnerable package check'
 $audit = Invoke-Native dotnet list $sln package --vulnerable --include-transitive 2>&1
