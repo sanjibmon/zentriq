@@ -23,7 +23,7 @@ $Version = Resolve-ZentriqVersion $Version
 Write-Section "Zentriq build $Version ($Configuration)"
 
 Assert-Tool dotnet 'Install the .NET SDK pinned in global.json (https://dotnet.microsoft.com/download).'
-Invoke-Native dotnet --info | Select-String -Pattern '^\s*(Version|OS Name|OS Version|RID):' | ForEach-Object { Write-Host $_.Line.Trim() }
+Invoke-Native { dotnet --info } | Select-String -Pattern '^\s*(Version|OS Name|OS Version|RID):' | ForEach-Object { Write-Host $_.Line.Trim() }
 
 # ---- frontend ------------------------------------------------------------------------------
 $frontend = Join-Path $root 'frontend'
@@ -32,9 +32,9 @@ if (-not $SkipFrontend -and (Test-Path (Join-Path $frontend 'package.json'))) {
     Push-Location $frontend
     try {
         Write-Section 'Frontend: npm ci'
-        if (Test-Path 'package-lock.json') { Invoke-Native npm ci --no-audit --no-fund } else { Invoke-Native npm install --no-audit --no-fund }
+        if (Test-Path 'package-lock.json') { Invoke-Native { npm ci --no-audit --no-fund } } else { Invoke-Native { npm install --no-audit --no-fund } }
         Write-Section 'Frontend: build'
-        Invoke-Native npm run build
+        Invoke-Native { npm run build }
     } finally { Pop-Location }
 } elseif (-not $SkipFrontend) {
     Write-Warning 'frontend/package.json not found: the API will serve the placeholder page in backend/Zentriq.Api/wwwroot.'
@@ -43,12 +43,12 @@ if (-not $SkipFrontend -and (Test-Path (Join-Path $frontend 'package.json'))) {
 # ---- backend -------------------------------------------------------------------------------
 $sln = Join-Path $root 'backend/Zentriq.slnx'
 Write-Section 'Backend: restore'
-Invoke-Native dotnet restore $sln
+Invoke-Native { dotnet restore $sln }
 Write-Section 'Backend: build'
-Invoke-Native dotnet build $sln --configuration $Configuration --no-restore "-p:Version=$Version" '-warnaserror:NU1901;NU1902;NU1903;NU1904'
+Invoke-Native { dotnet build $sln --configuration $Configuration --no-restore "-p:Version=$Version" '-warnaserror:NU1901;NU1902;NU1903;NU1904' }
 
 Write-Section 'Vulnerable package check'
-$audit = Invoke-Native dotnet list $sln package --vulnerable --include-transitive 2>&1
+$audit = Invoke-Native { dotnet list $sln package --vulnerable --include-transitive 2>&1 }
 $audit | Write-Host
 if ($audit -match 'has the following vulnerable packages') { throw 'Vulnerable NuGet packages found (see above).' }
 

@@ -59,9 +59,9 @@ if (-not $SkipPublish) {
     )
     foreach ($p in $publish) {
         Write-Section "Publish $($p.Project)"
-        Invoke-Native dotnet publish (Join-Path $root $p.Project) --configuration $Configuration --runtime win-x64 --self-contained true `
+        Invoke-Native { dotnet publish (Join-Path $root $p.Project) --configuration $Configuration --runtime win-x64 --self-contained true `
             "-p:Version=$Version" '-p:PublishReadyToRun=false' '-p:DebugType=none' '-p:GenerateDocumentationFile=false' `
-            --output (Join-Path $staging $p.Out)
+            --output (Join-Path $staging $p.Out) }
     }
     # Development settings never ship.
     Get-ChildItem $staging -Recurse -Filter 'appsettings.Development.json' | Remove-Item -Force
@@ -100,7 +100,7 @@ if ($SignCertThumbprint) {
 function Sign-Files([string[]] $Files) {
     if (-not $signtool -or $Files.Count -eq 0) { return }
     foreach ($batch in ($Files | ForEach-Object -Begin { $i = 0 } -Process { [pscustomobject]@{ G = [math]::Floor($i++ / 50); F = $_ } } | Group-Object G)) {
-        Invoke-Native $signtool sign /sha1 $SignCertThumbprint /fd SHA256 /td SHA256 /tr $TimestampUrl /d 'Zentriq Console' @($batch.Group.F)
+        Invoke-Native { & $signtool sign /sha1 $SignCertThumbprint /fd SHA256 /td SHA256 /tr $TimestampUrl /d 'Zentriq Console' @($batch.Group.F) }
     }
 }
 if ($signtool) {
@@ -112,7 +112,7 @@ if ($signtool) {
 # ---- 4. custom actions + MSI -------------------------------------------------------------------
 Write-Section 'MSI custom actions'
 $caProj = Join-Path $root 'installer/customactions/Zentriq.CustomActions.csproj'
-Invoke-Native dotnet build $caProj --configuration $Configuration "-p:Version=$Version"
+Invoke-Native { dotnet build $caProj --configuration $Configuration "-p:Version=$Version" }
 $caDll = Get-ChildItem (Join-Path $root 'installer/customactions/bin') -Recurse -Filter 'Zentriq.CustomActions.CA.dll' |
     Sort-Object LastWriteTime -Descending | Select-Object -First 1 -ExpandProperty FullName
 if (-not $caDll) { throw 'Zentriq.CustomActions.CA.dll was not produced.' }
@@ -124,8 +124,8 @@ Sign-Files @($caDll)
 
 Write-Section 'Zentriq.msi'
 Remove-Item (Join-Path $art 'msi') -Recurse -Force -ErrorAction SilentlyContinue
-Invoke-Native dotnet build (Join-Path $root 'installer/msi/Zentriq.Msi.wixproj') --configuration $Configuration `
-    "-p:ProductVersion=$Version" "-p:StagingDir=$staging" "-p:CustomActionDll=$caDll"
+Invoke-Native { dotnet build (Join-Path $root 'installer/msi/Zentriq.Msi.wixproj') --configuration $Configuration `
+    "-p:ProductVersion=$Version" "-p:StagingDir=$staging" "-p:CustomActionDll=$caDll" }
 $msi = Join-Path $art 'msi/Zentriq.msi'
 if (-not (Test-Path $msi)) { throw "MSI not found at $msi" }
 Sign-Files @($msi)
@@ -133,19 +133,19 @@ Sign-Files @($msi)
 # ---- 5. bundle -----------------------------------------------------------------------------------
 Write-Section 'Zentriq-Setup-x64.exe'
 Remove-Item (Join-Path $art 'bundle') -Recurse -Force -ErrorAction SilentlyContinue
-Invoke-Native dotnet build (Join-Path $root 'installer/bootstrapper/Zentriq.Bundle.wixproj') --configuration $Configuration `
-    "-p:ProductVersion=$Version" "-p:MsiPath=$msi" "-p:PrereqDir=$prereqDir" "-p:PgInstallerName=$pgFile" "-p:VcRedistMinBuild=$vcBuild"
+Invoke-Native { dotnet build (Join-Path $root 'installer/bootstrapper/Zentriq.Bundle.wixproj') --configuration $Configuration `
+    "-p:ProductVersion=$Version" "-p:MsiPath=$msi" "-p:PrereqDir=$prereqDir" "-p:PgInstallerName=$pgFile" "-p:VcRedistMinBuild=$vcBuild" }
 $bundle = Join-Path $art 'bundle/Zentriq-Setup-x64.exe'
 if (-not (Test-Path $bundle)) { throw "Bundle not found at $bundle" }
 
 if ($signtool) {
     # Burn bundles must have the engine signed first, then the whole bundle.
     Write-Section 'Sign bundle (engine detach/reattach)'
-    Invoke-Native dotnet tool update --global wix --version $wixVersion
+    Invoke-Native { dotnet tool update --global wix --version $wixVersion }
     $engine = Join-Path $art 'bundle/engine.exe'
-    Invoke-Native wix burn detach $bundle '-engine' $engine
+    Invoke-Native { wix burn detach $bundle '-engine' $engine }
     Sign-Files @($engine)
-    Invoke-Native wix burn reattach $bundle '-engine' $engine '-o' $bundle
+    Invoke-Native { wix burn reattach $bundle '-engine' $engine '-o' $bundle }
     Sign-Files @($bundle)
     Remove-Item $engine -Force
 }

@@ -9,14 +9,12 @@ function Assert-Tool([string] $Name, [string] $Hint) {
     if (-not (Get-Command $Name -ErrorAction SilentlyContinue)) { throw "$Name was not found on PATH. $Hint" }
 }
 
-# Runs a native command and throws on a non-zero exit code (PowerShell does not by default).
-# Deliberately a simple function (no param block) so arguments such as -p:Name=Value or -engine are
-# passed to the native tool unchanged instead of being bound as PowerShell parameters.
-function Invoke-Native {
-    $command = $args[0]
-    $rest = if ($args.Count -gt 1) { $args[1..($args.Count - 1)] } else { @() }
-    & $command @rest
-    if ($LASTEXITCODE -ne 0) { throw "'$command $($rest -join ' ')' failed with exit code $LASTEXITCODE." }
+# Runs a native command given as a script block and throws on a non-zero exit code
+# (PowerShell does not by default). Usage: Invoke-Native { dotnet build $sln -p:Version=$v }
+# A script block keeps normal native-command parsing, so -p:Name=Value, --info, /sha1 etc. pass through unchanged.
+function Invoke-Native([Parameter(Mandatory)] [scriptblock] $Command) {
+    & $Command
+    if ($LASTEXITCODE -ne 0) { throw "Command failed with exit code ${LASTEXITCODE}: $Command" }
 }
 
 # Make the reason for a failure visible in redirected/captured output (CI logs).
