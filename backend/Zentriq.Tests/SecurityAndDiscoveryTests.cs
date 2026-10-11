@@ -45,7 +45,8 @@ public sealed class TargetParserTests
     {
         var p = TargetParser.Parse("10.1.2.0/24", "10.1.2.10", Open);
         Assert.True(p.IsValid, string.Join("; ", p.Errors));
-        Assert.Equal(256, p.Items.Sum(i => i.Count));
+        // Network and broadcast addresses of a /24 are not scanned: 254 hosts.
+        Assert.Equal(254, p.Items.Sum(i => i.Count));
         Assert.DoesNotContain("10.1.2.10", TargetParser.Expand(p, 1000));
     }
 

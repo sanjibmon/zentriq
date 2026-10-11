@@ -19,7 +19,7 @@ public sealed class LicenseVerifierTests
     }
 
     private static LicensePayload Payload(Guid? install = null, DateTimeOffset? expires = null, Dictionary<string, int>? ent = null) =>
-        new(1, "ZQ-TEST-1", "Contoso", install ?? Install, Now.AddDays(-1), Now.AddDays(-1), expires ?? Now.AddDays(365), 14,
+        new(1, "ZQ-TEST-1", "Contoso", install ?? Install, Now.AddDays(-400), Now.AddDays(-400), expires ?? Now.AddDays(365), 14,
             ["*"], ent ?? new Dictionary<string, int> { ["endpoint"] = 100, ["server"] = 10 });
 
     private string Sign(LicensePayload p, string keyId = "test-key", ECDsa? key = null)
