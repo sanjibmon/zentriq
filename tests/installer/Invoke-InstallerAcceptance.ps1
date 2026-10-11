@@ -105,7 +105,7 @@ Remove-Item $answer -Force   # contains the administrator password
 
 if (-not $installed) {
     foreach ($t in 'T02 PostgreSQL provisioning', 'T03 Database migration', 'T04 Administrator sign-in', 'T05 API and worker services', 'T06 Trial initialization',
-                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall') {
+                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console') {
         Record $t.Substring(0, 3) $t.Substring(4) 'BLOCKED' 'installation failed'
     }
 } else {
@@ -149,6 +149,28 @@ if (-not $installed) {
         $fw = Get-NetFirewallRule -DisplayName 'Zentriq Console (HTTPS)' -ErrorAction SilentlyContinue
         Assert $fw 'firewall rule missing'
         'TLS OK, firewall rule present'
+    } | Out-Null
+    Check 'T22' 'Start menu and Desktop shortcuts use the Zentriq icon' {
+        $iconPath = Join-Path $env:ProgramFiles 'Zentriq\zentriq.ico'
+        Assert (Test-Path $iconPath) 'zentriq.ico not installed'
+        $start = Join-Path $env:ProgramData 'Microsoft\Windows\Start Menu\Programs\Zentriq\Zentriq Console.url'
+        $desk = Join-Path $env:PUBLIC 'Desktop\Zentriq Console.url'
+        foreach ($f in $start, $desk) {
+            Assert (Test-Path $f) "missing $f"
+            $c = Get-Content $f -Raw
+            Assert ($c -match '(?im)^IconFile=.*zentriq\.ico') "$f has no Zentriq icon: $c"
+            Assert ($c -match '(?im)^URL=https://') "$f has no https URL"
+        }
+        'Start menu + Desktop shortcuts with zentriq.ico'
+    } | Out-Null
+    Check 'T23' 'Web console sign-in page is served (not the placeholder)' {
+        $r = Invoke-WebRequest "$base/" -SkipCertificateCheck
+        Assert ($r.Content -notmatch 'added to this folder by the frontend build') 'placeholder page is still installed'
+        $js = [regex]::Match($r.Content, 'src="(/assets/[^"]+\.js)"').Groups[1].Value
+        Assert $js 'no application script referenced by index.html'
+        $bundle = Invoke-WebRequest "$base$js" -SkipCertificateCheck
+        Assert ($bundle.Content -match 'Sign in') 'application bundle has no sign-in page'
+        "index + $js ($([int]($bundle.RawContentLength/1KB)) KB)"
     } | Out-Null
     Check 'T08' 'zentriqctl verify (end-to-end health)' { & $ctl verify | Out-Host; Assert ($LASTEXITCODE -eq 0) "exit $LASTEXITCODE"; 'all checks passed' } | Out-Null
 
@@ -208,6 +230,7 @@ if (-not $installed) {
         Run-Setup $(if ($UpgradeBundle) { $UpgradeBundle } else { $Bundle }) @('/uninstall') 'uninstall' | Out-Null
         Assert (-not (Get-Service ZentriqApi -ErrorAction SilentlyContinue)) 'ZentriqApi service still registered'
         Assert (-not (Test-Path $ctl)) 'program files still present'
+        Assert (-not (Test-Path (Join-Path $env:PUBLIC 'Desktop\Zentriq Console.url'))) 'desktop shortcut not removed'
         Assert (Test-Path (Join-Path $dataDir 'Secrets\app.secrets')) 'secrets were deleted'
         Assert (Test-Path (Join-Path $dataDir 'Config\zentriq.json')) 'configuration was deleted'
         Assert ((Get-Service 'postgresql-x64-17').Status -eq 'Running') 'PostgreSQL was removed or stopped'

@@ -1,0 +1,73 @@
+/* Zentriq Console additions on top of the prototype stylesheet (zentriq.css). */
+html, body, #root { height: 100%; margin: 0; }
+a { color: var(--accent); }
+.nav a { cursor: pointer; }
+.kpi { text-decoration: none; color: inherit; display: block; }
+.kpi .s { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.empty-cell { text-align: center; color: var(--muted); padding: 22px !important; }
+.user-menu { position: relative; }
+.user-menu .popover { top: 42px; }
+.health-pill.lic-info { background: var(--info-soft); color: var(--info); }
+.health-pill.lic-warn { background: var(--warn-soft); color: var(--warn); }
+.health-pill.lic-crit { background: var(--crit-soft); color: var(--crit); }
+.license-strip { display: flex; gap: 8px; align-items: center; padding: 8px 24px; background: var(--warn-soft); font-size: 13px; border-bottom: 1px solid var(--line); }
+.stack-v { display: grid; gap: 14px; }
+.grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 14px; margin-bottom: 14px; }
+.bars { display: grid; gap: 8px; }
+.bars .row { display: grid; grid-template-columns: 140px 1fr 48px; gap: 10px; align-items: center; font-size: 13px; }
+.bars .track { height: 8px; background: var(--surface-3); border-radius: 4px; overflow: hidden; }
+.bars .fill { height: 100%; background: var(--accent); border-radius: 4px; }
+.bars .n { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+.dl2 { display: grid; grid-template-columns: max-content 1fr; gap: 6px 18px; font-size: 13px; margin: 0; }
+.dl2 dt { color: var(--muted); }
+.dl2 dd { margin: 0; overflow-wrap: anywhere; }
+.toolbar-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+.toolbar-row .grow { flex: 1; min-width: 220px; }
+.form-v { display: grid; gap: 12px; }
+.form-v label { display: grid; gap: 5px; font-size: 13px; font-weight: 500; }
+.form-v small { font-weight: 400; }
+.modal-scrim { position: fixed; inset: 0; background: rgba(8, 16, 22, 0.45); display: grid; place-items: center; z-index: 90; padding: 16px; }
+.modal-card { background: var(--surface); border-radius: 10px; box-shadow: var(--shadow); width: min(560px, 100%); max-height: 90vh; overflow: auto; }
+.modal-card header { padding: 14px 18px; border-bottom: 1px solid var(--line); display: flex; align-items: center; }
+.modal-card header h2 { margin: 0; font-size: 16px; }
+.modal-card .body { padding: 16px 18px; }
+.modal-card footer { padding: 12px 18px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; gap: 8px; }
+.progress { height: 6px; background: var(--surface-3); border-radius: 3px; overflow: hidden; min-width: 80px; }
+.progress > i { display: block; height: 100%; background: var(--accent); }
+.module-card { max-width: 720px; }
+
+/* ---- Sign-in ---------------------------------------------------------------------------- */
+.login { min-height: 100%; display: grid; grid-template-columns: minmax(320px, 44%) 1fr; background: var(--bg); }
+.login-brand { background: radial-gradient(1200px 600px at -10% -20%, #173040 0%, var(--rail) 55%); color: var(--rail-fg); padding: 48px 56px; display: flex; flex-direction: column; gap: 28px; }
+.login-brand-top { display: flex; gap: 14px; align-items: center; }
+.login-product { font-size: 24px; font-weight: 700; color: #eaf2f6; letter-spacing: 0.005em; }
+.login-tagline { font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: #7ee0ec; margin-top: 3px; }
+.login-strap { font-size: 18px; line-height: 1.5; color: #c9d5dd; max-width: 34ch; margin: 24px 0 0; }
+.login-points { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; font-size: 14px; }
+.login-points li { display: flex; gap: 10px; align-items: center; }
+.login-points svg { color: #38b3c4; width: 18px; height: 18px; }
+.login-brand-foot { margin-top: auto; font-size: 12px; color: var(--rail-muted); }
+.login-panel { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px 16px; gap: 16px; }
+.login-card { width: min(400px, 100%); background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); padding: 32px 32px 24px; display: grid; gap: 14px; }
+.login-card-logo { display: flex; justify-content: center; }
+.login-card h1 { margin: 0; font-size: 22px; text-align: center; }
+.login-card > p.muted { margin: -8px 0 4px; text-align: center; font-size: 13.5px; }
+.login-field { display: grid; gap: 6px; font-size: 13px; font-weight: 600; }
+.login-field input.in { height: 40px; font-size: 14px; width: 100%; box-sizing: border-box; }
+.login-field input.in:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.login-pw { position: relative; }
+.login-pw .icon-btn { position: absolute; right: 4px; top: 4px; width: 32px; height: 32px; }
+.login-pw input.in { padding-right: 40px; }
+.login-submit { width: 100%; justify-content: center; margin-top: 4px; }
+.login-error { margin: 0; }
+.login-help { font-size: 12.5px; text-align: center; margin: 4px 0 0; }
+.login-trial { font-size: 12.5px; color: var(--muted); }
+@media (max-width: 860px) {
+  .login { grid-template-columns: 1fr; }
+  .login-brand { padding: 28px 24px; gap: 14px; }
+  .login-strap, .login-points { display: none; }
+  .login-brand-foot { display: none; }
+}
+.boot { height: 100%; display: grid; place-items: center; animation: zq-pulse 1.4s ease-in-out infinite; }
+@keyframes zq-pulse { 50% { opacity: 0.45; } }
+a.btn{text-decoration:none}

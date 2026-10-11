@@ -77,6 +77,7 @@
     <Property Id="ZQ_ANSWERFILE" Secure="yes" />
     <Property Id="ZQ_FROM_BUNDLE" Secure="yes" />
     <Property Id="ZQ_URL" Secure="yes" />
+    <Property Id="DESKTOPSHORTCUT" Value="1" Secure="yes" />
 
     <SetProperty Id="INSTALLFOLDER" Value="[INSTALLFOLDER_REG]" After="AppSearch" Sequence="both" Condition="INSTALLFOLDER_REG" />
     <SetProperty Id="DATAFOLDER" Action="SetDataFolderFromExisting" Value="[ZQ_EXISTING]" After="AppSearch" Sequence="both" Condition="NOT DATAFOLDER AND ZQ_EXISTING" />
@@ -93,6 +94,7 @@
         <Directory Id="DocsFolder" Name="docs" />
       </Directory>
     </StandardDirectory>
+    <StandardDirectory Id="DesktopFolder" />
     <StandardDirectory Id="ProgramMenuFolder">
       <Directory Id="ShortcutFolder" Name="Zentriq" />
     </StandardDirectory>
@@ -105,7 +107,9 @@
       <ComponentRef Id="Settings" />
       <ComponentRef Id="FirewallAny" />
       <ComponentRef Id="FirewallLocalSubnet" />
+      <ComponentRef Id="ConsoleIcon" />
       <ComponentRef Id="StartMenu" />
+      <ComponentRef Id="DesktopShortcut" />
     </Feature>
 
     <!-- API service. Virtual account NT SERVICE\ZentriqApi: no password, least privilege. -->
@@ -169,10 +173,23 @@
       <RegistryValue Root="HKLM" Key="SOFTWARE\Zentriq\Console" Name="FirewallRuleLocalSubnet" Type="string" Value="localsubnet" KeyPath="yes" />
     </Component>
 
+    <!-- Branded icon used by the Start menu and Desktop shortcuts (otherwise Windows shows the browser icon). -->
+    <Component Id="ConsoleIcon" Directory="INSTALLFOLDER">
+      <File Id="ZentriqIconFile" Source="$(var.AssetsDir)\zentriq.ico" Name="zentriq.ico" KeyPath="yes" />
+    </Component>
+
     <Component Id="StartMenu" Directory="ShortcutFolder">
-      <util:InternetShortcut Id="ConsoleShortcut" Name="Zentriq Console" Target="[ZQ_URL]" Type="url" />
+      <util:InternetShortcut Id="ConsoleShortcut" Name="Zentriq Console" Target="[ZQ_URL]" Type="url"
+                             IconFile="[#ZentriqIconFile]" IconIndex="0" />
       <RemoveFolder Id="RemoveShortcutFolder" On="uninstall" />
       <RegistryValue Root="HKCU" Key="Software\Zentriq\Console" Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+    <!-- Desktop shortcut (all users). Opt out with DESKTOPSHORTCUT=0. -->
+    <Component Id="DesktopShortcut" Directory="DesktopFolder" Condition='DESKTOPSHORTCUT = "1"'>
+      <util:InternetShortcut Id="ConsoleDesktopShortcut" Name="Zentriq Console" Target="[ZQ_URL]" Type="url"
+                             IconFile="[#ZentriqIconFile]" IconIndex="0" />
+      <RegistryValue Root="HKCU" Key="Software\Zentriq\Console" Name="DesktopShortcut" Type="integer" Value="1" KeyPath="yes" />
     </Component>
 
     <!-- ===== Custom actions ================================================================ -->

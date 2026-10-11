@@ -110,8 +110,10 @@
                  DisableCondition="ZQ_EXISTING" EnableCondition="NOT ZQ_EXISTING" />
         <Control Id="DataNote" Type="Text" X="20" Y="136" Width="330" Height="40" NoPrefix="yes"
                  Text="Data is never deleted by upgrade, repair or uninstall. Access to the Secrets folder is limited to SYSTEM, Administrators and the Zentriq services. Choose a volume with room for backups." />
-        <Control Id="ExistingNote" Type="Text" X="20" Y="180" Width="330" Height="40" NoPrefix="yes" HideCondition="NOT ZQ_EXISTING" ShowCondition="ZQ_EXISTING"
+        <Control Id="ExistingNote" Type="Text" X="20" Y="176" Width="330" Height="36" NoPrefix="yes" HideCondition="NOT ZQ_EXISTING" ShowCondition="ZQ_EXISTING"
                  Text="Existing Zentriq data was found in this folder. Setup will keep it, reuse the saved database and HTTPS settings, take a backup before upgrading the database and skip the remaining configuration pages." />
+        <Control Id="DesktopCheck" Type="CheckBox" X="20" Y="214" Width="330" Height="15" Property="DESKTOPSHORTCUT" CheckBoxValue="1"
+                 Text="Create a Zentriq Console shortcut on the desktop" />
         <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
         <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)">
           <Publish Event="NewDialog" Value="ZqPrereqDlg" />

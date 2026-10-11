@@ -75,7 +75,7 @@ if (Test-Path (Join-Path $dist 'index.html')) {
     Remove-Item $wwwroot -Recurse -Force -ErrorAction SilentlyContinue
     Copy-Item $dist $wwwroot -Recurse
 } else {
-    Write-Warning 'frontend/dist not found; packaging the placeholder page. Run ./build.ps1 first to include the web console.'
+    throw 'frontend/dist/index.html not found: the web console has not been built. Run ./build.ps1 first (needs Node.js 22).'
 }
 $docs = Join-Path $staging 'docs'
 New-Item -ItemType Directory -Force -Path $docs | Out-Null
@@ -91,19 +91,41 @@ $vcBuild = [int]($lock.vcredist.fileVersion -split '\.')[2]
 Write-Host "PostgreSQL installer: $pgFile; VC++ runtime build: $vcBuild"
 
 # ---- 6a. signing helpers -----------------------------------------------------------------------
+# Two supported ways to sign (see docs/code-signing.md):
+#   certstore : certificate in the Windows certificate store / USB token  -> -SignCertThumbprint (ZENTRIQ_SIGN_THUMBPRINT)
+#   akv       : certificate whose key lives in Azure Key Vault (cloud HSM) -> ZENTRIQ_AKV_URL, ZENTRIQ_AKV_CERT,
+#               AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET; signs with AzureSignTool (works in CI)
+$signMode = if ($env:ZENTRIQ_AKV_URL -and $env:ZENTRIQ_AKV_CERT) { 'akv' } elseif ($SignCertThumbprint) { 'certstore' } else { $null }
 $signtool = $null
-if ($SignCertThumbprint) {
+if ($signMode -eq 'certstore') {
     $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" -ErrorAction SilentlyContinue |
         Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
     if (-not $signtool) { throw 'signtool.exe not found (install the Windows SDK signing tools).' }
+} elseif ($signMode -eq 'akv') {
+    foreach ($v in 'AZURE_TENANT_ID', 'AZURE_CLIENT_ID', 'AZURE_CLIENT_SECRET') { if (-not (Get-Item "env:$v" -ErrorAction SilentlyContinue)) { throw "$v must be set for Azure Key Vault signing." } }
+    Invoke-Native { dotnet tool update --global AzureSignTool --version 7.0.1 }
 }
+if ($signMode) { Write-Host "Code signing: $signMode" } else { Write-Warning 'Code signing: not configured (artifacts will show "Unknown publisher").' }
+$signDescription = 'Zentriq Console'
+$signUrl = 'https://zentriq.example'
 function Sign-Files([string[]] $Files) {
-    if (-not $signtool -or $Files.Count -eq 0) { return }
-    foreach ($batch in ($Files | ForEach-Object -Begin { $i = 0 } -Process { [pscustomobject]@{ G = [math]::Floor($i++ / 50); F = $_ } } | Group-Object G)) {
-        Invoke-Native { & $signtool sign /sha1 $SignCertThumbprint /fd SHA256 /td SHA256 /tr $TimestampUrl /d 'Zentriq Console' @($batch.Group.F) }
+    if (-not $signMode -or $Files.Count -eq 0) { return }
+    $batches = $Files | ForEach-Object -Begin { $i = 0 } -Process { [pscustomobject]@{ G = [math]::Floor($i++ / 40); F = $_ } } | Group-Object G
+    foreach ($batch in $batches) {
+        $f = @($batch.Group.F)
+        if ($signMode -eq 'certstore') {
+            Invoke-Native { & $signtool sign /sha1 $SignCertThumbprint /fd SHA256 /td SHA256 /tr $TimestampUrl /d $signDescription /du $signUrl @f }
+        } else {
+            Invoke-Native { AzureSignTool sign -kvu $env:ZENTRIQ_AKV_URL -kvc $env:ZENTRIQ_AKV_CERT -kvt $env:AZURE_TENANT_ID -kvi $env:AZURE_CLIENT_ID -kvs $env:AZURE_CLIENT_SECRET -tr $TimestampUrl -td sha256 -fd sha256 -d $signDescription -du $signUrl -v @f }
+        }
+    }
+    foreach ($file in $Files) {
+        $sig = Get-AuthenticodeSignature $file
+        if ($sig.Status -ne 'Valid') { throw "Signature check failed for ${file}: $($sig.Status) $($sig.StatusMessage)" }
     }
 }
-if ($signtool) {
+
+if ($signMode) {
     Write-Section 'Sign Zentriq binaries'
     $ours = Get-ChildItem $staging -Recurse -Include 'Zentriq*.dll', 'Zentriq*.exe', 'zentriqctl.exe', 'zentriqctl.dll' | Select-Object -ExpandProperty FullName
     Sign-Files $ours
@@ -138,7 +160,7 @@ Invoke-Native { dotnet build (Join-Path $root 'installer/bootstrapper/Zentriq.Bu
 $bundle = Join-Path $art 'bundle/Zentriq-Setup-x64.exe'
 if (-not (Test-Path $bundle)) { throw "Bundle not found at $bundle" }
 
-if ($signtool) {
+if ($signMode) {
     # Burn bundles must have the engine signed first, then the whole bundle.
     Write-Section 'Sign bundle (engine detach/reattach)'
     Invoke-Native { dotnet tool update --global wix --version $wixVersion }
@@ -173,7 +195,7 @@ $signatures = @{}
 foreach ($f in Get-ChildItem $release -File | Where-Object Extension -in '.exe', '.msi') {
     $s = Get-AuthenticodeSignature $f.FullName
     $signatures[$f.Name] = if ($s.Status -eq 'Valid') { "Valid: $($s.SignerCertificate.Subject)" } else { "$($s.Status)" }
-    if ($signtool -and $s.Status -ne 'Valid') { throw "Signature verification failed for $($f.Name): $($s.Status)" }
+    if ($signMode -and $s.Status -ne 'Valid') { throw "Signature verification failed for $($f.Name): $($s.Status)" }
 }
 
 $files = foreach ($f in Get-ChildItem $release -File | Sort-Object Name) {
@@ -188,7 +210,8 @@ $manifest = [ordered]@{
     builtAtUtc     = (Get-Date).ToUniversalTime().ToString('o')
     gitCommit      = $commit
     builder        = @{ os = [Environment]::OSVersion.VersionString; dotnetSdk = (dotnet --version); wix = $wixVersion }
-    signed         = [bool]$signtool
+    signed         = [bool]$signMode
+    signingMode    = $signMode
     files          = $files
     prerequisites  = $lock
     notes          = @(
@@ -199,5 +222,5 @@ $manifest = [ordered]@{
 $manifest | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $release 'release-manifest.json') -Encoding UTF8
 
 Get-ChildItem $release | Format-Table Name, Length -AutoSize | Out-String | Write-Host
-if (-not $signtool) { Write-Warning 'Artifacts are NOT code-signed. Set -SignCertThumbprint (or ZENTRIQ_SIGN_THUMBPRINT) for customer releases.' }
+if (-not $signMode) { Write-Warning 'Artifacts are NOT code-signed (Windows shows "Unknown publisher"). See docs/code-signing.md.' }
 Write-Host "Release written to $release" -ForegroundColor Green
