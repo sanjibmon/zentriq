@@ -196,11 +196,12 @@ if (-not $installed) {
     Check 'T14' 'Logs contain no administrator password or connection-string passwords' {
         $paths = @((Join-Path $dataDir 'Logs'), $env:TEMP, $OutDir, (Join-Path $env:SystemRoot 'Temp'))
         $files = $paths | Where-Object { Test-Path $_ } | ForEach-Object { Get-ChildItem $_ -Recurse -File -Include '*.log', '*.txt', '*.json' -ErrorAction SilentlyContinue }
-        $hits = $files | Select-String -SimpleMatch $adminPassword -List -ErrorAction SilentlyContinue
-        Assert (-not $hits) "administrator password found in: $($hits.Path -join ', ')"
+        $hits = @($files | Select-String -SimpleMatch $adminPassword -List -ErrorAction SilentlyContinue)
+        if ($hits.Count -gt 0) { throw "administrator password found in: $(($hits | ForEach-Object Path) -join ', ')" }
         $cs = $files | Select-String -Pattern '(?i)(password|pwd)\s*=\s*(?!\*\*\*REDACTED)[^;\s"]{6,}' -List -ErrorAction SilentlyContinue | Where-Object { $_.Line -notmatch 'PasswordPolicy|password=\*\*\*' }
-        Assert (-not $cs) "possible secret in: $(($cs | ForEach-Object { "$($_.Path):$($_.LineNumber)" }) -join ', ')"
-        "$($files.Count) log files scanned"
+        $cs = @($cs)
+        if ($cs.Count -gt 0) { throw "possible secret in: $(($cs | ForEach-Object { "$($_.Path):$($_.LineNumber): $($_.Line.Trim())" }) -join ' | ')" }
+        "$(@($files).Count) log files scanned"
     } | Out-Null
 
     $uninstalled = Check 'T15' 'Uninstall removes the program but keeps customer data' {
