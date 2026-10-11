@@ -32,6 +32,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Prepare log folder
+        shell: pwsh
+        run: New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP/ci-logs" | Out-Null
+
       - uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
@@ -56,23 +60,23 @@ jobs:
 
       - name: Build
         shell: pwsh
-        run: ./build.ps1 -Version $env:ZQ_VERSION
+        run: ./build.ps1 -Version $env:ZQ_VERSION *>&1 | Tee-Object -FilePath "$env:RUNNER_TEMP/ci-logs/1-build.log"
 
       - name: Test
         shell: pwsh
-        run: ./test.ps1 -NoBuild
+        run: ./test.ps1 -NoBuild *>&1 | Tee-Object -FilePath "$env:RUNNER_TEMP/ci-logs/2-test.log"
 
       - name: Package release
         shell: pwsh
         run: |
-          ./package-windows.ps1 -Version $env:ZQ_VERSION
+          ./package-windows.ps1 -Version $env:ZQ_VERSION *>&1 | Tee-Object -FilePath "$env:RUNNER_TEMP/ci-logs/3-package.log"
           Move-Item artifacts/release artifacts/release-main
           Get-Content artifacts/prereqs/prereqs.lock.json
 
       - name: Package upgrade target
         shell: pwsh
         run: |
-          ./package-windows.ps1 -Version $env:ZQ_UPGRADE_VERSION
+          ./package-windows.ps1 -Version $env:ZQ_UPGRADE_VERSION *>&1 | Tee-Object -FilePath "$env:RUNNER_TEMP/ci-logs/4-package-upgrade.log"
           Move-Item artifacts/release artifacts/release-upgrade
 
       - name: Free port 5432 (stop the runner's PostgreSQL)
@@ -83,7 +87,7 @@ jobs:
 
       - name: Installer acceptance suite
         shell: pwsh
-        run: ./tests/installer/Invoke-InstallerAcceptance.ps1 -Bundle "$PWD/artifacts/release-main/Zentriq-Setup-x64.exe" -UpgradeBundle "$PWD/artifacts/release-upgrade/Zentriq-Setup-x64.exe" -OutDir "$env:RUNNER_TEMP/acceptance"
+        run: ./tests/installer/Invoke-InstallerAcceptance.ps1 -Bundle "$PWD/artifacts/release-main/Zentriq-Setup-x64.exe" -UpgradeBundle "$PWD/artifacts/release-upgrade/Zentriq-Setup-x64.exe" -OutDir "$env:RUNNER_TEMP/acceptance" *>&1 | Tee-Object -FilePath "$env:RUNNER_TEMP/ci-logs/5-acceptance.log"
 
       - name: Summary
         if: always()
@@ -117,3 +121,23 @@ jobs:
           Copy-Item artifacts/test-results/summary.txt artifacts/release-main/unit-test-summary.txt -ErrorAction SilentlyContinue
           $notes = "Automated build $($env:GITHUB_SHA). Unsigned unless a signing certificate is configured. Acceptance results attached (installer-test-results.md)."
           gh release create $tag --prerelease --title "Zentriq $($env:ZQ_VERSION) (build $($env:GITHUB_RUN_NUMBER))" --notes $notes --target $env:GITHUB_SHA (Get-ChildItem artifacts/release-main -File).FullName
+
+      - name: Push logs and reports to the ci-logs branch
+        if: always()
+        shell: pwsh
+        run: |
+          # Logs/reports are also pushed to git so they can be read without access to the Actions log storage.
+          $d = Join-Path $env:RUNNER_TEMP 'ci-logs-repo'
+          New-Item -ItemType Directory -Force -Path $d | Out-Null
+          Copy-Item "$env:RUNNER_TEMP/ci-logs/*" $d -ErrorAction SilentlyContinue
+          if (Test-Path artifacts/test-results) { Copy-Item artifacts/test-results $d -Recurse }
+          if (Test-Path "$env:RUNNER_TEMP/acceptance") { Copy-Item "$env:RUNNER_TEMP/acceptance" $d -Recurse -Exclude '*.zbak' }
+          foreach ($f in 'artifacts/release-main/release-manifest.json', 'artifacts/release-main/SHA256SUMS.txt', 'artifacts/prereqs/prereqs.lock.json') { if (Test-Path $f) { Copy-Item $f $d } }
+          Get-ChildItem installer -Recurse -Filter '*.log' -ErrorAction SilentlyContinue | Copy-Item -Destination $d
+          "run $env:GITHUB_RUN_ID attempt $env:GITHUB_RUN_ATTEMPT commit $env:GITHUB_SHA job status ${{ job.status }}" | Set-Content (Join-Path $d 'RUN.txt')
+          Push-Location $d
+          git init -q -b ci-logs
+          git config user.name 'zentriq-ci'; git config user.email 'ci@zentriq.invalid'
+          git add -A; git commit -q -m "CI logs for run $env:GITHUB_RUN_ID"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ci-logs
+          Pop-Location
