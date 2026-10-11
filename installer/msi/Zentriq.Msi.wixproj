@@ -1,0 +1,26 @@
+<Project Sdk="WixToolset.Sdk/5.0.2">
+  <!--
+    WiX Toolset 5.0.2 is pinned deliberately: WiX 6 and 7 binaries are distributed under the Open Source
+    Maintenance Fee EULA (paid use for revenue-generating organizations). See docs/licensing.md.
+    Built by package-windows.ps1, which stages the published binaries and passes the paths below.
+  -->
+  <PropertyGroup>
+    <OutputName>Zentriq</OutputName>
+    <OutputType>Package</OutputType>
+    <Platform Condition="'$(Platform)' == ''">x64</Platform>
+    <InstallerPlatform>x64</InstallerPlatform>
+    <Cultures>en-US</Cultures>
+    <ProductVersion Condition="'$(ProductVersion)' == ''">1.0.0</ProductVersion>
+    <StagingDir Condition="'$(StagingDir)' == ''">$(MSBuildThisFileDirectory)..\..\artifacts\staging</StagingDir>
+    <AssetsDir>$(MSBuildThisFileDirectory)..\assets</AssetsDir>
+    <CustomActionDll Condition="'$(CustomActionDll)' == ''">$(MSBuildThisFileDirectory)..\..\artifacts\customactions\Zentriq.CustomActions.CA.dll</CustomActionDll>
+    <DefineConstants>ProductVersion=$(ProductVersion);StagingDir=$(StagingDir);AssetsDir=$(AssetsDir);CustomActionDll=$(CustomActionDll)</DefineConstants>
+    <OutputPath>$(MSBuildThisFileDirectory)..\..\artifacts\msi\</OutputPath>
+    <IntermediateOutputPath>$(MSBuildThisFileDirectory)obj\</IntermediateOutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="WixToolset.UI.wixext" Version="5.0.2" />
+    <PackageReference Include="WixToolset.Util.wixext" Version="5.0.2" />
+    <PackageReference Include="WixToolset.Firewall.wixext" Version="5.0.2" />
+  </ItemGroup>
+</Project>

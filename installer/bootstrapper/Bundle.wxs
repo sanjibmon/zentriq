@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Zentriq-Setup-x64.exe — offline bootstrapper (WiX Burn, 64-bit engine).
+
+  Chain:
+    1. Microsoft Visual C++ 2015-2022 Redistributable (x64)   prerequisite of PostgreSQL; skipped if present
+    2. Zentriq.msi                                            shows its own wizard (internal UI)
+       + payload prereqs\postgresql-<pinned>-windows-x64.exe  cached next to the MSI; zentriqctl runs it
+                                                              with the documented unattended options
+
+  The internal-UI bootstrapper installs the prerequisite first and then hands over to the MSI wizard, so
+  there is one license page and one set of questions. Silent install:
+     Zentriq-Setup-x64.exe /quiet /norestart /log setup.log ZQ_ANSWERFILE=C:\path\answers.json
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:bal="http://wixtoolset.org/schemas/v4/wxs/bal"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+
+  <Bundle Name="Zentriq Console"
+          Manufacturer="Zentriq"
+          Version="$(var.ProductVersion)"
+          UpgradeCode="6F1919F9-1BBA-47F1-B7FE-A85266ABE7D6"
+          IconSourceFile="$(var.AssetsDir)\zentriq.ico"
+          SplashScreenSourceFile="$(var.AssetsDir)\splash.bmp"
+          Compressed="yes"
+          bal:CommandLineVariables="caseInsensitive">
+
+    <Log Prefix="Zentriq-Setup" Extension="log" />
+
+    <BootstrapperApplication>
+      <bal:WixInternalUIBootstrapperApplication LogoFile="$(var.AssetsDir)\logo64.png" />
+    </BootstrapperApplication>
+
+    <bal:Condition Message="Zentriq requires a 64-bit edition of Windows Server 2019 (build 17763) or later."
+                   Condition="VersionNT64 AND WindowsBuildNumber &gt;= 17763" />
+
+    <Variable Name="ZQ_ANSWERFILE" Value="" bal:Overridable="yes" />
+
+    <util:RegistrySearch Id="VcRuntimeInstalledSearch" Variable="VcRuntimeInstalled" Result="value"
+                         Root="HKLM" Key="SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64" Value="Installed" Bitness="always64" />
+    <util:RegistrySearch Id="VcRuntimeBuildSearch" Variable="VcRuntimeBld" Result="value" After="VcRuntimeInstalledSearch"
+                         Root="HKLM" Key="SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64" Value="Bld" Bitness="always64" />
+
+    <Chain>
+      <ExePackage Id="VcRedistX64"
+                  DisplayName="Microsoft Visual C++ 2015-2022 Redistributable (x64)"
+                  SourceFile="$(var.PrereqDir)\vc_redist.x64.exe"
+                  Name="prereqs\vc_redist.x64.exe"
+                  PerMachine="yes" Permanent="yes" Vital="yes"
+                  InstallArguments="/install /quiet /norestart"
+                  DetectCondition="VcRuntimeInstalled = 1 AND VcRuntimeBld &gt;= $(var.VcRedistMinBuild)">
+        <ExitCode Value="1638" Behavior="success" />
+        <ExitCode Value="3010" Behavior="scheduleReboot" />
+      </ExePackage>
+
+      <MsiPackage Id="ZentriqMsi" SourceFile="$(var.MsiPath)" Vital="yes">
+        <MsiProperty Name="ZQ_FROM_BUNDLE" Value="1" />
+        <MsiProperty Name="ZQ_ANSWERFILE" Value="[ZQ_ANSWERFILE]" />
+        <Payload Id="PostgresInstaller" SourceFile="$(var.PrereqDir)\$(var.PgInstallerName)" Name="prereqs\$(var.PgInstallerName)" />
+      </MsiPackage>
+    </Chain>
+  </Bundle>
+</Wix>

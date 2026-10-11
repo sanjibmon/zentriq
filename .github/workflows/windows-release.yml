@@ -1,0 +1,119 @@
+name: windows-release
+
+# One job on a fresh GitHub-hosted Windows Server 2022 VM:
+#   build -> unit + PostgreSQL integration tests -> package 1.0.0 and 1.0.1 -> install 1.0.0 silently and run
+#   the acceptance suite (verify, restart, repair, backup, license rejection, upgrade to 1.0.1, uninstall,
+#   reinstall) -> publish the installers as a GitHub pre-release (installers are ~500 MB each, too large for
+#   the artifact quota) and upload the test reports as artifacts.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write   # create the pre-release with the installers
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: '1'
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  NUGET_XMLDOC_MODE: skip
+  ZQ_VERSION: '1.0.0'
+  ZQ_UPGRADE_VERSION: '1.0.1'
+
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Start the runner's PostgreSQL for integration tests
+        shell: pwsh
+        run: |
+          # GitHub Windows images include PostgreSQL (service disabled; user postgres / password root).
+          # Used only by the database integration tests; stopped before the installer test.
+          Get-ChildItem 'HKLM:\SOFTWARE\PostgreSQL\Installations' -ErrorAction SilentlyContinue | ForEach-Object { Get-ItemProperty $_.PSPath | Select-Object PSChildName, Version, 'Base Directory' | Format-List | Out-String | Write-Host }
+          $svc = Get-Service -Name 'postgresql*' | Select-Object -First 1
+          if (-not $svc) { Write-Warning 'No PostgreSQL on this runner; DB integration tests will be skipped.'; exit 0 }
+          Set-Service $svc.Name -StartupType Manual
+          Start-Service $svc.Name
+          Write-Host "Started $($svc.Name)"
+          "ZENTRIQ_TEST_PG=Host=localhost;Port=5432;Username=postgres;Password=root" | Out-File $env:GITHUB_ENV -Append
+          "RUNNER_PG_SERVICE=$($svc.Name)" | Out-File $env:GITHUB_ENV -Append
+
+      - name: Build
+        shell: pwsh
+        run: ./build.ps1 -Version $env:ZQ_VERSION
+
+      - name: Test
+        shell: pwsh
+        run: ./test.ps1 -NoBuild
+
+      - name: Package release
+        shell: pwsh
+        run: |
+          ./package-windows.ps1 -Version $env:ZQ_VERSION
+          Move-Item artifacts/release artifacts/release-main
+          Get-Content artifacts/prereqs/prereqs.lock.json
+
+      - name: Package upgrade target
+        shell: pwsh
+        run: |
+          ./package-windows.ps1 -Version $env:ZQ_UPGRADE_VERSION
+          Move-Item artifacts/release artifacts/release-upgrade
+
+      - name: Free port 5432 (stop the runner's PostgreSQL)
+        shell: pwsh
+        run: |
+          if ($env:RUNNER_PG_SERVICE) { Stop-Service $env:RUNNER_PG_SERVICE -Force; Set-Service $env:RUNNER_PG_SERVICE -StartupType Disabled }
+          Get-NetTCPConnection -LocalPort 5432 -State Listen -ErrorAction SilentlyContinue | Format-Table | Out-String | Write-Host
+
+      - name: Installer acceptance suite
+        shell: pwsh
+        run: ./tests/installer/Invoke-InstallerAcceptance.ps1 -Bundle "$PWD/artifacts/release-main/Zentriq-Setup-x64.exe" -UpgradeBundle "$PWD/artifacts/release-upgrade/Zentriq-Setup-x64.exe" -OutDir "$env:RUNNER_TEMP/acceptance"
+
+      - name: Summary
+        if: always()
+        shell: pwsh
+        run: |
+          $md = Join-Path $env:RUNNER_TEMP 'acceptance/installer-test-results.md'
+          if (Test-Path $md) { Get-Content $md | Out-File $env:GITHUB_STEP_SUMMARY -Append; Get-Content $md }
+          $s = 'artifacts/test-results/summary.txt'
+          if (Test-Path $s) { "`n**Unit/integration tests:** $(Get-Content $s)" | Out-File $env:GITHUB_STEP_SUMMARY -Append }
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-reports
+          retention-days: 14
+          path: |
+            artifacts/test-results
+            ${{ runner.temp }}/acceptance
+            artifacts/release-main/release-manifest.json
+            artifacts/release-main/SHA256SUMS.txt
+            artifacts/prereqs/prereqs.lock.json
+
+      - name: Publish pre-release with installers
+        if: success()
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "v$($env:ZQ_VERSION)-build.$($env:GITHUB_RUN_NUMBER)"
+          Copy-Item "$env:RUNNER_TEMP/acceptance/installer-test-results.md" artifacts/release-main/
+          Copy-Item artifacts/test-results/summary.txt artifacts/release-main/unit-test-summary.txt -ErrorAction SilentlyContinue
+          $notes = "Automated build $($env:GITHUB_SHA). Unsigned unless a signing certificate is configured. Acceptance results attached (installer-test-results.md)."
+          gh release create $tag --prerelease --title "Zentriq $($env:ZQ_VERSION) (build $($env:GITHUB_RUN_NUMBER))" --notes $notes --target $env:GITHUB_SHA (Get-ChildItem artifacts/release-main -File).FullName

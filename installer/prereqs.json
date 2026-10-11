@@ -1,0 +1,24 @@
+{
+  "comment": "Third-party installers bundled into Zentriq-Setup-x64.exe. Get-Prerequisites.ps1 downloads them, verifies the Authenticode signature (valid chain + expected publisher) and, when sha256 is set, the exact hash. Pin sha256 after the first verified download (the build prints it) so every later build bundles byte-identical files.",
+  "postgresql": {
+    "product": "PostgreSQL",
+    "version": "17.11-1",
+    "file": "postgresql-17.11-1-windows-x64.exe",
+    "urls": [
+      "https://get.enterprisedb.com/postgresql/postgresql-17.11-1-windows-x64.exe",
+      "https://sbp.enterprisedb.com/getfile.jsp?fileid=1260614"
+    ],
+    "publisher": "EnterpriseDB",
+    "sha256": "",
+    "license": "PostgreSQL License (https://www.postgresql.org/about/licence/); installer by EnterpriseDB"
+  },
+  "vcredist": {
+    "product": "Microsoft Visual C++ 2015-2022 Redistributable (x64)",
+    "version": "latest 14.x",
+    "file": "vc_redist.x64.exe",
+    "urls": [ "https://aka.ms/vs/17/release/vc_redist.x64.exe" ],
+    "publisher": "Microsoft Corporation",
+    "sha256": "",
+    "license": "Microsoft Software License Terms - Visual C++ Redistributable (redistribution permitted)"
+  }
+}

@@ -1,0 +1,15 @@
+# build outputs
+artifacts/
+**/bin/
+**/obj/
+frontend/node_modules/
+frontend/dist/
+*.wixpdb
+TestResults/
+# never commit signing keys or secrets
+*.private.pem
+*.pfx
+*.secrets
+answers*.json
+.vs/
+*.user

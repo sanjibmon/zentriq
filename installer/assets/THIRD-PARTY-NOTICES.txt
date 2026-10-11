@@ -1,0 +1,31 @@
+Zentriq Console - third-party software notices
+==============================================
+
+Zentriq Console includes or installs the following third-party components. Each is licensed under its own terms.
+
+PostgreSQL (installed by Zentriq-Setup-x64.exe using the EnterpriseDB Windows installer)
+  PostgreSQL Database Management System (also known as Postgres, formerly known as Postgres95)
+  Portions Copyright (c) 1996-2026, The PostgreSQL Global Development Group
+  Portions Copyright (c) 1994, The Regents of the University of California
+  Permission to use, copy, modify, and distribute this software and its documentation for any purpose, without fee,
+  and without a written agreement is hereby granted, provided that the above copyright notice and this paragraph and
+  the following two paragraphs appear in all copies. (Full text: https://www.postgresql.org/about/licence/)
+  The EnterpriseDB installer and the libraries it installs (OpenSSL, ICU, zlib, libxml2 and others) are provided
+  under their respective licenses, listed in the PostgreSQL installation folder.
+
+Microsoft .NET runtime and ASP.NET Core (self-contained in the Zentriq program files) - MIT License
+  Copyright (c) .NET Foundation and Contributors. https://github.com/dotnet/runtime/blob/main/LICENSE.TXT
+
+Entity Framework Core - MIT License, Copyright (c) .NET Foundation and Contributors.
+
+Npgsql and Npgsql.EntityFrameworkCore.PostgreSQL - PostgreSQL License
+  Copyright (c) 2002-2026, Npgsql. https://github.com/npgsql/npgsql/blob/main/LICENSE
+
+Microsoft Visual C++ 2015-2022 Redistributable (x64) - Microsoft Software License Terms
+  Installed as a prerequisite of PostgreSQL. https://visualstudio.microsoft.com/license-terms/
+
+WiX Toolset 5.0.2 (installer runtime components: Burn engine, internal-UI bootstrapper, UI/Util/Firewall
+  custom actions) - Microsoft Reciprocal License (MS-RL). https://github.com/wixtoolset/wix
+  Copyright (c) .NET Foundation and contributors.
+
+Web console third-party packages: see the licenses bundled with frontend/dist (generated at build time).

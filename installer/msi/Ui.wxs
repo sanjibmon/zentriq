@@ -1,0 +1,270 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Zentriq installation wizard (based on the WixUI_InstallDir dialog set):
+    1 Welcome  2 License
+    3 System check  4 Folders  5 Database  6 HTTPS & firewall  7 Administrator
+    8 Ready  9 Progress (zentriqctl: PostgreSQL, database, migrations, HTTPS, services, admin, trial, health)
+   10 Finish (opens the console)
+  Pages 5-7 are skipped when existing Zentriq data is found (repair/upgrade reuse the saved settings).
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Fragment>
+    <WixVariable Id="WixUILicenseRtf" Value="$(var.AssetsDir)\License.rtf" />
+    <WixVariable Id="WixUIBannerBmp" Value="$(var.AssetsDir)\WixUIBanner.bmp" />
+    <WixVariable Id="WixUIDialogBmp" Value="$(var.AssetsDir)\WixUIDialog.bmp" />
+
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Open the Zentriq Console now" />
+
+    <UI Id="ZentriqUI">
+      <TextStyle Id="WixUI_Font_Normal" FaceName="Segoe UI" Size="8" />
+      <TextStyle Id="WixUI_Font_Bigger" FaceName="Segoe UI" Size="12" />
+      <TextStyle Id="WixUI_Font_Title" FaceName="Segoe UI" Size="9" Bold="yes" />
+      <TextStyle Id="ZQ_Font_Mono" FaceName="Consolas" Size="8" />
+      <Property Id="DefaultUIFont" Value="WixUI_Font_Normal" />
+      <Property Id="WixUI_Mode" Value="InstallDir" />
+
+      <DialogRef Id="BrowseDlg" />
+      <DialogRef Id="DiskCostDlg" />
+      <DialogRef Id="ErrorDlg" />
+      <DialogRef Id="FatalError" />
+      <DialogRef Id="FilesInUse" />
+      <DialogRef Id="MsiRMFilesInUse" />
+      <DialogRef Id="PrepareDlg" />
+      <DialogRef Id="ProgressDlg" />
+      <DialogRef Id="ResumeDlg" />
+      <DialogRef Id="UserExit" />
+
+      <ProgressText Action="ZqProvision" Message="Configuring Zentriq (PostgreSQL, database, HTTPS, services, verification)" Template="[1]" />
+      <ProgressText Action="ZqUninstallCleanup" Message="Removing Zentriq scheduled tasks" />
+
+      <Publish Dialog="LicenseAgreementDlg" Control="Print" Event="DoAction" Value="WixUIPrintEula_X64" />
+      <Publish Dialog="BrowseDlg" Control="OK" Event="DoAction" Value="WixUIValidatePath_X64" Order="3" Condition="NOT WIXUI_DONTVALIDATEPATH" />
+      <Publish Dialog="BrowseDlg" Control="OK" Event="SpawnDialog" Value="InvalidDirDlg" Order="4" Condition='NOT WIXUI_DONTVALIDATEPATH AND WIXUI_INSTALLDIR_VALID &lt;&gt; "1"' />
+
+      <!-- Welcome / License -->
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="LicenseAgreementDlg" Condition="NOT Installed" />
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" Condition="Installed AND PATCH" />
+
+      <Publish Dialog="LicenseAgreementDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" />
+      <Publish Dialog="LicenseAgreementDlg" Control="Next" Event="DoAction" Value="ZqCheckPrerequisites" Order="1" Condition='LicenseAccepted = "1"' />
+      <Publish Dialog="LicenseAgreementDlg" Control="Next" Event="NewDialog" Value="ZqPrereqDlg" Order="2" Condition='LicenseAccepted = "1"' />
+
+      <!-- Ready / maintenance -->
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="ZqAdminDlg" Order="1" Condition="NOT Installed AND NOT ZQ_EXISTING" />
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="ZqFoldersDlg" Order="1" Condition="NOT Installed AND ZQ_EXISTING" />
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="MaintenanceTypeDlg" Order="2" Condition="Installed AND NOT PATCH" />
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" Order="2" Condition="Installed AND PATCH" />
+
+      <Publish Dialog="MaintenanceWelcomeDlg" Control="Next" Event="NewDialog" Value="MaintenanceTypeDlg" />
+      <Publish Dialog="MaintenanceTypeDlg" Control="RepairButton" Event="NewDialog" Value="VerifyReadyDlg" />
+      <Publish Dialog="MaintenanceTypeDlg" Control="RemoveButton" Event="NewDialog" Value="VerifyReadyDlg" />
+      <Publish Dialog="MaintenanceTypeDlg" Control="Back" Event="NewDialog" Value="MaintenanceWelcomeDlg" />
+
+      <!-- Finish -->
+      <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="ZqOpenConsole" Order="1"
+               Condition='WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed AND NOT (REMOVE = "ALL")' />
+      <Publish Dialog="ExitDialog" Control="Finish" Event="EndDialog" Value="Return" Order="999" />
+
+      <!-- ===== 3. System check ========================================================== -->
+      <Dialog Id="ZqPrereqDlg" Width="370" Height="270" Title="[ProductName] Setup">
+        <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="WixUI_Bmp_Banner" />
+        <Control Id="Title" Type="Text" X="15" Y="6" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Text="{\WixUI_Font_Title}System check" />
+        <Control Id="Description" Type="Text" X="25" Y="23" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Text="Setup checked this server against the Zentriq requirements." />
+        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+        <Control Id="Report" Type="Text" X="20" Y="54" Width="330" Height="150" NoPrefix="yes" Text="{\ZQ_Font_Mono}[ZQ_PREREQ_TEXT]" />
+        <Control Id="Blocked" Type="Text" X="20" Y="208" Width="330" Height="22" NoPrefix="yes" HideCondition='ZQ_PREREQ_BLOCK &lt;&gt; "1"' ShowCondition='ZQ_PREREQ_BLOCK = "1"'
+                 Text="Setup cannot continue until the items marked FAIL are resolved. Fix them and click Re-check." />
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+        <Control Id="Recheck" Type="PushButton" X="20" Y="243" Width="64" Height="17" Text="&amp;Re-check">
+          <Publish Event="DoAction" Value="ZqCheckPrerequisites" Order="1" />
+          <Publish Event="NewDialog" Value="ZqPrereqDlg" Order="2" />
+        </Control>
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)">
+          <Publish Event="NewDialog" Value="LicenseAgreementDlg" />
+        </Control>
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)"
+                 DisableCondition='ZQ_PREREQ_BLOCK = "1"' EnableCondition='ZQ_PREREQ_BLOCK &lt;&gt; "1"'>
+          <Publish Event="NewDialog" Value="ZqFoldersDlg" />
+        </Control>
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
+          <Publish Event="SpawnDialog" Value="CancelDlg" />
+        </Control>
+      </Dialog>
+
+      <!-- ===== 4. Folders =============================================================== -->
+      <Dialog Id="ZqFoldersDlg" Width="370" Height="270" Title="[ProductName] Setup">
+        <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="WixUI_Bmp_Banner" />
+        <Control Id="Title" Type="Text" X="15" Y="6" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Text="{\WixUI_Font_Title}Installation and data folders" />
+        <Control Id="Description" Type="Text" X="25" Y="23" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Text="Program files and customer data are kept in separate folders." />
+        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+        <Control Id="ProgLabel" Type="Text" X="20" Y="56" Width="330" Height="12" NoPrefix="yes" Text="Program files (replaced on upgrade):" />
+        <Control Id="Folder" Type="PathEdit" X="20" Y="70" Width="270" Height="18" Property="WIXUI_INSTALLDIR" Indirect="yes" />
+        <Control Id="ChangeFolder" Type="PushButton" X="295" Y="70" Width="56" Height="17" Text="!(loc.InstallDirDlgChange)">
+          <Publish Property="_BrowseProperty" Value="[WIXUI_INSTALLDIR]" Order="1" />
+          <Publish Event="SpawnDialog" Value="BrowseDlg" Order="2" />
+        </Control>
+        <Control Id="DataLabel" Type="Text" X="20" Y="98" Width="330" Height="12" NoPrefix="yes" Text="Data folder (configuration, protected secrets, logs, packages, exports, backups):" />
+        <Control Id="DataEdit" Type="Edit" X="20" Y="112" Width="330" Height="18" Property="DATAFOLDER" Text="{240}"
+                 DisableCondition="ZQ_EXISTING" EnableCondition="NOT ZQ_EXISTING" />
+        <Control Id="DataNote" Type="Text" X="20" Y="136" Width="330" Height="40" NoPrefix="yes"
+                 Text="Data is never deleted by upgrade, repair or uninstall. Access to the Secrets folder is limited to SYSTEM, Administrators and the Zentriq services. Choose a volume with room for backups." />
+        <Control Id="ExistingNote" Type="Text" X="20" Y="180" Width="330" Height="40" NoPrefix="yes" HideCondition="NOT ZQ_EXISTING" ShowCondition="ZQ_EXISTING"
+                 Text="Existing Zentriq data was found in this folder. Setup will keep it, reuse the saved database and HTTPS settings, take a backup before upgrading the database and skip the remaining configuration pages." />
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)">
+          <Publish Event="NewDialog" Value="ZqPrereqDlg" />
+        </Control>
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)">
+          <Publish Event="SetTargetPath" Value="[WIXUI_INSTALLDIR]" Order="1" />
+          <Publish Event="DoAction" Value="WixUIValidatePath_X64" Order="2" Condition="NOT WIXUI_DONTVALIDATEPATH" />
+          <Publish Event="SpawnDialog" Value="InvalidDirDlg" Order="3" Condition='NOT WIXUI_DONTVALIDATEPATH AND WIXUI_INSTALLDIR_VALID &lt;&gt; "1"' />
+          <Publish Event="NewDialog" Value="ZqDatabaseDlg" Order="4" Condition='NOT ZQ_EXISTING AND (WIXUI_DONTVALIDATEPATH OR WIXUI_INSTALLDIR_VALID = "1")' />
+          <Publish Event="NewDialog" Value="VerifyReadyDlg" Order="5" Condition='ZQ_EXISTING AND (WIXUI_DONTVALIDATEPATH OR WIXUI_INSTALLDIR_VALID = "1")' />
+        </Control>
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
+          <Publish Event="SpawnDialog" Value="CancelDlg" />
+        </Control>
+      </Dialog>
+
+      <!-- ===== 5. Database ============================================================== -->
+      <Dialog Id="ZqDatabaseDlg" Width="370" Height="270" Title="[ProductName] Setup">
+        <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="WixUI_Bmp_Banner" />
+        <Control Id="Title" Type="Text" X="15" Y="6" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Text="{\WixUI_Font_Title}PostgreSQL database" />
+        <Control Id="Description" Type="Text" X="25" Y="23" Width="300" Height="15" Transparent="yes" NoPrefix="yes" Text="Install PostgreSQL 17 on this server, or use an existing server." />
+        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+        <Control Id="Mode" Type="RadioButtonGroup" X="20" Y="50" Width="330" Height="32" Property="PGMODE">
+          <RadioButtonGroup Property="PGMODE">
+            <RadioButton Value="bundled" X="0" Y="0" Width="330" Height="15" Text="Install PostgreSQL 17 on this server (recommended)" />
+            <RadioButton Value="existing" X="0" Y="16" Width="330" Height="15" Text="Use an existing PostgreSQL server (version 14 to 18)" />
+          </RadioButtonGroup>
+        </Control>
+
+        <Control Id="PortLabel" Type="Text" X="20" Y="90" Width="80" Height="12" NoPrefix="yes" Text="Port:" />
+        <Control Id="PortEdit" Type="Edit" X="105" Y="88" Width="50" Height="17" Property="PGPORT" Text="{5}" />
+
+        <Control Id="DataLabel" Type="Text" X="20" Y="112" Width="80" Height="12" NoPrefix="yes" Text="Data folder:" HideCondition='PGMODE = "existing"' ShowCondition='PGMODE = "bundled"' />
+        <Control Id="DataEdit" Type="Edit" X="105" Y="110" Width="245" Height="17" Property="PGDATADIR" Text="{240}" HideCondition='PGMODE = "existing"' ShowCondition='PGMODE = "bundled"' />
+        <Control Id="BundledNote" Type="Text" X="20" Y="134" Width="330" Height="70" NoPrefix="yes" HideCondition='PGMODE = "existing"' ShowCondition='PGMODE = "bundled"'
+                 Text="The data folder can be on a separate volume. PostgreSQL listens on this server only. Zentriq generates and protects all database passwords (superuser, owner and application roles); you never need to type them, and the application never uses the superuser account." />
+
+        <Control Id="HostLabel" Type="Text" X="20" Y="112" Width="80" Height="12" NoPrefix="yes" Text="Server:" HideCondition='PGMODE = "bundled"' ShowCondition='PGMODE = "existing"' />
+        <Control Id="HostEdit" Type="Edit" X="105" Y="110" Width="245" Height="17" Property="PGHOST" Text="{253}" HideCondition='PGMODE = "bundled"' ShowCondition='PGMODE = "existing"' />
+        <Control Id="UserLabel" Type="Text" X="20" Y="134" Width="80" Height="12" NoPrefix="yes" Text="Admin user:" HideCondition='PGMODE = "bundled"' ShowCondition='PGMODE = "existing"' />
+        <Control Id="UserEdit" Type="Edit" X="105" Y="132" Width="150" Height="17" Property="PGSUPERUSER" Text="{63}" HideCondition='PGMODE = "bundled"' ShowCondition='PGMODE = "existing"' />
+        <Control Id="PwLabel" Type="Text" X="20" Y="156" Width="80" Height="12" NoPrefix="yes" Text="Password:" HideCondition='PGMODE = "bundled"' ShowCondition='PGMODE = "existing"' />
+        <Control Id="PwEdit" Type="Edit" X="105" Y="154" Width="150" Height="17" Property="PGSUPERPASSWORD" Password="yes" Text="{128}" HideCondition='PGMODE = "bundled"' ShowCondition='PGMODE = "existing"' />
+        <Control Id="ExistingNote" Type="Text" X="20" Y="178" Width="330" Height="50" NoPrefix="yes" HideCondition='PGMODE = "bundled"' ShowCondition='PGMODE = "existing"'
+                 Text="The admin user needs CREATEROLE and CREATEDB. It is used once to create the zentriq database and two least-privilege roles, and is not stored. Allow this server in pg_hba.conf (scram-sha-256)." />
+
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)">
+          <Publish Event="NewDialog" Value="ZqFoldersDlg" />
+        </Control>
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)">
+          <Publish Event="DoAction" Value="ZqValidateDatabase" Order="1" />
+          <Publish Event="SpawnDialog" Value="ZqMessageDlg" Order="2" Condition="ZQ_VALIDATION_ERROR" />
+          <Publish Event="NewDialog" Value="ZqHttpsDlg" Order="3" Condition="NOT ZQ_VALIDATION_ERROR" />
+        </Control>
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
+          <Publish Event="SpawnDialog" Value="CancelDlg" />
+        </Control>
+      </Dialog>
+
+      <!-- ===== 6. HTTPS and firewall ==================================================== -->
+      <Dialog Id="ZqHttpsDlg" Width="370" Height="270" Title="[ProductName] Setup">
+        <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="WixUI_Bmp_Banner" />
+        <Control Id="Title" Type="Text" X="15" Y="6" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Text="{\WixUI_Font_Title}HTTPS and network access" />
+        <Control Id="Description" Type="Text" X="25" Y="23" Width="300" Height="15" Transparent="yes" NoPrefix="yes" Text="How users will reach the Zentriq Console." />
+        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+        <Control Id="HostLabel" Type="Text" X="20" Y="56" Width="80" Height="12" NoPrefix="yes" Text="Host name:" />
+        <Control Id="HostEdit" Type="Edit" X="105" Y="54" Width="245" Height="17" Property="HTTPSHOSTNAME" Text="{253}" />
+        <Control Id="PortLabel" Type="Text" X="20" Y="78" Width="80" Height="12" NoPrefix="yes" Text="HTTPS port:" />
+        <Control Id="PortEdit" Type="Edit" X="105" Y="76" Width="50" Height="17" Property="HTTPSPORT" Text="{5}" />
+        <Control Id="CertMode" Type="RadioButtonGroup" X="20" Y="100" Width="330" Height="32" Property="CERTMODE">
+          <RadioButtonGroup Property="CERTMODE">
+            <RadioButton Value="selfsigned" X="0" Y="0" Width="330" Height="15" Text="Create a self-signed certificate (replace it later from Settings)" />
+            <RadioButton Value="existing" X="0" Y="16" Width="330" Height="15" Text="Use a certificate from Local Computer\Personal (thumbprint):" />
+          </RadioButtonGroup>
+        </Control>
+        <Control Id="ThumbEdit" Type="Edit" X="35" Y="134" Width="315" Height="17" Property="CERTTHUMBPRINT" Text="{64}"
+                 DisableCondition='CERTMODE &lt;&gt; "existing"' EnableCondition='CERTMODE = "existing"' />
+        <Control Id="FwLabel" Type="Text" X="20" Y="160" Width="330" Height="12" NoPrefix="yes" Text="Windows Firewall rule for the HTTPS port:" />
+        <Control Id="Firewall" Type="RadioButtonGroup" X="20" Y="173" Width="330" Height="48" Property="FIREWALLSCOPE">
+          <RadioButtonGroup Property="FIREWALLSCOPE">
+            <RadioButton Value="any" X="0" Y="0" Width="330" Height="15" Text="Allow from any network" />
+            <RadioButton Value="localsubnet" X="0" Y="16" Width="330" Height="15" Text="Allow from the local subnet only" />
+            <RadioButton Value="none" X="0" Y="32" Width="330" Height="15" Text="Do not create a rule (I manage the firewall myself)" />
+          </RadioButtonGroup>
+        </Control>
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)">
+          <Publish Event="NewDialog" Value="ZqDatabaseDlg" />
+        </Control>
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)">
+          <Publish Event="DoAction" Value="ZqValidateHttps" Order="1" />
+          <Publish Event="SpawnDialog" Value="ZqMessageDlg" Order="2" Condition="ZQ_VALIDATION_ERROR" />
+          <Publish Event="NewDialog" Value="ZqAdminDlg" Order="3" Condition="NOT ZQ_VALIDATION_ERROR" />
+        </Control>
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
+          <Publish Event="SpawnDialog" Value="CancelDlg" />
+        </Control>
+      </Dialog>
+
+      <!-- ===== 7. Administrator ========================================================= -->
+      <Dialog Id="ZqAdminDlg" Width="370" Height="270" Title="[ProductName] Setup">
+        <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="WixUI_Bmp_Banner" />
+        <Control Id="Title" Type="Text" X="15" Y="6" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Text="{\WixUI_Font_Title}First administrator" />
+        <Control Id="Description" Type="Text" X="25" Y="23" Width="300" Height="15" Transparent="yes" NoPrefix="yes" Text="This account signs in to the console and manages users and licensing." />
+        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+        <Control Id="OrgLabel" Type="Text" X="20" Y="58" Width="85" Height="12" NoPrefix="yes" Text="Organization:" />
+        <Control Id="OrgEdit" Type="Edit" X="110" Y="56" Width="240" Height="17" Property="ADMINORG" Text="{200}" />
+        <Control Id="NameLabel" Type="Text" X="20" Y="80" Width="85" Height="12" NoPrefix="yes" Text="Display name:" />
+        <Control Id="NameEdit" Type="Edit" X="110" Y="78" Width="240" Height="17" Property="ADMINNAME" Text="{120}" />
+        <Control Id="EmailLabel" Type="Text" X="20" Y="102" Width="85" Height="12" NoPrefix="yes" Text="Sign-in e-mail:" />
+        <Control Id="EmailEdit" Type="Edit" X="110" Y="100" Width="240" Height="17" Property="ADMINEMAIL" Text="{254}" />
+        <Control Id="PwLabel" Type="Text" X="20" Y="124" Width="85" Height="12" NoPrefix="yes" Text="Password:" />
+        <Control Id="PwEdit" Type="Edit" X="110" Y="122" Width="240" Height="17" Property="ADMINPASSWORD" Password="yes" Text="{256}" />
+        <Control Id="Pw2Label" Type="Text" X="20" Y="146" Width="85" Height="12" NoPrefix="yes" Text="Confirm password:" />
+        <Control Id="Pw2Edit" Type="Edit" X="110" Y="144" Width="240" Height="17" Property="ADMINPASSWORD2" Password="yes" Text="{256}" />
+        <Control Id="PolicyNote" Type="Text" X="20" Y="168" Width="330" Height="60" NoPrefix="yes"
+                 Text="At least 12 characters with three of: upper-case, lower-case, digits, symbols. The password is sent directly to the Zentriq service and stored only as a salted hash. Completing setup starts the 14-day trial with all modules enabled." />
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)">
+          <Publish Event="NewDialog" Value="ZqHttpsDlg" />
+        </Control>
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)">
+          <Publish Event="DoAction" Value="ZqValidateAdmin" Order="1" />
+          <Publish Event="SpawnDialog" Value="ZqMessageDlg" Order="2" Condition="ZQ_VALIDATION_ERROR" />
+          <Publish Event="NewDialog" Value="VerifyReadyDlg" Order="3" Condition="NOT ZQ_VALIDATION_ERROR" />
+        </Control>
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
+          <Publish Event="SpawnDialog" Value="CancelDlg" />
+        </Control>
+      </Dialog>
+
+      <!-- Validation message -->
+      <Dialog Id="ZqMessageDlg" Width="270" Height="110" Title="[ProductName] Setup" Modal="yes">
+        <Control Id="Icon" Type="Icon" X="15" Y="15" Width="24" Height="24" FixedSize="yes" IconSize="32" Text="WixUI_Ico_Exclam" />
+        <Control Id="Text" Type="Text" X="50" Y="15" Width="205" Height="60" NoPrefix="yes" Text="[ZQ_VALIDATION_ERROR]" />
+        <Control Id="OK" Type="PushButton" X="107" Y="82" Width="56" Height="17" Default="yes" Cancel="yes" Text="!(loc.WixUIOK)">
+          <Publish Event="EndDialog" Value="Return" />
+        </Control>
+      </Dialog>
+
+    </UI>
+
+    <CustomAction Id="ZqSetExitTextInstall" Property="WIXUI_EXITDIALOGOPTIONALTEXT"
+                  Value="Zentriq is installed and verified. Open [ZQ_URL] and sign in with the administrator account. Logs and the installation report are in [DATAFOLDER]\Logs." />
+    <CustomAction Id="ZqSetExitTextRemove" Property="WIXUI_EXITDIALOGOPTIONALTEXT"
+                  Value="Zentriq was removed. Your data in [DATAFOLDER] and the PostgreSQL database were kept. See the administrator guide for complete removal." />
+
+    <InstallUISequence>
+      <Custom Action="ZqSetExitTextInstall" Before="ExecuteAction" Condition="NOT Installed" />
+      <Custom Action="ZqSetExitTextRemove" Before="ExecuteAction" Condition='Installed AND REMOVE = "ALL"' />
+    </InstallUISequence>
+
+    <UIRef Id="WixUI_Common" />
+  </Fragment>
+</Wix>

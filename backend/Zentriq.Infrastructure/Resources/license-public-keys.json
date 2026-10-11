@@ -1,0 +1,11 @@
+{
+  "_comment": "License VERIFICATION keys trusted by this build. Public keys only. Replace the development key with your production key before shipping (see docs/licensing.md).",
+  "keys": [
+    {
+      "keyId": "zentriq-dev-2026-10",
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE4sDdddoJzSpvwusNbdPwWMzCbziD\n5xcJNyZm0QMCc3j9BOsnmJj/viiZThvEiuP4UM7fMnKLloUgUAWVP7G4UA==\n-----END PUBLIC KEY-----\n",
+      "notAfter": null,
+      "revoked": false
+    }
+  ]
+}

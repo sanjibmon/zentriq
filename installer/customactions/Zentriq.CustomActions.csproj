@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Windows Installer custom actions (DTF). Built for .NET Framework 4.7.2, which is present on every
+    supported Windows Server release, and packaged by WixToolset.Dtf.CustomAction into
+    Zentriq.CustomActions.CA.dll (self-extracting CA host). The heavy lifting is done by zentriqctl.exe;
+    these actions only check prerequisites, validate wizard input and drive zentriqctl with progress.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <PlatformTarget>x64</PlatformTarget>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <RootNamespace>Zentriq.CustomActions</RootNamespace>
+    <AssemblyName>Zentriq.CustomActions</AssemblyName>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+    <!-- No Directory.Build.props from /backend applies here (different folder tree). -->
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="WixToolset.Dtf.CustomAction" Version="5.0.2" />
+    <PackageReference Include="WixToolset.Dtf.WindowsInstaller" Version="5.0.2" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="System.ServiceProcess" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="CustomAction.config" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

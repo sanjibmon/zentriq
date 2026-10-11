@@ -1,0 +1,16 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="Zentriq.Domain/Zentriq.Domain.csproj" />
+    <Project Path="Zentriq.Application/Zentriq.Application.csproj" />
+    <Project Path="Zentriq.Infrastructure/Zentriq.Infrastructure.csproj" />
+    <Project Path="Zentriq.Api/Zentriq.Api.csproj" />
+    <Project Path="Zentriq.Worker/Zentriq.Worker.csproj" />
+    <Project Path="Zentriq.Setup/Zentriq.Setup.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="Zentriq.Tests/Zentriq.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="../tools/Zentriq.LicenseSigner/Zentriq.LicenseSigner.csproj" />
+  </Folder>
+</Solution>

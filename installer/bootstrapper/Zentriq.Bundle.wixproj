@@ -1,0 +1,23 @@
+<Project Sdk="WixToolset.Sdk/5.0.2">
+  <!-- Built by package-windows.ps1 after Zentriq.msi and the verified prerequisites are in place. -->
+  <PropertyGroup>
+    <OutputName>Zentriq-Setup-x64</OutputName>
+    <OutputType>Bundle</OutputType>
+    <Platform Condition="'$(Platform)' == ''">x64</Platform>
+    <InstallerPlatform>x64</InstallerPlatform>
+    <ProductVersion Condition="'$(ProductVersion)' == ''">1.0.0</ProductVersion>
+    <AssetsDir>$(MSBuildThisFileDirectory)..\assets</AssetsDir>
+    <MsiPath Condition="'$(MsiPath)' == ''">$(MSBuildThisFileDirectory)..\..\artifacts\msi\Zentriq.msi</MsiPath>
+    <PrereqDir Condition="'$(PrereqDir)' == ''">$(MSBuildThisFileDirectory)..\..\artifacts\prereqs</PrereqDir>
+    <PgInstallerName Condition="'$(PgInstallerName)' == ''">postgresql-17.11-1-windows-x64.exe</PgInstallerName>
+    <!-- VC++ 14.x runtime build required by the pinned PostgreSQL build (see installer/prereqs.json). -->
+    <VcRedistMinBuild Condition="'$(VcRedistMinBuild)' == ''">33816</VcRedistMinBuild>
+    <DefineConstants>ProductVersion=$(ProductVersion);AssetsDir=$(AssetsDir);MsiPath=$(MsiPath);PrereqDir=$(PrereqDir);PgInstallerName=$(PgInstallerName);VcRedistMinBuild=$(VcRedistMinBuild)</DefineConstants>
+    <OutputPath>$(MSBuildThisFileDirectory)..\..\artifacts\bundle\</OutputPath>
+    <IntermediateOutputPath>$(MSBuildThisFileDirectory)obj\</IntermediateOutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="WixToolset.BootstrapperApplications.wixext" Version="5.0.2" />
+    <PackageReference Include="WixToolset.Util.wixext" Version="5.0.2" />
+  </ItemGroup>
+</Project>

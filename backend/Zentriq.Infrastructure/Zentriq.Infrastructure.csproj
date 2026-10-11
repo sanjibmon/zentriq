@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Zentriq.Infrastructure</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Zentriq.Application\Zentriq.Application.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Npgsql" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.Extensions.Identity.Core" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Schema migrations are the single source of truth in /database and are embedded here. -->
+    <EmbeddedResource Include="..\..\database\bootstrap.sql" LogicalName="Zentriq.Database.bootstrap.sql" />
+    <EmbeddedResource Include="..\..\database\migrations\V*.sql" LogicalName="Zentriq.Database.Migrations.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Resources\license-public-keys.json" LogicalName="Zentriq.Licensing.PublicKeys.json" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Zentriq.Tests" />
+  </ItemGroup>
+</Project>

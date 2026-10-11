@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    VENDOR-SIDE tool. Never packaged into the customer installer (package-windows.ps1 publishes only the
+    API, Worker and zentriqctl). Private signing keys must stay in the vendor's protected key store.
+  -->
+  <Import Project="..\..\backend\Directory.Build.props" />
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>zentriq-license-signer</AssemblyName>
+    <RootNamespace>Zentriq.LicenseSigner</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\backend\Zentriq.Domain\Zentriq.Domain.csproj" />
+  </ItemGroup>
+</Project>

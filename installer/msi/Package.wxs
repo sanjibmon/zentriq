@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Zentriq.msi — installs the Zentriq API, Worker and zentriqctl, registers the Windows services
+  (virtual service accounts, no passwords), the firewall rule and registry settings, then runs
+  zentriqctl to provision PostgreSQL, the database, HTTPS, the first administrator and the trial.
+  The MSI reports success only if zentriqctl's end-to-end verification passes.
+
+  Never removes customer data: the data folder (default C:\ProgramData\Zentriq) and the PostgreSQL
+  server/database are not MSI resources and survive repair, upgrade and uninstall.
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:fw="http://wixtoolset.org/schemas/v4/wxs/firewall"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+
+  <Package Name="Zentriq Console"
+           Manufacturer="Zentriq"
+           Version="$(var.ProductVersion)"
+           UpgradeCode="41149E82-77BA-4689-851F-E2475BF1AC05"
+           Scope="perMachine"
+           InstallerVersion="500"
+           Language="1033"
+           Compressed="yes">
+
+    <SummaryInformation Description="Zentriq Console $(var.ProductVersion) — IT asset intelligence and operations platform" />
+
+    <MajorUpgrade Schedule="afterInstallInitialize"
+                  AllowSameVersionUpgrades="no"
+                  DowngradeErrorMessage="A newer version of Zentriq is already installed. Setup will now exit." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" MaximumUncompressedMediaSize="500" />
+
+    <Launch Condition="VersionNT64" Message="Zentriq requires a 64-bit edition of Windows Server 2019 or later." />
+    <Launch Condition="Privileged" Message="Zentriq must be installed by an administrator." />
+
+    <Icon Id="ZentriqIcon" SourceFile="$(var.AssetsDir)\zentriq.ico" />
+    <Property Id="ARPPRODUCTICON" Value="ZentriqIcon" />
+    <Property Id="ARPHELPLINK" Value="https://zentriq.example/support" />
+    <Property Id="ARPNOMODIFY" Value="1" />
+    <Property Id="MSIRESTARTMANAGERCONTROL" Value="Disable" />
+
+    <!-- ===== Persisted settings (read back on repair/upgrade) ============================== -->
+    <Property Id="INSTALLFOLDER_REG" Secure="yes">
+      <RegistrySearch Id="RegInstallDir" Root="HKLM" Key="SOFTWARE\Zentriq\Console" Name="InstallDirectory" Type="raw" Bitness="always64" />
+    </Property>
+    <Property Id="DATAFOLDER" Secure="yes">
+      <RegistrySearch Id="RegDataDir" Root="HKLM" Key="SOFTWARE\Zentriq\Console" Name="DataDirectory" Type="raw" Bitness="always64" />
+    </Property>
+    <Property Id="ZQ_EXISTING" Secure="yes">
+      <RegistrySearch Id="RegProvisioned" Root="HKLM" Key="SOFTWARE\Zentriq\Console" Name="ProvisionedDataDirectory" Type="raw" Bitness="always64" />
+    </Property>
+    <Property Id="HTTPSPORT" Value="443" Secure="yes">
+      <RegistrySearch Id="RegHttpsPort" Root="HKLM" Key="SOFTWARE\Zentriq\Console" Name="HttpsPort" Type="raw" Bitness="always64" />
+    </Property>
+    <Property Id="HTTPSHOSTNAME" Secure="yes">
+      <RegistrySearch Id="RegHttpsHost" Root="HKLM" Key="SOFTWARE\Zentriq\Console" Name="HttpsHostName" Type="raw" Bitness="always64" />
+    </Property>
+    <Property Id="FIREWALLSCOPE" Value="any" Secure="yes">
+      <RegistrySearch Id="RegFwScope" Root="HKLM" Key="SOFTWARE\Zentriq\Console" Name="FirewallScope" Type="raw" Bitness="always64" />
+    </Property>
+
+    <!-- ===== Wizard / silent-install properties ============================================ -->
+    <Property Id="PGMODE" Value="bundled" Secure="yes" />
+    <Property Id="PGHOST" Value="localhost" Secure="yes" />
+    <Property Id="PGPORT" Value="5432" Secure="yes" />
+    <Property Id="PGSUPERUSER" Value="postgres" Secure="yes" />
+    <Property Id="PGSUPERPASSWORD" Secure="yes" Hidden="yes" />
+    <Property Id="PGSERVICENAME" Value="postgresql-x64-17" Secure="yes" />
+    <Property Id="PGINSTALLDIR" Secure="yes" />
+    <Property Id="PGDATADIR" Secure="yes" />
+    <Property Id="PGINSTALLER" Secure="yes" />
+    <Property Id="CERTMODE" Value="selfsigned" Secure="yes" />
+    <Property Id="CERTTHUMBPRINT" Secure="yes" />
+    <Property Id="ADMINORG" Secure="yes" />
+    <Property Id="ADMINNAME" Value="Administrator" Secure="yes" />
+    <Property Id="ADMINEMAIL" Secure="yes" />
+    <Property Id="ADMINPASSWORD" Secure="yes" Hidden="yes" />
+    <Property Id="ADMINPASSWORD2" Secure="yes" Hidden="yes" />
+    <Property Id="ZQ_ANSWERFILE" Secure="yes" />
+    <Property Id="ZQ_FROM_BUNDLE" Secure="yes" />
+    <Property Id="ZQ_URL" Secure="yes" />
+
+    <SetProperty Id="INSTALLFOLDER" Value="[INSTALLFOLDER_REG]" After="AppSearch" Sequence="both" Condition="INSTALLFOLDER_REG" />
+    <SetProperty Id="DATAFOLDER" Action="SetDataFolderFromExisting" Value="[ZQ_EXISTING]" After="AppSearch" Sequence="both" Condition="NOT DATAFOLDER AND ZQ_EXISTING" />
+    <SetProperty Id="DATAFOLDER" Action="SetDataFolderDefault" Value="[CommonAppDataFolder]Zentriq" After="SetDataFolderFromExisting" Sequence="both" Condition="NOT DATAFOLDER" />
+    <SetProperty Id="PGINSTALLDIR" Value="[ProgramFiles64Folder]PostgreSQL\17" After="AppSearch" Sequence="both" Condition="NOT PGINSTALLDIR" />
+    <SetProperty Id="PGDATADIR" Value="[CommonAppDataFolder]PostgreSQL\17\data" After="AppSearch" Sequence="both" Condition="NOT PGDATADIR" />
+
+    <!-- ===== Layout ======================================================================= -->
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="Zentriq">
+        <Directory Id="ApiFolder" Name="api" />
+        <Directory Id="WorkerFolder" Name="worker" />
+        <Directory Id="ToolsFolder" Name="tools" />
+        <Directory Id="DocsFolder" Name="docs" />
+      </Directory>
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ShortcutFolder" Name="Zentriq" />
+    </StandardDirectory>
+
+    <Feature Id="Main" Title="Zentriq Console" Level="1" AllowAbsent="no">
+      <ComponentGroupRef Id="ApiFiles" />
+      <ComponentGroupRef Id="WorkerFiles" />
+      <ComponentGroupRef Id="ToolsFiles" />
+      <ComponentGroupRef Id="DocsFiles" />
+      <ComponentRef Id="Settings" />
+      <ComponentRef Id="FirewallAny" />
+      <ComponentRef Id="FirewallLocalSubnet" />
+      <ComponentRef Id="StartMenu" />
+    </Feature>
+
+    <!-- API service. Virtual account NT SERVICE\ZentriqApi: no password, least privilege. -->
+    <ComponentGroup Id="ApiFiles" Directory="ApiFolder">
+      <Component Id="ApiService">
+        <File Id="ApiExe" Source="$(var.StagingDir)\api\Zentriq.Api.exe" KeyPath="yes" />
+        <ServiceInstall Id="ApiServiceInstall" Name="ZentriqApi" DisplayName="Zentriq API"
+                        Description="Zentriq Console web application and REST API (HTTPS)."
+                        Type="ownProcess" Start="auto" ErrorControl="normal" Vital="yes"
+                        Account="NT SERVICE\ZentriqApi" />
+        <ServiceControl Id="ApiServiceControl" Name="ZentriqApi" Stop="both" Remove="uninstall" Wait="yes" />
+      </Component>
+      <Files Include="$(var.StagingDir)\api\**">
+        <Exclude Files="$(var.StagingDir)\api\Zentriq.Api.exe" />
+      </Files>
+    </ComponentGroup>
+
+    <!-- Worker service. Virtual account NT SERVICE\ZentriqWorker. -->
+    <ComponentGroup Id="WorkerFiles" Directory="WorkerFolder">
+      <Component Id="WorkerService">
+        <File Id="WorkerExe" Source="$(var.StagingDir)\worker\Zentriq.Worker.exe" KeyPath="yes" />
+        <ServiceInstall Id="WorkerServiceInstall" Name="ZentriqWorker" DisplayName="Zentriq Worker"
+                        Description="Zentriq background jobs: discovery, inventory, reports and licensing usage."
+                        Type="ownProcess" Start="auto" ErrorControl="normal" Vital="yes"
+                        Account="NT SERVICE\ZentriqWorker" />
+        <ServiceControl Id="WorkerServiceControl" Name="ZentriqWorker" Stop="both" Remove="uninstall" Wait="yes" />
+      </Component>
+      <Files Include="$(var.StagingDir)\worker\**">
+        <Exclude Files="$(var.StagingDir)\worker\Zentriq.Worker.exe" />
+      </Files>
+    </ComponentGroup>
+
+    <ComponentGroup Id="ToolsFiles" Directory="ToolsFolder">
+      <Files Include="$(var.StagingDir)\tools\**" />
+    </ComponentGroup>
+
+    <ComponentGroup Id="DocsFiles" Directory="DocsFolder">
+      <Files Include="$(var.StagingDir)\docs\**" />
+    </ComponentGroup>
+
+    <Component Id="Settings" Directory="INSTALLFOLDER">
+      <RegistryKey Root="HKLM" Key="SOFTWARE\Zentriq\Console">
+        <RegistryValue Name="InstallDirectory" Type="string" Value="[INSTALLFOLDER]" KeyPath="yes" />
+        <RegistryValue Name="DataDirectory" Type="string" Value="[DATAFOLDER]" />
+        <RegistryValue Name="HttpsPort" Type="string" Value="[HTTPSPORT]" />
+        <RegistryValue Name="HttpsHostName" Type="string" Value="[HTTPSHOSTNAME]" />
+        <RegistryValue Name="FirewallScope" Type="string" Value="[FIREWALLSCOPE]" />
+        <RegistryValue Name="Version" Type="string" Value="$(var.ProductVersion)" />
+      </RegistryKey>
+    </Component>
+
+    <!-- Inbound HTTPS for the console. Scope chosen on the HTTPS page (any / local subnet / none). -->
+    <Component Id="FirewallAny" Directory="INSTALLFOLDER" Condition='FIREWALLSCOPE = "any"'>
+      <fw:FirewallException Id="FwHttpsAny" Name="Zentriq Console (HTTPS)" Description="Inbound HTTPS to the Zentriq Console."
+                            Port="[HTTPSPORT]" Protocol="tcp" Scope="any" Profile="all" />
+      <RegistryValue Root="HKLM" Key="SOFTWARE\Zentriq\Console" Name="FirewallRule" Type="string" Value="any" KeyPath="yes" />
+    </Component>
+    <Component Id="FirewallLocalSubnet" Directory="INSTALLFOLDER" Condition='FIREWALLSCOPE = "localsubnet"'>
+      <fw:FirewallException Id="FwHttpsSubnet" Name="Zentriq Console (HTTPS, local subnet)" Description="Inbound HTTPS to the Zentriq Console from the local subnet."
+                            Port="[HTTPSPORT]" Protocol="tcp" Scope="localSubnet" Profile="all" />
+      <RegistryValue Root="HKLM" Key="SOFTWARE\Zentriq\Console" Name="FirewallRule" Type="string" Value="localsubnet" KeyPath="yes" />
+    </Component>
+
+    <Component Id="StartMenu" Directory="ShortcutFolder">
+      <util:InternetShortcut Id="ConsoleShortcut" Name="Zentriq Console" Target="[ZQ_URL]" Type="url" />
+      <RemoveFolder Id="RemoveShortcutFolder" On="uninstall" />
+      <RegistryValue Root="HKLM" Key="SOFTWARE\Zentriq\Console" Name="StartMenu" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+    <!-- ===== Custom actions ================================================================ -->
+    <Binary Id="ZqCA" SourceFile="$(var.CustomActionDll)" />
+
+    <CustomAction Id="ZqCheckPrerequisites" BinaryRef="ZqCA" DllEntry="CheckPrerequisites" Execute="immediate" Return="check" />
+    <CustomAction Id="ZqValidateDatabase" BinaryRef="ZqCA" DllEntry="ValidateDatabase" Execute="immediate" Return="check" />
+    <CustomAction Id="ZqValidateHttps" BinaryRef="ZqCA" DllEntry="ValidateHttps" Execute="immediate" Return="check" />
+    <CustomAction Id="ZqValidateAdmin" BinaryRef="ZqCA" DllEntry="ValidateAdmin" Execute="immediate" Return="check" />
+    <CustomAction Id="ZqOpenConsole" BinaryRef="ZqCA" DllEntry="OpenConsole" Execute="immediate" Return="ignore" />
+    <CustomAction Id="ZqPrepareProvision" BinaryRef="ZqCA" DllEntry="PrepareProvision" Execute="immediate" Return="check" HideTarget="yes" />
+    <CustomAction Id="ZqProvision" BinaryRef="ZqCA" DllEntry="Provision" Execute="deferred" Impersonate="no" Return="check" HideTarget="yes" />
+    <CustomAction Id="ZqUninstallCleanup" BinaryRef="ZqCA" DllEntry="UninstallCleanup" Execute="deferred" Impersonate="no" Return="ignore" />
+    <SetProperty Id="ZqUninstallCleanup" Value="Exe=[ToolsFolder]zentriqctl.exe" Before="ZqUninstallCleanup" Sequence="execute"
+                 Condition='REMOVE = "ALL" AND NOT UPGRADINGPRODUCTCODE' />
+
+    <InstallExecuteSequence>
+      <Custom Action="ZqCheckPrerequisites" After="CostFinalize" Condition='NOT (REMOVE = "ALL")' />
+      <Custom Action="ZqUninstallCleanup" Before="StopServices" Condition='REMOVE = "ALL" AND NOT UPGRADINGPRODUCTCODE' />
+      <Custom Action="ZqPrepareProvision" Before="ZqProvision" Condition='NOT (REMOVE = "ALL")' />
+      <Custom Action="ZqProvision" Before="InstallFinalize" Condition='NOT (REMOVE = "ALL")' />
+    </InstallExecuteSequence>
+
+    <UIRef Id="ZentriqUI" />
+  </Package>
+</Wix>

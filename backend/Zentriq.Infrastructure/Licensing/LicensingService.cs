@@ -1,0 +1,124 @@
+using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
+using Zentriq.Application.Common;
+using Zentriq.Application.Licensing;
+using Zentriq.Domain;
+using Zentriq.Domain.Licensing;
+using Zentriq.Infrastructure.Data;
+using Zentriq.Infrastructure.Secrets;
+
+namespace Zentriq.Infrastructure.Licensing;
+
+public sealed record WorkloadUsage(string Workload, int Billable, int? Limit);
+
+public sealed class WorkloadLimitExceededException(string workload, int limit)
+    : Exception($"The {workload.Replace('_', ' ')} workload limit ({limit}) has been reached. Retire unused assets or import a license with more capacity.")
+{
+    public string Workload { get; } = workload;
+    public int Limit { get; } = limit;
+}
+
+/// <summary>Database-backed licensing: current status, workload usage and enforcement.</summary>
+public sealed class LicensingService(
+    ZentriqDbContext db,
+    NpgsqlDataSource dataSource,
+    LicenseVerifier verifier,
+    IClock clock,
+    Func<AppSecrets> appSecrets)
+{
+    public const string WorkloadLockSql = "SELECT pg_advisory_xact_lock(hashtext('zentriq.workload_enforcement'))";
+
+    public async Task<LicenseStatus> GetStatusAsync(CancellationToken ct = default)
+    {
+        var state = await db.InstallState.AsNoTracking().FirstOrDefaultAsync(ct);
+        var trialRow = await db.Trial.AsNoTracking().FirstOrDefaultAsync(ct);
+        var tolerance = TimeSpan.FromMinutes(await GetSettingAsync("clock.rollback_tolerance_minutes", 1440, ct));
+
+        TrialSnapshot? trial = null;
+        if (trialRow is not null && state is not null)
+        {
+            var policy = JsonSerializer.Deserialize<TrialPolicy>(trialRow.Policy, JsonOptions) ?? TrialPolicy.Default;
+            var ok = TrialIntegrity.Verify(appSecrets().InstallSecretBytes(), state.InstallationId, trialRow.StartedAt, trialRow.ExpiresAt, trialRow.IntegrityMac)
+                     && trialRow.InstallationId == state.InstallationId;
+            trial = new TrialSnapshot(trialRow.StartedAt, trialRow.ExpiresAt, policy, ok);
+        }
+
+        ActiveLicenseSnapshot? license = null;
+        var rec = await db.LicenseRecords.AsNoTracking().FirstOrDefaultAsync(l => l.Status == "active", ct);
+        if (rec is not null && state is not null)
+        {
+            // Re-verify the stored signed document; never trust database columns alone.
+            var v = verifier.Verify(rec.RawDocument, state.InstallationId, clock.UtcNow, enforceValidityWindow: false);
+            if (v.IsValid) license = new ActiveLicenseSnapshot(v.Payload!);
+        }
+
+        return LicenseEvaluator.Evaluate(new LicenseInputs(
+            state?.InitializedAt is not null, trial, license, clock.UtcNow,
+            state?.LastSeenUtc ?? clock.UtcNow, tolerance));
+    }
+
+    public async Task<IReadOnlyList<WorkloadUsage>> GetUsageAsync(CancellationToken ct = default)
+    {
+        var status = await GetStatusAsync(ct);
+        var counts = await CountBillableAsync(null, null, ct);
+        return Workloads.All.Select(w => new WorkloadUsage(w, counts.GetValueOrDefault(w),
+            status.Limits.TryGetValue(w, out var l) ? l : null)).ToList();
+    }
+
+    /// <summary>
+    /// Counts billable assets per workload. Billable = status 'active', not merged, seen within
+    /// licensing.billable_seen_within_days. See <see cref="Workloads"/>.
+    /// </summary>
+    public async Task<Dictionary<string, int>> CountBillableAsync(NpgsqlConnection? conn, NpgsqlTransaction? tx, CancellationToken ct = default)
+    {
+        var days = await GetSettingAsync("licensing.billable_seen_within_days", 30, conn, tx, ct);
+        const string sql = """
+            SELECT CASE category WHEN 'endpoint' THEN 'endpoint'
+                                 WHEN 'server' THEN 'server' WHEN 'virtual_host' THEN 'server'
+                                 WHEN 'network_device' THEN 'network_device'
+                                 ELSE 'other' END AS workload,
+                   count(*)::int
+              FROM zentriq.assets
+             WHERE status = 'active' AND merged_into IS NULL
+               AND last_seen_at >= now() - make_interval(days => @d)
+             GROUP BY 1
+            """;
+        await using var cmd = conn is null ? dataSource.CreateCommand(sql) : new NpgsqlCommand(sql, conn, tx);
+        cmd.Parameters.AddWithValue("d", days);
+        var result = new Dictionary<string, int>();
+        await using var r = await cmd.ExecuteReaderAsync(ct);
+        while (await r.ReadAsync(ct)) result[r.GetString(0)] = r.GetInt32(1);
+        return result;
+    }
+
+    /// <summary>
+    /// Must be called inside the transaction that makes an asset billable. Serialises concurrent
+    /// enrolments with a transaction-scoped advisory lock, so two discoveries cannot both take the
+    /// last remaining slot. Allows a configurable overage grace (default 5 %) before refusing.
+    /// </summary>
+    public async Task EnsureCapacityAsync(NpgsqlConnection conn, NpgsqlTransaction tx, string workload, int adding, LicenseStatus status, CancellationToken ct = default)
+    {
+        await using (var l = new NpgsqlCommand(WorkloadLockSql, conn, tx)) await l.ExecuteNonQueryAsync(ct);
+        if (!status.Limits.TryGetValue(workload, out var limit)) return; // unlimited for this workload
+        var grace = await GetSettingAsync("licensing.overage_grace_percent", 5, conn, tx, ct);
+        var hardLimit = limit + (int)Math.Floor(limit * grace / 100.0);
+        var counts = await CountBillableAsync(conn, tx, ct);
+        if (counts.GetValueOrDefault(workload) + adding > hardLimit)
+            throw new WorkloadLimitExceededException(workload, limit);
+    }
+
+    public Task<int> GetSettingAsync(string key, int fallback, CancellationToken ct = default) => GetSettingAsync(key, fallback, null, null, ct);
+
+    /// <summary>Thread-safe (raw SQL, no DbContext) so it can be used from parallel discovery tasks.</summary>
+    public async Task<int> GetSettingAsync(string key, int fallback, NpgsqlConnection? conn, NpgsqlTransaction? tx, CancellationToken ct = default)
+    {
+        const string sql = "SELECT value::text FROM zentriq.system_settings WHERE key = @k";
+        await using var cmd = conn is null ? dataSource.CreateCommand(sql) : new NpgsqlCommand(sql, conn, tx);
+        cmd.Parameters.AddWithValue("k", key);
+        var v = await cmd.ExecuteScalarAsync(ct) as string;
+        return v is not null && int.TryParse(v.Trim('"'), out var n) ? n : fallback;
+    }
+
+    public static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+}
