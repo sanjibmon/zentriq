@@ -24,6 +24,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $root = $PSScriptRoot
 . (Join-Path $root 'deployment/scripts/common.ps1')
+trap { Write-Failure $_; break }
 
 $results = Join-Path $root 'artifacts/test-results'
 New-Item -ItemType Directory -Force -Path $results | Out-Null

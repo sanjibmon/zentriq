@@ -17,6 +17,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $root = $PSScriptRoot
 . (Join-Path $root 'deployment/scripts/common.ps1')
+trap { Write-Failure $_; break }
 
 $Version = Resolve-ZentriqVersion $Version
 Write-Section "Zentriq build $Version ($Configuration)"

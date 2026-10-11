@@ -37,6 +37,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $root = $PSScriptRoot
 . (Join-Path $root 'deployment/scripts/common.ps1')
+trap { Write-Failure $_; break }
 if (-not $IsWindows) { throw 'package-windows.ps1 must run on Windows (WiX and MSI validation require Windows Installer).' }
 
 $Version = Resolve-ZentriqVersion $Version
@@ -59,7 +60,7 @@ if (-not $SkipPublish) {
     foreach ($p in $publish) {
         Write-Section "Publish $($p.Project)"
         Invoke-Native dotnet publish (Join-Path $root $p.Project) --configuration $Configuration --runtime win-x64 --self-contained true `
-            "-p:Version=$Version" -p:PublishReadyToRun=false -p:DebugType=none -p:GenerateDocumentationFile=false `
+            "-p:Version=$Version" '-p:PublishReadyToRun=false' '-p:DebugType=none' '-p:GenerateDocumentationFile=false' `
             --output (Join-Path $staging $p.Out)
     }
     # Development settings never ship.
@@ -142,9 +143,9 @@ if ($signtool) {
     Write-Section 'Sign bundle (engine detach/reattach)'
     Invoke-Native dotnet tool update --global wix --version $wixVersion
     $engine = Join-Path $art 'bundle/engine.exe'
-    Invoke-Native wix burn detach $bundle -engine $engine
+    Invoke-Native wix burn detach $bundle '-engine' $engine
     Sign-Files @($engine)
-    Invoke-Native wix burn reattach $bundle -engine $engine -o $bundle
+    Invoke-Native wix burn reattach $bundle '-engine' $engine '-o' $bundle
     Sign-Files @($bundle)
     Remove-Item $engine -Force
 }

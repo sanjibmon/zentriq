@@ -24,6 +24,7 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $ProgressPreference = 'SilentlyContinue'
+trap { Write-Host "ERROR: $($_ | Out-String)"; Write-Host $_.ScriptStackTrace; break }
 
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 $results = [System.Collections.Generic.List[object]]::new()

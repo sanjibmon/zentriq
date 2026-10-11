@@ -10,10 +10,19 @@ function Assert-Tool([string] $Name, [string] $Hint) {
 }
 
 # Runs a native command and throws on a non-zero exit code (PowerShell does not by default).
+# Deliberately a simple function (no param block) so arguments such as -p:Name=Value or -engine are
+# passed to the native tool unchanged instead of being bound as PowerShell parameters.
 function Invoke-Native {
-    param([Parameter(Mandatory, Position = 0)] [string] $Command, [Parameter(ValueFromRemainingArguments)] [object[]] $Arguments)
-    & $Command @Arguments
-    if ($LASTEXITCODE -ne 0) { throw "'$Command $($Arguments -join ' ')' failed with exit code $LASTEXITCODE." }
+    $command = $args[0]
+    $rest = if ($args.Count -gt 1) { $args[1..($args.Count - 1)] } else { @() }
+    & $command @rest
+    if ($LASTEXITCODE -ne 0) { throw "'$command $($rest -join ' ')' failed with exit code $LASTEXITCODE." }
+}
+
+# Make the reason for a failure visible in redirected/captured output (CI logs).
+function Write-Failure($ErrorRecord) {
+    Write-Host ("ERROR: " + ($ErrorRecord | Out-String)) -ForegroundColor Red
+    if ($ErrorRecord.ScriptStackTrace) { Write-Host $ErrorRecord.ScriptStackTrace }
 }
 
 # MSI product versions must be major.minor.build with major/minor < 256 and build < 65536.
