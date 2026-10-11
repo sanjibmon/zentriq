@@ -9,16 +9,18 @@
       "https://sbp.enterprisedb.com/getfile.jsp?fileid=1260614"
     ],
     "publisher": "EnterpriseDB",
-    "sha256": "",
+    "sha256": "f104c552d8495a6f20738c2a03f643164bc64b9985363329e314dec24559f0b7",
     "license": "PostgreSQL License (https://www.postgresql.org/about/licence/); installer by EnterpriseDB"
   },
   "vcredist": {
     "product": "Microsoft Visual C++ 2015-2022 Redistributable (x64)",
-    "version": "latest 14.x",
+    "version": "14.44.35211.0",
     "file": "vc_redist.x64.exe",
-    "urls": [ "https://aka.ms/vs/17/release/vc_redist.x64.exe" ],
+    "urls": [
+      "https://aka.ms/vs/17/release/vc_redist.x64.exe"
+    ],
     "publisher": "Microsoft Corporation",
-    "sha256": "",
+    "sha256": "cc0ff0eb1dc3f5188ae6300faef32bf5beeba4bdd6e8e445a9184072096b713b",
     "license": "Microsoft Software License Terms - Visual C++ Redistributable (redistribution permitted)"
   }
 }
