@@ -161,18 +161,18 @@
     <Component Id="FirewallAny" Directory="INSTALLFOLDER" Condition='FIREWALLSCOPE = "any"'>
       <fw:FirewallException Id="FwHttpsAny" Name="Zentriq Console (HTTPS)" Description="Inbound HTTPS to the Zentriq Console."
                             Port="[HTTPSPORT]" Protocol="tcp" Scope="any" Profile="all" />
-      <RegistryValue Root="HKLM" Key="SOFTWARE\Zentriq\Console" Name="FirewallRule" Type="string" Value="any" KeyPath="yes" />
+      <RegistryValue Root="HKLM" Key="SOFTWARE\Zentriq\Console" Name="FirewallRuleAny" Type="string" Value="any" KeyPath="yes" />
     </Component>
     <Component Id="FirewallLocalSubnet" Directory="INSTALLFOLDER" Condition='FIREWALLSCOPE = "localsubnet"'>
       <fw:FirewallException Id="FwHttpsSubnet" Name="Zentriq Console (HTTPS, local subnet)" Description="Inbound HTTPS to the Zentriq Console from the local subnet."
                             Port="[HTTPSPORT]" Protocol="tcp" Scope="localSubnet" Profile="all" />
-      <RegistryValue Root="HKLM" Key="SOFTWARE\Zentriq\Console" Name="FirewallRule" Type="string" Value="localsubnet" KeyPath="yes" />
+      <RegistryValue Root="HKLM" Key="SOFTWARE\Zentriq\Console" Name="FirewallRuleLocalSubnet" Type="string" Value="localsubnet" KeyPath="yes" />
     </Component>
 
     <Component Id="StartMenu" Directory="ShortcutFolder">
       <util:InternetShortcut Id="ConsoleShortcut" Name="Zentriq Console" Target="[ZQ_URL]" Type="url" />
       <RemoveFolder Id="RemoveShortcutFolder" On="uninstall" />
-      <RegistryValue Root="HKLM" Key="SOFTWARE\Zentriq\Console" Name="StartMenu" Type="integer" Value="1" KeyPath="yes" />
+      <RegistryValue Root="HKCU" Key="Software\Zentriq\Console" Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
     </Component>
 
     <!-- ===== Custom actions ================================================================ -->
