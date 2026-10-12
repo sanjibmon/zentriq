@@ -101,13 +101,17 @@ $answer = Join-Path $OutDir 'answers.json'
     admin    = @{ organization = 'Zentriq CI'; email = $adminEmail; displayName = 'CI Administrator'; password = $adminPassword }
 } | ConvertTo-Json -Depth 4 | Set-Content $answer -Encoding UTF8
 
+# A previous failed attempt can leave a PostgreSQL data folder behind; setup must recover (T01 + T32).
+New-Item -ItemType Directory -Force -Path 'C:\ZentriqTestData\postgresql' | Out-Null
+Set-Content 'C:\ZentriqTestData\postgresql\PG_VERSION' '17' -Encoding ascii
+
 # ---- T01 install -------------------------------------------------------------------------------
 $installed = Check 'T01' 'First-time installation (silent, answer file)' { $sw = [Diagnostics.Stopwatch]::StartNew(); $r = Run-Setup $Bundle @("ZQ_ANSWERFILE=`"$answer`"") 'install'; "$r in $([int]$sw.Elapsed.TotalMinutes) min" }
 Remove-Item $answer -Force   # contains the administrator password
 
 if (-not $installed) {
     foreach ($t in 'T02 PostgreSQL provisioning', 'T03 Database migration', 'T04 Administrator sign-in', 'T05 API and worker services', 'T06 Trial initialization',
-                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall') {
+                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder') {
         Record $t.Substring(0, 3) $t.Substring(4) 'BLOCKED' 'installation failed'
     }
 } else {
@@ -115,6 +119,12 @@ if (-not $installed) {
         $svc = Get-Service 'postgresql-x64-17'; Assert ($svc.Status -eq 'Running') "status $($svc.Status)"
         $listen = Get-NetTCPConnection -LocalPort 5432 -State Listen; Assert (-not ($listen | Where-Object { $_.LocalAddress -notin '127.0.0.1', '::1' })) 'PostgreSQL listens on a non-loopback address'
         'running, loopback-only'
+    } | Out-Null
+    Check 'T32' 'Leftover data folder from an earlier failed attempt is set aside, not fatal' {
+        $aside = @(Get-ChildItem 'C:\ZentriqTestData' -Directory -Filter 'postgresql.incomplete-*')
+        Assert ($aside.Count -eq 1) 'leftover data folder was not set aside'
+        Assert (Test-Path 'C:\ZentriqTestData\postgresql\PG_VERSION') 'new data folder missing'
+        "moved to $($aside[0].Name)"
     } | Out-Null
     Check 'T05' 'API and worker services running under virtual accounts' {
         foreach ($n in 'ZentriqApi', 'ZentriqWorker') {
