@@ -66,6 +66,8 @@ function Login {
     Assert ($r.StatusCode -eq 200) "login returned $($r.StatusCode)"
     return $s
 }
+# PowerShell returns non-text media types (e.g. application/problem+json) as byte[]; read them as UTF-8.
+function Body($Response) { if ($Response.Content -is [byte[]]) { [Text.Encoding]::UTF8.GetString($Response.Content) } else { [string]$Response.Content } }
 function Setup-Status { Invoke-RestMethod "$base/api/v1/setup/status" }
 function Wait-Ready([int] $Seconds = 180) {
     $deadline = (Get-Date).AddSeconds($Seconds)
@@ -356,7 +358,8 @@ if (-not $installed) {
 
     Check 'T34' 'Scan history can be deleted (single and by age); assets are kept' {
         $s = Login
-        $scan = Api POST '/discovery/scans' @{ name = 'ci-delete-me'; scanType = 'single'; targetsText = '127.0.0.1' } -Session $s
+        $ip = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -match '^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)' -and $_.PrefixOrigin -ne 'WellKnown' } | Select-Object -First 1).IPAddress
+        $scan = Api POST '/discovery/scans' @{ name = 'ci-delete-me'; scanType = 'single'; targetsText = $ip } -Session $s
         $deadline = (Get-Date).AddMinutes(3)
         do { Start-Sleep 3; $d = Api GET "/discovery/scans/$($scan.id)" -Session $s } while ($d.scan.status -in 'queued', 'running' -and (Get-Date) -lt $deadline)
         $r = Invoke-WebRequest "$base/api/v1/discovery/scans/$($scan.id)" -Method Delete -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } -SkipHttpErrorCheck
@@ -379,7 +382,7 @@ if (-not $installed) {
             $counter = [BitConverter]::GetBytes($step); [Array]::Reverse($counter)
             $h = (New-Object Security.Cryptography.HMACSHA1 (, $key)).ComputeHash($counter)
             $o = $h[19] -band 0x0F
-            $bin = (($h[$o] -band 0x7F) -shl 24) -bor ($h[$o + 1] -shl 16) -bor ($h[$o + 2] -shl 8) -bor $h[$o + 3]
+            $bin = ([long]($h[$o] -band 0x7F) * 16777216) + ([long]$h[$o + 1] * 65536) + ([long]$h[$o + 2] * 256) + [long]$h[$o + 3]
             ($bin % 1000000).ToString('000000')
         }
         $s = Login
@@ -390,7 +393,7 @@ if (-not $installed) {
         try {
             $body = @{ email = $adminEmail; password = $adminPassword } | ConvertTo-Json
             $r = Invoke-WebRequest "$base/api/v1/auth/login" -Method Post -Body $body -ContentType 'application/json' -Headers @{ 'X-Zentriq-Request' = '1' } -SkipHttpErrorCheck
-            Assert ($r.StatusCode -eq 401 -and $r.Content -match 'mfaRequired') "login without code: $($r.StatusCode) $($r.Content)"
+            Assert ($r.StatusCode -eq 401 -and (Body $r) -match 'mfaRequired') "login without code: $($r.StatusCode) $(Body $r)"
             $s2 = New-Object Microsoft.PowerShell.Commands.WebRequestSession
             $body = @{ email = $adminEmail; password = $adminPassword; mfaCode = (Get-Totp $e.secret) } | ConvertTo-Json
             $r = Invoke-WebRequest "$base/api/v1/auth/login" -Method Post -Body $body -ContentType 'application/json' -Headers @{ 'X-Zentriq-Request' = '1' } -WebSession $s2 -SkipHttpErrorCheck
@@ -429,13 +432,13 @@ if (-not $installed) {
         $s = Login
         $bad = Invoke-WebRequest "$base/api/v1/directory/connections" -Method Post -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } -ContentType 'application/json' `
             -Body (@{ name = 'ci'; serverHost = '127.0.0.1'; baseDn = 'corp.example.com'; username = 'CORP\x'; password = 'x' } | ConvertTo-Json) -SkipHttpErrorCheck
-        Assert ($bad.StatusCode -eq 400 -and $bad.Content -match 'distinguished name') "invalid DN accepted: $($bad.StatusCode)"
+        Assert ($bad.StatusCode -eq 400 -and (Body $bad) -match 'distinguished name') "invalid DN accepted: $($bad.StatusCode) $(Body $bad)"
         $t = Api POST '/directory/connections/test' @{ name = 'ci'; serverHost = '127.0.0.1'; port = 636; ldaps = $true; baseDn = 'DC=ci,DC=invalid'; username = 'CI\nobody'; password = 'not-a-password' } -Session $s
         Assert (-not $t.ok) 'test reported success without a domain controller'
         Assert ($t.message -match 'reach|LDAP') "message: $($t.message)"
         $c = Api POST '/directory/connections' @{ name = 'ci-dc'; serverHost = '127.0.0.1'; dcName = 'dc01.ci.invalid'; ldaps = $true; baseDn = 'DC=ci,DC=invalid'; username = 'CI\nobody'; password = 'not-a-password' } -Session $s
         $list = Invoke-WebRequest "$base/api/v1/directory/connections" -WebSession $s
-        Assert ($list.Content -notmatch 'not-a-password') 'connection list exposes the password'
+        Assert ((Body $list) -notmatch 'not-a-password') 'connection list exposes the password'
         Api DELETE "/directory/connections/$($c.id)" -Session $s | Out-Null
         "invalid DN rejected; no DC: $($t.message); password not returned"
     } | Out-Null
