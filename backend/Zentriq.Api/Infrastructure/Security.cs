@@ -56,7 +56,8 @@ public sealed class CsrfHeaderMiddleware(RequestDelegate next)
 
     public async Task InvokeAsync(HttpContext ctx)
     {
-        if (ctx.Request.Path.StartsWithSegments("/api") && !HttpMethods.IsGet(ctx.Request.Method) &&
+        // Agent APIs use client certificates (no cookies), so they are not exposed to CSRF.
+        if (ctx.Request.Path.StartsWithSegments("/api") && !ctx.Request.Path.StartsWithSegments("/api/agent") && !HttpMethods.IsGet(ctx.Request.Method) &&
             !HttpMethods.IsHead(ctx.Request.Method) && !HttpMethods.IsOptions(ctx.Request.Method) &&
             ctx.Request.Headers[HeaderName] != "1")
         {

@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="Zentriq.Domain/Zentriq.Domain.csproj" />
+    <Project Path="Zentriq.Inventory/Zentriq.Inventory.csproj" />
     <Project Path="Zentriq.Application/Zentriq.Application.csproj" />
     <Project Path="Zentriq.Infrastructure/Zentriq.Infrastructure.csproj" />
     <Project Path="Zentriq.Api/Zentriq.Api.csproj" />

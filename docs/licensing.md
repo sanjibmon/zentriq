@@ -7,8 +7,9 @@
   a failed or cancelled installation never starts the trial, and re-running setup, repair, upgrade, restarting
   services or Windows, uninstall + reinstall over the same data never resets it (`trial` has a single row and the
   initialize call is idempotent).
-* All modules are enabled during the trial. Workload limits come from the trial policy (defaults: 250 endpoints,
-  25 servers, 50 network devices, 50 other) stored with the trial record.
+* All modules and features are enabled during the trial. The trial is limited to **30 devices in total** (any mix of
+  endpoints, servers, network devices and other assets; key `devices` in the trial policy). Installations whose trial
+  started under the earlier per-workload trial policy are moved to the 30-device policy by the 1.1 upgrade.
 * The trial row is protected by an HMAC keyed with the per-installation secret (`Secrets\app.secrets`); editing
   the dates in the database invalidates it and disables feature APIs.
 * Expiry is enforced by the API: module endpoints (inventory, discovery, dashboards, ...) refuse requests when the trial or license does not cover them, not only hidden in the UI. Expiry never deletes
@@ -27,6 +28,8 @@ or an agent within the last **30 days** (`licensing.billable_seen_within_days`).
 | `network_device` | network_device |
 | `other` | printer, iot, other |
 
+A license (or the trial) can also carry a total cap across all workloads (`devices`); it is exact (no overage grace).
+
 Limits are enforced transactionally when an asset becomes billable (discovery, import, manual creation): a
 transaction-scoped advisory lock serialises concurrent enrolment so parallel scans cannot both take the last slot.
 A 5 % overage grace (`licensing.overage_grace_percent`) applies before new assets are refused. Daily usage
@@ -40,18 +43,26 @@ snapshots (`license.usage_snapshot` job) are kept for reconciliation and shown u
    never shipped to customers):
    ```
    zentriq-license-signer sign --key zentriq-2027.private.pem --key-id zentriq-2027 --request activation-request.json \
-       --customer "Contoso Ltd" --expires 2027-12-31 --grace 14 --entitle endpoint=1000 --entitle server=100 --out contoso.zlic
+       --customer "Contoso Ltd" --expires 2027-12-31 --grace 14 --entitle endpoint=1000 --entitle server=100 \
+       --company "Contoso Private Limited" --contact-name "A. Admin" --contact-email it@contoso.example \
+       --contact-phone "+91 80 5555 0101" --address "12 MG Road, Bengaluru 560001" --country India --tax-id 29ABCDE1234F1Z5 \
+       --out contoso.zlic
    ```
+   The `--company`/`--contact-*` options produce a schema-2 license that carries the **licensee** details.
 3. Import the `.zlic` file (`POST /api/v1/licensing/import`; the *Licensing* page in the console). Rejections return HTTP 422 with the reason and are written to the audit log.
+   The licensee (company, contact person, e-mail, phone, address, tax ID) is shown under *Licensing › Licensed to* and
+   fills the empty fields of the **company profile** (*System Settings › Company profile*), which administrators can
+   edit at any time. Signed licensee details themselves cannot be changed without a new license.
 
-### License file format (`.zlic`, schema version 1)
+### License file format (`.zlic`, schema versions 1 and 2)
 
 ```json
 { "format": "zentriq-license", "keyId": "zentriq-2027", "algorithm": "ES256",
   "payload": "<base64 UTF-8 JSON>", "signature": "<base64 ECDSA P-256/SHA-256, IEEE P1363>" }
 ```
 The payload holds `schemaVersion, licenseId, customer, installationId, issuedAt, notBefore, expiresAt, graceDays,
-modules, entitlements, requestId`. Zentriq verifies the signature over the exact payload bytes **before** reading any
+modules, entitlements, requestId` and, in schema 2, `licensee { company, contactName, contactEmail, contactPhone,
+address, country, taxId }`. Zentriq verifies the signature over the exact payload bytes **before** reading any
 field, then checks: known and non-revoked key ID, supported schema version, installation binding, validity window
 and grace, known modules and workloads, value ranges. Malformed, tampered, expired, wrongly bound, unknown-key and
 future-schema licenses are rejected with a specific reason and the attempt is audited. Unsigned entitlement values

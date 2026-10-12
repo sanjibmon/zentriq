@@ -15,7 +15,7 @@
 
     <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
-    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Open the Zentriq Console now" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Open the Zentriq Web Console now" />
 
     <UI Id="ZentriqUI">
       <TextStyle Id="WixUI_Font_Normal" FaceName="Segoe UI" Size="8" />
@@ -113,7 +113,7 @@
         <Control Id="ExistingNote" Type="Text" X="20" Y="176" Width="330" Height="36" NoPrefix="yes" HideCondition="NOT ZQ_EXISTING" ShowCondition="ZQ_EXISTING"
                  Text="Existing Zentriq data was found in this folder. Setup will keep it, reuse the saved database and HTTPS settings, take a backup before upgrading the database and skip the remaining configuration pages." />
         <Control Id="DesktopCheck" Type="CheckBox" X="20" Y="214" Width="330" Height="15" Property="DESKTOPSHORTCUT" CheckBoxValue="1"
-                 Text="Create a Zentriq Console shortcut on the desktop" />
+                 Text="Create a Zentriq Web Console shortcut on the desktop" />
         <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
         <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)">
           <Publish Event="NewDialog" Value="ZqPrereqDlg" />

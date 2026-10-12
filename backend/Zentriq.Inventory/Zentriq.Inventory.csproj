@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Shared inventory model and collectors. netstandard2.0 so the same code runs in the Zentriq Agent
+    (.NET Framework 4.8, built into Windows: no runtime to install on endpoints) and in the server Worker (.NET 10).
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <RootNamespace>Zentriq.Inventory</RootNamespace>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <NoWarn>$(NoWarn);CS8604;CS8602</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="System.Text.Json" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Zentriq.Tests" />
+  </ItemGroup>
+</Project>

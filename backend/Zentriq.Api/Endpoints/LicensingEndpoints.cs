@@ -25,8 +25,9 @@ public static class LicensingEndpoints
     {
         var g = api.MapGroup("/licensing").WithTags("Licensing");
 
-        g.MapGet("/status", async (LicensingService licensing, ZentriqDbContext db, CancellationToken ct) =>
+        g.MapGet("/status", async (LicensingService licensing, ZentriqDbContext db, LicenseVerifier verifier, CancellationToken ct) =>
         {
+            var licensee = await OrganizationEndpoints.ActiveLicenseeAsync(db, verifier, ct);
             var status = await licensing.GetStatusAsync(ct);
             var usage = await licensing.GetUsageAsync(ct);
             var state = await db.InstallState.AsNoTracking().FirstOrDefaultAsync(ct);
@@ -39,6 +40,7 @@ public static class LicensingEndpoints
                 limits = status.Limits, usage, installationId = state?.InstallationId,
                 trial = trial is null ? null : new { trial.StartedAt, trial.ExpiresAt },
                 license = active,
+                licensee,
             });
         }).RequireAuthorization();
 
@@ -92,6 +94,8 @@ public static class LicensingEndpoints
             db.LicenseRecords.Add(rec);
             if (p.RequestId is { } reqId)
                 await db.LicenseActivations.Where(a => a.RequestId == reqId).ExecuteUpdateAsync(s => s.SetProperty(a => a.FulfilledByLicense, p.LicenseId), ct);
+            if (p.Licensee is { } licensee && await db.Organizations.OrderBy(o => o.CreatedAt).FirstOrDefaultAsync(ct) is { } org)
+                OrganizationEndpoints.ApplyLicensee(org, licensee);
             await db.SaveChangesAsync(ct);
             await tx.CommitAsync(ct);
             await rc.AuditAsync("license.import", p.LicenseId, detail: new { p.Customer, p.ExpiresAt, p.Entitlements, p.Modules });

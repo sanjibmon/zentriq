@@ -23,12 +23,13 @@ public static class Permissions
     public const string BackupRun = "backup.run";
     public const string SettingsManage = "settings.manage";
     public const string AuditView = "audit.view";
+    public const string AgentsManage = "agents.manage";
 
     public static readonly IReadOnlyList<string> All =
     [
         AssetsView, AssetsManage, ScansRun, ScansProfiles, CredentialsManage, PatchApprove, PatchDeploy,
         DeployRun, RemoteStart, RemoteUnattended, ReportsDesign, ReportsExport, DashboardsShare, VulnExcept,
-        JobsView, UsersManage, LicensingManage, BackupRun, SettingsManage, AuditView
+        JobsView, UsersManage, LicensingManage, BackupRun, SettingsManage, AuditView, AgentsManage
     ];
 }
 

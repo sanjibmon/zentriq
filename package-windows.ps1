@@ -9,7 +9,8 @@
     1. Publish API, Worker and zentriqctl (self-contained win-x64; no .NET runtime needed on the server).
     2. Stage the web console (frontend/dist), documentation and third-party notices.
     3. Download + verify prerequisites (PostgreSQL, VC++ runtime): Authenticode publisher and pinned SHA-256.
-    4. Build the MSI custom actions, then Zentriq.msi (WiX 5.0.2, ICE validation on).
+    4. Build the Zentriq Agent and ZentriqAgent-x64.msi (served by the console), the MSI custom actions,
+       then Zentriq.msi (WiX 5.0.2, ICE validation on).
     5. Build Zentriq-Setup-x64.exe (Burn) with the MSI, PostgreSQL and VC++ runtime embedded.
     6. Optionally Authenticode-sign binaries, MSI and bundle (engine detach/reattach) and verify signatures.
     7. Write SHA256SUMS.txt and release-manifest.json.
@@ -131,6 +132,27 @@ if ($signMode) {
     Sign-Files $ours
 }
 
+# ---- 4a. Zentriq Agent (.NET Framework 4.8 service) + ZentriqAgent-x64.msi ----------------------
+Write-Section 'Zentriq Agent'
+$agentStage = Join-Path $art 'staging-agent'
+Remove-Item $agentStage -Recurse -Force -ErrorAction SilentlyContinue
+Invoke-Native { dotnet publish (Join-Path $root 'agent/Zentriq.Agent/Zentriq.Agent.csproj') --configuration $Configuration `
+    "-p:Version=$Version" '-p:DebugType=none' --output $agentStage }
+Get-ChildItem $agentStage -Include '*.pdb', '*.xml' -Recurse | Remove-Item -Force
+if (-not (Test-Path (Join-Path $agentStage 'ZentriqAgent.exe'))) { throw 'ZentriqAgent.exe was not produced.' }
+Sign-Files @(Get-ChildItem $agentStage -Include 'ZentriqAgent.exe', 'Zentriq*.dll' -Recurse | Select-Object -ExpandProperty FullName)
+Remove-Item (Join-Path $art 'agent-msi') -Recurse -Force -ErrorAction SilentlyContinue
+Invoke-Native { dotnet build (Join-Path $root 'installer/agent-msi/Zentriq.AgentMsi.wixproj') --configuration $Configuration `
+    "-p:ProductVersion=$Version" "-p:AgentDir=$agentStage" }
+$agentMsi = Join-Path $art 'agent-msi/ZentriqAgent-x64.msi'
+if (-not (Test-Path $agentMsi)) { throw "Agent MSI not found at $agentMsi" }
+Sign-Files @($agentMsi)
+# The console serves the agent package at https://<server>/downloads/ZentriqAgent-x64.msi
+$downloads = Join-Path $wwwroot 'downloads'
+New-Item -ItemType Directory -Force -Path $downloads | Out-Null
+Copy-Item $agentMsi $downloads -Force
+Set-Content (Join-Path $downloads 'ZentriqAgent-x64.version') $Version -Encoding ascii -NoNewline
+
 # ---- 4. custom actions + MSI -------------------------------------------------------------------
 Write-Section 'MSI custom actions'
 $caProj = Join-Path $root 'installer/customactions/Zentriq.CustomActions.csproj'
@@ -178,6 +200,7 @@ Remove-Item $release -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path $release | Out-Null
 Copy-Item $bundle $release
 Copy-Item $msi $release
+Copy-Item $agentMsi $release
 
 $kit = Join-Path $art 'msi-offline-kit'
 Remove-Item $kit -Recurse -Force -ErrorAction SilentlyContinue
@@ -216,7 +239,8 @@ $manifest = [ordered]@{
     prerequisites  = $lock
     notes          = @(
         'Zentriq-Setup-x64.exe: offline bootstrapper (VC++ runtime + PostgreSQL + Zentriq.msi).',
-        'Zentriq.msi: Zentriq only; uses prereqs\ next to the MSI (see the offline kit) or an existing PostgreSQL server.'
+        'Zentriq.msi: Zentriq only; uses prereqs\ next to the MSI (see the offline kit) or an existing PostgreSQL server.',
+        'ZentriqAgent-x64.msi: Zentriq Agent for Windows devices (also served by the console at /downloads).'
     )
 }
 $manifest | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $release 'release-manifest.json') -Encoding UTF8

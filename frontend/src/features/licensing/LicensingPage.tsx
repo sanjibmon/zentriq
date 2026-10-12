@@ -60,7 +60,7 @@ export function LicensingPage() {
           <div className="grid-2">
             <Panel title="Workload usage" sub="Active assets seen in the last 30 days" flush>
               <DataTable rows={d.usage.map((u) => ({ ...u, id: u.workload }))} columns={[
-                { key: 'w', label: 'Workload', render: (r) => fmt.label(r.workload) },
+                { key: 'w', label: 'Workload', render: (r) => (r.workload === 'devices' ? <b>All devices (total)</b> : fmt.label(r.workload)) },
                 { key: 'b', label: 'Billable', render: (r) => r.billable.toLocaleString() },
                 { key: 'l', label: 'Entitled', render: (r) => (r.limit == null ? 'Unlimited' : r.limit.toLocaleString()) },
                 { key: 'p', label: 'Use', render: (r) => r.limit ? <div className="progress" title={`${Math.round((r.billable / r.limit) * 100)}%`}><i style={{ width: `${Math.min(100, (r.billable / r.limit) * 100)}%` }} /></div> : '—' },
@@ -76,8 +76,22 @@ export function LicensingPage() {
                   <dt>Customer</dt><dd>{d.license.customerName}</dd>
                   <dt>Valid until</dt><dd>{fmt.day(d.license.expiresAt)} (+{d.license.graceDays} days grace)</dd>
                 </>}
+                {d.mode.startsWith('Trial') && <><dt>Trial edition</dt><dd>All modules, up to {d.limits.devices ?? 30} devices in total</dd></>}
               </dl>
             </Panel>
+            {d.licensee && (
+              <Panel title="Licensed to">
+                <dl className="dl2">
+                  <dt>Company</dt><dd><b>{d.licensee.company}</b></dd>
+                  {d.licensee.contactName && <><dt>Contact</dt><dd>{d.licensee.contactName}</dd></>}
+                  {d.licensee.contactEmail && <><dt>Email</dt><dd>{d.licensee.contactEmail}</dd></>}
+                  {d.licensee.contactPhone && <><dt>Phone</dt><dd>{d.licensee.contactPhone}</dd></>}
+                  {d.licensee.address && <><dt>Address</dt><dd>{d.licensee.address}{d.licensee.country ? `, ${d.licensee.country}` : ''}</dd></>}
+                  {d.licensee.taxId && <><dt>Tax ID</dt><dd className="mono">{d.licensee.taxId}</dd></>}
+                </dl>
+                <small className="muted">From the signed license. Edit your company profile in System Settings.</small>
+              </Panel>
+            )}
           </div>
         </>
       )}

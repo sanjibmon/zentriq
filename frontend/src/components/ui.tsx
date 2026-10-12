@@ -179,6 +179,11 @@ export function Pager({ page, pageSize, total, onPage }: { page: number; pageSiz
   );
 }
 
+const LABELS: Record<string, string> = {
+  winrm: 'WinRM', ssh: 'SSH', snmp: 'SNMP', agent: 'Agent', smbios_uuid: 'SMBIOS UUID', mac: 'MAC address', agent_id: 'Agent ID',
+  ad_object_guid: 'AD object GUID', hostname_fqdn: 'FQDN', ad: 'Active Directory', serial: 'Serial number', auth_failed: 'Credentials rejected',
+};
+
 export const fmt = {
   date: (s: string | null | undefined) => (s ? new Date(s).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '—'),
   day: (s: string | null | undefined) => (s ? new Date(s).toLocaleDateString(undefined, { dateStyle: 'medium' }) : '—'),
@@ -196,5 +201,5 @@ export const fmt = {
     while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
     return `${n.toFixed(i ? 1 : 0)} ${u[i]}`;
   },
-  label: (s: string | null | undefined) => (s ? s.replace(/[_.]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : '—'),
+  label: (s: string | null | undefined) => (s ? LABELS[s.toLowerCase()] ?? s.replace(/[_.]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : '—'),
 };

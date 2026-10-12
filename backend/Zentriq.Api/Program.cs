@@ -34,6 +34,8 @@ var httpOnly = builder.Environment.IsDevelopment() || Environment.GetEnvironment
 
 builder.Services.AddZentriqInfrastructure(options, paths, "Zentriq.Api");
 
+builder.Services.AddSingleton<AgentServer>();
+
 // ---- Kestrel / HTTPS -------------------------------------------------------------------
 builder.WebHost.ConfigureKestrel((ctx, k) =>
 {
@@ -47,6 +49,18 @@ builder.WebHost.ConfigureKestrel((ctx, k) =>
     }
     var cert = HttpsCertificate.Load(options, paths);
     k.ListenAnyIP(options.Https.Port, l => l.UseHttps(cert));
+    if (options.Https.AgentPort > 0)
+    {
+        // Agents: mutual TLS. Any client certificate is accepted at the TLS layer; AgentEndpoints validates
+        // it against the installation's agent CA and the agent registry (enrollment itself has no certificate).
+        k.ListenAnyIP(options.Https.AgentPort, l => l.UseHttps(new Microsoft.AspNetCore.Server.Kestrel.Https.HttpsConnectionAdapterOptions
+        {
+            ServerCertificate = cert,
+            ClientCertificateMode = Microsoft.AspNetCore.Server.Kestrel.Https.ClientCertificateMode.AllowCertificate,
+            ClientCertificateValidation = (_, _, _) => true,
+            CheckCertificateRevocation = false,
+        }));
+    }
     if (options.Https.LoopbackHealthPort > 0)
         k.Listen(System.Net.IPAddress.Loopback, options.Https.LoopbackHealthPort); // health probes only (see HealthEndpoints)
 });
@@ -78,6 +92,9 @@ builder.Services.AddAuthorization(o =>
 builder.Services.AddRateLimiter(o =>
 {
     o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    o.AddPolicy("agent-enroll", ctx => RateLimitPartition.GetFixedWindowLimiter(
+        ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = 20, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
     o.AddPolicy("login", ctx => RateLimitPartition.GetFixedWindowLimiter(
         ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
@@ -106,6 +123,7 @@ app.UseExceptionHandler(e => e.Run(async ctx =>
 }));
 app.UseStatusCodePages();
 app.UseMiddleware<SecurityHeadersMiddleware>();
+app.UseMiddleware<AgentPortMiddleware>();
 if (!httpOnly) app.UseHsts();
 
 app.UseDefaultFiles();
@@ -128,6 +146,11 @@ api.MapLicensingEndpoints();
 api.MapUserEndpoints();
 api.MapAuditEndpoints();
 api.MapSystemEndpoints();
+api.MapOrganizationEndpoints();
+api.MapCredentialEndpoints();
+api.MapInventoryEndpoints();
+api.MapAgentAdminEndpoints();
+app.MapAgentEndpoints();
 api.MapPendingModuleEndpoints();
 app.MapOpenApi("/api/openapi/{documentName}.json").RequireAuthorization(Permissions.SettingsManage);
 

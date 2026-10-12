@@ -29,14 +29,19 @@ Run `Zentriq-Setup-x64.exe` as an administrator. The wizard:
 2. **System check** – OS, memory, disk, ports, PostgreSQL, existing Zentriq data. Items marked *FAIL* block setup; *WARN* items are advisory. *Re-check* after fixing.
 3. **Folders** – program files (default `C:\Program Files\Zentriq`) and the data folder (default `C:\ProgramData\Zentriq`), which contains `Config`, `Secrets`, `Logs`, `Packages`, `Exports` and `Backups`. Data is never stored with the program files.
 4. **PostgreSQL** – *Install PostgreSQL 17 on this server* (choose port and data folder; it can be on another volume, e.g. `D:\PostgreSQL\17\data`) or *Use an existing PostgreSQL server* (14–18; host, port, and a role with CREATEROLE/CREATEDB used once and not stored).
-5. **HTTPS and network access** – host name users will type, HTTPS port, certificate (self-signed, or an existing certificate in *Local Computer › Personal* by thumbprint) and the Windows Firewall rule (any network / local subnet / none).
+5. **HTTPS and network access** – host name users will type, HTTPS port, certificate (self-signed, or an existing certificate in *Local Computer › Personal* by thumbprint) and the Windows Firewall rules (any network / local subnet / none) for the console port and the agent gateway (TCP 8444).
 6. **First administrator** – organization, name, sign-in e-mail and password (12+ characters, three character classes).
 7. **Ready** → **Progress**. Setup installs PostgreSQL, creates the database and least-privilege roles, applies migrations, issues/binds the certificate, starts the services, has the worker run a self-test job, creates the administrator, starts the 14-day trial and verifies the console over HTTPS.
-8. **Finish** – opens the console URL.
+8. **Finish** – opens the console URL. A **Zentriq Web Console** shortcut (Zentriq icon) is created on the desktop (unless unticked on the Folders page) and in *Start › Zentriq*.
 
 If existing Zentriq data is found (reinstall, upgrade), pages 4–6 are skipped and the saved settings are reused.
 
 **Setup reports success only after every verification passes.** If a step fails you get the failed step, the reason, what to do and the log path; Windows Installer then removes the program files, while PostgreSQL, the database and the data folder are kept, so running setup again continues where it stopped. See [troubleshooting.md](troubleshooting.md).
+
+## Installing agents on devices
+
+The server installer includes the Windows agent package; it is downloadable from *Agents* in the console and is also
+published next to the server installers as `ZentriqAgent-x64.msi`. See [agents-and-agentless.md](agents-and-agentless.md).
 
 ## Silent installation
 

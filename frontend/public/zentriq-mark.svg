@@ -1,1 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#0A7385"/><path d="M9 10h14l-14 12h14" stroke="#E9F7F9" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="23" cy="10" r="2.2" fill="#7EE0EC"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Zentriq mark: a "connected Z" — the diagonal is a link between two devices (nodes) and the
+       dashed orbit stands for continuous discovery across the estate. -->
+  <defs>
+    <linearGradient id="zq-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#13A3B4"/>
+      <stop offset="1" stop-color="#075468"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="15" fill="url(#zq-bg)"/>
+  <path d="M32 9.5a22.5 22.5 0 0 1 22.5 22.5" fill="none" stroke="#9FEAF2" stroke-opacity=".55" stroke-width="2.2" stroke-linecap="round" stroke-dasharray="1 5.2"/>
+  <path d="M32 54.5A22.5 22.5 0 0 1 9.5 32" fill="none" stroke="#9FEAF2" stroke-opacity=".55" stroke-width="2.2" stroke-linecap="round" stroke-dasharray="1 5.2"/>
+  <path d="M18 20.5h25.5L20.5 43.5H46" fill="none" stroke="#FFFFFF" stroke-width="6.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="44.5" cy="20.5" r="5.6" fill="#8BF0FA" stroke="#075468" stroke-width="2.4"/>
+  <circle cx="19.5" cy="43.5" r="5.6" fill="#8BF0FA" stroke="#075468" stroke-width="2.4"/>
+</svg>

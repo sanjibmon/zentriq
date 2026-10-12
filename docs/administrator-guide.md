@@ -38,6 +38,17 @@ Setup logs: `%TEMP%\Zentriq-Setup_*.log` (bootstrapper and MSI), `%TEMP%\install
 Self-signed certificate: setup adds it to *Trusted Root* on the server only. To avoid browser warnings elsewhere,
 distribute `C:\ProgramData\Zentriq\Secrets\https.pfx`'s public certificate via Group Policy or replace it as above.
 
+## Company profile
+
+*System Settings › Company profile* holds the customer's company name, legal name, address, tax ID and primary
+contact. Administrators (`settings.manage`) can edit it; changes are audited. When a production license that carries
+licensee details is imported, empty profile fields are filled from it and *Licensing* shows the signed licensee.
+
+## Discovery credentials and agents
+
+Scan credentials, Active Directory discovery and the Zentriq Agent are described in
+[agents-and-agentless.md](agents-and-agentless.md), including the limitations of agentless collection.
+
 ## Moving data
 
 PostgreSQL data can be placed on another volume at installation. To move the Zentriq data folder later: stop the

@@ -36,6 +36,19 @@ public sealed class Organization
     public Guid Id { get; set; }
     public string Name { get; set; } = "";
     public DateTimeOffset CreatedAt { get; set; }
+    public string? LegalName { get; set; }
+    public string? AddressLine1 { get; set; }
+    public string? AddressLine2 { get; set; }
+    public string? City { get; set; }
+    public string? StateRegion { get; set; }
+    public string? PostalCode { get; set; }
+    public string? Country { get; set; }
+    public string? TaxId { get; set; }
+    public string? Website { get; set; }
+    public string? ContactName { get; set; }
+    public string? ContactEmail { get; set; }
+    public string? ContactPhone { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
 }
 
 public sealed class Site
@@ -229,6 +242,9 @@ public sealed class ScanResult
     public bool AssetCreated { get; set; }
     public int? DurationMs { get; set; }
     public DateTimeOffset RecordedAt { get; set; }
+    /// <summary>Protocol that collected inventory (WinRM, DCOM/WMI, SSH, SNMPv2c, SNMPv3), if any.</summary>
+    public string? Protocol { get; set; }
+    public Guid? CredentialId { get; set; }
 }
 
 public sealed class Dashboard

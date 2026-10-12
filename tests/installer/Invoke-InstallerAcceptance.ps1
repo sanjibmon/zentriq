@@ -7,7 +7,9 @@
 .DESCRIPTION
   Installs silently with an answer file, then verifies the installation the way a customer would use it:
   services, PostgreSQL, migrations, HTTPS, administrator sign-in, trial, repair, restart, backup, license
-  rejection, credential-free logs, upgrade, uninstall (data preserved) and reinstall (trial not reset).
+  rejection, company profile, Zentriq Agent (download, enrollment, inventory, mTLS port, revocation, uninstall),
+  agentless WinRM inventory with a stored credential (and merge with the agent record), credential-free logs,
+  upgrade, uninstall (data preserved) and reinstall (trial not reset).
 
   Every check is recorded as PASS / FAIL / BLOCKED / NOT RUN in <OutDir>\installer-test-results.json and .md.
   DESTRUCTIVE: only run on a disposable VM or CI runner.
@@ -105,7 +107,7 @@ Remove-Item $answer -Force   # contains the administrator password
 
 if (-not $installed) {
     foreach ($t in 'T02 PostgreSQL provisioning', 'T03 Database migration', 'T04 Administrator sign-in', 'T05 API and worker services', 'T06 Trial initialization',
-                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console') {
+                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall') {
         Record $t.Substring(0, 3) $t.Substring(4) 'BLOCKED' 'installation failed'
     }
 } else {
@@ -153,8 +155,8 @@ if (-not $installed) {
     Check 'T22' 'Start menu and Desktop shortcuts use the Zentriq icon' {
         $iconPath = Join-Path $env:ProgramFiles 'Zentriq\zentriq.ico'
         Assert (Test-Path $iconPath) 'zentriq.ico not installed'
-        $start = Join-Path $env:ProgramData 'Microsoft\Windows\Start Menu\Programs\Zentriq\Zentriq Console.url'
-        $desk = Join-Path $env:PUBLIC 'Desktop\Zentriq Console.url'
+        $start = Join-Path $env:ProgramData 'Microsoft\Windows\Start Menu\Programs\Zentriq\Zentriq Web Console.url'
+        $desk = Join-Path $env:PUBLIC 'Desktop\Zentriq Web Console.url'
         foreach ($f in $start, $desk) {
             Assert (Test-Path $f) "missing $f"
             $c = Get-Content $f -Raw
@@ -203,6 +205,127 @@ if (-not $installed) {
         "rejected with $($r.StatusCode)"
     } | Out-Null
 
+    # ---- 1.1: trial policy, company profile, agent, agentless (WinRM) -----------------------------
+    function Api([string] $Method, [string] $Path, $Body = $null, $Session) {
+        $p = @{ Uri = "$base/api/v1$Path"; Method = $Method; WebSession = $Session; Headers = @{ 'X-Zentriq-Request' = '1' }; ContentType = 'application/json' }
+        if ($null -ne $Body) { $p.Body = ($Body | ConvertTo-Json -Depth 6) }
+        Invoke-RestMethod @p
+    }
+    Check 'T24' 'Trial: every module enabled, 30 devices in total' {
+        $s = Login
+        $st = Api GET '/licensing/status' -Session $s
+        Assert ($st.modules -contains '*') "modules: $($st.modules -join ',')"
+        Assert ($st.limits.devices -eq 30) "device limit $($st.limits.devices)"
+        Assert (@($st.usage | Where-Object workload -eq 'devices').Count -eq 1) 'no total devices usage row'
+        "limits: $($st.limits | ConvertTo-Json -Compress)"
+    } | Out-Null
+    Check 'T25' 'Company profile can be edited and read back' {
+        $s = Login
+        $body = @{ name = 'Zentriq CI Ltd'; legalName = 'Zentriq CI Private Limited'; city = 'Bengaluru'; country = 'India'; contactName = 'CI Admin'; contactEmail = 'it@ci.zentriq.test'; contactPhone = '+91 80 0000 0000' }
+        Api PUT '/organization' $body -Session $s | Out-Null
+        $o = Api GET '/organization' -Session $s
+        Assert ($o.profile.name -eq 'Zentriq CI Ltd' -and $o.profile.contactEmail -eq 'it@ci.zentriq.test') "profile: $($o.profile | ConvertTo-Json -Compress)"
+        "profile saved ($($o.profile.legalName))"
+    } | Out-Null
+
+    $script:agentAsset = $null
+    $agentMsi = Join-Path $OutDir 'ZentriqAgent-x64.msi'
+    $agentInstalled = Check 'T26' 'Agent: enrollment code, MSI download from the console, silent install, inventory received' {
+        $s = Login
+        $pkg = Api GET '/agents/package' -Session $s
+        Assert ($pkg.enrollmentAvailable) 'agent CA not provisioned'
+        Assert ($pkg.package) 'agent MSI is not served by the console'
+        Invoke-WebRequest "$base$($pkg.package.url)" -OutFile $agentMsi
+        $sig = Get-AuthenticodeSignature $agentMsi
+        $tok = Api POST '/agents/enrollment-tokens' @{ name = 'ci'; validDays = 1; maxUses = 2; serverUrl = 'https://localhost:8444' } -Session $s
+        Assert ($tok.code -like 'ZQ1.*') 'no enrollment code returned'
+        $log = Join-Path $OutDir 'agent-install.log'
+        $p = Start-Process msiexec.exe -ArgumentList '/i', "`"$agentMsi`"", '/qn', "ENROLLMENTCODE=$($tok.code)", '/l*v', "`"$log`"" -Wait -PassThru
+        Assert ($p.ExitCode -eq 0) "agent MSI exit $($p.ExitCode); see $log"
+        Assert ((Get-Service ZentriqAgent).Status -eq 'Running') 'ZentriqAgent service not running'
+        Assert (-not (Select-String -Path $log -SimpleMatch $tok.code -Quiet)) 'enrollment code written to the MSI log'
+        $deadline = (Get-Date).AddMinutes(4)
+        do {
+            Start-Sleep 5
+            $a = @(Api GET '/agents' -Session $s) | Where-Object { $_.assetId -and $_.lastInventoryAt } | Select-Object -First 1
+        } while (-not $a -and (Get-Date) -lt $deadline)
+        if (-not $a) { & (Join-Path $env:ProgramFiles 'Zentriq Agent\ZentriqAgent.exe') --status | Out-Host; throw 'agent did not enroll and send inventory within 4 minutes' }
+        $script:agentAsset = $a.assetId
+        $script:agentId = $a.id
+        $inv = Api GET "/assets/$($a.assetId)/inventory" -Session $s
+        Assert ($inv.source -eq 'agent') "inventory source $($inv.source)"
+        Assert (@($inv.software).Count -gt 5) "only $(@($inv.software).Count) software items"
+        Assert ($inv.document.hardware.memoryBytes -gt 0) 'no memory size'
+        Assert ($inv.document.device.serialNumber -or $inv.document.device.smbiosUuid) 'no serial number or SMBIOS UUID'
+        $reg = Get-ItemProperty 'HKLM:\SOFTWARE\Zentriq\Agent'
+        Assert (-not $reg.PSObject.Properties['EnrollmentCode']) 'enrollment code left in the registry'
+        $cert = Get-ChildItem Cert:\LocalMachine\My | Where-Object Thumbprint -eq $reg.CertThumbprint
+        Assert $cert 'agent certificate not in LocalMachine\My'
+        "$($a.hostname): $(@($inv.software).Count) applications, $([math]::Round($inv.document.hardware.memoryBytes/1GB)) GB RAM, health $($a.health); MSI signature: $($sig.Status)"
+    }
+    Check 'T27' 'Agent port serves only the agent API and requires a client certificate' {
+        $r1 = Invoke-WebRequest 'https://localhost:8444/' -SkipHttpErrorCheck
+        $r2 = Invoke-WebRequest 'https://localhost:8444/api/v1/setup/status' -SkipHttpErrorCheck
+        $r3 = Invoke-WebRequest 'https://localhost:8444/api/agent/v1/checkin' -Method Post -Body '{}' -ContentType 'application/json' -SkipHttpErrorCheck
+        $r4 = Invoke-WebRequest "$base/api/agent/v1/checkin" -Method Post -Body '{}' -ContentType 'application/json' -SkipHttpErrorCheck
+        Assert ($r1.StatusCode -eq 404) "console on agent port: $($r1.StatusCode)"
+        Assert ($r2.StatusCode -eq 404) "API v1 on agent port: $($r2.StatusCode)"
+        Assert ($r3.StatusCode -eq 401) "agent API without certificate: $($r3.StatusCode)"
+        Assert ($r4.StatusCode -eq 404) "agent API on console port: $($r4.StatusCode)"
+        $fw = Get-NetFirewallRule -DisplayName 'Zentriq Agent gateway*' -ErrorAction SilentlyContinue
+        Assert $fw 'agent firewall rule missing'
+        '/ 404, /api/v1 404, no cert 401, console port 404, firewall rule present'
+    } | Out-Null
+
+    $scanUser = 'zqscan'
+    $scanPassword = 'Zs-' + [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(15)).Replace('+', 'x').Replace('/', 'y') + '-7b'
+    Check 'T28' 'Agentless WinRM inventory with a stored credential; merges with the agent record' {
+        # Target preparation as an administrator would do it (local account, WinRM, UAC remote restrictions, TrustedHosts for NTLM by address).
+        New-LocalUser $scanUser -Password (ConvertTo-SecureString $scanPassword -AsPlainText -Force) -PasswordNeverExpires | Out-Null
+        Add-LocalGroupMember -Group Administrators -Member $scanUser
+        Enable-PSRemoting -Force -SkipNetworkProfileCheck | Out-Null
+        Set-Item WSMan:\localhost\Client\TrustedHosts -Value '*' -Force
+        Set-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System' -Name LocalAccountTokenFilterPolicy -Value 1 -Type DWord
+        $ip = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -match '^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)' -and $_.PrefixOrigin -ne 'WellKnown' } | Select-Object -First 1).IPAddress
+        Assert $ip 'no private IPv4 address on this machine'
+        $s = Login
+        $before = (Api GET '/assets/summary' -Session $s).total
+        $cred = Api POST '/credentials' @{ name = 'ci-local-admin'; kind = 'windows_local'; username = "$env:COMPUTERNAME\$scanUser"; secret = @{ password = $scanPassword } } -Session $s
+        $list = Invoke-WebRequest "$base/api/v1/credentials" -WebSession $s
+        Assert ($list.Content -notmatch [regex]::Escape($scanPassword)) 'credential API returned the secret'
+        $scan = Api POST '/discovery/scans' @{ name = 'ci-winrm'; scanType = 'single'; targetsText = $ip; credentialIds = @($cred.id) } -Session $s
+        $deadline = (Get-Date).AddMinutes(6)
+        do { Start-Sleep 5; $d = Api GET "/discovery/scans/$($scan.id)" -Session $s } while ($d.scan.status -in 'queued', 'running' -and (Get-Date) -lt $deadline)
+        $res = (Api GET "/discovery/scans/$($scan.id)/results" -Session $s).items | Select-Object -First 1
+        Assert ($res.status -eq 'success') "scan result $($res.status): $($res.detail)"
+        Assert ($res.protocol -like 'WinRM*') "protocol $($res.protocol)"
+        $inv = Api GET "/assets/$($res.assetId)/inventory" -Session $s
+        Assert ($inv.source -eq 'winrm') "inventory source $($inv.source)"
+        Assert (@($inv.software).Count -gt 5) "only $(@($inv.software).Count) software items"
+        $after = (Api GET '/assets/summary' -Session $s).total
+        if ($script:agentAsset) {
+            Assert ($res.assetId -eq $script:agentAsset) "agentless scan created a second asset ($($res.assetId)) instead of updating the agent's ($($script:agentAsset))"
+            Assert ($after -eq $before) "asset count $before -> $after"
+        }
+        "$ip via $($res.protocol): $(@($inv.software).Count) applications; assets $before -> $after; $($res.detail)"
+    } | Out-Null
+    if ($agentInstalled) {
+        Check 'T29' 'Agent revocation is enforced and uninstall removes the agent' {
+            $s = Login
+            Api POST "/agents/$($script:agentId)/revoke" -Session $s | Out-Null
+            $exe = Join-Path $env:ProgramFiles 'Zentriq Agent\ZentriqAgent.exe'
+            Stop-Service ZentriqAgent
+            $out = & $exe --once 2>&1 | Out-String
+            $status = & $exe --status 2>&1 | Out-String
+            Assert ($status -match 'Status:\s+revoked') "agent status after revoke: $status $out"
+            $p = Start-Process msiexec.exe -ArgumentList '/x', "`"$agentMsi`"", '/qn', '/l*v', "`"$(Join-Path $OutDir 'agent-uninstall.log')`"" -Wait -PassThru
+            Assert ($p.ExitCode -eq 0) "uninstall exit $($p.ExitCode)"
+            Assert (-not (Get-Service ZentriqAgent -ErrorAction SilentlyContinue)) 'service still registered'
+            Assert (-not (Test-Path 'HKLM:\SOFTWARE\Zentriq\Agent')) 'agent registry state left behind'
+            'revoked agent refused; uninstalled cleanly'
+        } | Out-Null
+    } else { Record 'T29' 'Agent revocation and uninstall' 'BLOCKED' 'agent install failed' }
+
     if ($UpgradeBundle) {
         Check 'T13' 'Upgrade to the next release preserves data and trial' {
             Run-Setup $UpgradeBundle @() 'upgrade' | Out-Null
@@ -220,6 +343,8 @@ if (-not $installed) {
         $files = $paths | Where-Object { Test-Path $_ } | ForEach-Object { Get-ChildItem $_ -Recurse -File -Include '*.log', '*.txt', '*.json' -ErrorAction SilentlyContinue }
         $hits = @($files | Select-String -SimpleMatch $adminPassword -List -ErrorAction SilentlyContinue)
         if ($hits.Count -gt 0) { throw "administrator password found in: $(($hits | ForEach-Object Path) -join ', ')" }
+        $hits = @($files | Select-String -SimpleMatch $scanPassword -List -ErrorAction SilentlyContinue)
+        if ($hits.Count -gt 0) { throw "scan credential password found in: $(($hits | ForEach-Object Path) -join ', ')" }
         $cs = $files | Select-String -Pattern '(?i)(password|pwd)\s*=\s*(?!\*\*\*REDACTED)[^;\s"]{6,}' -List -ErrorAction SilentlyContinue | Where-Object { $_.Line -notmatch 'PasswordPolicy|password=\*\*\*' }
         $cs = @($cs)
         if ($cs.Count -gt 0) { throw "possible secret in: $(($cs | ForEach-Object { "$($_.Path):$($_.LineNumber): $($_.Line.Trim())" }) -join ' | ')" }
@@ -230,7 +355,7 @@ if (-not $installed) {
         Run-Setup $(if ($UpgradeBundle) { $UpgradeBundle } else { $Bundle }) @('/uninstall') 'uninstall' | Out-Null
         Assert (-not (Get-Service ZentriqApi -ErrorAction SilentlyContinue)) 'ZentriqApi service still registered'
         Assert (-not (Test-Path $ctl)) 'program files still present'
-        Assert (-not (Test-Path (Join-Path $env:PUBLIC 'Desktop\Zentriq Console.url'))) 'desktop shortcut not removed'
+        Assert (-not (Test-Path (Join-Path $env:PUBLIC 'Desktop\Zentriq Web Console.url'))) 'desktop shortcut not removed'
         Assert (Test-Path (Join-Path $dataDir 'Secrets\app.secrets')) 'secrets were deleted'
         Assert (Test-Path (Join-Path $dataDir 'Config\zentriq.json')) 'configuration was deleted'
         Assert ((Get-Service 'postgresql-x64-17').Status -eq 'Running') 'PostgreSQL was removed or stopped'
@@ -253,6 +378,8 @@ foreach ($t in @(
     @('T18', 'Trial expiry enforcement end-to-end (clock moved past 14 days)', 'Covered by unit tests (LicenseEvaluator); not run against an installed server.'),
     @('T19', 'Valid commercial license activation end-to-end', 'Requires the vendor private key; signer + verifier covered by unit tests. Run manually with docs/licensing.md.'),
     @('T20', 'AD/OU scan in a test domain', 'No Active Directory domain on CI runners.'),
+    @('T30', 'Agentless SSH (Linux) and SNMP collection against real devices', 'No Linux/SNMP targets on the Windows CI runner; parsers covered by unit tests. Run manually.'),
+    @('T31', 'Agent over the internet through a firewall/reverse proxy', 'CI runs agent and server on one machine. Run manually with a published port 8444.'),
     @('T21', 'Interactive wizard (UI) walk-through', 'Silent install exercises the same provisioning; UI pages need a manual run on a VM.'))) {
     Record $t[0] $t[1] 'NOT RUN' $t[2]
 }

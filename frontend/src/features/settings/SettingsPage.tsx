@@ -3,6 +3,7 @@ import { api } from '../../api/client';
 import type { BackupFile, SystemInfo } from '../../api/types';
 import { useAuth } from '../../app/auth';
 import { useApi } from '../../app/useApi';
+import { CompanyProfile } from './CompanyProfile';
 import { Callout, DataTable, ErrorBox, fmt, Loading, PageHead, Panel, Pill } from '../../components/ui';
 
 export function SettingsPage() {
@@ -19,9 +20,10 @@ export function SettingsPage() {
 
   return (
     <>
-      <PageHead title="System Settings" desc="Installation, services, database and backups."
+      <PageHead title="System Settings" desc="Company profile, installation, services, database and backups."
         actions={can('backup.run') && <button className="btn" onClick={() => void backupNow()}>Back up now</button>} />
       {msg && <Callout>{msg}</Callout>}
+      <CompanyProfile />
       <ErrorBox error={info.error} />
       {!i ? <Loading /> : (
         <div className="grid-2">

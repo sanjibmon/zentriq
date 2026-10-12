@@ -5,7 +5,10 @@ using Npgsql;
 using NpgsqlTypes;
 using Zentriq.Application.Discovery;
 using Zentriq.Domain;
+using Zentriq.Infrastructure.Inventory;
 using Zentriq.Infrastructure.Licensing;
+using Zentriq.Infrastructure.Secrets;
+using Zentriq.Worker.Agentless;
 
 namespace Zentriq.Worker.Handlers;
 
@@ -16,16 +19,23 @@ namespace Zentriq.Worker.Handlers;
 ///  * Bounded concurrency, per-probe timeouts, cooperative cancellation.
 ///  * Resumable: targets that already have a result are skipped, so a retried or recovered job
 ///    (e.g. after a worker restart) continues where it stopped.
-///  * Credentialed inventory (WMI/WinRM/SSH/SNMP) is NOT part of this build. Responding hosts are
-///    recorded as reachable_unauthenticated (management ports open) or inventory_unavailable,
-///    never as a successful inventory.
+///  * Credentialed (agentless) inventory over WinRM/DCOM, SSH and SNMP when the scan has credentials; a
+///    host is "success" only when an inventory was actually collected. Without usable credentials,
+///    responding hosts are recorded as reachable_unauthenticated or inventory_unavailable.
+///  * Scan type "ad" lists enabled computer objects in a domain/OU and scans them; an AD object alone is
+///    never treated as proof that the computer is online or inventoried.
 /// </summary>
-public sealed class DiscoveryScanHandler(NpgsqlDataSource ds, IHostPinger pinger, LicensingService licensing, ILogger<DiscoveryScanHandler> logger) : IJobHandler
+public sealed class DiscoveryScanHandler(NpgsqlDataSource ds, IHostPinger pinger, LicensingService licensing, AgentlessInventory agentless,
+    CredentialProtector protector, InventoryStore inventoryStore, ILogger<DiscoveryScanHandler> logger) : IJobHandler
 {
     public string JobType => JobTypes.DiscoveryScan;
 
     private static readonly int[] ManagementPorts = [22, 135, 445, 5985, 5986];
-    private sealed record Config(string ScanType, string TargetsText, string ExcludeText, int Concurrency, int TimeoutMs, int[] Ports, List<string> ApprovedScopes, int MaxTargets);
+    private sealed record DirectorySource(string Server, string BaseDn, bool Ldaps, Guid CredentialId, int? InactiveDays);
+    private sealed record Config(string ScanType, string TargetsText, string ExcludeText, int Concurrency, int TimeoutMs, int[] Ports, List<string> ApprovedScopes, int MaxTargets,
+        Guid[]? CredentialIds = null, DirectorySource? Directory = null);
+    private List<ScanCredential> _creds = [];
+    private Dictionary<string, DirectoryComputer> _adObjects = new(StringComparer.OrdinalIgnoreCase);
 
     public async Task<object?> ExecuteAsync(JobContext context, CancellationToken ct)
     {
@@ -35,14 +45,28 @@ public sealed class DiscoveryScanHandler(NpgsqlDataSource ds, IHostPinger pinger
 
         var cfg = JsonSerializer.Deserialize<Config>(configJson, new JsonSerializerOptions(JsonSerializerDefaults.Web))
                   ?? throw new PermanentJobException("Scan configuration is unreadable.");
-        var parsed = TargetParser.Parse(cfg.TargetsText, cfg.ExcludeText, new ScanSafeguards(cfg.ApprovedScopes, cfg.MaxTargets, 0));
-        if (!parsed.IsValid)
+        try { _creds = await Credentials.LoadAsync(ds, protector, cfg.CredentialIds ?? [], ct); }
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            await FinishAsync(scanId, "failed", string.Join("; ", parsed.Errors), ct);
-            throw new PermanentJobException("Targets failed validation: " + string.Join("; ", parsed.Errors));
+            await FinishAsync(scanId, "failed", "Scan credentials could not be decrypted: " + ex.Message, ct);
+            throw new PermanentJobException("Scan credentials could not be decrypted: " + ex.Message);
         }
 
-        var targets = TargetParser.Expand(parsed, cfg.MaxTargets).ToList();
+        List<string> targets;
+        if (cfg.ScanType == "ad")
+        {
+            targets = await DirectoryTargetsAsync(scanId, cfg, context, ct);
+        }
+        else
+        {
+            var parsed = TargetParser.Parse(cfg.TargetsText, cfg.ExcludeText, new ScanSafeguards(cfg.ApprovedScopes, cfg.MaxTargets, 0));
+            if (!parsed.IsValid)
+            {
+                await FinishAsync(scanId, "failed", string.Join("; ", parsed.Errors), ct);
+                throw new PermanentJobException("Targets failed validation: " + string.Join("; ", parsed.Errors));
+            }
+            targets = TargetParser.Expand(parsed, cfg.MaxTargets).ToList();
+        }
         var done = await ExistingResultsAsync(scanId, ct);
         await MarkRunningAsync(scanId, targets.Count, done.Count, ct);
         await context.LogAsync(done.Count > 0
@@ -143,19 +167,43 @@ public sealed class DiscoveryScanHandler(NpgsqlDataSource ds, IHostPinger pinger
         }
 
         var probe = await pinger.ProbeAsync(ip, cfg.Ports, timeout, ct);
+        _adObjects.TryGetValue(target, out var adObject);
+        var adNote = adObject is null ? "" : $" Active Directory: {adObject.DistinguishedName}{(adObject.LastLogon is { } ll ? $", last logon {ll:yyyy-MM-dd}" : "")}.";
         if (!probe.Alive)
         {
-            await RecordAsync(scanId, target, ip, hostname, ScanResultStatus.Unreachable, [], "No response on any probed port (host down, filtered or not routed).", probe.DurationMs, false, null, ct);
+            // Network devices often answer only SNMP (UDP), which the TCP probe cannot see.
+            if (_creds.Any(c => c.IsSnmp))
+            {
+                var snmp = await agentless.TryCollectAsync(ip, hostname, [], false, _creds.Where(c => c.IsSnmp).ToList(), timeout, ct);
+                if (snmp.Outcome == CollectionAttempt.Success) return await StoreInventoryAsync(scanId, target, ip, snmp, probe, adObject, license, ct);
+            }
+            await RecordAsync(scanId, target, ip, hostname, ScanResultStatus.Unreachable, [], "No response on any probed port (host down, filtered or not routed)." + adNote, probe.DurationMs, false, null, ct);
             return new(ScanResultStatus.Unreachable, false, false);
         }
 
         hostname ??= await pinger.ReverseLookupAsync(ip, timeout, ct);
+        CollectionAttempt? attempt = null;
+        if (_creds.Count > 0)
+        {
+            attempt = await agentless.TryCollectAsync(ip, hostname, probe.OpenPorts, true, _creds, TimeSpan.FromSeconds(Math.Max(15, cfg.TimeoutMs / 1000.0 * 10)), ct);
+            if (attempt.Outcome == CollectionAttempt.Success) return await StoreInventoryAsync(scanId, target, ip, attempt, probe, adObject, license, ct);
+        }
         var mgmt = probe.OpenPorts.Intersect(ManagementPorts).ToArray();
         string status, detail;
-        if (mgmt.Length > 0)
+        if (attempt is { Outcome: CollectionAttempt.AuthFailed })
+        {
+            status = ScanResultStatus.AuthFailed;
+            detail = attempt.Detail;
+        }
+        else if (attempt is { Outcome: CollectionAttempt.Failed })
+        {
+            status = ScanResultStatus.InventoryFailed;
+            detail = attempt.Detail;
+        }
+        else if (mgmt.Length > 0)
         {
             status = ScanResultStatus.ReachableUnauthenticated;
-            detail = $"Responded; management ports open ({string.Join(',', mgmt)}). Credentialed inventory is not available in this build.";
+            detail = $"Responded; management ports open ({string.Join(',', mgmt)}). " + (attempt?.Detail ?? "Add credentials to the scan, or install the Zentriq Agent, to collect inventory.");
         }
         else
         {
@@ -167,8 +215,72 @@ public sealed class DiscoveryScanHandler(NpgsqlDataSource ds, IHostPinger pinger
 
         var (assetId, created, updated, assetNote) = await ReconcileAssetAsync(ip, hostname, probe.OpenPorts, license, ct);
         if (assetNote is not null) detail += " " + assetNote;
+        detail += adNote;
+        if (assetId is { } aid && adObject is not null) await AddIdentifierAsync(aid, "ad_object_guid", adObject.ObjectGuid.ToString("D"), ct);
         await RecordAsync(scanId, target, ip, hostname, status, probe.OpenPorts, detail, probe.DurationMs, created, assetId, ct);
         return new(status, created, updated);
+    }
+
+    private async Task<TargetOutcome> StoreInventoryAsync(Guid scanId, string target, IPAddress ip, CollectionAttempt attempt, ProbeResult probe, DirectoryComputer? ad, Application.Licensing.LicenseStatus license, CancellationToken ct)
+    {
+        await using var conn = await ds.OpenConnectionAsync(ct);
+        var r = await inventoryStore.ApplyAsync(conn, attempt.Document!, new MatchHints(Ip: ip), license, ct);
+        var detail = attempt.Detail + (r.Note is null ? "" : " " + r.Note);
+        if (r.AssetId is { } id && ad is not null) await AddIdentifierAsync(id, "ad_object_guid", ad.ObjectGuid.ToString("D"), ct);
+        var host = attempt.Document!.Device.Fqdn ?? attempt.Document.Device.Hostname;
+        await RecordAsync(scanId, target, ip, host, r.AssetId is null ? ScanResultStatus.InventoryFailed : ScanResultStatus.Success, probe.OpenPorts, detail,
+            probe.DurationMs, r.Created, r.AssetId, ct, attempt.Protocol, attempt.CredentialId);
+        return new(r.AssetId is null ? ScanResultStatus.InventoryFailed : ScanResultStatus.Success, r.Created, !r.Created && r.AssetId is not null);
+    }
+
+    private async Task AddIdentifierAsync(Guid assetId, string kind, string value, CancellationToken ct)
+    {
+        if (value == Guid.Empty.ToString("D")) return;
+        await using var cmd = ds.CreateCommand("INSERT INTO zentriq.asset_identifiers (asset_id, kind, value) VALUES (@a, @k, @v) ON CONFLICT (kind, value) DO NOTHING");
+        cmd.Parameters.AddWithValue("a", assetId);
+        cmd.Parameters.AddWithValue("k", kind);
+        cmd.Parameters.AddWithValue("v", value);
+        await cmd.ExecuteNonQueryAsync(ct);
+    }
+
+    /// <summary>Enabled AD computer objects under the base DN become hostname targets.</summary>
+    private async Task<List<string>> DirectoryTargetsAsync(Guid scanId, Config cfg, JobContext context, CancellationToken ct)
+    {
+        var d = cfg.Directory ?? throw new PermanentJobException("Directory settings are missing.");
+        await using var limitCmd = ds.CreateCommand("SELECT value::text FROM zentriq.system_settings WHERE key = 'discovery.ad_page_limit'");
+        var limit = int.TryParse(((await limitCmd.ExecuteScalarAsync(ct)) as string)?.Trim('"'), out var l) ? l : 20000;
+        List<ScanCredential> dirCreds;
+        try { dirCreds = await Credentials.LoadAsync(ds, protector, [d.CredentialId], ct); }
+        catch (Exception ex) when (ex is not OperationCanceledException) { throw new PermanentJobException("Directory credential could not be decrypted: " + ex.Message); }
+        if (dirCreds.Count == 0) throw new PermanentJobException("The directory credential no longer exists.");
+
+        List<DirectoryComputer> computers;
+        try
+        {
+            computers = await Task.Run(() => DirectoryCollector.ListComputers(d.Server, d.BaseDn, d.Ldaps, dirCreds[0], Math.Min(limit, cfg.MaxTargets), TimeSpan.FromSeconds(60)), ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            var msg = Zentriq.Application.Security.Redactor.Redact(ex.Message);
+            await FinishAsync(scanId, "failed", $"Active Directory query failed: {msg}", ct);
+            throw new PermanentJobException($"Active Directory query failed ({d.Server}, {d.BaseDn}): {msg}");
+        }
+        var cutoff = d.InactiveDays is > 0 ? DateTimeOffset.UtcNow.AddDays(-d.InactiveDays.Value) : (DateTimeOffset?)null;
+        var targets = new List<string>();
+        foreach (var c in computers)
+        {
+            var name = c.DnsHostName ?? c.Name;
+            if (string.IsNullOrWhiteSpace(name)) continue;
+            _adObjects[name] = c;
+            if (cutoff is not null && c.LastLogon is { } ll && ll < cutoff)
+            {
+                await RecordAsync(scanId, name, null, name, ScanResultStatus.Skipped, [], $"Not scanned: no logon to the domain since {ll:yyyy-MM-dd} (inactive > {d.InactiveDays} days). {c.DistinguishedName}", null, false, null, ct);
+                continue;
+            }
+            targets.Add(name);
+        }
+        await context.LogAsync($"Active Directory: {computers.Count} enabled computer object(s) under {d.BaseDn}; {targets.Count} to scan.", ct: ct);
+        return targets;
     }
 
     /// <summary>
@@ -313,14 +425,15 @@ public sealed class DiscoveryScanHandler(NpgsqlDataSource ds, IHostPinger pinger
             await RecordAsync(scanId, t, null, null, ScanResultStatus.Cancelled, [], "Not probed: scan was cancelled.", null, false, null, ct);
     }
 
-    private async Task RecordAsync(Guid scanId, string target, IPAddress? ip, string? hostname, string status, int[] ports, string detail, int? durationMs, bool created, Guid? assetId, CancellationToken ct)
+    private async Task RecordAsync(Guid scanId, string target, IPAddress? ip, string? hostname, string status, int[] ports, string detail, int? durationMs, bool created, Guid? assetId, CancellationToken ct,
+        string? protocol = null, Guid? credentialId = null)
     {
         await using var cmd = ds.CreateCommand("""
-            INSERT INTO zentriq.scan_results (scan_id, target, ip_address, hostname, status, open_ports, detail, asset_id, asset_created, duration_ms)
-            VALUES (@s, @t, @ip, @h, @st, @p, @d, @a, @c, @ms)
+            INSERT INTO zentriq.scan_results (scan_id, target, ip_address, hostname, status, open_ports, detail, asset_id, asset_created, duration_ms, protocol, credential_id)
+            VALUES (@s, @t, @ip, @h, @st, @p, @d, @a, @c, @ms, @proto, @cred)
             ON CONFLICT (scan_id, target) DO UPDATE SET status = EXCLUDED.status, ip_address = EXCLUDED.ip_address, hostname = EXCLUDED.hostname,
                 open_ports = EXCLUDED.open_ports, detail = EXCLUDED.detail, asset_id = EXCLUDED.asset_id, asset_created = EXCLUDED.asset_created,
-                duration_ms = EXCLUDED.duration_ms, recorded_at = now()
+                duration_ms = EXCLUDED.duration_ms, protocol = EXCLUDED.protocol, credential_id = EXCLUDED.credential_id, recorded_at = now()
             WHERE zentriq.scan_results.status = 'cancelled'
             """);
         cmd.Parameters.AddWithValue("s", scanId);
@@ -333,6 +446,8 @@ public sealed class DiscoveryScanHandler(NpgsqlDataSource ds, IHostPinger pinger
         cmd.Parameters.Add(new NpgsqlParameter("a", NpgsqlDbType.Uuid) { Value = (object?)assetId ?? DBNull.Value });
         cmd.Parameters.AddWithValue("c", created);
         cmd.Parameters.Add(new NpgsqlParameter("ms", NpgsqlDbType.Integer) { Value = (object?)durationMs ?? DBNull.Value });
+        cmd.Parameters.Add(new NpgsqlParameter("proto", NpgsqlDbType.Text) { Value = (object?)protocol ?? DBNull.Value });
+        cmd.Parameters.Add(new NpgsqlParameter("cred", NpgsqlDbType.Uuid) { Value = (object?)credentialId ?? DBNull.Value });
         await cmd.ExecuteNonQueryAsync(ct);
     }
 }

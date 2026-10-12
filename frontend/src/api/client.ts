@@ -57,6 +57,7 @@ export const api = {
   post: <T>(path: string, body?: unknown, allow401 = false) => request<T>('POST', path, { body: body ?? {}, allow401 }),
   put: <T>(path: string, body?: unknown) => request<T>('PUT', path, { body: body ?? {} }),
   patch: <T>(path: string, body?: unknown) => request<T>('PATCH', path, { body: body ?? {} }),
+  del: <T>(path: string) => request<T>('DELETE', path),
   /** POST that returns a file (e.g. the activation request) and saves it in the browser. */
   async download(path: string, fallbackName: string): Promise<void> {
     const res = await fetch(url(path), { method: 'POST', headers: { 'X-Zentriq-Request': '1' }, credentials: 'same-origin' });

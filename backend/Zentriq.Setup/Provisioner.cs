@@ -159,6 +159,8 @@ public sealed class Provisioner(ProvisionInput input, ZentriqPaths paths, Report
         if (string.IsNullOrEmpty(_app.DbAppPassword)) _app.DbAppPassword = SecretStore.NewPassword();
         if (string.IsNullOrEmpty(_app.InstallSecret)) _app.InstallSecret = SecretStore.NewKey();
         if (string.IsNullOrEmpty(_app.HttpsPfxPassword)) _app.HttpsPfxPassword = SecretStore.NewPassword();
+        if (string.IsNullOrEmpty(_app.CredentialKey)) _app.CredentialKey = SecretStore.NewKey();
+        if (string.IsNullOrEmpty(_app.AgentCaPfxPassword)) _app.AgentCaPfxPassword = SecretStore.NewPassword();
 
         if (_superPassword.Length > 0)
             await new PostgresProvisioner(log).EnsureDatabaseAsync(input.Postgres, _superPassword, _owner.DbOwnerPassword, _app.DbAppPassword, ct);
@@ -229,6 +231,10 @@ public sealed class Provisioner(ProvisionInput input, ZentriqPaths paths, Report
             ? cm.EnsureSelfSigned(paths, _options.Https.HostName, _app.HttpsPfxPassword!, forceNew: false)
             : cm.UseExisting(input.Https.CertificateThumbprint!, input.ApiService);
         _thumbprint = info.Thumbprint;
+        // Agent CA (issues agent client certificates for mutual TLS); readable only by the API service.
+        if (Zentriq.Infrastructure.Agents.AgentCertificateAuthority.Ensure(paths.AgentCaFile, _app.AgentCaPfxPassword!, Environment.MachineName))
+            log.Info("Created the agent certificate authority (Secrets\\agent-ca.pfx).");
+        WindowsHost.SecureFile(paths.AgentCaFile, (WindowsHost.ServiceSid(input.ApiService), FileSystemRights.Read));
         if (string.IsNullOrWhiteSpace(input.Https.CertificateThumbprint))
         {
             _options.Https.CertificatePath = paths.HttpsCertificateFile;

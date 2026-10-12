@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ZentriqAgent-x64.msi — Zentriq Agent for Windows endpoints and servers.
+    Silent:  msiexec /i ZentriqAgent-x64.msi /qn ENROLLMENTCODE="ZQ1...." [PROXYURL="http://proxy:8080"]
+  Runs as LocalSystem (read-only inventory needs WMI/registry access), outbound HTTPS only, no listening ports.
+  The enrollment code is a hidden property (masked in MSI logs) and is deleted by the agent once used.
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+
+  <Package Name="Zentriq Agent"
+           Manufacturer="Zentriq"
+           Version="$(var.ProductVersion)"
+           UpgradeCode="7C0E1B4A-3D52-4E8F-9A61-2B5C8D7E4F30"
+           Scope="perMachine"
+           InstallerVersion="500"
+           Language="1033"
+           Compressed="yes">
+
+    <SummaryInformation Description="Zentriq Agent $(var.ProductVersion) — device inventory for Zentriq" />
+    <MajorUpgrade Schedule="afterInstallInitialize" AllowSameVersionUpgrades="no"
+                  DowngradeErrorMessage="A newer version of the Zentriq Agent is already installed." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <PropertyRef Id="WIX_IS_NETFRAMEWORK_48_OR_LATER_INSTALLED" />
+    <Launch Condition="Installed OR WIX_IS_NETFRAMEWORK_48_OR_LATER_INSTALLED"
+            Message="The Zentriq Agent requires .NET Framework 4.8 (included in Windows 10 1903+, Windows 11 and Windows Server 2022+; install it first on older systems)." />
+    <Launch Condition="VersionNT64" Message="This package is for 64-bit Windows." />
+    <Launch Condition="Privileged" Message="The Zentriq Agent must be installed by an administrator." />
+
+    <Icon Id="AgentIcon" SourceFile="$(var.AssetsDir)\zentriq-agent.ico" />
+    <Property Id="ARPPRODUCTICON" Value="AgentIcon" />
+    <Property Id="ARPNOMODIFY" Value="1" />
+
+    <Property Id="ENROLLMENTCODE" Secure="yes" Hidden="yes" />
+    <Property Id="PROXYURL" Secure="yes">
+      <RegistrySearch Id="RegProxy" Root="HKLM" Key="SOFTWARE\Zentriq\Agent" Name="ProxyUrl" Type="raw" Bitness="always64" />
+    </Property>
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="Zentriq Agent" />
+    </StandardDirectory>
+
+    <Feature Id="Main" Title="Zentriq Agent" Level="1" AllowAbsent="no">
+      <ComponentGroupRef Id="AgentFiles" />
+      <ComponentRef Id="AgentSettings" />
+      <ComponentRef Id="AgentEnrollment" />
+      <ComponentRef Id="AgentProxy" />
+    </Feature>
+
+    <ComponentGroup Id="AgentFiles" Directory="INSTALLFOLDER">
+      <Component Id="AgentService">
+        <File Id="AgentExe" Source="$(var.AgentDir)\ZentriqAgent.exe" KeyPath="yes" />
+        <ServiceInstall Id="AgentServiceInstall" Name="ZentriqAgent" DisplayName="Zentriq Agent"
+                        Description="Collects hardware and software inventory for Zentriq (outbound HTTPS only)."
+                        Type="ownProcess" Start="auto" ErrorControl="normal" Vital="yes" Account="LocalSystem">
+          <ServiceConfig DelayedAutoStart="yes" OnInstall="yes" OnReinstall="yes" />
+          <util:ServiceConfig FirstFailureActionType="restart" SecondFailureActionType="restart" ThirdFailureActionType="restart"
+                              RestartServiceDelayInSeconds="60" ResetPeriodInDays="1" />
+        </ServiceInstall>
+        <ServiceControl Id="AgentServiceControl" Name="ZentriqAgent" Start="install" Stop="both" Remove="uninstall" Wait="yes" />
+      </Component>
+      <Files Include="$(var.AgentDir)\**">
+        <Exclude Files="$(var.AgentDir)\ZentriqAgent.exe" />
+      </Files>
+    </ComponentGroup>
+
+    <Component Id="AgentSettings" Directory="INSTALLFOLDER">
+      <RegistryKey Root="HKLM" Key="SOFTWARE\Zentriq\Agent">
+        <RegistryValue Name="InstallDirectory" Type="string" Value="[INSTALLFOLDER]" KeyPath="yes" />
+        <RegistryValue Name="Version" Type="string" Value="$(var.ProductVersion)" />
+      </RegistryKey>
+    </Component>
+
+    <!-- Written only when a code is supplied; the agent removes the value after enrollment. -->
+    <Component Id="AgentEnrollment" Directory="INSTALLFOLDER" Condition="ENROLLMENTCODE" Transitive="yes">
+      <RegistryValue Root="HKLM" Key="SOFTWARE\Zentriq\Agent" Name="EnrollmentCode" Type="string" Value="[ENROLLMENTCODE]" />
+      <RegistryValue Root="HKLM" Key="SOFTWARE\Zentriq\Agent" Name="EnrollmentSupplied" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+    <Component Id="AgentProxy" Directory="INSTALLFOLDER" Condition="PROXYURL" Transitive="yes">
+      <RegistryValue Root="HKLM" Key="SOFTWARE\Zentriq\Agent" Name="ProxyUrl" Type="string" Value="[PROXYURL]" KeyPath="yes" />
+    </Component>
+
+    <!-- Uninstall: remove the agent certificate and state (not on upgrade). -->
+    <CustomAction Id="AgentCleanup" FileRef="AgentExe" ExeCommand="--cleanup" Execute="deferred" Impersonate="no" Return="ignore" />
+    <InstallExecuteSequence>
+      <Custom Action="AgentCleanup" After="StopServices" Condition='REMOVE = "ALL" AND NOT UPGRADINGPRODUCTCODE' />
+    </InstallExecuteSequence>
+
+    <UIRef Id="ZentriqAgentUI" />
+  </Package>
+</Wix>

@@ -17,6 +17,11 @@ public static class Workloads
 
     public static readonly IReadOnlyList<string> All = [Endpoint, Server, NetworkDevice, Other];
 
+    /// <summary>Limit key for a total device cap across all workloads (used by the trial policy; also allowed in licenses).</summary>
+    public const string TotalDevices = "devices";
+
+    public static bool IsLimitKey(string key) => key == TotalDevices || All.Contains(key);
+
     public static string FromAssetCategory(string category) => category switch
     {
         "endpoint" => Endpoint,

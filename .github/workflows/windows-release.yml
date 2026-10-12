@@ -28,8 +28,8 @@ env:
   AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
   AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
   AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
-  ZQ_VERSION: '1.0.2'
-  ZQ_UPGRADE_VERSION: '1.0.3'
+  ZQ_VERSION: '1.1.0'
+  ZQ_UPGRADE_VERSION: '1.1.1'
 
 jobs:
   windows:

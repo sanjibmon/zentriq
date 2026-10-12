@@ -13,7 +13,9 @@ namespace Zentriq.Infrastructure.Licensing;
 public sealed record WorkloadUsage(string Workload, int Billable, int? Limit);
 
 public sealed class WorkloadLimitExceededException(string workload, int limit)
-    : Exception($"The {workload.Replace('_', ' ')} workload limit ({limit}) has been reached. Retire unused assets or import a license with more capacity.")
+    : Exception(workload == Workloads.TotalDevices
+        ? $"The device limit ({limit} devices) has been reached. Retire unused assets or import a license with more capacity."
+        : $"The {workload.Replace('_', ' ')} workload limit ({limit}) has been reached. Retire unused assets or import a license with more capacity.")
 {
     public string Workload { get; } = workload;
     public int Limit { get; } = limit;
@@ -62,8 +64,11 @@ public sealed class LicensingService(
     {
         var status = await GetStatusAsync(ct);
         var counts = await CountBillableAsync(null, null, ct);
-        return Workloads.All.Select(w => new WorkloadUsage(w, counts.GetValueOrDefault(w),
+        var rows = Workloads.All.Select(w => new WorkloadUsage(w, counts.GetValueOrDefault(w),
             status.Limits.TryGetValue(w, out var l) ? l : null)).ToList();
+        if (status.Limits.TryGetValue(Workloads.TotalDevices, out var total))
+            rows.Insert(0, new WorkloadUsage(Workloads.TotalDevices, counts.Values.Sum(), total));
+        return rows;
     }
 
     /// <summary>
@@ -100,12 +105,20 @@ public sealed class LicensingService(
     public async Task EnsureCapacityAsync(NpgsqlConnection conn, NpgsqlTransaction tx, string workload, int adding, LicenseStatus status, CancellationToken ct = default)
     {
         await using (var l = new NpgsqlCommand(WorkloadLockSql, conn, tx)) await l.ExecuteNonQueryAsync(ct);
-        if (!status.Limits.TryGetValue(workload, out var limit)) return; // unlimited for this workload
-        var grace = await GetSettingAsync("licensing.overage_grace_percent", 5, conn, tx, ct);
-        var hardLimit = limit + (int)Math.Floor(limit * grace / 100.0);
+        var hasWorkloadLimit = status.Limits.TryGetValue(workload, out var limit);
+        var hasTotal = status.Limits.TryGetValue(Workloads.TotalDevices, out var totalLimit);
+        if (!hasWorkloadLimit && !hasTotal) return; // unlimited
         var counts = await CountBillableAsync(conn, tx, ct);
-        if (counts.GetValueOrDefault(workload) + adding > hardLimit)
-            throw new WorkloadLimitExceededException(workload, limit);
+        if (hasWorkloadLimit)
+        {
+            var grace = await GetSettingAsync("licensing.overage_grace_percent", 5, conn, tx, ct);
+            var hardLimit = limit + (int)Math.Floor(limit * grace / 100.0);
+            if (counts.GetValueOrDefault(workload) + adding > hardLimit)
+                throw new WorkloadLimitExceededException(workload, limit);
+        }
+        // The total device cap (trial: 30) is exact: no overage grace.
+        if (hasTotal && counts.Values.Sum() + adding > totalLimit)
+            throw new WorkloadLimitExceededException(Workloads.TotalDevices, totalLimit);
     }
 
     public Task<int> GetSettingAsync(string key, int fallback, CancellationToken ct = default) => GetSettingAsync(key, fallback, null, null, ct);

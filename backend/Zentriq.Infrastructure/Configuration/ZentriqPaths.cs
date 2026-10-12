@@ -49,5 +49,6 @@ public sealed class ZentriqPaths
     public string AppSecretsFile => Path.Combine(Secrets, "app.secrets");
     public string OwnerSecretsFile => Path.Combine(Secrets, "owner.secrets");
     public string HttpsCertificateFile => Path.Combine(Secrets, "https.pfx");
+    public string AgentCaFile => Path.Combine(Secrets, "agent-ca.pfx");
     public string InstallResultFile => Path.Combine(Logs, "install-result.json");
 }

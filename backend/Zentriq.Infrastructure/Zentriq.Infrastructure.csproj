@@ -4,6 +4,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Zentriq.Application\Zentriq.Application.csproj" />
+    <ProjectReference Include="..\Zentriq.Inventory\Zentriq.Inventory.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Npgsql" />

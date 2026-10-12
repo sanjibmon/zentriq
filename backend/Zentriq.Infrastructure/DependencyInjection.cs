@@ -48,6 +48,8 @@ public static class DependencyInjection
         services.AddSingleton<AuditWriter>();
         services.AddSingleton<JobQueue>();
         services.AddSingleton<SqlMigrator>();
+        services.AddSingleton<CredentialProtector>();
+        services.AddScoped<Zentriq.Infrastructure.Inventory.InventoryStore>();
         return services;
     }
 

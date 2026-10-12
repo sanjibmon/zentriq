@@ -107,6 +107,8 @@
       <ComponentRef Id="Settings" />
       <ComponentRef Id="FirewallAny" />
       <ComponentRef Id="FirewallLocalSubnet" />
+      <ComponentRef Id="FirewallAgentAny" />
+      <ComponentRef Id="FirewallAgentLocalSubnet" />
       <ComponentRef Id="ConsoleIcon" />
       <ComponentRef Id="StartMenu" />
       <ComponentRef Id="DesktopShortcut" />
@@ -173,13 +175,25 @@
       <RegistryValue Root="HKLM" Key="SOFTWARE\Zentriq\Console" Name="FirewallRuleLocalSubnet" Type="string" Value="localsubnet" KeyPath="yes" />
     </Component>
 
+    <!-- Inbound HTTPS 8444 for Zentriq Agents (mutual TLS; only the agent API is served on this port). -->
+    <Component Id="FirewallAgentAny" Directory="INSTALLFOLDER" Condition='FIREWALLSCOPE = "any"'>
+      <fw:FirewallException Id="FwAgentAny" Name="Zentriq Agent gateway (HTTPS 8444)" Description="Inbound connections from Zentriq Agents (client-certificate authenticated)."
+                            Port="8444" Protocol="tcp" Scope="any" Profile="all" />
+      <RegistryValue Root="HKLM" Key="SOFTWARE\Zentriq\Console" Name="FirewallAgentRuleAny" Type="string" Value="any" KeyPath="yes" />
+    </Component>
+    <Component Id="FirewallAgentLocalSubnet" Directory="INSTALLFOLDER" Condition='FIREWALLSCOPE = "localsubnet"'>
+      <fw:FirewallException Id="FwAgentSubnet" Name="Zentriq Agent gateway (HTTPS 8444, local subnet)" Description="Inbound connections from Zentriq Agents on the local subnet."
+                            Port="8444" Protocol="tcp" Scope="localSubnet" Profile="all" />
+      <RegistryValue Root="HKLM" Key="SOFTWARE\Zentriq\Console" Name="FirewallAgentRuleLocalSubnet" Type="string" Value="localsubnet" KeyPath="yes" />
+    </Component>
+
     <!-- Branded icon used by the Start menu and Desktop shortcuts (otherwise Windows shows the browser icon). -->
     <Component Id="ConsoleIcon" Directory="INSTALLFOLDER">
       <File Id="ZentriqIconFile" Source="$(var.AssetsDir)\zentriq.ico" Name="zentriq.ico" KeyPath="yes" />
     </Component>
 
     <Component Id="StartMenu" Directory="ShortcutFolder">
-      <util:InternetShortcut Id="ConsoleShortcut" Name="Zentriq Console" Target="[ZQ_URL]" Type="url"
+      <util:InternetShortcut Id="ConsoleShortcut" Name="Zentriq Web Console" Target="[ZQ_URL]" Type="url"
                              IconFile="[#ZentriqIconFile]" IconIndex="0" />
       <RemoveFolder Id="RemoveShortcutFolder" On="uninstall" />
       <RegistryValue Root="HKCU" Key="Software\Zentriq\Console" Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
@@ -187,7 +201,7 @@
 
     <!-- Desktop shortcut (all users). Opt out with DESKTOPSHORTCUT=0. -->
     <Component Id="DesktopShortcut" Directory="DesktopFolder" Condition='DESKTOPSHORTCUT = "1"'>
-      <util:InternetShortcut Id="ConsoleDesktopShortcut" Name="Zentriq Console" Target="[ZQ_URL]" Type="url"
+      <util:InternetShortcut Id="ConsoleDesktopShortcut" Name="Zentriq Web Console" Target="[ZQ_URL]" Type="url"
                              IconFile="[#ZentriqIconFile]" IconIndex="0" />
       <RegistryValue Root="HKCU" Key="Software\Zentriq\Console" Name="DesktopShortcut" Type="integer" Value="1" KeyPath="yes" />
     </Component>

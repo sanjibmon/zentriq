@@ -1,0 +1,21 @@
+<Project Sdk="WixToolset.Sdk/5.0.2">
+  <!-- Zentriq Agent MSI (per-machine, x64). Built by package-windows.ps1 before the server MSI, which serves it at /downloads. -->
+  <PropertyGroup>
+    <OutputName>ZentriqAgent-x64</OutputName>
+    <OutputType>Package</OutputType>
+    <Platform Condition="'$(Platform)' == ''">x64</Platform>
+    <InstallerPlatform>x64</InstallerPlatform>
+    <Cultures>en-US</Cultures>
+    <ProductVersion Condition="'$(ProductVersion)' == ''">1.0.0</ProductVersion>
+    <AgentDir Condition="'$(AgentDir)' == ''">$(MSBuildThisFileDirectory)..\..\artifacts\staging-agent</AgentDir>
+    <AssetsDir>$(MSBuildThisFileDirectory)..\assets</AssetsDir>
+    <DefineConstants>ProductVersion=$(ProductVersion);AgentDir=$(AgentDir);AssetsDir=$(AssetsDir)</DefineConstants>
+    <OutputPath>$(MSBuildThisFileDirectory)..\..\artifacts\agent-msi\</OutputPath>
+    <IntermediateOutputPath>$(MSBuildThisFileDirectory)obj\</IntermediateOutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="WixToolset.UI.wixext" Version="5.0.2" />
+    <PackageReference Include="WixToolset.Util.wixext" Version="5.0.2" />
+    <PackageReference Include="WixToolset.Netfx.wixext" Version="5.0.2" />
+  </ItemGroup>
+</Project>

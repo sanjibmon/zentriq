@@ -25,6 +25,7 @@ builder.Services.AddScoped<IJobHandler, SelfTestHandler>();
 builder.Services.AddScoped<IJobHandler, DiscoveryScanHandler>();
 builder.Services.AddScoped<IJobHandler, UsageSnapshotHandler>();
 builder.Services.AddSingleton<IHostPinger, TcpHostPinger>();
+builder.Services.AddSingleton<Zentriq.Worker.Agentless.AgentlessInventory>();
 
 builder.Services.AddHostedService<JobRunner>();
 builder.Services.AddHostedService<Housekeeping>();

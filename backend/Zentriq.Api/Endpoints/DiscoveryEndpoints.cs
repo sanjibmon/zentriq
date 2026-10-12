@@ -12,15 +12,19 @@ namespace Zentriq.Api.Endpoints;
 
 public static class DiscoveryEndpoints
 {
-    public sealed record ScanRequest(string? Name, string ScanType, string? TargetsText, string? ExcludeText, int? Concurrency, int? TimeoutMs, int[]? Ports);
+    public sealed record ScanRequest(string? Name, string ScanType, string? TargetsText, string? ExcludeText, int? Concurrency, int? TimeoutMs, int[]? Ports,
+        Guid[]? CredentialIds = null, DirectorySource? Directory = null);
+    /// <summary>Active Directory source for scan type "ad": computers under BaseDn become targets.</summary>
+    public sealed record DirectorySource(string Server, string BaseDn, bool Ldaps, Guid CredentialId, int? InactiveDays);
     public sealed record JobEventDto(DateTimeOffset OccurredAt, string Level, string Message);
     public sealed record ProfileBody(string Name, string? Description, ScanRequest Config, bool Shared);
 
     /// <summary>Persisted scan configuration consumed by the worker (no secrets).</summary>
-    public sealed record ScanConfig(string ScanType, string TargetsText, string ExcludeText, int Concurrency, int TimeoutMs, int[] Ports, IReadOnlyList<string> ApprovedScopes, int MaxTargets);
+    public sealed record ScanConfig(string ScanType, string TargetsText, string ExcludeText, int Concurrency, int TimeoutMs, int[] Ports, IReadOnlyList<string> ApprovedScopes, int MaxTargets,
+        Guid[]? CredentialIds = null, DirectorySource? Directory = null);
 
     public static readonly int[] DefaultPorts = [22, 80, 135, 139, 443, 445, 3389, 5985, 5986, 161];
-    private static readonly string[] SupportedTypes = ["ip", "single", "list"];
+    private static readonly string[] SupportedTypes = ["ip", "single", "list", "ad"];
 
     public static void MapDiscoveryEndpoints(this RouteGroupBuilder api)
     {
@@ -79,7 +83,7 @@ public static class DiscoveryEndpoints
             var rows = await query.OrderBy(r => r.Id).Skip((p - 1) * ps).Take(ps).ToListAsync(ct);
             return Results.Ok(new PagedResult<object>(rows.Select(r => (object)new
             {
-                r.Id, r.Target, ip = r.IpAddress?.ToString(), r.Hostname, r.Status, r.OpenPorts, r.Detail, r.AssetId, r.AssetCreated, r.DurationMs, r.RecordedAt,
+                r.Id, r.Target, ip = r.IpAddress?.ToString(), r.Hostname, r.Status, r.OpenPorts, r.Detail, r.AssetId, r.AssetCreated, r.DurationMs, r.RecordedAt, r.Protocol, r.CredentialId,
             }).ToList(), total, p, ps));
         }).RequireAuthorization(Permissions.AssetsView);
 
@@ -152,10 +156,31 @@ public static class DiscoveryEndpoints
     private static async Task<(DiscoveryScan? Scan, IResult? Error)> CreateScanAsync(ScanRequest body, Guid? profileId, ZentriqDbContext db, JobQueue jobs, RequestContext rc, CancellationToken ct)
     {
         if (!SupportedTypes.Contains(body.ScanType))
-            return (null, Validation.Problem("scanType", body.ScanType == "ad"
-                ? "Active Directory discovery is not available in this build."
-                : "Unsupported scan type."));
+            return (null, Validation.Problem("scanType", "Unsupported scan type."));
         var sg = await LoadSafeguardsAsync(db, ct);
+
+        var credIds = (body.CredentialIds ?? []).Distinct().Take(10).ToArray();
+        if (credIds.Length > 0)
+        {
+            var known = await db.Database.SqlQuery<Guid>($"SELECT id AS \"Value\" FROM zentriq.credentials WHERE id = ANY({credIds})").ToListAsync(ct);
+            if (known.Count != credIds.Length) return (null, Validation.Problem("credentialIds", "One or more selected credentials no longer exist."));
+        }
+        if (body.ScanType == "ad")
+        {
+            var d = body.Directory;
+            if (d is null || string.IsNullOrWhiteSpace(d.Server) || string.IsNullOrWhiteSpace(d.BaseDn))
+                return (null, Validation.Problem("directory", "Enter the domain controller and the domain or OU (distinguished name) to discover."));
+            if (!d.BaseDn.Contains("DC=", StringComparison.OrdinalIgnoreCase))
+                return (null, Validation.Problem("directory.baseDn", "Use a distinguished name, e.g. OU=Servers,DC=corp,DC=example,DC=com."));
+            var kind = await db.Database.SqlQuery<string>($"SELECT kind AS \"Value\" FROM zentriq.credentials WHERE id = {d.CredentialId}").FirstOrDefaultAsync(ct);
+            if (kind is not ("ldap_bind" or "windows_domain"))
+                return (null, Validation.Problem("directory.credentialId", "Choose a directory (LDAP bind) or Windows domain credential with read access to the directory."));
+            var adConfig = new ScanConfig("ad", "", body.ExcludeText ?? "", Math.Clamp(body.Concurrency ?? sg.DefaultConcurrency, 1, sg.MaxConcurrency),
+                Math.Clamp(body.TimeoutMs ?? sg.ProbeTimeoutMs, 200, 10_000), DefaultPorts, sg.Safeguards.ApprovedScopes, sg.Safeguards.MaxTargets, credIds,
+                d with { Server = d.Server.Trim(), BaseDn = d.BaseDn.Trim() });
+            return await PersistScanAsync(body, adConfig, 0, profileId, db, jobs, rc, ct);
+        }
+
         var parsed = TargetParser.Parse(body.TargetsText, body.ExcludeText, sg.Safeguards);
         if (body.ScanType == "single" && parsed.Items.Count == 1 && parsed.Items[0].Count != 1)
             return (null, Validation.Problem("targetsText", "A single-host scan takes exactly one IP address or hostname."));
@@ -167,15 +192,19 @@ public static class DiscoveryEndpoints
         var concurrency = Math.Clamp(body.Concurrency ?? sg.DefaultConcurrency, 1, sg.MaxConcurrency);
         var timeout = Math.Clamp(body.TimeoutMs ?? sg.ProbeTimeoutMs, 200, 10_000);
         var ports = (body.Ports is { Length: > 0 } ? body.Ports : DefaultPorts).Where(p => p is > 0 and < 65536).Distinct().Take(32).ToArray();
-        var config = new ScanConfig(body.ScanType, body.TargetsText ?? "", body.ExcludeText ?? "", concurrency, timeout, ports, sg.Safeguards.ApprovedScopes, sg.Safeguards.MaxTargets);
+        var config = new ScanConfig(body.ScanType, body.TargetsText ?? "", body.ExcludeText ?? "", concurrency, timeout, ports, sg.Safeguards.ApprovedScopes, sg.Safeguards.MaxTargets, credIds);
+        return await PersistScanAsync(body, config, parsed.TotalAddresses, profileId, db, jobs, rc, ct);
+    }
 
+    private static async Task<(DiscoveryScan? Scan, IResult? Error)> PersistScanAsync(ScanRequest body, ScanConfig config, long totalAddresses, Guid? profileId, ZentriqDbContext db, JobQueue jobs, RequestContext rc, CancellationToken ct)
+    {
         var now = DateTimeOffset.UtcNow;
         var scan = new DiscoveryScan
         {
             Id = Guid.NewGuid(),
-            Name = string.IsNullOrWhiteSpace(body.Name) ? $"{(body.ScanType == "single" ? "Single host" : "IP scan")} {now:yyyy-MM-dd HH:mm} UTC" : body.Name.Trim()[..Math.Min(body.Name.Trim().Length, 200)],
+            Name = string.IsNullOrWhiteSpace(body.Name) ? $"{(body.ScanType switch { "single" => "Single host", "ad" => "Active Directory", _ => "IP scan" })} {now:yyyy-MM-dd HH:mm} UTC" : body.Name.Trim()[..Math.Min(body.Name.Trim().Length, 200)],
             ScanType = body.ScanType, ProfileId = profileId, Config = JsonSerializer.Serialize(config, JsonOpts), Status = "queued",
-            TotalTargets = (int)Math.Min(parsed.TotalAddresses, int.MaxValue), CreatedBy = rc.UserId, CreatedAt = now,
+            TotalTargets = (int)Math.Min(totalAddresses, int.MaxValue), CreatedBy = rc.UserId, CreatedAt = now,
         };
 
         await using var tx = await db.Database.BeginTransactionAsync(ct);
@@ -186,7 +215,7 @@ public static class DiscoveryEndpoints
             (NpgsqlConnection)db.Database.GetDbConnection(), (NpgsqlTransaction)tx.GetDbTransaction(), ct);
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
-        await rc.AuditAsync("scan.create", scan.Name, detail: new { scan.Id, scan.ScanType, targets = scan.TotalTargets, profileId });
+        await rc.AuditAsync("scan.create", scan.Name, detail: new { scan.Id, scan.ScanType, targets = scan.TotalTargets, profileId, credentials = config.CredentialIds?.Length ?? 0 });
         return (scan, null);
     }
 

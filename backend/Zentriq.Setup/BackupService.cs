@@ -63,6 +63,7 @@ public sealed class BackupService(ZentriqPaths paths, ZentriqOptions options, Re
             {
                 zip.CreateEntryFromFile(dump, "db.dump", CompressionLevel.Fastest);
                 if (File.Exists(paths.ConfigFile)) zip.CreateEntryFromFile(paths.ConfigFile, "config/zentriq.json");
+                if (File.Exists(paths.AgentCaFile)) zip.CreateEntryFromFile(paths.AgentCaFile, "secrets/agent-ca.pfx");
                 WriteEntry(zip, "secrets/app.json", JsonSerializer.Serialize(app));
                 WriteEntry(zip, "secrets/owner.json", JsonSerializer.Serialize(owner));
                 WriteEntry(zip, "manifest.json", JsonSerializer.Serialize(new { options.ProductVersion, createdAt = DateTimeOffset.UtcNow, label, schema = "zentriq" }));
@@ -198,6 +199,14 @@ public sealed class BackupService(ZentriqPaths paths, ZentriqOptions options, Re
 
             // Keep this server's database passwords; restore the secrets the data depends on.
             currentApp.InstallSecret = restoredApp.InstallSecret;
+            // Scan credentials are encrypted with the credential key; enrolled agents chain to the agent CA.
+            if (!string.IsNullOrEmpty(restoredApp.CredentialKey)) currentApp.CredentialKey = restoredApp.CredentialKey;
+            if (!string.IsNullOrEmpty(restoredApp.AgentCaPfxPassword) && zip.GetEntry("secrets/agent-ca.pfx") is { } caEntry)
+            {
+                caEntry.ExtractToFile(paths.AgentCaFile, overwrite: true);
+                currentApp.AgentCaPfxPassword = restoredApp.AgentCaPfxPassword;
+                WindowsHost.SecureFile(paths.AgentCaFile, (WindowsHost.ServiceSid(apiService), System.Security.AccessControl.FileSystemRights.Read));
+            }
             currentOwner.BackupKey = restoredOwner.BackupKey;
             store.Write(paths.AppSecretsFile, currentApp);
             store.Write(paths.OwnerSecretsFile, currentOwner);

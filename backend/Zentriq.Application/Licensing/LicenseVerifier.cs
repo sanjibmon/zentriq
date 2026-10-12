@@ -130,9 +130,11 @@ public sealed class LicenseVerifier(ILicensePublicKeyStore keys)
         if (p.Entitlements is null || p.Entitlements.Count == 0) return "License lists no workload entitlements.";
         foreach (var (workload, qty) in p.Entitlements)
         {
-            if (!Workloads.All.Contains(workload)) return $"Unknown workload category '{workload}'.";
+            if (!Workloads.IsLimitKey(workload)) return $"Unknown workload category '{workload}'.";
             if (qty is < 0 or > 10_000_000) return $"Entitlement for '{workload}' is out of range.";
         }
+        if (p.SchemaVersion < 2 && p.Licensee is not null) return "Licensee details require license schema 2.";
+        if (p.Licensee is { } l && (string.IsNullOrWhiteSpace(l.Company) || l.Company.Length > 200)) return "Licensee company is missing or too long.";
         return null;
     }
 }

@@ -13,6 +13,10 @@ public sealed class AppSecrets
     /// <summary>Per-installation HMAC key (base64, 32 bytes) used for trial integrity.</summary>
     [JsonPropertyName("installSecret")] public string InstallSecret { get; set; } = "";
     [JsonPropertyName("httpsPfxPassword")] public string? HttpsPfxPassword { get; set; }
+    /// <summary>AES-256 key (base64) protecting discovery credentials in the database.</summary>
+    [JsonPropertyName("credentialKey")] public string? CredentialKey { get; set; }
+    /// <summary>Password of Secrets\agent-ca.pfx (internal CA that issues agent client certificates).</summary>
+    [JsonPropertyName("agentCaPfxPassword")] public string? AgentCaPfxPassword { get; set; }
 
     public byte[] InstallSecretBytes() => Convert.FromBase64String(InstallSecret);
 }

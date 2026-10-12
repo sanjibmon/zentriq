@@ -14,6 +14,9 @@ using Zentriq.Domain.Licensing;
 //           --customer <name> --expires <yyyy-mm-dd> [--not-before <yyyy-mm-dd>] [--grace <days>]
 //           --entitle endpoint=500 --entitle server=50 [--modules *|inventory,discovery,...]
 //           [--license-id <id>] --out <license.zlic>
+//           Licensee details (schema 2, shown to the customer): [--company <legal name>] [--contact-name ..]
+//           [--contact-email ..] [--contact-phone ..] [--address ..] [--country ..] [--tax-id ..]
+//           A total cap across all device types can be given with --entitle devices=<n>.
 //
 //   inspect --license <file.zlic> --public <public.pem>
 //       Verifies the signature and prints the payload.
@@ -71,7 +74,7 @@ internal static class Signer
         {
             var parts = e.Split('=', 2);
             if (parts.Length != 2 || !int.TryParse(parts[1], out var qty) || qty < 0) throw new ArgumentException($"Bad --entitle '{e}' (use workload=quantity).");
-            if (!Workloads.All.Contains(parts[0])) throw new ArgumentException($"Unknown workload '{parts[0]}'. Known: {string.Join(", ", Workloads.All)}.");
+            if (!Workloads.IsLimitKey(parts[0])) throw new ArgumentException($"Unknown workload '{parts[0]}'. Known: {string.Join(", ", Workloads.All)}, {Workloads.TotalDevices}.");
             entitlements[parts[0]] = qty;
         }
         if (entitlements.Count == 0) throw new ArgumentException("At least one --entitle is required.");
@@ -80,10 +83,13 @@ internal static class Signer
         foreach (var m in modules) if (m != "*" && !Modules.All.Contains(m)) throw new ArgumentException($"Unknown module '{m}'.");
 
         var now = DateTimeOffset.UtcNow;
+        var customer = One(o, "customer");
+        var licensee = new Licensee(Opt(o, "company") ?? customer, Opt(o, "contact-name"), Opt(o, "contact-email"),
+            Opt(o, "contact-phone"), Opt(o, "address"), Opt(o, "country"), Opt(o, "tax-id"));
         var payload = new LicensePayload(
             SchemaVersion: LicenseFormats.CurrentSchemaVersion,
             LicenseId: Opt(o, "license-id") ?? $"ZQ-{now:yyyyMMdd}-{RandomNumberGenerator.GetHexString(8)}",
-            Customer: One(o, "customer"),
+            Customer: customer,
             InstallationId: request.InstallationId,
             IssuedAt: now,
             NotBefore: Opt(o, "not-before") is { } nb ? DateTimeOffset.Parse(nb + "T00:00:00Z") : now.AddMinutes(-5),
@@ -91,7 +97,8 @@ internal static class Signer
             GraceDays: int.Parse(Opt(o, "grace") ?? "14"),
             Modules: modules,
             Entitlements: entitlements,
-            RequestId: request.RequestId);
+            RequestId: request.RequestId,
+            Licensee: licensee);
 
         var payloadBytes = JsonSerializer.SerializeToUtf8Bytes(payload);
         using var key = ECDsa.Create();

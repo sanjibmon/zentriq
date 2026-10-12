@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { api } from '../../api/client';
 import type { Asset, Paged } from '../../api/types';
-import { useRouter } from '../../app/router';
+import { Link, useRouter } from '../../app/router';
 import { useApi } from '../../app/useApi';
 import { DataTable, ErrorBox, fmt, PageHead, Pager, Panel, Pill, statusTone } from '../../components/ui';
 
@@ -36,7 +36,7 @@ export function AssetsPage() {
       <ErrorBox error={data.error} />
       <Panel flush>
         <DataTable rows={data.data?.items ?? []} empty={data.loading ? 'Loading…' : 'No assets match. Run a discovery scan to find devices.'} columns={[
-          { key: 'h', label: 'Hostname', render: (r) => <><b>{r.hostname ?? r.ip ?? '—'}</b>{r.fqdn && <div className="faint" style={{ fontSize: 11.5 }}>{r.fqdn}</div>}</> },
+          { key: 'h', label: 'Hostname', render: (r) => <><Link to={`/assets/${r.id}`}><b>{r.hostname ?? r.ip ?? '—'}</b></Link>{r.fqdn && <div className="faint" style={{ fontSize: 11.5 }}>{r.fqdn}</div>}</> },
           { key: 'ip', label: 'IP address', render: (r) => <span className="mono">{r.ip ?? '—'}</span> },
           { key: 'c', label: 'Category', render: (r) => fmt.label(r.category) },
           { key: 'os', label: 'Operating system', render: (r) => r.osName ?? fmt.label(r.osFamily) },

@@ -21,7 +21,18 @@ public sealed record LicensePayload(
     [property: JsonPropertyName("graceDays")] int GraceDays,
     [property: JsonPropertyName("modules")] IReadOnlyList<string> Modules,
     [property: JsonPropertyName("entitlements")] IReadOnlyDictionary<string, int> Entitlements,
-    [property: JsonPropertyName("requestId")] Guid? RequestId = null);
+    [property: JsonPropertyName("requestId")] Guid? RequestId = null,
+    [property: JsonPropertyName("licensee")] Licensee? Licensee = null);
+
+/// <summary>Customer details carried by schema-2 licenses and shown in the console (signed, so read-only).</summary>
+public sealed record Licensee(
+    [property: JsonPropertyName("company")] string Company,
+    [property: JsonPropertyName("contactName")] string? ContactName = null,
+    [property: JsonPropertyName("contactEmail")] string? ContactEmail = null,
+    [property: JsonPropertyName("contactPhone")] string? ContactPhone = null,
+    [property: JsonPropertyName("address")] string? Address = null,
+    [property: JsonPropertyName("country")] string? Country = null,
+    [property: JsonPropertyName("taxId")] string? TaxId = null);
 
 /// <summary>Offline activation request exported by the customer and sent to the vendor.</summary>
 public sealed record ActivationRequest(
@@ -40,8 +51,9 @@ public static class LicenseFormats
     public const string License = "zentriq-license";
     public const string ActivationRequest = "zentriq-activation-request";
     public const string Algorithm = "ES256";
-    public const int CurrentSchemaVersion = 1;
-    public static readonly IReadOnlySet<int> SupportedSchemaVersions = new HashSet<int> { 1 };
+    /// <summary>2 adds the optional "licensee" block (company and contact details).</summary>
+    public const int CurrentSchemaVersion = 2;
+    public static readonly IReadOnlySet<int> SupportedSchemaVersions = new HashSet<int> { 1, 2 };
     public const int MaxDocumentBytes = 64 * 1024;
 }
 
@@ -49,7 +61,7 @@ public sealed record TrialPolicy(int Days, IReadOnlyDictionary<string, int> Limi
 {
     public static TrialPolicy Default { get; } = new(
         14,
-        new Dictionary<string, int> { ["endpoint"] = 250, ["server"] = 25, ["network_device"] = 50, ["other"] = 50 },
+        new Dictionary<string, int> { [Zentriq.Domain.Workloads.TotalDevices] = 30 },  // 30 devices in total, every module
         ["*"]);
 }
 
