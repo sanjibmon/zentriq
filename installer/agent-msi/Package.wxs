@@ -3,7 +3,8 @@
   ZentriqAgent-x64.msi — Zentriq Agent for Windows endpoints and servers.
     Silent:  msiexec /i ZentriqAgent-x64.msi /qn ENROLLMENTCODE="ZQ1...." [PROXYURL="http://proxy:8080"]
   Runs as LocalSystem (read-only inventory needs WMI/registry access), outbound HTTPS only, no listening ports.
-  The enrollment code is a hidden property (masked in MSI logs) and is deleted by the agent once used.
+  The enrollment code is a hidden property, written by a hidden custom action (never in MSI logs), and deleted
+  by the agent once used.
 -->
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
      xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
@@ -44,7 +45,6 @@
     <Feature Id="Main" Title="Zentriq Agent" Level="1" AllowAbsent="no">
       <ComponentGroupRef Id="AgentFiles" />
       <ComponentRef Id="AgentSettings" />
-      <ComponentRef Id="AgentEnrollment" />
       <ComponentRef Id="AgentProxy" />
     </Feature>
 
@@ -72,20 +72,22 @@
       </RegistryKey>
     </Component>
 
-    <!-- Written only when a code is supplied; the agent removes the value after enrollment. -->
-    <Component Id="AgentEnrollment" Directory="INSTALLFOLDER" Condition="ENROLLMENTCODE" Transitive="yes">
-      <RegistryValue Root="HKLM" Key="SOFTWARE\Zentriq\Agent" Name="EnrollmentCode" Type="string" Value="[ENROLLMENTCODE]" />
-      <RegistryValue Root="HKLM" Key="SOFTWARE\Zentriq\Agent" Name="EnrollmentSupplied" Type="integer" Value="1" KeyPath="yes" />
-    </Component>
-
     <Component Id="AgentProxy" Directory="INSTALLFOLDER" Condition="PROXYURL" Transitive="yes">
       <RegistryValue Root="HKLM" Key="SOFTWARE\Zentriq\Agent" Name="ProxyUrl" Type="string" Value="[PROXYURL]" KeyPath="yes" />
     </Component>
+
+    <!-- Enrollment code: written by a hidden deferred custom action (a RegistryValue would appear in the MSI log).
+         The agent deletes the value once it has enrolled. -->
+    <Binary Id="ZqCA" SourceFile="$(var.CustomActionDll)" />
+    <CustomAction Id="ZqAgentPrepare" BinaryRef="ZqCA" DllEntry="PrepareAgentEnrollment" Execute="immediate" Return="check" HideTarget="yes" />
+    <CustomAction Id="ZqAgentEnroll" BinaryRef="ZqCA" DllEntry="WriteAgentEnrollment" Execute="deferred" Impersonate="no" Return="check" HideTarget="yes" />
 
     <!-- Uninstall: remove the agent certificate and state (not on upgrade). -->
     <CustomAction Id="AgentCleanup" FileRef="AgentExe" ExeCommand="--cleanup" Execute="deferred" Impersonate="no" Return="ignore" />
     <InstallExecuteSequence>
       <Custom Action="AgentCleanup" After="StopServices" Condition='REMOVE = "ALL" AND NOT UPGRADINGPRODUCTCODE' />
+      <Custom Action="ZqAgentPrepare" Before="ZqAgentEnroll" Condition='ENROLLMENTCODE AND NOT (REMOVE = "ALL")' />
+      <Custom Action="ZqAgentEnroll" After="WriteRegistryValues" Condition='ENROLLMENTCODE AND NOT (REMOVE = "ALL")' />
     </InstallExecuteSequence>
 
     <UIRef Id="ZentriqAgentUI" />

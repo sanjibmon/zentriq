@@ -9,7 +9,8 @@
     <ProductVersion Condition="'$(ProductVersion)' == ''">1.0.0</ProductVersion>
     <AgentDir Condition="'$(AgentDir)' == ''">$(MSBuildThisFileDirectory)..\..\artifacts\staging-agent</AgentDir>
     <AssetsDir>$(MSBuildThisFileDirectory)..\assets</AssetsDir>
-    <DefineConstants>ProductVersion=$(ProductVersion);AgentDir=$(AgentDir);AssetsDir=$(AssetsDir)</DefineConstants>
+    <CustomActionDll Condition="'$(CustomActionDll)' == ''">$(MSBuildThisFileDirectory)..\..\artifacts\customactions\Zentriq.CustomActions.CA.dll</CustomActionDll>
+    <DefineConstants>ProductVersion=$(ProductVersion);AgentDir=$(AgentDir);AssetsDir=$(AssetsDir);CustomActionDll=$(CustomActionDll)</DefineConstants>
     <OutputPath>$(MSBuildThisFileDirectory)..\..\artifacts\agent-msi\</OutputPath>
     <IntermediateOutputPath>$(MSBuildThisFileDirectory)obj\</IntermediateOutputPath>
   </PropertyGroup>

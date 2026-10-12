@@ -132,28 +132,7 @@ if ($signMode) {
     Sign-Files $ours
 }
 
-# ---- 4a. Zentriq Agent (.NET Framework 4.8 service) + ZentriqAgent-x64.msi ----------------------
-Write-Section 'Zentriq Agent'
-$agentStage = Join-Path $art 'staging-agent'
-Remove-Item $agentStage -Recurse -Force -ErrorAction SilentlyContinue
-Invoke-Native { dotnet publish (Join-Path $root 'agent/Zentriq.Agent/Zentriq.Agent.csproj') --configuration $Configuration `
-    "-p:Version=$Version" '-p:DebugType=none' --output $agentStage }
-Get-ChildItem $agentStage -Include '*.pdb', '*.xml' -Recurse | Remove-Item -Force
-if (-not (Test-Path (Join-Path $agentStage 'ZentriqAgent.exe'))) { throw 'ZentriqAgent.exe was not produced.' }
-Sign-Files @(Get-ChildItem $agentStage -Include 'ZentriqAgent.exe', 'Zentriq*.dll' -Recurse | Select-Object -ExpandProperty FullName)
-Remove-Item (Join-Path $art 'agent-msi') -Recurse -Force -ErrorAction SilentlyContinue
-Invoke-Native { dotnet build (Join-Path $root 'installer/agent-msi/Zentriq.AgentMsi.wixproj') --configuration $Configuration `
-    "-p:ProductVersion=$Version" "-p:AgentDir=$agentStage" }
-$agentMsi = Join-Path $art 'agent-msi/ZentriqAgent-x64.msi'
-if (-not (Test-Path $agentMsi)) { throw "Agent MSI not found at $agentMsi" }
-Sign-Files @($agentMsi)
-# The console serves the agent package at https://<server>/downloads/ZentriqAgent-x64.msi
-$downloads = Join-Path $wwwroot 'downloads'
-New-Item -ItemType Directory -Force -Path $downloads | Out-Null
-Copy-Item $agentMsi $downloads -Force
-Set-Content (Join-Path $downloads 'ZentriqAgent-x64.version') $Version -Encoding ascii -NoNewline
-
-# ---- 4. custom actions + MSI -------------------------------------------------------------------
+# ---- 4. MSI custom actions (server and agent MSIs) -----------------------------------------
 Write-Section 'MSI custom actions'
 $caProj = Join-Path $root 'installer/customactions/Zentriq.CustomActions.csproj'
 Invoke-Native { dotnet build $caProj --configuration $Configuration "-p:Version=$Version" }
@@ -166,6 +145,28 @@ Copy-Item $caDll $caOut -Force
 $caDll = Join-Path $caOut 'Zentriq.CustomActions.CA.dll'
 Sign-Files @($caDll)
 
+# ---- 4a. Zentriq Agent (.NET Framework 4.8 service) + ZentriqAgent-x64.msi ----------------------
+Write-Section 'Zentriq Agent'
+$agentStage = Join-Path $art 'staging-agent'
+Remove-Item $agentStage -Recurse -Force -ErrorAction SilentlyContinue
+Invoke-Native { dotnet publish (Join-Path $root 'agent/Zentriq.Agent/Zentriq.Agent.csproj') --configuration $Configuration `
+    "-p:Version=$Version" '-p:DebugType=none' --output $agentStage }
+Get-ChildItem $agentStage -Include '*.pdb', '*.xml' -Recurse | Remove-Item -Force
+if (-not (Test-Path (Join-Path $agentStage 'ZentriqAgent.exe'))) { throw 'ZentriqAgent.exe was not produced.' }
+Sign-Files @(Get-ChildItem $agentStage -Include 'ZentriqAgent.exe', 'Zentriq*.dll' -Recurse | Select-Object -ExpandProperty FullName)
+Remove-Item (Join-Path $art 'agent-msi') -Recurse -Force -ErrorAction SilentlyContinue
+Invoke-Native { dotnet build (Join-Path $root 'installer/agent-msi/Zentriq.AgentMsi.wixproj') --configuration $Configuration `
+    "-p:ProductVersion=$Version" "-p:AgentDir=$agentStage" "-p:CustomActionDll=$caDll" }
+$agentMsi = Join-Path $art 'agent-msi/ZentriqAgent-x64.msi'
+if (-not (Test-Path $agentMsi)) { throw "Agent MSI not found at $agentMsi" }
+Sign-Files @($agentMsi)
+# The console serves the agent package at https://<server>/downloads/ZentriqAgent-x64.msi
+$downloads = Join-Path $wwwroot 'downloads'
+New-Item -ItemType Directory -Force -Path $downloads | Out-Null
+Copy-Item $agentMsi $downloads -Force
+Set-Content (Join-Path $downloads 'ZentriqAgent-x64.version') $Version -Encoding ascii -NoNewline
+
+# ---- 4b. server MSI ------------------------------------------------------------------------------
 Write-Section 'Zentriq.msi'
 Remove-Item (Join-Path $art 'msi') -Recurse -Force -ErrorAction SilentlyContinue
 Invoke-Native { dotnet build (Join-Path $root 'installer/msi/Zentriq.Msi.wixproj') --configuration $Configuration `
