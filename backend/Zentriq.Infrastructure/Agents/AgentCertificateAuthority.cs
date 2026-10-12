@@ -57,7 +57,7 @@ public static class AgentCertificateAuthority
         catch (CryptographicException ex) { throw new ArgumentException("The certificate request is not valid: " + ex.Message, nameof(csrDer)); }
         ValidateKey(csr.PublicKey);
 
-        var req = new CertificateRequest($"CN={agentId:D}, O=Zentriq Agent", csr.PublicKey, HashAlgorithmName.SHA256);
+        var req = new CertificateRequest(new X500DistinguishedName($"CN={agentId:D}, O=Zentriq Agent"), csr.PublicKey, HashAlgorithmName.SHA256);
         req.CertificateExtensions.Add(new X509BasicConstraintsExtension(false, false, 0, true));
         req.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.DigitalSignature | X509KeyUsageFlags.KeyEncipherment, true));
         req.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension([new Oid(ClientAuthOid)], true));

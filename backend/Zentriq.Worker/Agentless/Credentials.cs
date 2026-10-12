@@ -43,7 +43,7 @@ public sealed record ScanCredential(Guid Id, string Name, string Kind, string? U
         while (await r.ReadAsync(ct))
         {
             var id = r.GetGuid(0);
-            var scopes = r.IsDBNull(6) ? [] : r.GetString(6).Split([',', ';', '\n', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+            var scopes = r.IsDBNull(6) ? new List<string>() : r.GetString(6).Split([',', ';', '\n', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
             list.Add(new ScanCredential(id, r.GetString(1), r.GetString(2), r.IsDBNull(3) ? null : r.GetString(3),
                 protector.Unprotect(id, r.GetString(4)), JsonDocument.Parse(r.GetString(5)).RootElement.Clone(), scopes));
         }
