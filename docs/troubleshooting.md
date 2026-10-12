@@ -30,3 +30,17 @@ Logs: `%TEMP%\Zentriq-Setup_*.log` (bootstrapper), `%TEMP%\Zentriq-Setup_*_Zentr
 * **Clock rollback** – server time moved backwards >24 h; correct the time (NTP). Features resume automatically.
 * **Jobs stay queued** – `Get-Service ZentriqWorker`; worker heartbeat in `zentriqctl verify`. Jobs whose worker died are re-queued after their lease expires.
 * **Backups on demand never run** – the `\Zentriq\Maintenance` scheduled task must be enabled (`schtasks /Query /TN "\Zentriq\Maintenance"`).
+
+## Inventory collection
+
+* **Scan result "Credentials rejected … Access is denied" (Windows)** – the account is not a local administrator on the
+  target, or it is a local account blocked by UAC remote restrictions (set `LocalAccountTokenFilterPolicy = 1`), or
+  NTLM was refused (use a host name with Kerberos in a domain, or add the targets to WinRM `TrustedHosts` / use
+  WinRM over HTTPS when scanning by IP address).
+* **"No selected credential matches the protocols this host exposes"** – WinRM (5985/5986), RPC (135) or SSH (22)
+  are not reachable from the Zentriq server; open the firewall or install the agent.
+* **SSH "host key … changed"** – the device was rebuilt or something is impersonating it. Verify, then clear the key
+  under *Discovery › Credentials › SSH host keys*.
+* **Agent shows "Never checked in"** – on the device run `"C:\Program Files\Zentriq Agent\ZentriqAgent.exe" --status`
+  and see `C:\ProgramData\Zentriq\Agent\Logs\agent.log`. Typical causes: port 8444 not reachable, proxy needed
+  (`PROXYURL`), expired/used-up enrollment code, .NET Framework 4.8 missing.

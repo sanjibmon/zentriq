@@ -405,3 +405,4 @@ Get-ChildItem $env:TEMP -Filter 'install-postgresql.log' -ErrorAction SilentlyCo
 $failed = @($results | Where-Object outcome -eq 'FAIL').Count
 Write-Host "`n$(@($results | Where-Object outcome -eq 'PASS').Count) passed, $failed failed, $(@($results | Where-Object outcome -eq 'BLOCKED').Count) blocked, $(@($results | Where-Object outcome -eq 'NOT RUN').Count) not run"
 if ($failed -gt 0 -or @($results | Where-Object outcome -eq 'BLOCKED').Count -gt 0) { exit 1 }
+exit 0   # explicit: native tools run by the tests (e.g. ZentriqAgent.exe --status after revocation) leave $LASTEXITCODE set
