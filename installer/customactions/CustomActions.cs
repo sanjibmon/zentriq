@@ -336,13 +336,15 @@ namespace Zentriq.CustomActions
 
             var lines = stderr.ToString().Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
             Func<string, string> pick = prefix => lines.Where(l => l.StartsWith(prefix, StringComparison.Ordinal)).Select(l => l.Substring(prefix.Length)).FirstOrDefault();
+            // The Windows Installer error dialog shows only a few short lines: keep the message compact and put
+            // each item on its own line (long text is cut off and paths become unreadable).
             var msg = new StringBuilder("Zentriq could not be configured.\r\n\r\n");
-            msg.AppendLine(pick("ERROR ") ?? "zentriqctl failed without an error message.");
+            msg.Append(pick("ERROR ") ?? "zentriqctl failed without an error message.").Append("\r\n");
             var remedy = pick("REMEDY ");
-            if (remedy != null) msg.AppendLine().Append("What to do: ").AppendLine(remedy);
+            if (remedy != null) msg.Append("\r\n").Append(remedy).Append("\r\n");
             var log = pick("LOG ");
-            msg.AppendLine().Append("Details: ").AppendLine(log ?? (cad["DataDir"] + "\\Logs"));
-            msg.Append("Setup will now undo the program installation. Your data and the PostgreSQL server are kept, so running setup again continues where it stopped.");
+            msg.Append("\r\nSetup log:\r\n").Append(log ?? (cad["DataDir"] + "\\Logs"));
+            session.Log("Zentriq configuration failed: " + msg.ToString().Replace("\r\n", " "));
             using (var r = new Record(1))
             {
                 r.FormatString = "[1]";

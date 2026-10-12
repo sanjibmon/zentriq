@@ -27,7 +27,6 @@
 
       <DialogRef Id="BrowseDlg" />
       <DialogRef Id="DiskCostDlg" />
-      <DialogRef Id="ErrorDlg" />
       <DialogRef Id="FatalError" />
       <DialogRef Id="FilesInUse" />
       <DialogRef Id="MsiRMFilesInUse" />
@@ -244,6 +243,20 @@
         <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
           <Publish Event="SpawnDialog" Value="CancelDlg" />
         </Control>
+      </Dialog>
+
+      <!-- Error dialog: larger than the stock ErrorDlg so a failure message and its log path are readable. -->
+      <Property Id="ErrorDialog" Value="ZqErrorDlg" />
+      <Dialog Id="ZqErrorDlg" Width="370" Height="200" Title="[ProductName] Setup" ErrorDialog="yes">
+        <Control Id="ErrorIcon" Type="Icon" X="15" Y="15" Width="24" Height="24" FixedSize="yes" IconSize="32" Text="WixUI_Ico_Exclam" />
+        <Control Id="ErrorText" Type="Text" X="50" Y="15" Width="305" Height="145" TabSkip="no" NoPrefix="yes" Text="!(loc.ErrorDlgErrorText)" />
+        <Control Id="A" Type="PushButton" X="157" Y="172" Width="56" Height="17" TabSkip="yes" Text="!(loc.WixUICancel)"><Publish Event="EndDialog" Value="ErrorAbort" /></Control>
+        <Control Id="C" Type="PushButton" X="157" Y="172" Width="56" Height="17" TabSkip="yes" Text="!(loc.WixUICancel)"><Publish Event="EndDialog" Value="ErrorCancel" /></Control>
+        <Control Id="I" Type="PushButton" X="157" Y="172" Width="56" Height="17" TabSkip="yes" Text="!(loc.WixUIIgnore)"><Publish Event="EndDialog" Value="ErrorIgnore" /></Control>
+        <Control Id="N" Type="PushButton" X="157" Y="172" Width="56" Height="17" TabSkip="yes" Text="!(loc.WixUINo)"><Publish Event="EndDialog" Value="ErrorNo" /></Control>
+        <Control Id="O" Type="PushButton" X="157" Y="172" Width="56" Height="17" TabSkip="yes" Text="!(loc.WixUIOK)"><Publish Event="EndDialog" Value="ErrorOk" /></Control>
+        <Control Id="R" Type="PushButton" X="157" Y="172" Width="56" Height="17" TabSkip="yes" Text="!(loc.WixUIRetry)"><Publish Event="EndDialog" Value="ErrorRetry" /></Control>
+        <Control Id="Y" Type="PushButton" X="157" Y="172" Width="56" Height="17" TabSkip="yes" Text="!(loc.WixUIYes)"><Publish Event="EndDialog" Value="ErrorYes" /></Control>
       </Dialog>
 
       <!-- Validation message -->

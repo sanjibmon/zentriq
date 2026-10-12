@@ -57,7 +57,11 @@ public sealed class PostgresProvisioner(Reporter log)
 
         var superPassword = SecretStore.NewPassword(24);
         var dataDir = pg.DataDir ?? Path.Combine(pg.InstallDir, "data");
+        SetAsideIncompleteInstall(pg, dataDir);
         log.Info($"Installing PostgreSQL to {pg.InstallDir} (data: {dataDir}, port {pg.Port}, service {pg.ServiceName}).");
+        if (IsPortInUse(pg.Port))
+            throw new SetupException($"Port {pg.Port} is already in use, so PostgreSQL cannot be installed on it.",
+                $"Stop the program using port {pg.Port} or choose another PostgreSQL port, then run setup again.");
         // Documented EDB installer options (installer --help). The initial superuser password is
         // rotated immediately afterwards, so its brief appearance on the command line is not reused.
         var args = new[]
@@ -70,10 +74,17 @@ public sealed class PostgresProvisioner(Reporter log)
             "--disable-components", "pgAdmin,stackbuilder",
             "--install_runtimes", "0", "--create_shortcuts", "0",
         };
+        var started = DateTime.Now.AddMinutes(-1);
         var r = await WindowsHost.RunAsync(pg.InstallerPath, args, TimeSpan.FromMinutes(30), ct: ct);
+        var installerLog = CollectInstallerLog(started, superPassword);
         if (r.ExitCode != 0 || !WindowsHost.ServiceExists(pg.ServiceName))
-            throw new SetupException($"PostgreSQL installation failed (exit code {r.ExitCode}).",
-                $"See %TEMP%\\install-postgresql.log and {log.LogPath}. Ensure the data folder is empty and port {pg.Port} is free.");
+        {
+            var cause = installerLog.Cause ?? Redactor.Redact(r.Output.Replace(superPassword, "***").Trim()).Split('\n').LastOrDefault(l => l.Trim().Length > 0)?.Trim();
+            log.Error($"PostgreSQL installer exit code {r.ExitCode}. {(cause is null ? "" : "Installer reported: " + cause)}");
+            throw new SetupException(
+                $"PostgreSQL installation failed (exit code {r.ExitCode}){(cause is null ? "." : ": " + Shorten(cause, 220))}",
+                installerLog.Path is null ? "See the Zentriq setup log." : $"PostgreSQL installer log: {installerLog.Path}");
+        }
         WindowsHost.StartAndWait(pg.ServiceName, TimeSpan.FromMinutes(3));
         await WaitForPortAsync("localhost", pg.Port, TimeSpan.FromMinutes(2), ct);
 
@@ -91,6 +102,72 @@ public sealed class PostgresProvisioner(Reporter log)
         await WaitForPortAsync("localhost", pg.Port, TimeSpan.FromMinutes(2), ct);
         await CheckVersionAsync(pg, rotated, ct);
         return rotated;
+    }
+
+    /// <summary>
+    /// A previous attempt that failed half-way can leave a PostgreSQL data folder (and EDB's install folder and
+    /// registration) behind without a service. Zentriq never knew that cluster's password, so it cannot be used and
+    /// makes the EDB installer fail ("data directory is not empty"). It is renamed — never deleted — so nothing is lost.
+    /// </summary>
+    private void SetAsideIncompleteInstall(PostgresInput pg, string dataDir)
+    {
+        var stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
+        if (Directory.Exists(dataDir) && Directory.EnumerateFileSystemEntries(dataDir).Any())
+        {
+            var aside = dataDir.TrimEnd('\\') + ".incomplete-" + stamp;
+            Directory.Move(dataDir, aside);
+            log.Warn($"The PostgreSQL data folder {dataDir} was left by an earlier, incomplete installation (no {pg.ServiceName} service). Moved it to {aside}.");
+        }
+        // Stale EDB registration of an installation whose service does not exist.
+        try
+        {
+            using var hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
+            foreach (var key in new[] { $@"SOFTWARE\PostgreSQL\Installations\{pg.ServiceName}", $@"SOFTWARE\PostgreSQL\Services\{pg.ServiceName}" })
+                if (hklm.OpenSubKey(key) is { } k)
+                {
+                    k.Dispose();
+                    hklm.DeleteSubKeyTree(key, false);
+                    log.Warn($"Removed the stale PostgreSQL registration HKLM\\{key} (its service does not exist).");
+                }
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException) { log.Warn($"Could not clean the stale PostgreSQL registration: {ex.Message}"); }
+    }
+
+    private static bool IsPortInUse(int port) =>
+        System.Net.NetworkInformation.IPGlobalProperties.GetIPGlobalProperties().GetActiveTcpListeners().Any(e => e.Port == port);
+
+    private static string Shorten(string s, int max) => s.Length <= max ? s : s[..max] + "…";
+
+    /// <summary>
+    /// The EDB installer writes install-postgresql.log (and bitrock_installer*.log) to the TEMP folder of the account
+    /// running it (SYSTEM: C:\Windows\Temp). Copy the newest one into the Zentriq log folder and pull out its error.
+    /// </summary>
+    private (string? Path, string? Cause) CollectInstallerLog(DateTime since, string secret)
+    {
+        try
+        {
+            var temp = System.IO.Path.GetTempPath();
+            var file = new[] { "install-postgresql.log", "bitrock_installer*.log" }
+                .SelectMany(p => Directory.EnumerateFiles(temp, p))
+                .Select(f => new FileInfo(f)).Where(f => f.LastWriteTime >= since)
+                .OrderByDescending(f => f.Name.StartsWith("install-postgresql", StringComparison.OrdinalIgnoreCase)).ThenByDescending(f => f.LastWriteTime)
+                .FirstOrDefault();
+            if (file is null) return (null, null);
+            var dest = file.FullName;
+            if (log.LogPath is null) return (file.FullName, null); // never read an unredacted copy into messages
+            if (log.LogPath is { } lp)
+            {
+                dest = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(lp)!, $"postgresql-install-{DateTime.Now:yyyyMMdd-HHmmss}.log");
+                // The log can contain the initial superuser password on the command line; redact while copying.
+                File.WriteAllText(dest, Redactor.Redact(File.ReadAllText(file.FullName).Replace(secret, "***REDACTED***")));
+            }
+            var lines = File.ReadAllLines(dest);
+            var cause = lines.Reverse()
+                .FirstOrDefault(l => l.Contains("Error", StringComparison.OrdinalIgnoreCase) || l.Contains("failed", StringComparison.OrdinalIgnoreCase)
+                                  || l.Contains("Problem running", StringComparison.OrdinalIgnoreCase) || l.Contains("FATAL", StringComparison.Ordinal))?.Trim();
+            return (dest, cause);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return (null, null); }
     }
 
     public async Task<int> CheckVersionAsync(PostgresInput pg, string superPassword, CancellationToken ct)
