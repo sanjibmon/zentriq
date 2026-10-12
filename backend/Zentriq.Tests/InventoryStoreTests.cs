@@ -2,6 +2,7 @@ using System.Net;
 using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
 using Zentriq.Application.Licensing;
+using Zentriq.Domain.Licensing;
 using Zentriq.Infrastructure.Database;
 using Zentriq.Infrastructure.Inventory;
 using Zentriq.Infrastructure.Licensing;

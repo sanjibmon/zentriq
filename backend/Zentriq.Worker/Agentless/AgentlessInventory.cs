@@ -31,7 +31,7 @@ public sealed class AgentlessInventory(NpgsqlDataSource ds, ILogger<AgentlessInv
                 cts.CancelAfter(TimeSpan.FromMinutes(3));
                 var doc = await run().WaitAsync(cts.Token);
                 if (doc is null) { errors.Add($"{protocol}: no response"); return null; }
-                await Credentials.MarkUsedAsync(ds, c.Id);
+                await ScanCredential.MarkUsedAsync(ds, c.Id);
                 return new CollectionAttempt(CollectionAttempt.Success, doc, protocol, c.Id,
                     $"Inventoried over {protocol} with credential '{c.Name}' ({doc.Software.Count} software items{(doc.Errors.Count > 0 ? $"; partial: {string.Join("; ", doc.Errors.Take(3))}" : "")}).");
             }

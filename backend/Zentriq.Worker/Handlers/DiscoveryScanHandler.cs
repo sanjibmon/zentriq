@@ -45,7 +45,7 @@ public sealed class DiscoveryScanHandler(NpgsqlDataSource ds, IHostPinger pinger
 
         var cfg = JsonSerializer.Deserialize<Config>(configJson, new JsonSerializerOptions(JsonSerializerDefaults.Web))
                   ?? throw new PermanentJobException("Scan configuration is unreadable.");
-        try { _creds = await Credentials.LoadAsync(ds, protector, cfg.CredentialIds ?? [], ct); }
+        try { _creds = await ScanCredential.LoadAsync(ds, protector, cfg.CredentialIds ?? [], ct); }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             await FinishAsync(scanId, "failed", "Scan credentials could not be decrypted: " + ex.Message, ct);
@@ -250,7 +250,7 @@ public sealed class DiscoveryScanHandler(NpgsqlDataSource ds, IHostPinger pinger
         await using var limitCmd = ds.CreateCommand("SELECT value::text FROM zentriq.system_settings WHERE key = 'discovery.ad_page_limit'");
         var limit = int.TryParse(((await limitCmd.ExecuteScalarAsync(ct)) as string)?.Trim('"'), out var l) ? l : 20000;
         List<ScanCredential> dirCreds;
-        try { dirCreds = await Credentials.LoadAsync(ds, protector, [d.CredentialId], ct); }
+        try { dirCreds = await ScanCredential.LoadAsync(ds, protector, [d.CredentialId], ct); }
         catch (Exception ex) when (ex is not OperationCanceledException) { throw new PermanentJobException("Directory credential could not be decrypted: " + ex.Message); }
         if (dirCreds.Count == 0) throw new PermanentJobException("The directory credential no longer exists.");
 
