@@ -1,8 +1,17 @@
 # Test report
 
-Source of truth: GitHub Actions run 38208536699 (commit `aec63fc`), workflow `windows-release`, on a GitHub-hosted
-**Windows Server 2022 Datacenter 10.0.20348** VM. Release: `v1.1.0-build.19` (pre-release, **unsigned**).
+Latest: GitHub Actions run 38278358328 (commit `576af7e`), workflow `windows-release`, on a GitHub-hosted
+**Windows Server 2022 Datacenter 10.0.20348** VM. Release: `v1.1.1-build.25` (pre-release, **unsigned**).
+Results: unit + PostgreSQL integration tests 45/45 PASS; upgrade from published 1.0.2 (U01, U02) PASS;
+installer acceptance **30 passed, 0 failed, 0 blocked, 10 not run** (full table in the release asset
+`installer-test-results.md`). New in this build and PASS: T33 show enrollment code again, T34 delete scans,
+T35 authenticator-app MFA (QR, TOTP sign-in, disable), T36 forgot-password without SMTP + `zentriqctl reset-password`,
+T37 Active Directory connection validation and error reporting. NOT RUN: T20 AD sync against a real domain,
+T38 reset e-mail delivery, T39 refusal on Server 2012 R2, T40 install on Server 2016 (no such systems in CI).
+The web console screens for these features were checked in a browser against a mock API, not against a live server.
 Raw logs: branch `ci-logs` of this repository.
+
+The detailed sections below are from the earlier run 38208536699 (`v1.1.0-build.19`).
 
 ## Build and packaging
 
@@ -80,7 +89,10 @@ Notes:
 |---|---|
 | Interactive wizards (server and agent MSI dialogs) on a VM | NOT RUN – silent installs exercise the same actions |
 | Upgrade from the published 1.0.2 build to 1.1.0 | NOT RUN in CI (migration verified on PostgreSQL directly) |
-| Agentless SSH (Linux/macOS), SNMP, Active Directory against real systems | NOT RUN – parsers unit-tested |
+| Agentless SSH (Linux/macOS), SNMP, Active Directory sync/scan against real systems | NOT RUN – parsers unit-tested; AD connection errors tested (T37) |
+| Password reset e-mail delivery through a real SMTP server | NOT RUN |
+| Setup on Windows Server 2016, and refusal on Server 2012 R2 | NOT RUN – CI has Windows Server 2022 only |
+| Firewalled-host detection (ARP/ICMP) on a real LAN | NOT RUN |
 | Agent over the internet / through a reverse proxy, proxy (`PROXYURL`) | NOT RUN |
 | Agent on Windows 10/11 clients and Server 2016/2019 | NOT RUN – CI used Windows Server 2022 |
 | Windows reboot persistence | NOT RUN |
