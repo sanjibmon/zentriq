@@ -57,14 +57,14 @@ public sealed class InventoryParserTests
         Assert.Equal("lt-01", doc.Device.Hostname);
         Assert.Equal("lt-01.corp.example.com", doc.Device.Fqdn);
         Assert.Equal("7HX2LQ3", doc.Device.SerialNumber);
-        Assert.Equal("4c4c4544-0042-3510-8048-b7c04f4b3233", doc.Device.SmbiosUuid);
+        Assert.Equal("4C4C4544-0042-3510-8048-B7C04F4B3233", doc.Device.SmbiosUuid);
         Assert.Equal("laptop", doc.Device.Chassis);
         Assert.Equal("endpoint", doc.Device.Category);
         Assert.Equal("Windows 11 Pro", doc.Os.Name);
         Assert.False(doc.Os.IsServer);
         Assert.Equal(10, doc.Hardware.CpuCores);
         Assert.Equal(12, doc.Hardware.CpuThreads);
-        Assert.Equal("aa:bb:cc:00:11:22", doc.Network.Single().Mac);
+        Assert.Equal("AA:BB:CC:00:11:22", doc.Network.Single().Mac);
         Assert.Equal(new[] { "10.1.2.3" }, doc.Network.Single().Ipv4);
         var sw = Assert.Single(doc.Software);
         Assert.Equal("7-Zip 24.08 (x64)", sw.Name);
@@ -131,7 +131,7 @@ public sealed class InventoryParserTests
         Assert.Equal("FOC1234X0AB", doc.Device.SerialNumber);
         Assert.Equal("WS-C2960X-48FPD-L", doc.Device.Model);
         Assert.Equal("sw-core-01", doc.Device.Hostname);
-        Assert.Equal("00:1a:2b:3c:4d:5e", doc.Network[0].Mac);
+        Assert.Equal("00:1A:2B:3C:4D:5E", doc.Network[0].Mac);
     }
 
     [Fact]
@@ -211,7 +211,8 @@ public sealed class AgentSecurityTests : IDisposable
     [Fact]
     public void Credential_secrets_are_bound_to_their_record()
     {
-        var protector = new CredentialProtector(() => new AppSecrets { CredentialKey = SecretStore.NewKey() });
+        var secrets = new AppSecrets { CredentialKey = SecretStore.NewKey() };
+        var protector = new CredentialProtector(() => secrets);
         var id = Guid.NewGuid();
         var blob = protector.Protect(id, new CredentialSecret { Password = "P@ssw0rd!" });
         Assert.DoesNotContain("P@ssw0rd", blob);
