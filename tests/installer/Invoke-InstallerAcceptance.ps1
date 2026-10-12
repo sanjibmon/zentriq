@@ -300,8 +300,9 @@ if (-not $installed) {
         Assert ($res.status -eq 'success') "scan result $($res.status): $($res.detail)"
         Assert ($res.protocol -like 'WinRM*') "protocol $($res.protocol)"
         $inv = Api GET "/assets/$($res.assetId)/inventory" -Session $s
-        Assert ($inv.source -eq 'winrm') "inventory source $($inv.source)"
-        Assert (@($inv.software).Count -gt 5) "only $(@($inv.software).Count) software items"
+        $diag = "detail: $($res.detail); document errors: $(@($inv.document.errors) -join ' | '); host: $($inv.document.device.hostname)"
+        Assert ($inv.source -eq 'winrm') "inventory source $($inv.source); $diag"
+        Assert (@($inv.software).Count -gt 5) "only $(@($inv.software).Count) software items; $diag"
         $after = (Api GET '/assets/summary' -Session $s).total
         if ($script:agentAsset) {
             Assert ($res.assetId -eq $script:agentAsset) "agentless scan created a second asset ($($res.assetId)) instead of updating the agent's ($($script:agentAsset))"

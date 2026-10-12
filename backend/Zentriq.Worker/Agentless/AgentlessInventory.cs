@@ -31,6 +31,15 @@ public sealed class AgentlessInventory(NpgsqlDataSource ds, ILogger<AgentlessInv
                 cts.CancelAfter(TimeSpan.FromMinutes(3));
                 var doc = await run().WaitAsync(cts.Token);
                 if (doc is null) { errors.Add($"{protocol}: no response"); return null; }
+                // Connected, but the core sections could not be read (e.g. WMI/registry access denied for this account):
+                // that is a failed collection, not an empty device.
+                if (doc.Device.Hostname is null && doc.Os.Name is null && doc.Device.SerialNumber is null)
+                {
+                    var why = doc.Errors.Count > 0 ? string.Join("; ", doc.Errors.Take(4)) : "no data returned";
+                    var denied = doc.Errors.Any(e => e.Contains("denied", StringComparison.OrdinalIgnoreCase));
+                    (denied ? authFailures : errors).Add($"{protocol} '{c.Name}': connected but could not read inventory ({Zentriq.Application.Security.Redactor.Redact(why)})");
+                    return null;
+                }
                 await ScanCredential.MarkUsedAsync(ds, c.Id);
                 return new CollectionAttempt(CollectionAttempt.Success, doc, protocol, c.Id,
                     $"Inventoried over {protocol} with credential '{c.Name}' ({doc.Software.Count} software items{(doc.Errors.Count > 0 ? $"; partial: {string.Join("; ", doc.Errors.Take(3))}" : "")}).");
