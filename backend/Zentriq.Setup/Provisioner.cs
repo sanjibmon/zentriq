@@ -337,7 +337,7 @@ public sealed class Provisioner(ProvisionInput input, ZentriqPaths paths, Report
             if (await check.ExecuteScalarAsync(ct) is true) { log.Info("Installation already initialized; the trial is unchanged."); return; }
 
         if (input.Admin is null || string.IsNullOrWhiteSpace(input.Admin.Email))
-            throw new SetupException("Administrator details are required to initialize Zentriq.", "Run the installer again and complete the Administrator page.");
+            throw new SetupException("This Zentriq installation has no administrator yet (an earlier setup did not finish).", "Run setup again and fill in the Administrator page; for silent installs add the admin section to the answer file.");
 
         var token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
         await using (var set = new NpgsqlCommand("UPDATE zentriq.install_state SET setup_token_hash = @h, setup_token_expires_at = now() + interval '30 minutes' WHERE id = 1", conn))

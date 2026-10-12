@@ -51,8 +51,7 @@
       <Publish Dialog="LicenseAgreementDlg" Control="Next" Event="NewDialog" Value="ZqPrereqDlg" Order="2" Condition='LicenseAccepted = "1"' />
 
       <!-- Ready / maintenance -->
-      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="ZqAdminDlg" Order="1" Condition="NOT Installed AND NOT ZQ_EXISTING" />
-      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="ZqFoldersDlg" Order="1" Condition="NOT Installed AND ZQ_EXISTING" />
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="ZqAdminDlg" Order="1" Condition="NOT Installed" />
       <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="MaintenanceTypeDlg" Order="2" Condition="Installed AND NOT PATCH" />
       <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" Order="2" Condition="Installed AND PATCH" />
 
@@ -110,7 +109,7 @@
         <Control Id="DataNote" Type="Text" X="20" Y="136" Width="330" Height="40" NoPrefix="yes"
                  Text="Data is never deleted by upgrade, repair or uninstall. Access to the Secrets folder is limited to SYSTEM, Administrators and the Zentriq services. Choose a volume with room for backups." />
         <Control Id="ExistingNote" Type="Text" X="20" Y="176" Width="330" Height="36" NoPrefix="yes" HideCondition="NOT ZQ_EXISTING" ShowCondition="ZQ_EXISTING"
-                 Text="Existing Zentriq data was found in this folder. Setup will keep it, reuse the saved database and HTTPS settings, take a backup before upgrading the database and skip the remaining configuration pages." />
+                 Text="Existing Zentriq data was found in this folder. Setup will keep it, reuse the saved database and HTTPS settings, take a backup before upgrading the database and skip the database and HTTPS pages." />
         <Control Id="DesktopCheck" Type="CheckBox" X="20" Y="214" Width="330" Height="15" Property="DESKTOPSHORTCUT" CheckBoxValue="1"
                  Text="Create a Zentriq Web Console shortcut on the desktop" />
         <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
@@ -122,7 +121,7 @@
           <Publish Event="DoAction" Value="WixUIValidatePath_X64" Order="2" Condition="NOT WIXUI_DONTVALIDATEPATH" />
           <Publish Event="SpawnDialog" Value="InvalidDirDlg" Order="3" Condition='NOT WIXUI_DONTVALIDATEPATH AND WIXUI_INSTALLDIR_VALID &lt;&gt; "1"' />
           <Publish Event="NewDialog" Value="ZqDatabaseDlg" Order="4" Condition='NOT ZQ_EXISTING AND (WIXUI_DONTVALIDATEPATH OR WIXUI_INSTALLDIR_VALID = "1")' />
-          <Publish Event="NewDialog" Value="VerifyReadyDlg" Order="5" Condition='ZQ_EXISTING AND (WIXUI_DONTVALIDATEPATH OR WIXUI_INSTALLDIR_VALID = "1")' />
+          <Publish Event="NewDialog" Value="ZqAdminDlg" Order="5" Condition='ZQ_EXISTING AND (WIXUI_DONTVALIDATEPATH OR WIXUI_INSTALLDIR_VALID = "1")' />
         </Control>
         <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
           <Publish Event="SpawnDialog" Value="CancelDlg" />
@@ -229,11 +228,14 @@
         <Control Id="PwEdit" Type="Edit" X="110" Y="122" Width="240" Height="17" Property="ADMINPASSWORD" Password="yes" Text="{256}" />
         <Control Id="Pw2Label" Type="Text" X="20" Y="146" Width="85" Height="12" NoPrefix="yes" Text="Confirm password:" />
         <Control Id="Pw2Edit" Type="Edit" X="110" Y="144" Width="240" Height="17" Property="ADMINPASSWORD2" Password="yes" Text="{256}" />
-        <Control Id="PolicyNote" Type="Text" X="20" Y="168" Width="330" Height="60" NoPrefix="yes"
+        <Control Id="PolicyNote" Type="Text" X="20" Y="168" Width="330" Height="34" NoPrefix="yes"
                  Text="At least 12 characters with three of: upper-case, lower-case, digits, symbols. The password is sent directly to the Zentriq service and stored only as a salted hash. Completing setup starts the 14-day trial with all modules enabled." />
+        <Control Id="ExistingAdminNote" Type="Text" X="20" Y="204" Width="330" Height="26" NoPrefix="yes" HideCondition="NOT ZQ_EXISTING" ShowCondition="ZQ_EXISTING"
+                 Text="Existing Zentriq data was found. If it already has an administrator these details are not used; if the earlier setup did not finish, they create the first administrator." />
         <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
         <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)">
-          <Publish Event="NewDialog" Value="ZqHttpsDlg" />
+          <Publish Event="NewDialog" Value="ZqHttpsDlg" Condition="NOT ZQ_EXISTING" />
+          <Publish Event="NewDialog" Value="ZqFoldersDlg" Condition="ZQ_EXISTING" />
         </Control>
         <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)">
           <Publish Event="DoAction" Value="ZqValidateAdmin" Order="1" />
