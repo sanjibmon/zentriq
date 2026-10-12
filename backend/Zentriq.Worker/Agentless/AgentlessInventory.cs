@@ -37,19 +37,19 @@ public sealed class AgentlessInventory(NpgsqlDataSource ds, ILogger<AgentlessInv
                 {
                     var why = doc.Errors.Count > 0 ? string.Join("; ", doc.Errors.Take(4)) : "no data returned";
                     var denied = doc.Errors.Any(e => e.Contains("denied", StringComparison.OrdinalIgnoreCase));
-                    (denied ? authFailures : errors).Add($"{protocol} '{c.Name}': connected but could not read inventory ({Zentriq.Application.Security.Redactor.Redact(why)})");
+                    (denied ? authFailures : errors).Add($"{protocol} '{c.Name}' to {target}: could not read inventory ({Zentriq.Application.Security.Redactor.Redact(why)})");
                     return null;
                 }
                 await ScanCredential.MarkUsedAsync(ds, c.Id);
                 return new CollectionAttempt(CollectionAttempt.Success, doc, protocol, c.Id,
-                    $"Inventoried over {protocol} with credential '{c.Name}' ({doc.Software.Count} software items{(doc.Errors.Count > 0 ? $"; partial: {string.Join("; ", doc.Errors.Take(3))}" : "")}).");
+                    $"Inventoried {target} over {protocol} with credential '{c.Name}' ({doc.Software.Count} software items{(doc.Errors.Count > 0 ? $"; partial: {string.Join("; ", doc.Errors.Take(3))}" : "")}).");
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
             catch (Exception ex)
             {
                 var msg = Zentriq.Application.Security.Redactor.Redact(ex.Message);
-                if (isAuth(ex)) authFailures.Add($"{protocol} '{c.Name}': {msg}");
-                else errors.Add($"{protocol} '{c.Name}': {msg}");
+                if (isAuth(ex)) authFailures.Add($"{protocol} '{c.Name}' to {target}: {msg}");
+                else errors.Add($"{protocol} '{c.Name}' to {target}: {msg}");
                 logger.LogDebug(ex, "{Protocol} collection from {Target} with {Credential} failed", protocol, target, c.Name);
                 return null;
             }

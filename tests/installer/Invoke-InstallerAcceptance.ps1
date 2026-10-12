@@ -286,6 +286,9 @@ if (-not $installed) {
         Enable-PSRemoting -Force -SkipNetworkProfileCheck | Out-Null
         Set-Item WSMan:\localhost\Client\TrustedHosts -Value '*' -Force
         Set-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System' -Name LocalAccountTokenFilterPolicy -Value 1 -Type DWord
+        # CI only: the scan targets this same machine; NTLM's loopback check rejects authentication to the machine's own
+        # DNS aliases (e.g. <name>.mshome.net from reverse DNS). Remote targets are not affected.
+        Set-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Lsa' -Name DisableLoopbackCheck -Value 1 -Type DWord
         $ip = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -match '^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)' -and $_.PrefixOrigin -ne 'WellKnown' } | Select-Object -First 1).IPAddress
         Assert $ip 'no private IPv4 address on this machine'
         $s = Login
