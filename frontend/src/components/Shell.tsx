@@ -33,7 +33,7 @@ export function Shell({ children }: { children: ReactNode }) {
           <LogoMark className="brand-mark" />
           <div className="brand-name">
             {PRODUCT.name}
-            <small>IT Operations</small>
+            <small>Web Console</small>
           </div>
         </div>
         <nav className="nav" aria-label="Primary">

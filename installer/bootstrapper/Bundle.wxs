@@ -16,7 +16,7 @@
      xmlns:bal="http://wixtoolset.org/schemas/v4/wxs/bal"
      xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
 
-  <Bundle Name="Zentriq Console"
+  <Bundle Name="Zentriq"
           Manufacturer="Zentriq"
           Version="$(var.ProductVersion)"
           UpgradeCode="6F1919F9-1BBA-47F1-B7FE-A85266ABE7D6"

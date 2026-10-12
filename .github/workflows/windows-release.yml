@@ -28,8 +28,9 @@ env:
   AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
   AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
   AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
-  ZQ_VERSION: '1.1.0'
-  ZQ_UPGRADE_VERSION: '1.1.1'
+  ZQ_VERSION: '1.1.1'
+  ZQ_UPGRADE_VERSION: '1.1.2'
+  ZQ_PREVIOUS_RELEASE: 'v1.0.2-build.11'
 
 jobs:
   windows:
@@ -91,6 +92,15 @@ jobs:
           if ($env:RUNNER_PG_SERVICE) { Stop-Service $env:RUNNER_PG_SERVICE -Force; Set-Service $env:RUNNER_PG_SERVICE -StartupType Disabled }
           Get-NetTCPConnection -LocalPort 5432 -State Listen -ErrorAction SilentlyContinue | Format-Table | Out-String | Write-Host
 
+      - name: Upgrade from the previous published release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Customers on the last published build upgrade to this one; install it first, then upgrade, then clean up.
+          gh release download $env:ZQ_PREVIOUS_RELEASE -R $env:GITHUB_REPOSITORY -p 'Zentriq-Setup-x64.exe' -D "$env:RUNNER_TEMP/previous"
+          ./tests/installer/Invoke-UpgradeFromRelease.ps1 -OldBundle "$env:RUNNER_TEMP/previous/Zentriq-Setup-x64.exe" -NewBundle "$PWD/artifacts/release-main/Zentriq-Setup-x64.exe" -OutDir "$env:RUNNER_TEMP/acceptance-upgrade" *>&1 | Tee-Object -FilePath "$env:RUNNER_TEMP/ci-logs/5a-upgrade-from-release.log"
+
       - name: Installer acceptance suite
         shell: pwsh
         run: ./tests/installer/Invoke-InstallerAcceptance.ps1 -Bundle "$PWD/artifacts/release-main/Zentriq-Setup-x64.exe" -UpgradeBundle "$PWD/artifacts/release-upgrade/Zentriq-Setup-x64.exe" -OutDir "$env:RUNNER_TEMP/acceptance" *>&1 | Tee-Object -FilePath "$env:RUNNER_TEMP/ci-logs/5-acceptance.log"
@@ -101,6 +111,8 @@ jobs:
         run: |
           $md = Join-Path $env:RUNNER_TEMP 'acceptance/installer-test-results.md'
           if (Test-Path $md) { Get-Content $md | Out-File $env:GITHUB_STEP_SUMMARY -Append; Get-Content $md }
+          $um = Join-Path $env:RUNNER_TEMP 'acceptance-upgrade/upgrade-results.md'
+          if (Test-Path $um) { Get-Content $um | Out-File $env:GITHUB_STEP_SUMMARY -Append; Get-Content $um }
           $s = 'artifacts/test-results/summary.txt'
           if (Test-Path $s) { "`n**Unit/integration tests:** $(Get-Content $s)" | Out-File $env:GITHUB_STEP_SUMMARY -Append }
 
@@ -138,6 +150,7 @@ jobs:
           Copy-Item "$env:RUNNER_TEMP/ci-logs/*" $d -ErrorAction SilentlyContinue
           if (Test-Path artifacts/test-results) { Copy-Item artifacts/test-results $d -Recurse }
           if (Test-Path "$env:RUNNER_TEMP/acceptance") { Copy-Item "$env:RUNNER_TEMP/acceptance" $d -Recurse -Exclude '*.zbak' }
+          if (Test-Path "$env:RUNNER_TEMP/acceptance-upgrade") { Copy-Item "$env:RUNNER_TEMP/acceptance-upgrade" $d -Recurse -Exclude '*.zbak' }
           foreach ($f in 'artifacts/release-main/release-manifest.json', 'artifacts/release-main/SHA256SUMS.txt', 'artifacts/prereqs/prereqs.lock.json') { if (Test-Path $f) { Copy-Item $f $d } }
           Get-ChildItem installer -Recurse -Filter '*.log' -ErrorAction SilentlyContinue | Copy-Item -Destination $d
           "run $env:GITHUB_RUN_ID attempt $env:GITHUB_RUN_ATTEMPT commit $env:GITHUB_SHA job status ${{ job.status }}" | Set-Content (Join-Path $d 'RUN.txt')

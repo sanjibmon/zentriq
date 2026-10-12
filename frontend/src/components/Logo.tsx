@@ -1,36 +1,22 @@
-import { useId } from 'react';
-
 /**
  * The Zentriq mark — a "connected Z": the diagonal links two devices (nodes) and the dashed orbit stands for
  * continuous discovery. Same artwork as the installer icon (installer/assets/src/zentriq-mark.svg).
  */
 export function LogoMark({ size = 28, className }: { size?: number; className?: string }) {
-  const gid = `zq-bg-${useId().replace(/:/g, '')}`;
-  const small = size < 26;
-  return (
+  // Flat artwork, no fine detail: identical to installer/assets/src/zentriq-mark*.svg.
+  return size < 26 ? (
+    <svg className={className} width={size} height={size} viewBox="0 0 16 16" aria-hidden="true">
+      <rect width="16" height="16" rx="3" fill="#0A6475" />
+      <path d="M4 4h8L4 12h8" fill="none" stroke="#fff" strokeWidth="2" strokeLinejoin="miter" />
+      <circle cx="12" cy="4" r="2" fill="#5EE6F2" />
+      <circle cx="4" cy="12" r="2" fill="#5EE6F2" />
+    </svg>
+  ) : (
     <svg className={className} width={size} height={size} viewBox="0 0 64 64" aria-hidden="true">
-      <defs>
-        <linearGradient id={gid} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#13A3B4" />
-          <stop offset="1" stopColor="#075468" />
-        </linearGradient>
-      </defs>
-      {small ? (
-        <>
-          <rect width="64" height="64" rx="14" fill={`url(#${gid})`} />
-          <path d="M15 17h31L18 47h31" fill="none" stroke="#fff" strokeWidth="9" strokeLinecap="round" strokeLinejoin="round" />
-          <circle cx="47" cy="17" r="7.5" fill="#8BF0FA" stroke="#075468" strokeWidth="3" />
-          <circle cx="17" cy="47" r="7.5" fill="#8BF0FA" stroke="#075468" strokeWidth="3" />
-        </>
-      ) : (
-        <>
-          <rect x="2" y="2" width="60" height="60" rx="15" fill={`url(#${gid})`} />
-          <path d="M32 9.5a22.5 22.5 0 0 1 22.5 22.5M32 54.5A22.5 22.5 0 0 1 9.5 32" fill="none" stroke="#9FEAF2" strokeOpacity=".55" strokeWidth="2.2" strokeLinecap="round" strokeDasharray="1 5.2" />
-          <path d="M18 20.5h25.5L20.5 43.5H46" fill="none" stroke="#fff" strokeWidth="6.2" strokeLinecap="round" strokeLinejoin="round" />
-          <circle cx="44.5" cy="20.5" r="5.6" fill="#8BF0FA" stroke="#075468" strokeWidth="2.4" />
-          <circle cx="19.5" cy="43.5" r="5.6" fill="#8BF0FA" stroke="#075468" strokeWidth="2.4" />
-        </>
-      )}
+      <rect width="64" height="64" rx="14" fill="#0A6475" />
+      <path d="M16 18h28L20 46h28" fill="none" stroke="#fff" strokeWidth="7.5" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="46" cy="18" r="6.5" fill="#5EE6F2" />
+      <circle cx="18" cy="46" r="6.5" fill="#5EE6F2" />
     </svg>
   );
 }
@@ -38,6 +24,6 @@ export function LogoMark({ size = 28, className }: { size?: number; className?: 
 export const PRODUCT = {
   name: 'Zentriq',
   full: 'Zentriq Web Console',
-  tagline: 'IT asset intelligence & operations',
+  tagline: 'IT Asset Intelligence',
   strap: 'Discover, inventory, secure and manage every device in your estate — self-hosted, on your own servers.',
 };

@@ -28,37 +28,34 @@ const page = (w, h, body, bg = '#fff') => `<!doctype html><html><head><style>
   .wm{font-weight:700;letter-spacing:-.02em;color:#fff} .tag{color:#9FD8E0;font-weight:500;letter-spacing:.06em;text-transform:uppercase}
 </style></head><body>${body}</body></html>`;
 
-const product = { server: { mark: MARK, title: 'Zentriq', sub: 'Web Console', tag: 'IT asset intelligence', g1: '#0B3A4A', g2: '#062430', accent: '#13A3B4' },
-                  agent: { mark: AGENT, title: 'Zentriq', sub: 'Agent', tag: 'Device inventory', g1: '#173A63', g2: '#0B1C33', accent: '#F59E0B' } };
+// Setup shows only the brand: "Zentriq" and the tagline.
+const product = { server: { mark: MARK, title: 'Zentriq', tag: 'IT Asset Intelligence', bg: '#0A2E3A', accent: '#5EE6F2' },
+                  agent: { mark: AGENT, title: 'Zentriq', tag: 'IT Asset Intelligence', bg: '#10243F', accent: '#F59E0B' } };
+// Wizard bitmaps are rendered at 2x: Windows scales them to the dialog, so they stay sharp at 150-200 % display scaling.
+const S = 2;
 
-function dialog(p) { // 493x312: art on the left 164 px; the rest stays white for the wizard text
-  return page(493, 312, `
-    <div style="position:absolute;left:0;top:0;width:164px;height:312px;background:linear-gradient(160deg,${p.g1},${p.g2});overflow:hidden">
-      ${network(164, 312, p === product.agent ? 7 : 3, '#8BF0FA', 0.16)}
-      <div style="position:absolute;left:22px;top:28px"><img src="${dataUri(p.mark)}" width="60" height="60"></div>
-      <div class="wm" style="position:absolute;left:22px;top:100px;font-size:26px;line-height:1">${p.title}</div>
-      <div style="position:absolute;left:22px;top:131px;font-size:15px;font-weight:600;color:#DDF7FA">${p.sub}</div>
-      <div class="tag" style="position:absolute;left:22px;top:156px;font-size:9.5px">${p.tag}</div>
-      <div style="position:absolute;left:22px;bottom:22px;right:22px;height:3px;border-radius:2px;background:linear-gradient(90deg,${p.accent},transparent)"></div>
-    </div>`);
+function dialog(p) { // 493x312 (x2): brand panel on the left 164 px; the rest stays white for the wizard text
+  return page(493 * S, 312 * S, `
+    <div style="position:absolute;left:0;top:0;width:${164 * S}px;height:${312 * S}px;background:${p.bg}"></div>
+    <div style="position:absolute;left:${22 * S}px;top:${34 * S}px"><img src="${dataUri(p.mark)}" width="${56 * S}" height="${56 * S}"></div>
+    <div class="wm" style="position:absolute;left:${22 * S}px;top:${104 * S}px;font-size:${28 * S}px;line-height:1">${p.title}</div>
+    <div style="position:absolute;left:${23 * S}px;top:${138 * S}px;font-size:${10.5 * S}px;font-weight:600;letter-spacing:.02em;color:#CFEFF4">${p.tag}</div>
+    <div style="position:absolute;left:${22 * S}px;top:${158 * S}px;width:${28 * S}px;height:${3 * S}px;background:${p.accent}"></div>`);
 }
 
-function banner(p) { // 493x58: title/description text sits on the left; mark at the right
-  return page(493, 58, `
-    <div style="position:absolute;right:0;top:0;width:150px;height:58px;background:linear-gradient(90deg,#fff,${p.g1}14)"></div>
-    <div style="position:absolute;right:14px;top:9px"><img src="${dataUri(p.mark)}" width="40" height="40"></div>
-    <div style="position:absolute;left:0;right:0;bottom:0;height:3px;background:linear-gradient(90deg,${p.accent},${p.g1})"></div>`);
+function banner(p) { // 493x58 (x2): title/description text sits on the left; mark at the right
+  return page(493 * S, 58 * S, `
+    <div style="position:absolute;right:${14 * S}px;top:${11 * S}px"><img src="${dataUri(p.mark)}" width="${36 * S}" height="${36 * S}"></div>
+    <div style="position:absolute;left:0;right:0;bottom:0;height:${2 * S}px;background:${p.bg}"></div>`);
 }
 
-function splash(p) { // 420x220 Burn splash screen
+function splash(p) { // 420x220 Burn splash screen (shown at its native size)
   return page(420, 220, `
-    <div style="position:absolute;inset:0;background:radial-gradient(120% 140% at 0% 0%,${p.g1},${p.g2})">${network(420, 220, 11, '#8BF0FA', 0.13)}</div>
-    <div style="position:absolute;left:36px;top:48px"><img src="${dataUri(p.mark)}" width="84" height="84"></div>
-    <div class="wm" style="position:absolute;left:138px;top:54px;font-size:36px;line-height:1">${p.title}</div>
-    <div style="position:absolute;left:139px;top:96px;font-size:18px;font-weight:600;color:#DDF7FA">${p.sub}</div>
-    <div class="tag" style="position:absolute;left:139px;top:124px;font-size:10.5px">${p.tag} &amp; operations</div>
-    <div style="position:absolute;left:36px;bottom:26px;font-size:12px;color:#BFE7EC">Starting setup…</div>
-    <div style="position:absolute;left:0;right:0;bottom:0;height:5px;background:linear-gradient(90deg,${p.accent},#8BF0FA)"></div>`, p.g2);
+    <div style="position:absolute;inset:0;background:${p.bg}"></div>
+    <div style="position:absolute;left:40px;top:62px"><img src="${dataUri(p.mark)}" width="96" height="96"></div>
+    <div class="wm" style="position:absolute;left:156px;top:76px;font-size:42px;line-height:1">${p.title}</div>
+    <div style="position:absolute;left:158px;top:128px;font-size:15px;font-weight:600;letter-spacing:.02em;color:#CFEFF4">${p.tag}</div>
+    <div style="position:absolute;left:158px;top:154px;width:40px;height:4px;background:${p.accent}"></div>`, p.bg);
 }
 
 const icon = (s, size) => page(size, size, `<img src="${dataUri(s)}" width="${size}" height="${size}" style="display:block">`, 'transparent');
@@ -75,11 +72,11 @@ const icon = (s, size) => page(size, size, `<img src="${dataUri(s)}" width="${si
   for (const s of [16, 20, 24]) await shot(icon(SMALL, s), s, s, `mark-${s}.png`, true);
   for (const s of [32, 40, 48, 64, 96, 128, 256, 512]) await shot(icon(MARK, s), s, s, `mark-${s}.png`, true);
   for (const s of [16, 20, 24, 32, 40, 48, 64, 96, 128, 256]) await shot(icon(AGENT, s), s, s, `agent-${s}.png`, true);
-  await shot(dialog(product.server), 493, 312, 'WixUIDialog.png');
-  await shot(banner(product.server), 493, 58, 'WixUIBanner.png');
+  await shot(dialog(product.server), 493 * S, 312 * S, 'WixUIDialog.png');
+  await shot(banner(product.server), 493 * S, 58 * S, 'WixUIBanner.png');
   await shot(splash(product.server), 420, 220, 'splash.png');
-  await shot(dialog(product.agent), 493, 312, 'AgentDialog.png');
-  await shot(banner(product.agent), 493, 58, 'AgentBanner.png');
+  await shot(dialog(product.agent), 493 * S, 312 * S, 'AgentDialog.png');
+  await shot(banner(product.agent), 493 * S, 58 * S, 'AgentBanner.png');
   await b.close();
   console.log('rendered to ' + out);
 })();

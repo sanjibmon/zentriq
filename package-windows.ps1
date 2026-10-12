@@ -107,7 +107,7 @@ if ($signMode -eq 'certstore') {
     Invoke-Native { dotnet tool update --global AzureSignTool --version 7.0.1 }
 }
 if ($signMode) { Write-Host "Code signing: $signMode" } else { Write-Warning 'Code signing: not configured (artifacts will show "Unknown publisher").' }
-$signDescription = 'Zentriq Console'
+$signDescription = 'Zentriq'
 $signUrl = 'https://zentriq.example'
 function Sign-Files([string[]] $Files) {
     if (-not $signMode -or $Files.Count -eq 0) { return }
@@ -229,7 +229,7 @@ $files = foreach ($f in Get-ChildItem $release -File | Sort-Object Name) {
 
 $commit = (git -C $root rev-parse HEAD 2>$null)
 $manifest = [ordered]@{
-    product        = 'Zentriq Console'
+    product        = 'Zentriq'
     version        = $Version
     builtAtUtc     = (Get-Date).ToUniversalTime().ToString('o')
     gitCommit      = $commit

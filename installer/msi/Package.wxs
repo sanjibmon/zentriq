@@ -12,7 +12,7 @@
      xmlns:fw="http://wixtoolset.org/schemas/v4/wxs/firewall"
      xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
 
-  <Package Name="Zentriq Console"
+  <Package Name="Zentriq"
            Manufacturer="Zentriq"
            Version="$(var.ProductVersion)"
            UpgradeCode="41149E82-77BA-4689-851F-E2475BF1AC05"
@@ -21,7 +21,7 @@
            Language="1033"
            Compressed="yes">
 
-    <SummaryInformation Description="Zentriq Console $(var.ProductVersion) — IT asset intelligence and operations platform" />
+    <SummaryInformation Description="Zentriq $(var.ProductVersion) — IT Asset Intelligence" />
 
     <MajorUpgrade Schedule="afterInstallInitialize"
                   AllowSameVersionUpgrades="no"
@@ -99,7 +99,7 @@
       <Directory Id="ShortcutFolder" Name="Zentriq" />
     </StandardDirectory>
 
-    <Feature Id="Main" Title="Zentriq Console" Level="1" AllowAbsent="no">
+    <Feature Id="Main" Title="Zentriq" Level="1" AllowAbsent="no">
       <ComponentGroupRef Id="ApiFiles" />
       <ComponentGroupRef Id="WorkerFiles" />
       <ComponentGroupRef Id="ToolsFiles" />
