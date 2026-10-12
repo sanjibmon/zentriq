@@ -15,7 +15,8 @@ public static class DiscoveryEndpoints
     public sealed record ScanRequest(string? Name, string ScanType, string? TargetsText, string? ExcludeText, int? Concurrency, int? TimeoutMs, int[]? Ports,
         Guid[]? CredentialIds = null, DirectorySource? Directory = null);
     /// <summary>Active Directory source for scan type "ad": computers under BaseDn become targets.</summary>
-    public sealed record DirectorySource(string Server, string BaseDn, bool Ldaps, Guid CredentialId, int? InactiveDays);
+    public sealed record DeleteScansBody(Guid[]? Ids, int? OlderThanDays);
+    public sealed record DirectorySource(string? Server, string? BaseDn, bool Ldaps, Guid? CredentialId, int? InactiveDays, Guid? ConnectionId = null);
     public sealed record JobEventDto(DateTimeOffset OccurredAt, string Level, string Message);
     public sealed record ProfileBody(string Name, string? Description, ScanRequest Config, bool Shared);
 
@@ -100,6 +101,31 @@ public static class DiscoveryEndpoints
             return Results.Ok(ScanDto(s, null));
         }).RequireAuthorization(Permissions.ScansRun);
 
+        // Scan history housekeeping. Running scans must be cancelled first; assets found by a scan are kept.
+        g.MapDelete("/scans/{id:guid}", async (Guid id, ZentriqDbContext db, RequestContext rc, CancellationToken ct) =>
+        {
+            var s = await db.DiscoveryScans.FirstOrDefaultAsync(x => x.Id == id, ct);
+            if (s is null) return Results.NotFound();
+            if (s.Status is "queued" or "running" or "cancelling") return Results.Problem(statusCode: 409, title: "Cancel the scan before deleting it.");
+            db.DiscoveryScans.Remove(s);
+            await db.SaveChangesAsync(ct);
+            await rc.AuditAsync("scan.delete", s.Name, detail: new { s.Id, s.Number });
+            return Results.NoContent();
+        }).RequireAuthorization(Permissions.ScansRun);
+
+        g.MapPost("/scans/delete", async (DeleteScansBody body, ZentriqDbContext db, RequestContext rc, CancellationToken ct) =>
+        {
+            var q = db.DiscoveryScans.Where(x => x.Status != "queued" && x.Status != "running" && x.Status != "cancelling");
+            if (body.Ids is { Length: > 0 }) q = q.Where(x => body.Ids.Contains(x.Id));
+            else if (body.OlderThanDays is int days and > 0) q = q.Where(x => x.CreatedAt < DateTimeOffset.UtcNow.AddDays(-days));
+            else return Validation.Problem("ids", "Select scans to delete, or give an age in days.");
+            var victims = await q.ToListAsync(ct);
+            db.DiscoveryScans.RemoveRange(victims);
+            await db.SaveChangesAsync(ct);
+            await rc.AuditAsync("scan.delete", $"{victims.Count} scan(s)", detail: new { ids = victims.Select(v => v.Id), body.OlderThanDays });
+            return Results.Ok(new { deleted = victims.Count });
+        }).RequireAuthorization(Permissions.ScansRun);
+
         g.MapPost("/scans/{id:guid}/retry", async (Guid id, ZentriqDbContext db, JobQueue jobs, RequestContext rc, CancellationToken ct) =>
         {
             var s = await db.DiscoveryScans.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
@@ -109,7 +135,7 @@ public static class DiscoveryEndpoints
                 .Select(r => r.Target).ToListAsync(ct);
             if (failed.Count == 0) return Results.Problem(statusCode: 409, title: "There are no failed targets to retry.");
             var cfg = JsonSerializer.Deserialize<ScanConfig>(s.Config, JsonOpts)!;
-            var req = new ScanRequest($"{s.Name} (retry)", "list", string.Join('\n', failed), null, cfg.Concurrency, cfg.TimeoutMs, cfg.Ports);
+            var req = new ScanRequest($"{s.Name} (retry)", "list", string.Join('\n', failed), null, cfg.Concurrency, cfg.TimeoutMs, cfg.Ports, cfg.CredentialIds);
             var (scan, error) = await CreateScanAsync(req, s.ProfileId, db, jobs, rc, ct);
             return error ?? Results.Accepted($"/api/v1/discovery/scans/{scan!.Id}", ScanDto(scan, null));
         }).RequireAuthorization(Permissions.ScansRun);
@@ -168,16 +194,29 @@ public static class DiscoveryEndpoints
         if (body.ScanType == "ad")
         {
             var d = body.Directory;
-            if (d is null || string.IsNullOrWhiteSpace(d.Server) || string.IsNullOrWhiteSpace(d.BaseDn))
-                return (null, Validation.Problem("directory", "Enter the domain controller and the domain or OU (distinguished name) to discover."));
-            if (!d.BaseDn.Contains("DC=", StringComparison.OrdinalIgnoreCase))
-                return (null, Validation.Problem("directory.baseDn", "Use a distinguished name, e.g. OU=Servers,DC=corp,DC=example,DC=com."));
-            var kind = await db.Database.SqlQuery<string>($"SELECT kind AS \"Value\" FROM zentriq.credentials WHERE id = {d.CredentialId}").FirstOrDefaultAsync(ct);
-            if (kind is not ("ldap_bind" or "windows_domain"))
-                return (null, Validation.Problem("directory.credentialId", "Choose a directory (LDAP bind) or Windows domain credential with read access to the directory."));
+            if (d?.ConnectionId is { } connId)
+            {
+                var row = await db.Database.SqlQuery<string>($"SELECT concat_ws(chr(31), coalesce(server_host, ''), coalesce(base_dn, ''), transport, inactive_days::text) AS \"Value\" FROM zentriq.directory_connections WHERE id = {connId}").FirstOrDefaultAsync(ct);
+                if (row is null) return (null, Validation.Problem("directory.connectionId", "The Active Directory connection no longer exists."));
+                var f = row.Split('\u001f');
+                d = new DirectorySource(f[0], f[1], f[2] == "ldaps", null, d.InactiveDays ?? int.Parse(f[3]), connId);
+            }
+            else
+            {
+                if (d is null || string.IsNullOrWhiteSpace(d.Server) || string.IsNullOrWhiteSpace(d.BaseDn))
+                    return (null, Validation.Problem("directory", "Choose an Active Directory connection (Discovery > Active Directory)."));
+                if (!d.BaseDn.Contains("DC=", StringComparison.OrdinalIgnoreCase))
+                    return (null, Validation.Problem("directory.baseDn", "Use a distinguished name, e.g. OU=Servers,DC=corp,DC=example,DC=com."));
+                if (d.CredentialId is not { } dirCredId)
+                    return (null, Validation.Problem("directory.credentialId", "Choose a directory (LDAP bind) or Windows domain credential with read access to the directory."));
+                var kind = await db.Database.SqlQuery<string>($"SELECT kind AS \"Value\" FROM zentriq.credentials WHERE id = {dirCredId}").FirstOrDefaultAsync(ct);
+                if (kind is not ("ldap_bind" or "windows_domain"))
+                    return (null, Validation.Problem("directory.credentialId", "Choose a directory (LDAP bind) or Windows domain credential with read access to the directory."));
+                d = d with { Server = d.Server.Trim(), BaseDn = d.BaseDn.Trim() };
+            }
             var adConfig = new ScanConfig("ad", "", body.ExcludeText ?? "", Math.Clamp(body.Concurrency ?? sg.DefaultConcurrency, 1, sg.MaxConcurrency),
                 Math.Clamp(body.TimeoutMs ?? sg.ProbeTimeoutMs, 200, 10_000), DefaultPorts, sg.Safeguards.ApprovedScopes, sg.Safeguards.MaxTargets, credIds,
-                d with { Server = d.Server.Trim(), BaseDn = d.BaseDn.Trim() });
+                d);
             return await PersistScanAsync(body, adConfig, 0, profileId, db, jobs, rc, ct);
         }
 

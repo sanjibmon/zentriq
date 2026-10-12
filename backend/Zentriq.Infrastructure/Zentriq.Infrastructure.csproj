@@ -12,6 +12,7 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
     <PackageReference Include="Microsoft.Extensions.Identity.Core" />
     <PackageReference Include="System.Security.Cryptography.ProtectedData" />
+    <PackageReference Include="System.DirectoryServices.Protocols" />
   </ItemGroup>
   <ItemGroup>
     <!-- Schema migrations are the single source of truth in /database and are embedded here. -->

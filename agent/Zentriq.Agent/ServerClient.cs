@@ -60,6 +60,7 @@ internal sealed class ServerClient : IDisposable
     public ServerClient(string serverUrl, IReadOnlyCollection<string> pins, X509Certificate2? clientCertificate, string? proxyUrl)
     {
         _base = new Uri(serverUrl.TrimEnd('/') + "/");
+        proxyUrl = UsableProxy(proxyUrl, _base);
         var handler = new HttpClientHandler
         {
             ClientCertificateOptions = ClientCertificateOption.Manual,
@@ -71,6 +72,28 @@ internal sealed class ServerClient : IDisposable
         if (clientCertificate is not null) handler.ClientCertificates.Add(clientCertificate);
         _http = new HttpClient(handler) { Timeout = TimeSpan.FromMinutes(5) };
         _http.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("ZentriqAgent", Program.Version));
+    }
+
+    /// <summary>
+    /// Only plain http:// forward proxies are supported by .NET Framework. Anything else (an https:// address, or the
+    /// Zentriq server itself entered by mistake) is ignored with a warning instead of breaking every connection.
+    /// </summary>
+    internal static string? UsableProxy(string? proxyUrl, Uri server)
+    {
+        if (string.IsNullOrWhiteSpace(proxyUrl)) return null;
+        var p = proxyUrl!.Trim();
+        if (!p.Contains("://")) p = "http://" + p;
+        if (!Uri.TryCreate(p, UriKind.Absolute, out var u) || u.Scheme != Uri.UriSchemeHttp)
+        {
+            Log.Warn($"Ignoring proxy '{proxyUrl}': only http://host:port proxies are supported. Connecting directly.");
+            return null;
+        }
+        if (string.Equals(u.Host, server.Host, StringComparison.OrdinalIgnoreCase))
+        {
+            Log.Warn($"Ignoring proxy '{proxyUrl}': it is the Zentriq server itself, not a proxy. Connecting directly.");
+            return null;
+        }
+        return u.GetLeftPart(UriPartial.Authority);
     }
 
     private static bool Validate(X509Certificate2? cert, SslPolicyErrors errors, IReadOnlyCollection<string> pins)

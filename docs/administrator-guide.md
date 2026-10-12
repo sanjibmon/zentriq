@@ -44,10 +44,15 @@ distribute `C:\ProgramData\Zentriq\Secrets\https.pfx`'s public certificate via G
 contact. Administrators (`settings.manage`) can edit it; changes are audited. When a production license that carries
 licensee details is imported, empty profile fields are filled from it and *Licensing* shows the signed licensee.
 
-## Discovery credentials and agents
+## Discovery credentials, Active Directory and agents
 
 Scan credentials, Active Directory discovery and the Zentriq Agent are described in
 [agents-and-agentless.md](agents-and-agentless.md), including the limitations of agentless collection.
+
+**Scan history.** Click a scan's name to see the result for every device (open ports, how inventory was collected,
+or why it was not). Finished scans can be deleted one by one, by selection, or with *Delete old scans…* (older than
+N days). Deleting a scan removes its results and log only; devices it found stay in the asset inventory. A running
+scan must be cancelled first.
 
 ## Moving data
 
@@ -57,7 +62,7 @@ services, move the folder (preserving ACLs, e.g. `robocopy /E /COPYALL /MOVE`), 
 
 ## Uninstalling
 
-*Apps & features › Zentriq Console › Uninstall* (or `Zentriq-Setup-x64.exe /uninstall /quiet`) removes program
+*Apps & features › Zentriq › Uninstall* (or `Zentriq-Setup-x64.exe /uninstall /quiet`) removes program
 files, services, firewall rule and scheduled tasks. It **does not delete** customer data, backups, secrets, the
 certificate or the PostgreSQL server/database, so a later installation continues with the same data and trial.
 
@@ -70,6 +75,22 @@ Complete removal (irreversible – take and export a backup first):
 ## Account and access
 
 * Sign-in sessions: HttpOnly, Secure, SameSite=Strict cookie, 30 minutes sliding. Login attempts are rate limited.
-* MFA (TOTP) can be enrolled per user and required by policy.
+* **Two-step verification (MFA).** Each user turns it on under *avatar › My account & MFA › Set up authenticator app*:
+  scan the QR code with **Microsoft Authenticator**, **Google Authenticator** or any TOTP app (or type the key shown),
+  then enter the 6-digit code. From then on every sign-in asks for the current code.
+  *System Settings › Sign-in security › Require two-step verification* makes it mandatory: users without MFA must set
+  it up at their next sign-in and cannot use anything else until they do (the server grants no permissions to such a
+  session). Set it up for your own account first.
+* **Lost phone.** An administrator opens *Users, Roles & Sites › Edit / Reset MFA* for that user; the user signs in
+  with the password and sets MFA up again. Locked-out last administrator: on the server run
+  `zentriqctl reset-password --email admin@company.com --disable-mfa` (elevated).
+* **Forgotten password.**
+  * With e-mail configured (*System Settings › E-mail (SMTP)*: server, port 587 STARTTLS or 25, optional user/password,
+    sender, console address used in links; *Send test*), the sign-in page offers *Forgot password?*. The user receives
+    a one-time link valid for 30 minutes (configurable). Users with MFA must also enter an authenticator code to
+    reset. The answer never reveals whether an address has an account; at most three links per user per hour.
+  * Without e-mail, an administrator sets a new password under *Users, Roles & Sites › Edit*, or on the server:
+    `zentriqctl reset-password --email user@company.com` (prompts for the new password; unlocks the account and signs
+    out existing sessions).
 * RBAC is enforced by the API for every endpoint; the UI only hides what the API would refuse.
 * Every security-relevant action is written to the audit log (`/api/v1/audit`).

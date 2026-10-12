@@ -99,8 +99,8 @@ public sealed class Provisioner(ProvisionInput input, ZentriqPaths paths, Report
     {
         if (!OperatingSystem.IsWindows()) throw new SetupException("zentriqctl provisioning runs on Windows only.");
         if (!WindowsHost.IsAdministrator()) throw new SetupException("Administrator rights are required.", "Run the installer or zentriqctl from an elevated session.");
-        if (Environment.OSVersion.Version < new Version(10, 0, 17763))
-            throw new SetupException($"Windows {Environment.OSVersion.Version} is not supported.", "Use Windows Server 2019 or later.");
+        if (Environment.OSVersion.Version < new Version(10, 0, 14393))
+            throw new SetupException($"Windows {Environment.OSVersion.Version} is not supported.", "The minimum operating system requirement is Windows Server 2016 (any edition).");
         if (!Environment.Is64BitOperatingSystem) throw new SetupException("A 64-bit operating system is required.");
         var drive = new DriveInfo(Path.GetPathRoot(paths.Root)!);
         if (drive.AvailableFreeSpace < 2L * 1024 * 1024 * 1024)

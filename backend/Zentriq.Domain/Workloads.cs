@@ -62,6 +62,7 @@ public static class JobTypes
 {
     public const string SelfTest = "system.selftest";
     public const string DiscoveryScan = "discovery.scan";
+    public const string DirectorySync = "directory.sync";
     public const string UsageSnapshot = "license.usage_snapshot";
     public const string MaintenanceBackup = "maintenance.backup";
 

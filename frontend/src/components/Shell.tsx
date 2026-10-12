@@ -75,6 +75,9 @@ export function Shell({ children }: { children: ReactNode }) {
                   <div className="muted" style={{ fontSize: 12.5 }}>{me.email}</div>
                   <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>{me.roles.map((r) => r.name).join(', ')}</div>
                 </div>
+                <button className="pop-item" role="menuitem" onClick={() => { setMenu(false); navigate('/account'); }}>
+                  <Icon name="lock" /> My account &amp; MFA{!me.mfaEnabled && <span className="muted" style={{ marginLeft: 6, fontSize: 11.5 }}>(off)</span>}
+                </button>
                 <button className="pop-item" role="menuitem" onClick={() => { setMenu(false); void logout(); }}>
                   <Icon name="x" /> Sign out
                 </button>

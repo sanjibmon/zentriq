@@ -29,6 +29,28 @@ namespace Zentriq.CustomActions
             return ActionResult.Success;
         }
 
+        /// <summary>Wizard "Connect to Zentriq" page: checks the code format and that the proxy is a plain http:// proxy.</summary>
+        [CustomAction]
+        public static ActionResult ValidateAgentInput(Session session)
+        {
+            string error = null;
+            var code = (session["ENROLLMENTCODE"] ?? "").Trim().Trim('"');
+            var proxy = (session["PROXYURL"] ?? "").Trim();
+            if (code.Length > 0 && !code.StartsWith("ZQ1.", StringComparison.Ordinal))
+                error = "The enrollment code must start with ZQ1. Copy it from the Zentriq Web Console (Agents > Enrollment codes > Show code).";
+            else if (proxy.Length > 0)
+            {
+                Uri u;
+                var candidate = proxy.Contains("://") ? proxy : "http://" + proxy;
+                if (!Uri.TryCreate(candidate, UriKind.Absolute, out u) || u.Scheme != Uri.UriSchemeHttp)
+                    error = "The proxy must be an http:// address such as http://proxy.example.com:8080. Leave it empty if this device connects to the Zentriq server directly (the server address is already inside the enrollment code).";
+                else if (code.Length > 0 && code.IndexOf(u.Host, StringComparison.OrdinalIgnoreCase) >= 0)
+                    error = "This looks like the Zentriq server address, not a proxy. Leave the proxy empty: the server address is already inside the enrollment code.";
+            }
+            session["ZQ_VALIDATION_ERROR"] = error ?? "";
+            return ActionResult.Success;
+        }
+
         [CustomAction]
         public static ActionResult WriteAgentEnrollment(Session session)
         {

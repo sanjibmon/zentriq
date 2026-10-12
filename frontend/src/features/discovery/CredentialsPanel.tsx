@@ -64,7 +64,7 @@ export function CredentialsPanel() {
   );
 }
 
-function CredentialDialog({ existing, onClose, onSaved }: { existing: Credential | null; onClose: () => void; onSaved: () => void }) {
+export function CredentialDialog({ existing, onClose, onSaved }: { existing: Credential | null; onClose: () => void; onSaved: () => void }) {
   const o = (existing?.options ?? {}) as Record<string, unknown>;
   const [name, setName] = useState(existing?.name ?? '');
   const [kind, setKind] = useState(existing?.kind ?? 'windows_domain');

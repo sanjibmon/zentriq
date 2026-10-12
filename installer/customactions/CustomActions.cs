@@ -47,8 +47,8 @@ namespace Zentriq.CustomActions
                     var type = nt?.GetValue("InstallationType") as string ?? "";
                     int build;
                     int.TryParse(nt?.GetValue("CurrentBuildNumber") as string, out build);
-                    if (build < 17763) fail(string.Format("{0} (build {1}) is not supported. Windows Server 2019 or later is required.", product, build));
-                    else if (type.IndexOf("Server", StringComparison.OrdinalIgnoreCase) < 0) warn(string.Format("{0} (build {1}) is a client edition; Windows Server 2019/2022/2025 is the supported platform.", product, build));
+                    if (build < 14393) fail(string.Format("{0} (build {1}) is not supported. The minimum operating system requirement is Windows Server 2016 (any edition).", product, build));
+                    else if (type.IndexOf("Server", StringComparison.OrdinalIgnoreCase) < 0) warn(string.Format("{0} (build {1}) is a client edition; Windows Server 2016/2019/2022/2025 is the supported platform.", product, build));
                     else ok(string.Format("{0} (build {1})", product, build));
                 }
                 if (!Environment.Is64BitOperatingSystem) fail("A 64-bit operating system is required.");

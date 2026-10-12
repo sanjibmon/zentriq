@@ -15,6 +15,14 @@ const HEALTH: Record<AgentRow['health'], [string, Tone]> = {
   revoked: ['Revoked', 'crit'],
 };
 
+/** Agents must reach the server by an address that resolves for them; the address used for this console is the best default. */
+function suggestedUrl(p: AgentPackage | null): string {
+  const port = p?.agentPort || 8444;
+  const host = window.location.hostname;
+  if (!host || host === 'localhost' || host === '127.0.0.1') return p?.defaultServerUrl ?? '';
+  return `https://${host.includes(':') ? `[${host}]` : host}:${port}`;
+}
+
 export function AgentsPage() {
   const { can } = useAuth();
   const manage = can('agents.manage');
@@ -37,6 +45,15 @@ export function AgentsPage() {
     const r = await api.post<{ message: string }>(`/agents/${a.id}/collect`);
     setMsg(r.message);
   }
+  async function showCode(t: EnrollmentToken) {
+    setMsg(null);
+    try {
+      setCreated(await api.get<NewEnrollmentToken>(`/agents/enrollment-tokens/${t.id}/code`));
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (err) {
+      setMsg(err instanceof Error ? err.message : String(err));
+    }
+  }
   async function revokeToken(t: EnrollmentToken) {
     if (!window.confirm(`Revoke enrollment code "${t.name}"? Agents already enrolled are not affected.`)) return;
     await api.post(`/agents/enrollment-tokens/${t.id}/revoke`);
@@ -54,7 +71,7 @@ export function AgentsPage() {
       <ErrorBox error={agents.error ?? pkg.error} />
       {pkg.data && !pkg.data.enrollmentAvailable && <Callout tone="warn" icon="alert">Agent enrollment is not configured on this server (agent CA missing). Run <span className="mono">zentriqctl repair</span> on the server.</Callout>}
       {created && (
-        <Panel title={`Enrollment code “${created.name}”`} sub="Shown once — copy it now" right={<button className="btn sm" onClick={() => setCreated(null)}>Done</button>}>
+        <Panel title={`Enrollment code “${created.name}”`} sub="You can show it again later from the Enrollment codes tab while it is active" right={<button className="btn sm" onClick={() => setCreated(null)}>Done</button>}>
           <div className="form-v">
             <Callout tone="warn" icon="lock">Anyone with this code can enroll a device until it expires ({fmt.date(created.expiresAt)}){created.maxUses ? ` or is used ${created.maxUses} time(s)` : ''}. Treat it like a password; revoke it if it leaks.</Callout>
             <label>Enrollment code<CopyBox value={created.code} label="Enrollment code" rows={3} /></label>
@@ -96,8 +113,19 @@ export function AgentsPage() {
             { key: 'url', label: 'Server address', render: (t) => <span className="mono">{t.serverUrl}</span> },
             { key: 'e', label: 'Expires', render: (t) => fmt.date(t.expiresAt) },
             { key: 'b', label: 'Created', render: (t) => `${fmt.day(t.createdAt)}${t.createdBy ? ` · ${t.createdBy}` : ''}` },
-            { key: 'x', label: '', render: (t) => t.state === 'active' ? <button className="btn sm" onClick={() => void revokeToken(t)}>Revoke</button> : null },
+            { key: 'x', label: '', render: (t) => t.state === 'active' ? <div style={{ display: 'flex', gap: 6 }}><button className="btn sm" onClick={() => void showCode(t)}>Show code</button><button className="btn sm" onClick={() => void revokeToken(t)}>Revoke</button></div> : null },
           ]} />
+        </Panel>
+      )}
+      {tab === 'agents' && rows.length === 0 && (tokens.data ?? []).some((t) => t.state === 'active') && (
+        <Panel title="Installed the agent but the device is not listed?">
+          <ul className="plain">
+            <li>On the device, open <span className="mono">C:\ProgramData\Zentriq\Agent\Logs\agent.log</span>. Each attempt is logged with the reason it failed.</li>
+            <li><b>“does not support proxies with the https scheme”</b> — a proxy was entered during setup. Leave <i>Proxy</i> empty unless the device must use a web proxy. To fix an installed agent run in an elevated PowerShell: <span className="mono">Remove-ItemProperty HKLM:\SOFTWARE\Zentriq\Agent -Name ProxyUrl; Restart-Service ZentriqAgent</span>, or install the latest agent MSI.</li>
+            <li><b>Cannot connect / timed out</b> — the device must reach this server on TCP {pkg.data?.agentPort ?? 8444}. Check the server address in the code and allow the port in Windows Firewall on this server.</li>
+            <li><b>Enrollment code rejected</b> — the code expired, was revoked or reached its maximum number of devices. Create a new code.</li>
+            <li>A code&apos;s <i>Uses</i> count goes up when a device enrolls successfully; 0 uses means no device has enrolled with it yet.</li>
+          </ul>
         </Panel>
       )}
       <Panel title="How agents connect">
@@ -108,7 +136,7 @@ export function AgentsPage() {
           <li>Devices found by both an agent and an agentless scan are merged into one asset (matched by SMBIOS UUID, serial number and MAC address).</li>
         </ul>
       </Panel>
-      {newOpen && <NewCodeDialog defaultUrl={pkg.data?.defaultServerUrl ?? ''} onClose={() => setNewOpen(false)} onCreated={(t) => { setNewOpen(false); setCreated(t); setTab('codes'); tokens.reload(); }} />}
+      {newOpen && <NewCodeDialog defaultUrl={suggestedUrl(pkg.data)} onClose={() => setNewOpen(false)} onCreated={(t) => { setNewOpen(false); setCreated(t); setTab('codes'); tokens.reload(); }} />}
     </>
   );
 }

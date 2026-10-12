@@ -26,12 +26,12 @@ namespace Zentriq.Worker.Handlers;
 ///    never treated as proof that the computer is online or inventoried.
 /// </summary>
 public sealed class DiscoveryScanHandler(NpgsqlDataSource ds, IHostPinger pinger, LicensingService licensing, AgentlessInventory agentless,
-    CredentialProtector protector, InventoryStore inventoryStore, ILogger<DiscoveryScanHandler> logger) : IJobHandler
+    CredentialProtector protector, InventoryStore inventoryStore, Zentriq.Infrastructure.ActiveDirectory.DirectoryStore directoryStore, ILogger<DiscoveryScanHandler> logger) : IJobHandler
 {
     public string JobType => JobTypes.DiscoveryScan;
 
     private static readonly int[] ManagementPorts = [22, 135, 445, 5985, 5986];
-    private sealed record DirectorySource(string Server, string BaseDn, bool Ldaps, Guid CredentialId, int? InactiveDays);
+    private sealed record DirectorySource(string? Server, string? BaseDn, bool Ldaps, Guid? CredentialId, int? InactiveDays, Guid? ConnectionId = null);
     private sealed record Config(string ScanType, string TargetsText, string ExcludeText, int Concurrency, int TimeoutMs, int[] Ports, List<string> ApprovedScopes, int MaxTargets,
         Guid[]? CredentialIds = null, DirectorySource? Directory = null);
     private List<ScanCredential> _creds = [];
@@ -214,6 +214,16 @@ public sealed class DiscoveryScanHandler(NpgsqlDataSource ds, IHostPinger pinger
         }
 
         var (assetId, created, updated, assetNote) = await ReconcileAssetAsync(ip, hostname, probe.OpenPorts, license, ct);
+        if (assetId is { } macAsset && probe.Mac is { } mac)
+        {
+            await using (var m = ds.CreateCommand("UPDATE zentriq.assets SET mac_address = COALESCE(mac_address, @m::macaddr) WHERE id = @id"))
+            {
+                m.Parameters.AddWithValue("m", mac);
+                m.Parameters.AddWithValue("id", macAsset);
+                await m.ExecuteNonQueryAsync(ct);
+            }
+            await AddIdentifierAsync(macAsset, "mac", mac, ct);
+        }
         if (assetNote is not null) detail += " " + assetNote;
         detail += adNote;
         if (assetId is { } aid && adObject is not null) await AddIdentifierAsync(aid, "ad_object_guid", adObject.ObjectGuid.ToString("D"), ct);
@@ -249,21 +259,27 @@ public sealed class DiscoveryScanHandler(NpgsqlDataSource ds, IHostPinger pinger
         var d = cfg.Directory ?? throw new PermanentJobException("Directory settings are missing.");
         await using var limitCmd = ds.CreateCommand("SELECT value::text FROM zentriq.system_settings WHERE key = 'discovery.ad_page_limit'");
         var limit = int.TryParse(((await limitCmd.ExecuteScalarAsync(ct)) as string)?.Trim('"'), out var l) ? l : 20000;
-        List<ScanCredential> dirCreds;
-        try { dirCreds = await ScanCredential.LoadAsync(ds, protector, [d.CredentialId], ct); }
-        catch (Exception ex) when (ex is not OperationCanceledException) { throw new PermanentJobException("Directory credential could not be decrypted: " + ex.Message); }
-        if (dirCreds.Count == 0) throw new PermanentJobException("The directory credential no longer exists.");
-
         List<DirectoryComputer> computers;
-        try
+        if (d.ConnectionId is { } connId)
         {
-            computers = await Task.Run(() => DirectoryCollector.ListComputers(d.Server, d.BaseDn, d.Ldaps, dirCreds[0], Math.Min(limit, cfg.MaxTargets), TimeSpan.FromSeconds(60)), ct);
+            computers = await ComputersFromConnectionAsync(scanId, connId, Math.Min(limit, cfg.MaxTargets), ct);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        else
         {
-            var msg = Zentriq.Application.Security.Redactor.Redact(ex.Message);
-            await FinishAsync(scanId, "failed", $"Active Directory query failed: {msg}", ct);
-            throw new PermanentJobException($"Active Directory query failed ({d.Server}, {d.BaseDn}): {msg}");
+            List<ScanCredential> dirCreds;
+            try { dirCreds = await ScanCredential.LoadAsync(ds, protector, d.CredentialId is { } cid ? [cid] : [], ct); }
+            catch (Exception ex) when (ex is not OperationCanceledException) { throw new PermanentJobException("Directory credential could not be decrypted: " + ex.Message); }
+            if (dirCreds.Count == 0) throw new PermanentJobException("The directory credential no longer exists.");
+            try
+            {
+                computers = await Task.Run(() => DirectoryCollector.ListComputers(d.Server!, d.BaseDn!, d.Ldaps, dirCreds[0], Math.Min(limit, cfg.MaxTargets), TimeSpan.FromSeconds(60)), ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                var msg = Zentriq.Application.Security.Redactor.Redact(ex.Message);
+                await FinishAsync(scanId, "failed", $"Active Directory query failed: {msg}", ct);
+                throw new PermanentJobException($"Active Directory query failed ({d.Server}, {d.BaseDn}): {msg}");
+            }
         }
         var cutoff = d.InactiveDays is > 0 ? DateTimeOffset.UtcNow.AddDays(-d.InactiveDays.Value) : (DateTimeOffset?)null;
         var targets = new List<string>();
@@ -281,6 +297,40 @@ public sealed class DiscoveryScanHandler(NpgsqlDataSource ds, IHostPinger pinger
         }
         await context.LogAsync($"Active Directory: {computers.Count} enabled computer object(s) under {d.BaseDn}; {targets.Count} to scan.", ct: ct);
         return targets;
+    }
+
+    /// <summary>Lists enabled computers through a saved AD connection and refreshes them in directory_objects.</summary>
+    private async Task<List<DirectoryComputer>> ComputersFromConnectionAsync(Guid scanId, Guid connectionId, int limit, CancellationToken ct)
+    {
+        Zentriq.Infrastructure.ActiveDirectory.DirectoryConnectionInfo? info;
+        try { info = await directoryStore.LoadAsync(connectionId, ct); }
+        catch (Exception ex) when (ex is not OperationCanceledException) { throw new PermanentJobException("The directory password could not be decrypted: " + ex.Message); }
+        if (info is null) throw new PermanentJobException("The Active Directory connection no longer exists.");
+        try
+        {
+            var entries = await Task.Run(() =>
+            {
+                using var ldap = Zentriq.Infrastructure.ActiveDirectory.DirectoryClient.Connect(info.Settings, TimeSpan.FromSeconds(60));
+                return Zentriq.Infrastructure.ActiveDirectory.DirectoryClient.Search(ldap, info.Settings.BaseDn, Zentriq.Infrastructure.ActiveDirectory.DirectoryClient.Computers, "computer", limit).ToList();
+            }, ct);
+            await using (var conn = await ds.OpenConnectionAsync(ct))
+            {
+                foreach (var e in entries) await directoryStore.UpsertAsync(conn, connectionId, e, ct);
+            }
+            return entries.Where(e => e.Enabled != false)
+                .Select(e => new DirectoryComputer(e.Name ?? e.SamAccountName?.TrimEnd('$') ?? "", e.DnsHostName, e.OperatingSystem, e.ObjectGuid, e.LastLogon, e.DistinguishedName))
+                .ToList();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            var msg = ex switch
+            {
+                System.DirectoryServices.Protocols.LdapException le => Zentriq.Infrastructure.ActiveDirectory.DirectoryClient.Explain(le, info.Settings),
+                _ => Zentriq.Application.Security.Redactor.Redact(ex.Message),
+            };
+            await FinishAsync(scanId, "failed", $"Active Directory query failed: {msg}", ct);
+            throw new PermanentJobException($"Active Directory query failed ({info.Settings.ServerHost}, {info.Settings.BaseDn}): {msg}");
+        }
     }
 
     /// <summary>

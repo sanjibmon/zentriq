@@ -11,6 +11,8 @@ import { HardwarePage } from '../features/inventory/HardwarePage';
 import { AssetDetailPage } from '../features/inventory/AssetDetailPage';
 import { ModulePage } from '../features/placeholder/ModulePage';
 import { LoginPage } from '../features/login/LoginPage';
+import { ResetPasswordPage } from '../features/login/ResetPasswordPage';
+import { AccountPage, MfaRequiredPage } from '../features/account/AccountPage';
 import { Shell } from '../components/Shell';
 import { LogoMark } from '../components/Logo';
 import { AuthProvider, useAuth } from './auth';
@@ -30,12 +32,15 @@ function Routes() {
   if (path === '/users') return <UsersPage />;
   if (path === '/audit') return <AuditPage />;
   if (path === '/settings') return <SettingsPage />;
+  if (path === '/account') return <AccountPage />;
   if (path.startsWith('/modules/')) return <ModulePage id={path.slice('/modules/'.length)} />;
   return <ModulePage id="" />;
 }
 
 function Gate() {
   const { me, checking } = useAuth();
+  const { path } = useRouter();
+  if (path === '/reset-password') return <ResetPasswordPage />;
   if (checking)
     return (
       <div className="boot" aria-busy="true">
@@ -43,6 +48,7 @@ function Gate() {
       </div>
     );
   if (!me) return <LoginPage />;
+  if (me.mfaEnrollmentRequired) return <MfaRequiredPage />;
   return (
     <Shell>
       <Routes />

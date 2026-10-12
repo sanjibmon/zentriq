@@ -98,6 +98,9 @@ builder.Services.AddRateLimiter(o =>
     o.AddPolicy("login", ctx => RateLimitPartition.GetFixedWindowLimiter(
         ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+    o.AddPolicy("password-reset", ctx => RateLimitPartition.GetFixedWindowLimiter(
+        ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = 5, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
 });
 
 builder.Services.AddProblemDetails(o => o.CustomizeProblemDetails = c =>
@@ -138,6 +141,7 @@ app.MapHealthEndpoints();
 var api = app.MapGroup("/api/v1");
 api.MapSetupEndpoints();
 api.MapAuthEndpoints();
+api.MapAccountEndpoints(options);
 api.MapAssetEndpoints();
 api.MapDiscoveryEndpoints();
 api.MapJobEndpoints();
@@ -148,6 +152,7 @@ api.MapAuditEndpoints();
 api.MapSystemEndpoints();
 api.MapOrganizationEndpoints();
 api.MapCredentialEndpoints();
+api.MapDirectoryEndpoints();
 api.MapInventoryEndpoints();
 api.MapAgentAdminEndpoints();
 app.MapAgentEndpoints();

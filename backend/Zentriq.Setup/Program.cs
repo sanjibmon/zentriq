@@ -32,6 +32,9 @@ internal static class Cli
                                          Check a backup can be decrypted (--deep: restore into a scratch database).
           restore <file> [--recovery-key F] --yes
                                          Replace the current data with a backup (a safety backup is taken first).
+          reset-password --email <addr> [--disable-mfa]
+                                         Set a new password for a console user (prompted, not echoed),
+                                         unlock the account and optionally turn off its MFA.
           maintenance run-pending        Run queued privileged jobs (used by the scheduled task).
           uninstall-cleanup              Remove scheduled tasks (used by the uninstaller). Never deletes data.
           version                        Print the version.
@@ -108,6 +111,11 @@ internal static class Cli
                     if (!yes) throw new SetupException("Restore replaces all current Zentriq data.", "Re-run with --yes to confirm.");
                     await new BackupService(paths, LoadOptions(paths), log).RestoreAsync(file, key, "ZentriqApi", "ZentriqWorker", ct);
                     return 0;
+                }
+                case "reset-password":
+                {
+                    var email = TakeOption(args, "--email") ?? throw new SetupException("reset-password requires --email <address>.");
+                    return await ResetPasswordAsync(paths, email, TakeFlag(args, "--disable-mfa"), ct);
                 }
                 case "maintenance":
                     if (args.FirstOrDefault() != "run-pending") throw new SetupException("Usage: zentriqctl maintenance run-pending");
@@ -283,6 +291,65 @@ internal static class Cli
         Console.WriteLine(sb.ToString());
         log.Info($"Diagnostics bundle written to {zipPath} (redacted; contains no secrets files).");
         return 0;
+    }
+
+    // ---- reset-password ---------------------------------------------------------------------------
+
+    /// <summary>Break-glass password reset for an administrator who is locked out (run elevated on the server).</summary>
+    private static async Task<int> ResetPasswordAsync(ZentriqPaths paths, string email, bool disableMfa, CancellationToken ct)
+    {
+        if (!File.Exists(paths.ConfigFile)) throw new SetupException("Zentriq is not provisioned on this server.");
+        var options = LoadOptions(paths);
+        var app = new SecretStore(SecretProtectorFactory.Create()).Read<AppSecrets>(paths.AppSecretsFile);
+        await using var ds = NpgsqlDataSource.Create(ConnectionStrings.Build(options.Database, options.Database.AppUser, app.DbAppPassword, applicationName: "zentriqctl"));
+        Guid id; string displayName;
+        await using (var find = ds.CreateCommand("SELECT id, display_name FROM zentriq.users WHERE lower(email) = lower(@e)"))
+        {
+            find.Parameters.AddWithValue("e", email.Trim());
+            await using var r = await find.ExecuteReaderAsync(ct);
+            if (!await r.ReadAsync(ct)) throw new SetupException($"No user with the e-mail address '{email}'.");
+            id = r.GetGuid(0); displayName = r.GetString(1);
+        }
+        string password;
+        if (Console.IsInputRedirected) password = (await Console.In.ReadLineAsync(ct) ?? "").TrimEnd('\r', '\n');
+        else
+        {
+            password = ReadHidden($"New password for {email}: ");
+            if (ReadHidden("Repeat the new password: ") != password) throw new SetupException("The passwords do not match.");
+        }
+        var err = Zentriq.Application.Security.PasswordPolicy.Validate(password, email);
+        if (err is not null) throw new SetupException(err);
+        var user = new User { Id = id, Email = email };
+        var hash = new Microsoft.AspNetCore.Identity.PasswordHasher<User>().HashPassword(user, password);
+        await using (var upd = ds.CreateCommand($"""
+            UPDATE zentriq.users SET password_hash = @h, password_changed_at = now(), security_stamp = gen_random_uuid(), failed_attempts = 0,
+                   locked_until = NULL, status = 'active', updated_at = now(){(disableMfa ? ", mfa_enabled = false, mfa_secret_protected = NULL" : "")}
+             WHERE id = @id
+            """))
+        {
+            upd.Parameters.AddWithValue("h", hash);
+            upd.Parameters.AddWithValue("id", id);
+            await upd.ExecuteNonQueryAsync(ct);
+        }
+        await new Zentriq.Infrastructure.Audit.AuditWriter(ds).WriteAsync(new Zentriq.Infrastructure.Audit.AuditActor(null, $"zentriqctl ({Environment.UserName})", null),
+            "user.password_reset_local", email, "Success", new { mfaDisabled = disableMfa }, ct: ct);
+        Console.WriteLine($"Password reset for {displayName} <{email}>. The account is unlocked{(disableMfa ? " and MFA is turned off (set it up again after signing in)" : "")}. Existing sessions are signed out.");
+        return 0;
+    }
+
+    private static string ReadHidden(string prompt)
+    {
+        Console.Write(prompt);
+        var sb = new StringBuilder();
+        while (true)
+        {
+            var k = Console.ReadKey(intercept: true);
+            if (k.Key == ConsoleKey.Enter) break;
+            if (k.Key == ConsoleKey.Backspace) { if (sb.Length > 0) sb.Length--; continue; }
+            if (!char.IsControl(k.KeyChar)) sb.Append(k.KeyChar);
+        }
+        Console.WriteLine();
+        return sb.ToString();
     }
 
     // ---- maintenance ----------------------------------------------------------------------------

@@ -86,3 +86,14 @@ ul.plain { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 13
 .linkish { border: 0; background: none; padding: 0; color: var(--accent); cursor: pointer; text-align: left; font: inherit; }
 .linkish:hover { text-decoration: underline; }
 .form-v label.row-check { display: flex; gap: 8px; align-items: center; font-weight: 400; }
+button.link { border: 0; background: none; padding: 0; color: var(--accent); cursor: pointer; font: inherit; text-align: left; }
+button.link:hover { text-decoration: underline; }
+.row-sel { width: 16px; height: 16px; }
+.drawer-scrim { position: fixed; inset: 0; background: rgba(8, 16, 22, 0.35); z-index: 80; display: flex; justify-content: flex-end; }
+.drawer { background: var(--surface); width: min(1000px, 100%); height: 100%; overflow: auto; box-shadow: var(--shadow); display: flex; flex-direction: column; }
+.drawer > header { padding: 14px 18px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 10px; position: sticky; top: 0; background: var(--surface); z-index: 1; }
+.drawer > header h2 { margin: 0; font-size: 16px; flex: 1; }
+.drawer > .body { padding: 14px 18px; display: grid; gap: 12px; }
+.log-box { font-family: var(--mono, ui-monospace, monospace); font-size: 12px; background: var(--surface-2, rgba(0,0,0,.03)); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; max-height: 220px; overflow: auto; white-space: pre-wrap; }
+.callout.ok{background:var(--ok-soft);border-color:transparent}
+.seg button.on .muted{color:inherit;opacity:.75}

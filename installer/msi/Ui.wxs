@@ -176,7 +176,7 @@
       <Dialog Id="ZqHttpsDlg" Width="370" Height="270" Title="[ProductName] Setup">
         <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="WixUI_Bmp_Banner" />
         <Control Id="Title" Type="Text" X="15" Y="6" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Text="{\WixUI_Font_Title}HTTPS and network access" />
-        <Control Id="Description" Type="Text" X="25" Y="23" Width="300" Height="15" Transparent="yes" NoPrefix="yes" Text="How users will reach the Zentriq Console." />
+        <Control Id="Description" Type="Text" X="25" Y="23" Width="300" Height="15" Transparent="yes" NoPrefix="yes" Text="How users will reach the Zentriq Web Console." />
         <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
         <Control Id="HostLabel" Type="Text" X="20" Y="56" Width="80" Height="12" NoPrefix="yes" Text="Host name:" />
         <Control Id="HostEdit" Type="Edit" X="105" Y="54" Width="245" Height="17" Property="HTTPSHOSTNAME" Text="{253}" />

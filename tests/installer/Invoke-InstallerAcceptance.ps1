@@ -111,7 +111,7 @@ Remove-Item $answer -Force   # contains the administrator password
 
 if (-not $installed) {
     foreach ($t in 'T02 PostgreSQL provisioning', 'T03 Database migration', 'T04 Administrator sign-in', 'T05 API and worker services', 'T06 Trial initialization',
-                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder') {
+                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection') {
         Record $t.Substring(0, 3) $t.Substring(4) 'BLOCKED' 'installation failed'
     }
 } else {
@@ -340,6 +340,106 @@ if (-not $installed) {
         } | Out-Null
     } else { Record 'T29' 'Agent revocation and uninstall' 'BLOCKED' 'agent install failed' }
 
+    Check 'T33' 'Enrollment code can be shown again later; revoked codes cannot' {
+        $s = Login
+        $tok = Api POST '/agents/enrollment-tokens' @{ name = 'ci-show'; validDays = 1; maxUses = 1; serverUrl = 'https://localhost:8444' } -Session $s
+        $again = Api GET "/agents/enrollment-tokens/$($tok.id)/code" -Session $s
+        Assert ($again.code -eq $tok.code) 'shown code differs from the created code'
+        Assert ($again.installCommand -like "*$($tok.code)*") 'install command missing the code'
+        Api POST "/agents/enrollment-tokens/$($tok.id)/revoke" -Session $s | Out-Null
+        $r = Invoke-WebRequest "$base/api/v1/agents/enrollment-tokens/$($tok.id)/code" -WebSession $s -SkipHttpErrorCheck
+        Assert ($r.StatusCode -eq 410) "revoked code returned $($r.StatusCode)"
+        $db = Invoke-WebRequest "$base/api/v1/agents/enrollment-tokens" -WebSession $s
+        Assert ($db.Content -notmatch [regex]::Escape($tok.code)) 'token list exposes codes'
+        'code shown again; revoked code refused (410); list does not expose codes'
+    } | Out-Null
+
+    Check 'T34' 'Scan history can be deleted (single and by age); assets are kept' {
+        $s = Login
+        $scan = Api POST '/discovery/scans' @{ name = 'ci-delete-me'; scanType = 'single'; targetsText = '127.0.0.1' } -Session $s
+        $deadline = (Get-Date).AddMinutes(3)
+        do { Start-Sleep 3; $d = Api GET "/discovery/scans/$($scan.id)" -Session $s } while ($d.scan.status -in 'queued', 'running' -and (Get-Date) -lt $deadline)
+        $r = Invoke-WebRequest "$base/api/v1/discovery/scans/$($scan.id)" -Method Delete -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } -SkipHttpErrorCheck
+        Assert ($r.StatusCode -eq 204) "delete returned $($r.StatusCode)"
+        $g = Invoke-WebRequest "$base/api/v1/discovery/scans/$($scan.id)" -WebSession $s -SkipHttpErrorCheck
+        Assert ($g.StatusCode -eq 404) "deleted scan still readable ($($g.StatusCode))"
+        $bulk = Api POST '/discovery/scans/delete' @{ olderThanDays = 3650 } -Session $s
+        Assert ($null -ne $bulk.deleted) 'bulk delete returned no count'
+        $assets = (Api GET '/assets/summary' -Session $s).total
+        "single delete 204, then 404; bulk delete ok ($($bulk.deleted)); assets kept ($assets)"
+    } | Out-Null
+
+    Check 'T35' 'Authenticator-app MFA: QR enrollment, sign-in requires the code, disable' {
+        Start-Sleep 61   # sign-in is rate limited to 10 per minute per address; start with a fresh window
+        function Get-Totp([string] $Base32) {
+            $alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'; $bits = ''
+            foreach ($c in $Base32.ToUpper().ToCharArray()) { $bits += [Convert]::ToString($alphabet.IndexOf($c), 2).PadLeft(5, '0') }
+            $key = [byte[]]@(for ($i = 0; $i + 8 -le $bits.Length; $i += 8) { [Convert]::ToByte($bits.Substring($i, 8), 2) })
+            $step = [long][math]::Floor([DateTimeOffset]::UtcNow.ToUnixTimeSeconds() / 30)
+            $counter = [BitConverter]::GetBytes($step); [Array]::Reverse($counter)
+            $h = (New-Object Security.Cryptography.HMACSHA1 (, $key)).ComputeHash($counter)
+            $o = $h[19] -band 0x0F
+            $bin = (($h[$o] -band 0x7F) -shl 24) -bor ($h[$o + 1] -shl 16) -bor ($h[$o + 2] -shl 8) -bor $h[$o + 3]
+            ($bin % 1000000).ToString('000000')
+        }
+        $s = Login
+        $e = Api POST '/auth/mfa/enroll' -Session $s
+        Assert ($e.qrSvg -match '<svg') 'no QR code SVG returned'
+        Assert ($e.otpauthUri -like 'otpauth://totp/*') "otpauth URI: $($e.otpauthUri)"
+        Api POST '/auth/mfa/confirm' @{ code = (Get-Totp $e.secret) } -Session $s | Out-Null
+        try {
+            $body = @{ email = $adminEmail; password = $adminPassword } | ConvertTo-Json
+            $r = Invoke-WebRequest "$base/api/v1/auth/login" -Method Post -Body $body -ContentType 'application/json' -Headers @{ 'X-Zentriq-Request' = '1' } -SkipHttpErrorCheck
+            Assert ($r.StatusCode -eq 401 -and $r.Content -match 'mfaRequired') "login without code: $($r.StatusCode) $($r.Content)"
+            $s2 = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+            $body = @{ email = $adminEmail; password = $adminPassword; mfaCode = (Get-Totp $e.secret) } | ConvertTo-Json
+            $r = Invoke-WebRequest "$base/api/v1/auth/login" -Method Post -Body $body -ContentType 'application/json' -Headers @{ 'X-Zentriq-Request' = '1' } -WebSession $s2 -SkipHttpErrorCheck
+            Assert ($r.StatusCode -eq 200) "login with code: $($r.StatusCode) $($r.Content)"
+            Assert ((Api GET '/auth/me' -Session $s2).mfaEnabled) 'me.mfaEnabled is false'
+        } finally {
+            if ($s2) { Api POST '/auth/mfa/disable' @{ password = $adminPassword; code = (Get-Totp $e.secret) } -Session $s2 | Out-Null }
+        }
+        Login | Out-Null   # password-only sign-in works again
+        'QR SVG returned; sign-in refused without code, accepted with TOTP; MFA turned off again'
+    } | Out-Null
+
+    Check 'T36' 'Forgot password: no account disclosure; zentriqctl reset-password works' {
+        Start-Sleep 61
+        $o = Invoke-RestMethod "$base/api/v1/auth/options"
+        Assert ($o.passwordResetByEmail -eq $false) 'reset by e-mail reported available without SMTP'
+        $r = Invoke-WebRequest "$base/api/v1/auth/forgot" -Method Post -Body (@{ email = 'nobody@example.invalid' } | ConvertTo-Json) -ContentType 'application/json' -Headers @{ 'X-Zentriq-Request' = '1' } -SkipHttpErrorCheck
+        Assert ($r.StatusCode -eq 503) "forgot without SMTP returned $($r.StatusCode)"
+        $r = Invoke-WebRequest "$base/api/v1/auth/reset" -Method Post -Body (@{ token = 'bogus'; newPassword = 'Another-Passw0rd-1' } | ConvertTo-Json) -ContentType 'application/json' -Headers @{ 'X-Zentriq-Request' = '1' } -SkipHttpErrorCheck
+        Assert ($r.StatusCode -eq 400) "reset with a bogus token returned $($r.StatusCode)"
+        $temp = 'Ci-Reset-' + [Guid]::NewGuid().ToString('N').Substring(0, 10) + '-9'
+        try {
+            $temp | & $ctl reset-password --email $adminEmail | Out-Host
+            Assert ($LASTEXITCODE -eq 0) "zentriqctl reset-password exit $LASTEXITCODE"
+            $body = @{ email = $adminEmail; password = $temp } | ConvertTo-Json
+            $r = Invoke-WebRequest "$base/api/v1/auth/login" -Method Post -Body $body -ContentType 'application/json' -Headers @{ 'X-Zentriq-Request' = '1' } -SkipHttpErrorCheck
+            Assert ($r.StatusCode -eq 200) "sign-in with the reset password: $($r.StatusCode)"
+        } finally {
+            $adminPassword | & $ctl reset-password --email $adminEmail | Out-Null
+        }
+        Login | Out-Null
+        'options=false, forgot 503 without SMTP, bogus token 400, zentriqctl reset-password then sign-in OK'
+    } | Out-Null
+
+    Check 'T37' 'Active Directory connection: validation and a clear error when no DC answers' {
+        $s = Login
+        $bad = Invoke-WebRequest "$base/api/v1/directory/connections" -Method Post -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } -ContentType 'application/json' `
+            -Body (@{ name = 'ci'; serverHost = '127.0.0.1'; baseDn = 'corp.example.com'; username = 'CORP\x'; password = 'x' } | ConvertTo-Json) -SkipHttpErrorCheck
+        Assert ($bad.StatusCode -eq 400 -and $bad.Content -match 'distinguished name') "invalid DN accepted: $($bad.StatusCode)"
+        $t = Api POST '/directory/connections/test' @{ name = 'ci'; serverHost = '127.0.0.1'; port = 636; ldaps = $true; baseDn = 'DC=ci,DC=invalid'; username = 'CI\nobody'; password = 'not-a-password' } -Session $s
+        Assert (-not $t.ok) 'test reported success without a domain controller'
+        Assert ($t.message -match 'reach|LDAP') "message: $($t.message)"
+        $c = Api POST '/directory/connections' @{ name = 'ci-dc'; serverHost = '127.0.0.1'; dcName = 'dc01.ci.invalid'; ldaps = $true; baseDn = 'DC=ci,DC=invalid'; username = 'CI\nobody'; password = 'not-a-password' } -Session $s
+        $list = Invoke-WebRequest "$base/api/v1/directory/connections" -WebSession $s
+        Assert ($list.Content -notmatch 'not-a-password') 'connection list exposes the password'
+        Api DELETE "/directory/connections/$($c.id)" -Session $s | Out-Null
+        "invalid DN rejected; no DC: $($t.message); password not returned"
+    } | Out-Null
+
     if ($UpgradeBundle) {
         Check 'T13' 'Upgrade to the next release preserves data and trial' {
             Run-Setup $UpgradeBundle @() 'upgrade' | Out-Null
@@ -391,7 +491,10 @@ foreach ($t in @(
     @('T17', 'Restart of Windows (trial persists across reboot)', 'CI runners cannot reboot mid-job; covered by T09/T10/T16 persistence checks. Run manually on a VM.'),
     @('T18', 'Trial expiry enforcement end-to-end (clock moved past 14 days)', 'Covered by unit tests (LicenseEvaluator); not run against an installed server.'),
     @('T19', 'Valid commercial license activation end-to-end', 'Requires the vendor private key; signer + verifier covered by unit tests. Run manually with docs/licensing.md.'),
-    @('T20', 'AD/OU scan in a test domain', 'No Active Directory domain on CI runners.'),
+    @('T20', 'AD/OU scan and directory sync (computers, users, groups, OUs) in a test domain', 'No Active Directory domain on CI runners. T37 covers validation and error handling only.'),
+    @('T38', 'Password reset by e-mail (SMTP delivery and link)', 'No mail server on CI runners; T36 covers the no-SMTP path and zentriqctl reset-password.'),
+    @('T39', 'Setup refuses Windows Server 2012 R2 and older', 'CI has only Windows Server 2022; the bundle/MSI conditions need a manual run on an old VM.'),
+    @('T40', 'Installation on Windows Server 2016', 'CI has only Windows Server 2022. Run manually on a Server 2016 VM.'),
     @('T30', 'Agentless SSH (Linux) and SNMP collection against real devices', 'No Linux/SNMP targets on the Windows CI runner; parsers covered by unit tests. Run manually.'),
     @('T31', 'Agent over the internet through a firewall/reverse proxy', 'CI runs agent and server on one machine. Run manually with a published port 8444.'),
     @('T21', 'Interactive wizard (UI) walk-through', 'Silent install exercises the same provisioning; UI pages need a manual run on a VM.'))) {

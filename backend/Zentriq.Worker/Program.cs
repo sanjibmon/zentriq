@@ -24,6 +24,7 @@ builder.Services.AddSingleton(new WorkerIdentity($"{Environment.MachineName}:{En
 builder.Services.AddScoped<IJobHandler, SelfTestHandler>();
 builder.Services.AddScoped<IJobHandler, DiscoveryScanHandler>();
 builder.Services.AddScoped<IJobHandler, UsageSnapshotHandler>();
+builder.Services.AddScoped<IJobHandler, DirectorySyncHandler>();
 builder.Services.AddSingleton<IHostPinger, TcpHostPinger>();
 builder.Services.AddSingleton<Zentriq.Worker.Agentless.AgentlessInventory>();
 

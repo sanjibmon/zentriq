@@ -21,9 +21,30 @@ export interface Me {
   email: string;
   displayName: string;
   mfaEnabled: boolean;
+  /** MFA is mandatory and not set up yet: the session has no permissions until enrollment is confirmed. */
+  mfaEnrollmentRequired?: boolean;
   roles: { id: string; name: string }[];
   permissions: string[];
   license: LicenseSummary;
+}
+
+export interface MfaEnrollment {
+  secret: string;
+  otpauthUri: string;
+  qrSvg: string;
+}
+
+export interface SmtpConfig {
+  enabled: boolean;
+  host: string | null;
+  port: number;
+  security: 'starttls' | 'none';
+  username: string | null;
+  hasPassword: boolean;
+  fromAddress: string | null;
+  fromName: string | null;
+  consoleUrl: string | null;
+  defaultConsoleUrl: string;
 }
 
 export interface SetupStatus {
@@ -345,4 +366,74 @@ export interface AssetInventory {
   software: { name: string; publisher: string | null; version: string | null; installedOn: string | null; architecture: string | null; source: string }[];
   agent: { id: string; status: string; version: string; lastCheckinAt: string | null; lastInventoryAt: string | null } | null;
   identifiers: { kind: string; value: string }[];
+}
+
+export interface ScanResultRow {
+  id: number;
+  target: string;
+  ip: string | null;
+  hostname: string | null;
+  status: string;
+  openPorts: number[] | null;
+  detail: string | null;
+  assetId: string | null;
+  assetCreated: boolean;
+  durationMs: number | null;
+  recordedAt: string;
+  protocol: string | null;
+  credentialId: string | null;
+}
+
+export interface DirectoryConnection {
+  id: string;
+  name: string;
+  serverHost: string | null;
+  dcName: string | null;
+  port: number;
+  ldaps: boolean;
+  verifyCertificate: boolean;
+  baseDn: string | null;
+  username: string | null;
+  inactiveDays: number;
+  lastSyncAt: string | null;
+  lastSyncStatus: string | null;
+  lastError: string | null;
+  counts: Record<string, number>;
+  createdAt: string;
+  lastValidatedAt: string | null;
+  syncJobStatus: string | null;
+}
+
+export interface DirectoryTestResult {
+  ok: boolean;
+  message: string;
+  defaultNamingContext: string | null;
+  dnsHostName: string | null;
+  sampleCount: number | null;
+}
+
+export interface DirectoryObject {
+  id: string;
+  objectClass: 'computer' | 'user' | 'group' | 'organizationalUnit' | string;
+  name: string | null;
+  samAccountName: string | null;
+  displayName: string | null;
+  mail: string | null;
+  userPrincipalName: string | null;
+  dnsHostName: string | null;
+  operatingSystem: string | null;
+  operatingSystemVersion: string | null;
+  enabled: boolean | null;
+  lastLogon: string | null;
+  whenCreated: string | null;
+  passwordLastSet: string | null;
+  department: string | null;
+  title: string | null;
+  description: string | null;
+  distinguishedName: string;
+  parentDn: string | null;
+  memberOf: string[];
+  syncedAt: string;
+  connectionId: string;
+  assetId: string | null;
 }

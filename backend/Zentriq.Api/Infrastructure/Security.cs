@@ -15,6 +15,8 @@ public static class ZentriqClaims
     public const string Permission = "zq:perm";
     public const string Stamp = "zq:stamp";
     public const string Role = "zq:role";
+    /// <summary>Signed in, but MFA is mandatory and not yet set up: no permissions until enrollment is confirmed.</summary>
+    public const string MfaPending = "zq:mfa_pending";
 }
 
 public static class SessionEvents

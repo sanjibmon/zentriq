@@ -295,7 +295,7 @@ public static class AgentEndpoints
             return Results.Ok(list);
         }).RequireAuthorization(Permissions.AgentsManage);
 
-        g.MapPost("/enrollment-tokens", async (TokenRequest req, NpgsqlDataSource ds, AgentServer server, RequestContext rc, IWebHostEnvironment env, CancellationToken ct) =>
+        g.MapPost("/enrollment-tokens", async (TokenRequest req, NpgsqlDataSource ds, AgentServer server, RequestContext rc, IWebHostEnvironment env, Zentriq.Infrastructure.Secrets.CredentialProtector protector, CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(req.Name) || req.Name.Length > 100) return Validation.Problem("name", "Enter a name (max 100 characters).");
             var days = req.ValidDays ?? 30;
@@ -310,8 +310,8 @@ public static class AgentEndpoints
             var id = Guid.NewGuid();
             var expires = DateTimeOffset.UtcNow.AddDays(days);
             await using var cmd = ds.CreateCommand("""
-                INSERT INTO zentriq.agent_enrollment_tokens (id, name, token_hash, server_url, max_uses, expires_at, created_by)
-                VALUES (@id, @n, @h, @u, @m, @e, @by)
+                INSERT INTO zentriq.agent_enrollment_tokens (id, name, token_hash, server_url, max_uses, expires_at, created_by, code_protected)
+                VALUES (@id, @n, @h, @u, @m, @e, @by, @code)
                 """);
             cmd.Parameters.AddWithValue("id", id);
             cmd.Parameters.AddWithValue("n", req.Name.Trim());
@@ -320,8 +320,10 @@ public static class AgentEndpoints
             cmd.Parameters.Add(new NpgsqlParameter("m", NpgsqlDbType.Integer) { Value = (object?)req.MaxUses ?? DBNull.Value });
             cmd.Parameters.AddWithValue("e", expires);
             cmd.Parameters.Add(new NpgsqlParameter("by", NpgsqlDbType.Uuid) { Value = (object?)rc.UserId ?? DBNull.Value });
-            await cmd.ExecuteNonQueryAsync(ct);
             var code = BuildCode(url, secret, Pins(server));
+            // Kept encrypted so administrators can show the code again (Agents > Enrollment codes > Show code).
+            cmd.Parameters.AddWithValue("code", protector.Protect(id, new Zentriq.Infrastructure.Secrets.CredentialSecret { Password = code }));
+            await cmd.ExecuteNonQueryAsync(ct);
             await rc.AuditAsync("agent.token_create", req.Name, detail: new { id, url, days, req.MaxUses });
             return Results.Ok(new
             {
@@ -329,6 +331,27 @@ public static class AgentEndpoints
                 installCommand = $"msiexec /i ZentriqAgent-x64.msi /qn ENROLLMENTCODE=\"{code}\"",
                 package = PackageInfo(env),
             });
+        }).RequireAuthorization(Permissions.AgentsManage);
+
+        g.MapGet("/enrollment-tokens/{id:guid}/code", async (Guid id, NpgsqlDataSource ds, RequestContext rc, IWebHostEnvironment env, Zentriq.Infrastructure.Secrets.CredentialProtector protector, CancellationToken ct) =>
+        {
+            await using var cmd = ds.CreateCommand("SELECT name, code_protected, revoked_at IS NULL AND expires_at > now() AND (max_uses IS NULL OR uses < max_uses), server_url, expires_at, max_uses, uses FROM zentriq.agent_enrollment_tokens WHERE id = @id");
+            cmd.Parameters.AddWithValue("id", id);
+            await using var r = await cmd.ExecuteReaderAsync(ct);
+            if (!await r.ReadAsync(ct)) return Results.NotFound();
+            var name = r.GetString(0);
+            if (r.IsDBNull(1)) return Results.Problem(statusCode: 410, title: "This code was created by an earlier version and cannot be shown again. Create a new enrollment code.");
+            if (!r.GetBoolean(2)) return Results.Problem(statusCode: 410, title: "This enrollment code is no longer active (expired, revoked or used up).");
+            var code = protector.Unprotect(id, r.GetString(1)).Password!;
+            var result = new
+            {
+                id, name, code, serverUrl = r.GetString(3), expiresAt = r.GetFieldValue<DateTimeOffset>(4), maxUses = r.IsDBNull(5) ? (int?)null : r.GetInt32(5), uses = r.GetInt32(6),
+                installCommand = $"msiexec /i ZentriqAgent-x64.msi /qn ENROLLMENTCODE=\"{code}\"",
+                package = PackageInfo(env),
+            };
+            await r.DisposeAsync();
+            await rc.AuditAsync("agent.token_viewed", name);
+            return Results.Ok(result);
         }).RequireAuthorization(Permissions.AgentsManage);
 
         g.MapPost("/enrollment-tokens/{id:guid}/revoke", async (Guid id, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>

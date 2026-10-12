@@ -28,7 +28,12 @@
                   DowngradeErrorMessage="A newer version of Zentriq is already installed. Setup will now exit." />
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" MaximumUncompressedMediaSize="500" />
 
-    <Launch Condition="VersionNT64" Message="Zentriq requires a 64-bit edition of Windows Server 2019 or later." />
+    <!-- MSI's own VersionNT/WindowsBuild are capped on Windows 10+, so read the real build number (Server 2016 = 14393). -->
+    <Property Id="ZQ_OSBUILD">
+      <RegistrySearch Id="RegOsBuild" Root="HKLM" Key="SOFTWARE\Microsoft\Windows NT\CurrentVersion" Name="CurrentBuildNumber" Type="raw" Bitness="always64" />
+    </Property>
+    <Launch Condition="Installed OR (ZQ_OSBUILD AND ZQ_OSBUILD &gt;= 14393)" Message="The minimum operating system requirement is Windows Server 2016 (any edition). Zentriq supports Windows Server 2016, 2019, 2022 and 2025 (64-bit)." />
+    <Launch Condition="VersionNT64" Message="Zentriq requires a 64-bit (x64) edition of Windows Server 2016 or later." />
     <Launch Condition="Privileged" Message="Zentriq must be installed by an administrator." />
 
     <Icon Id="ZentriqIcon" SourceFile="$(var.AssetsDir)\zentriq.ico" />

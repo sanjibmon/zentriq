@@ -64,7 +64,8 @@ public static class AuthEndpoints
 
             user.FailedAttempts = 0; user.LockedUntil = null; user.LastLoginAt = now;
             await db.SaveChangesAsync(ct);
-            await SignInAsync(http, db, user, ct);
+            // When MFA is mandatory and this user has not set it up, the session carries no permissions until enrollment is confirmed.
+            await SignInAsync(http, db, user, ct, mfaPending: mfaRequired && !user.MfaEnabled);
             await audit.WriteAsync(new AuditActor(user.Id, user.Email, ip), "auth.login", user.Email, "Success", ct: ct);
             return Results.Ok(new { ok = true, mfaEnrollmentRequired = mfaRequired && !user.MfaEnabled });
         }).AllowAnonymous().RequireRateLimiting("login");
@@ -83,6 +84,7 @@ public static class AuthEndpoints
             return Results.Ok(new
             {
                 id = u.Id, email = u.Email, displayName = u.DisplayName, mfaEnabled = u.MfaEnabled,
+                mfaEnrollmentRequired = rc.Principal.HasClaim(c => c.Type == ZentriqClaims.MfaPending),
                 roles = u.Roles.Select(r => new { id = r.RoleId, name = r.Role!.Name }),
                 permissions = rc.Principal.FindAll(ZentriqClaims.Permission).Select(c => c.Value).OrderBy(x => x),
                 license = new { mode = lic.Mode.ToString(), lic.Summary, lic.ExpiresAt, lic.DaysRemaining, featuresEnabled = lic.FeaturesEnabled, lic.Modules },
@@ -111,7 +113,8 @@ public static class AuthEndpoints
             var secret = Totp.NewSecret();
             u.MfaSecretProtected = Convert.ToBase64String(dp.CreateProtector(MfaPurpose).Protect(secret));
             await db.SaveChangesAsync(ct);
-            return Results.Ok(new { secret = Totp.ToBase32(secret), otpauthUri = Totp.OtpAuthUri("Zentriq", u.Email, secret) });
+            var uri = Totp.OtpAuthUri("Zentriq", u.Email, secret);
+            return Results.Ok(new { secret = Totp.ToBase32(secret), otpauthUri = uri, qrSvg = AccountEndpoints.QrSvg(uri) });
         }).RequireAuthorization();
 
         g.MapPost("/mfa/confirm", async (MfaConfirmBody body, RequestContext rc, ZentriqDbContext db, IDataProtectionProvider dp, HttpContext http, CancellationToken ct) =>
@@ -128,7 +131,7 @@ public static class AuthEndpoints
         }).RequireAuthorization();
     }
 
-    public static async Task SignInAsync(HttpContext http, ZentriqDbContext db, User user, CancellationToken ct)
+    public static async Task SignInAsync(HttpContext http, ZentriqDbContext db, User user, CancellationToken ct, bool mfaPending = false)
     {
         var roleIds = await db.UserRoles.AsNoTracking().Where(r => r.UserId == user.Id).Select(r => r.RoleId).ToListAsync(ct);
         var perms = await db.RolePermissions.AsNoTracking().Where(rp => roleIds.Contains(rp.RoleId)).Select(rp => rp.PermissionCode).Distinct().ToListAsync(ct);
@@ -140,7 +143,8 @@ public static class AuthEndpoints
             new(ZentriqClaims.Stamp, user.SecurityStamp.ToString()),
         };
         claims.AddRange(roleIds.Select(r => new Claim(ZentriqClaims.Role, r)));
-        claims.AddRange(perms.Select(p => new Claim(ZentriqClaims.Permission, p)));
+        if (mfaPending) claims.Add(new Claim(ZentriqClaims.MfaPending, "1"));
+        else claims.AddRange(perms.Select(p => new Claim(ZentriqClaims.Permission, p)));
         var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme));
         await http.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, new AuthenticationProperties { IsPersistent = false });
     }

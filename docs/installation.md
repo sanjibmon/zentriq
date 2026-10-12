@@ -1,4 +1,4 @@
-# Installing Zentriq Console
+# Installing Zentriq
 
 ## What you get
 
@@ -11,11 +11,14 @@
 **EXE vs MSI.** The EXE is a WiX *Burn* bootstrapper: it installs prerequisites (Visual C++ runtime), caches the
 PostgreSQL installer next to the MSI and then runs `Zentriq.msi` with its full wizard. The MSI is the actual Zentriq
 product package (files, services, firewall rule, registry) and runs the configuration engine `zentriqctl`. Both
-end with the same verified installation. Both appear as one entry ("Zentriq Console") in *Apps & features*.
+end with the same verified installation. Both appear as one entry ("Zentriq") in *Apps & features*.
 
 ## Requirements
 
-* Windows Server 2019, 2022 or 2025 (64-bit), Desktop Experience or Server Core. Windows 10/11 is accepted for evaluation only.
+* **Windows Server 2016 or later, any edition** (Standard, Datacenter, Essentials; Desktop Experience or Server Core), 64-bit:
+  Windows Server 2016, 2019, 2022 or 2025. Windows 10/11 (build 14393+) is accepted for evaluation only.
+  On Windows Server 2012 R2 or older, setup does not start; it shows *"The minimum operating system requirement is
+  Windows Server 2016 (any edition)."* (checked by the setup EXE, by the MSI and again by the system check).
 * 4 GB RAM minimum (8 GB+ recommended), 2 CPU cores, 10 GB free disk (more for data and backups).
 * Local administrator rights. Domain administrator rights are **not** needed and the services never run as one.
 * A free TCP port for HTTPS (default 443) and, for the bundled database, 5432.

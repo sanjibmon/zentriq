@@ -31,8 +31,11 @@
       <bal:WixInternalUIBootstrapperApplication LogoFile="$(var.AssetsDir)\logo64.png" />
     </BootstrapperApplication>
 
-    <bal:Condition Message="Zentriq requires a 64-bit edition of Windows Server 2019 (build 17763) or later."
-                   Condition="VersionNT64 AND WindowsBuildNumber &gt;= 17763" />
+    <!-- Windows Server 2016 = build 14393. Older systems (Server 2012 R2 = 9600) are refused before anything is installed. -->
+    <bal:Condition Message="The minimum operating system requirement is Windows Server 2016 (any edition). Zentriq supports Windows Server 2016, 2019, 2022 and 2025 (64-bit)."
+                   Condition="WindowsBuildNumber &gt;= 14393" />
+    <bal:Condition Message="Zentriq requires a 64-bit (x64) edition of Windows Server 2016 or later."
+                   Condition="VersionNT64" />
 
     <Variable Name="ZQ_ANSWERFILE" Value="" bal:Overridable="yes" />
 

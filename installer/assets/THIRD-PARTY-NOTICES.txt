@@ -1,7 +1,7 @@
-Zentriq Console - third-party software notices
+Zentriq - third-party software notices
 ==============================================
 
-Zentriq Console includes or installs the following third-party components. Each is licensed under its own terms.
+Zentriq includes or installs the following third-party components. Each is licensed under its own terms.
 
 PostgreSQL (installed by Zentriq-Setup-x64.exe using the EnterpriseDB Windows installer)
   PostgreSQL Database Management System (also known as Postgres, formerly known as Postgres95)

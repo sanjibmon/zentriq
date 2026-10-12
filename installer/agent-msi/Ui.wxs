@@ -42,11 +42,11 @@
         <Control Id="Description" Type="Text" X="25" Y="23" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Text="Paste the enrollment code from the Zentriq Web Console." />
         <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
         <Control Id="CodeLabel" Type="Text" X="20" Y="56" Width="330" Height="24" NoPrefix="yes"
-                 Text="Enrollment code (Zentriq Web Console > Agents > Enrollment codes). It starts with ZQ1. and contains the server address:" />
+                 Text="Enrollment code (Zentriq Web Console > Agents > Enrollment codes > Show code). It starts with ZQ1. and already contains the server address:" />
         <Control Id="Code" Type="Edit" X="20" Y="82" Width="330" Height="18" Property="ENROLLMENTCODE" Text="{2048}" />
         <Control Id="CodeNote" Type="Text" X="20" Y="104" Width="330" Height="36" NoPrefix="yes"
                  Text="You can leave this empty and enroll later from an elevated prompt: &quot;C:\Program Files\Zentriq Agent\ZentriqAgent.exe&quot; --enroll ZQ1...." />
-        <Control Id="ProxyLabel" Type="Text" X="20" Y="146" Width="330" Height="12" NoPrefix="yes" Text="HTTP proxy for reaching the server (optional, e.g. http://proxy.example.com:8080):" />
+        <Control Id="ProxyLabel" Type="Text" X="20" Y="146" Width="330" Height="12" NoPrefix="yes" Text="Proxy (optional, only if this device must use a web proxy; normally leave empty):" />
         <Control Id="Proxy" Type="Edit" X="20" Y="160" Width="330" Height="18" Property="PROXYURL" Text="{512}" />
         <Control Id="Note" Type="Text" X="20" Y="186" Width="330" Height="40" NoPrefix="yes"
                  Text="The agent connects out to the server over HTTPS (port 8444 by default). It does not open any inbound port and only reads inventory; it does not change settings on this device." />
@@ -55,13 +55,23 @@
           <Publish Event="NewDialog" Value="LicenseAgreementDlg" />
         </Control>
         <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)">
-          <Publish Event="NewDialog" Value="VerifyReadyDlg" />
+          <Publish Event="DoAction" Value="ZqAgentValidate" Order="1" />
+          <Publish Event="SpawnDialog" Value="ZqMessageDlg" Order="2" Condition="ZQ_VALIDATION_ERROR" />
+          <Publish Event="NewDialog" Value="VerifyReadyDlg" Order="3" Condition="NOT ZQ_VALIDATION_ERROR" />
         </Control>
         <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
           <Publish Event="SpawnDialog" Value="CancelDlg" />
         </Control>
       </Dialog>
+      <Dialog Id="ZqMessageDlg" Width="270" Height="120" Title="[ProductName] Setup">
+        <Control Id="Icon" Type="Icon" X="15" Y="15" Width="24" Height="24" FixedSize="yes" IconSize="32" Text="WixUI_Ico_Exclam" />
+        <Control Id="Text" Type="Text" X="50" Y="15" Width="205" Height="72" NoPrefix="yes" Text="[ZQ_VALIDATION_ERROR]" />
+        <Control Id="OK" Type="PushButton" X="107" Y="94" Width="56" Height="17" Default="yes" Cancel="yes" Text="!(loc.WixUIOK)">
+          <Publish Event="EndDialog" Value="Return" />
+        </Control>
+      </Dialog>
     </UI>
+    <CustomAction Id="ZqAgentValidate" BinaryRef="ZqCA" DllEntry="ValidateAgentInput" Execute="immediate" Return="check" />
 
     <UIRef Id="WixUI_Common" />
   </Fragment>

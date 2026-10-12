@@ -49,6 +49,8 @@ public static class DependencyInjection
         services.AddSingleton<JobQueue>();
         services.AddSingleton<SqlMigrator>();
         services.AddSingleton<CredentialProtector>();
+        services.AddSingleton<Zentriq.Infrastructure.ActiveDirectory.DirectoryStore>();
+        services.AddSingleton<Zentriq.Infrastructure.Mail.MailService>();
         services.AddScoped<Zentriq.Infrastructure.Inventory.InventoryStore>();
         return services;
     }

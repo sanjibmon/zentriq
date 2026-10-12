@@ -19,7 +19,7 @@ public static class SystemEndpoints
     [
         "discovery.approved_scopes", "discovery.max_targets", "discovery.confirm_above", "discovery.min_prefix",
         "discovery.default_concurrency", "discovery.max_concurrency", "discovery.probe_timeout_ms",
-        "security.mfa_required", "security.lockout_threshold", "security.lockout_minutes",
+        "security.mfa_required", "security.lockout_threshold", "security.lockout_minutes", "security.password_reset_minutes",
     ];
 
     public static void MapSystemEndpoints(this RouteGroupBuilder api)
@@ -132,6 +132,7 @@ public static class SystemEndpoints
             "discovery.probe_timeout_ms" => n is >= 200 and <= 10000 ? null : "Must be between 200 and 10000.",
             "security.lockout_threshold" => n is >= 3 and <= 20 ? null : "Must be between 3 and 20.",
             "security.lockout_minutes" => n is >= 1 and <= 1440 ? null : "Must be between 1 and 1440.",
+            "security.password_reset_minutes" => n is >= 5 and <= 1440 ? null : "Must be between 5 and 1440.",
             _ => n >= 0 ? null : "Must be zero or more.",
         };
     }

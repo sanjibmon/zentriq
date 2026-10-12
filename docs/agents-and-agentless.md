@@ -17,7 +17,9 @@ Devices reported by both are merged into one asset (SMBIOS UUID → serial numbe
 
 1. *Discovery & Scans › Credentials › Add credential*. Types: Windows domain / local account, SSH password / key,
    SNMP v2c / v3, Active Directory (LDAP bind). Optionally restrict each credential to the networks it belongs to.
-2. *New scan*: targets (IP, CIDR, ranges, host names) **or** an Active Directory domain/OU, and the credentials to try.
+2. *New scan*: targets (IP, CIDR, ranges, host names) **or** the computers of an Active Directory connection, and the
+   credentials to try. **Without a credential a scan only finds devices** (address, name, open ports, MAC on the local
+   subnet); it cannot read hardware, software or network details. The dialog warns and asks for confirmation.
 3. For every responsive device the worker tries, in order: WinRM (HTTPS preferred when selected) → DCOM/WMI → SSH → SNMP.
    The first credential that works is used; a rejected credential is reported as *Credentials rejected* on the result.
 
@@ -39,7 +41,54 @@ administrators. SNMP: vendor, model, serial (ENTITY-MIB), firmware, interfaces a
   root on Linux (`/sys/class/dmi/id`) – without them, merging relies on MAC and host name. Commands are read-only; no
   `sudo` is used.
 * **SNMP** – v3 (authPriv, SHA-256/AES) recommended; v2c only on trusted management networks.
-* **Active Directory** – a domain account with read access; LDAPS (636) recommended, otherwise LDAP is signed and sealed.
+* **Active Directory** – see below.
+
+### Preparing Windows computers for agentless inventory (Group Policy)
+
+With Windows Firewall on (the default), Windows computers answer nothing that agentless inventory can use. For
+domain computers, one GPO linked to the computers' OU enables it:
+
+1. *Computer Configuration › Policies › Administrative Templates › Windows Components › Windows Remote Management (WinRM) › WinRM Service*:
+   **Allow remote server management through WinRM** = Enabled, IPv4 filter = `*` (or the Zentriq server address).
+2. *… › System Services*: **Windows Remote Management (WS-Management)** = Automatic.
+3. *… › Windows Defender Firewall with Advanced Security › Inbound Rules*: new rule, TCP **5985**, *Remote IP address* =
+   the Zentriq server only.
+4. Give the scan account rights: a domain group that is in the computers' local *Administrators* group (GPO
+   *Restricted Groups* / *Local Users and Groups*), or remote WMI/registry read rights.
+5. `gpupdate /force` (or wait for the refresh), then scan by **host name** (Kerberos) – or by IP with WinRM HTTPS (5986).
+
+For a single computer: `Enable-PSRemoting -Force` in an elevated PowerShell, then allow 5985 from the Zentriq server.
+
+**Firewalled hosts are still found.** If no probed port answers, Zentriq checks the host with ARP (same subnet) and
+ICMP ping. A host that answers is recorded as *Inventory unavailable* with the reason ("Host is up … every probed port
+is blocked by a firewall") and, on the local subnet, its MAC address. To inventory it, open WinRM as above or install
+the agent. Devices that block ping and are on another subnet cannot be detected without an agent.
+
+## Active Directory
+
+*Discovery & Scans › Active Directory › Add connection*:
+
+| Field | Example |
+|---|---|
+| Domain controller IP address or host name | `192.168.1.2` or `dc01.corp.example.com` |
+| Domain controller name (FQDN) | `dc01.corp.example.com` – used to check the LDAPS certificate when you connect by IP |
+| User ID | `CORP\svc-zentriq` or `svc-zentriq@corp.example.com` (a `CN=…` DN works with LDAPS only) |
+| Password | stored encrypted (AES-256-GCM); never shown again or returned by the API |
+| Domain or OU (distinguished name) | `DC=corp,DC=example,DC=com` or `OU=Head Office,DC=corp,DC=example,DC=com` – leave empty and click *Test connection* to fill in the domain |
+| LDAPS / port | LDAPS 636 (recommended; *Verify certificate* on) or LDAP 389, which is signed and sealed with Kerberos/NTLM |
+
+*Test connection* signs in and reads the container without saving. *Sync now* reads, under that container,
+**organizational units, users, groups and computers** (paged, read-only; nothing is written to AD):
+
+* Computers: name, DNS name, operating system and version, enabled/disabled, last logon, OU – linked to the asset when
+  it is in the inventory.
+* Users: display name, login (sAMAccountName / UPN), e-mail, department, title, enabled/disabled, last logon,
+  password last set, group memberships, OU.
+* Groups: name, description, e-mail; OUs: name and DN.
+
+Objects deleted from AD disappear at the next sync. *Scan computers* starts a scan of the enabled computers in that
+container (skipping those with no logon for N days) with the inventory credentials you select. An ordinary domain user
+can read these attributes; no administrator account is needed for AD itself.
 
 ### Limitations of agentless collection (in this release)
 
@@ -78,15 +127,27 @@ administrators. SNMP: vendor, model, serial (ENTITY-MIB), firmware, interfaces a
 ### Deploying
 
 1. *Agents › New enrollment code*: name, validity (1–365 days), optional maximum number of devices and the address
-   agents should use. The code (`ZQ1.…`) is shown once; it contains the server address, a one-time-readable secret and
-   the server certificate's key pin.
+   agents should use (pre-filled with the address you opened the console with, e.g. `https://192.168.1.8:8444` – it
+   must be reachable from the devices). The code (`ZQ1.…`) contains the server address, a secret and the server
+   certificate's key pin. While it is active you can show it again with *Enrollment codes › Show code* (stored
+   encrypted on the server; viewing is audited). Codes created before this feature was added cannot be shown again; create a new one.
 2. Download the MSI from *Agents* (or `https://<server>/downloads/ZentriqAgent-x64.msi`) and install:
    ```
    msiexec /i ZentriqAgent-x64.msi /qn ENROLLMENTCODE="ZQ1...." [PROXYURL="http://proxy:8080"]
    ```
+   Leave `PROXYURL` (wizard: *Proxy*) **empty** unless the device can reach the server only through a web proxy. It
+   must be an `http://` proxy address – never the Zentriq server address. The wizard rejects invalid values; the agent
+   ignores an `https://` proxy or one that points at the server (logged as a warning).
    Works with Intune (line-of-business app), Configuration Manager, Group Policy or interactively (the wizard asks
    for the code). Enroll later with `"C:\Program Files\Zentriq Agent\ZentriqAgent.exe" --enroll ZQ1....`.
-3. The device appears under *Agents* within a minute and its inventory shortly after.
+3. The device appears under *Agents* within a minute and its inventory shortly after. If it does not, see
+   `C:\ProgramData\Zentriq\Agent\Logs\agent.log` on the device; the *Agents* page lists the common causes.
+
+**Mass deployment** (no remote push from the Zentriq server – use your existing tools):
+* **Intune**: *Apps › Windows › Line-of-business app*, upload the MSI, command-line arguments `ENROLLMENTCODE="ZQ1…"`.
+* **Configuration Manager**: application with the `msiexec /i … /qn ENROLLMENTCODE="ZQ1…"` command.
+* **Group Policy**: a computer startup script running the same `msiexec` command from a share
+  (GPO software installation cannot pass the code; use a script or an MST transform with `ENROLLMENTCODE`).
 
 ### How it works
 
@@ -103,7 +164,7 @@ administrators. SNMP: vendor, model, serial (ENTITY-MIB), firmware, interfaces a
 
 ### Agent limitations (this release)
 
-* Windows only; no Linux/macOS agent yet. Needs .NET Framework 4.8 (not present by default on Server 2016/2019).
+* Windows only; no Linux/macOS agent yet. Needs .NET Framework 4.8 (not present by default on Server 2016/2019; Windows 10 1903+/11 have it).
 * Inventory only – the agent does not deploy software, patch or provide remote control.
 * If the server's self-signed certificate is replaced by a new self-signed one **after** the old one stopped working,
   agents must be re-enrolled; use a CA-issued certificate for internet-facing deployments.
