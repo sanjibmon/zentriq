@@ -10,6 +10,16 @@ namespace Zentriq.Inventory;
 /// <summary>Shared by the server and the Zentriq Agent: enrollment-code format and certificate pinning.</summary>
 public static class AgentProtocol
 {
+    /// <summary>True when agent <paramref name="version"/> is older than package <paramref name="latest"/> (1.1.1 = 1.1.1.0).</summary>
+    public static bool IsOlderVersion(string? version, string? latest)
+    {
+        if (!System.Version.TryParse(version, out var v) || !System.Version.TryParse(latest, out var l)) return false;
+        return Normalize(v) < Normalize(l);
+    }
+
+    private static System.Version Normalize(System.Version v) =>
+        new System.Version(v.Major, v.Minor, System.Math.Max(v.Build, 0), System.Math.Max(v.Revision, 0));
+
     public const string CodePrefix = "ZQ1.";
 
     public sealed class EnrollmentCode

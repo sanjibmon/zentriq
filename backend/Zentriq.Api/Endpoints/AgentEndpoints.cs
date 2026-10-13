@@ -492,10 +492,7 @@ public static class AgentEndpoints
     }
 
     /// <summary>True when <paramref name="version"/> is older than <paramref name="latest"/> (1.1.1 = 1.1.1.0).</summary>
-    internal static bool IsOlder(string? version, string? latest) =>
-        Version.TryParse(version, out var v) && Version.TryParse(latest, out var l) && Normalize(v) < Normalize(l);
-
-    private static Version Normalize(Version v) => new(v.Major, v.Minor, Math.Max(v.Build, 0), Math.Max(v.Revision, 0));
+    internal static bool IsOlder(string? version, string? latest) => AgentProtocol.IsOlderVersion(version, latest);
 
     private static readonly object HashLock = new();
     private static (string Path, DateTime Written, long Length, string Sha)? _hash;
