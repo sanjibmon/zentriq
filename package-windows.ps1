@@ -45,7 +45,9 @@ trap { Write-Failure $_; break }
 if (-not $IsWindows) { throw 'package-windows.ps1 must run on Windows (WiX and MSI validation require Windows Installer).' }
 
 $Version = Resolve-ZentriqVersion $Version
-$PackageVersion = "$Version.$Build"   # 4-part: MSI/Burn ProductVersion and the agent's assembly version
+$PackageVersion = "$Version.$Build"   # 4-part: MSI/Burn ProductVersion, server file versions, the agent's assembly version
+# Server binaries keep assembly version major.minor.patch (the product/database version) but get file version
+# major.minor.patch.build, so Windows Installer always sees the files of a newer build as newer and replaces them.
 $art = Join-Path $root 'artifacts'
 $staging = Join-Path $art 'staging'
 $prereqDir = Join-Path $art 'prereqs'
@@ -65,7 +67,7 @@ if (-not $SkipPublish) {
     foreach ($p in $publish) {
         Write-Section "Publish $($p.Project)"
         Invoke-Native { dotnet publish (Join-Path $root $p.Project) --configuration $Configuration --runtime win-x64 --self-contained true `
-            "-p:Version=$Version" '-p:PublishReadyToRun=false' '-p:DebugType=none' '-p:GenerateDocumentationFile=false' `
+            "-p:Version=$Version" "-p:FileVersion=$PackageVersion" '-p:PublishReadyToRun=false' '-p:DebugType=none' '-p:GenerateDocumentationFile=false' `
             --output (Join-Path $staging $p.Out) }
     }
     # Development settings never ship.
@@ -139,7 +141,7 @@ if ($signMode) {
 # ---- 4. MSI custom actions (server and agent MSIs) -----------------------------------------
 Write-Section 'MSI custom actions'
 $caProj = Join-Path $root 'installer/customactions/Zentriq.CustomActions.csproj'
-Invoke-Native { dotnet build $caProj --configuration $Configuration "-p:Version=$Version" }
+Invoke-Native { dotnet build $caProj --configuration $Configuration "-p:Version=$Version" "-p:FileVersion=$PackageVersion" }
 $caDll = Get-ChildItem (Join-Path $root 'installer/customactions/bin') -Recurse -Filter 'Zentriq.CustomActions.CA.dll' |
     Sort-Object LastWriteTime -Descending | Select-Object -First 1 -ExpandProperty FullName
 if (-not $caDll) { throw 'Zentriq.CustomActions.CA.dll was not produced.' }
