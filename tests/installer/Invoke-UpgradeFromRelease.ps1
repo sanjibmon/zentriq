@@ -152,7 +152,7 @@ if ($ok) {
         $bad = @($checks.GetEnumerator() | Where-Object { (($_.Key -in 'activity log', 'dashboard overview') -and $_.Value -ne 200) -or (($_.Key -in 'software uninstall', 'agent update') -and $_.Value -ne 400) })
         if ($bad.Count) { throw "unexpected responses: $(($checks.GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)" }) -join ', ')" }
         $ov = Invoke-RestMethod "$base/api/v1/dashboard/overview" -WebSession $s -Headers $h
-        if (-not $ov.facets.PSObject.Properties['cores']) { throw 'dashboard overview has no processor (cores) data' }
+        if (-not $ov.PSObject.Properties['cores']) { throw 'dashboard overview has no processor (cores) data' }
         # Save a customised dashboard layout with the new chart types (rejected by older servers).
         $dash = @(Invoke-RestMethod "$base/api/v1/dashboards" -WebSession $s -Headers $h | ForEach-Object { $_ }) | Where-Object { $_.owned } | Select-Object -First 1
         $layout = @{ name = 'My dashboard'; shared = $false; filters = @{}; refreshSeconds = 60; widgets = @(
