@@ -343,7 +343,7 @@ if (-not $installed) {
         do {
             if ($Nudge) { & $Nudge }
             Start-Sleep 5
-            $a = @(Api GET "/assets/$AssetId/actions" -Session $Session) | Where-Object { $_.id -eq $ActionId } | Select-Object -First 1
+            $a = @(Api GET "/assets/$AssetId/actions" -Session $Session | ForEach-Object { $_ }) | Where-Object { $_.id -eq $ActionId } | Select-Object -First 1
         } while ((-not $a -or $a.status -notin 'succeeded', 'failed') -and (Get-Date) -lt $deadline)
         if (-not $a) { throw "action $ActionId not found" }
         return $a
@@ -406,7 +406,7 @@ if (-not $installed) {
             Stop-Service ZentriqAgent
             try {
                 $deadline = (Get-Date).AddMinutes(4)
-                do { & $exe --once *> $null; Start-Sleep 3; $inst = @(Api GET '/inventory/software/installs?name=CI%20Dummy%20App' -Session $s) } while ($inst.Count -eq 0 -and (Get-Date) -lt $deadline)
+                do { & $exe --once *> $null; Start-Sleep 3; $inst = @(Api GET '/inventory/software/installs?name=CI%20Dummy%20App' -Session $s | ForEach-Object { $_ }) } while ($inst.Count -eq 0 -and (Get-Date) -lt $deadline)
                 Assert ($inst.Count -ge 1) 'dummy application not in the inventory'
                 Assert ($inst[0].agent -eq 'ready') "agent state $($inst[0].agent)"
                 $r = Api POST '/software/uninstall' @{ name = 'CI Dummy App'; assetIds = @($script:agentAsset) } -Session $s
@@ -418,7 +418,7 @@ if (-not $installed) {
             } finally { Start-Service ZentriqAgent }
             Assert ($a.status -eq 'succeeded') "uninstall $($a.status): $($a.detail)"
             Assert (-not (Test-Path $key)) 'uninstall registration still present'
-            $left = @(Api GET '/inventory/software/installs?name=CI%20Dummy%20App' -Session $s)
+            $left = @(Api GET '/inventory/software/installs?name=CI%20Dummy%20App' -Session $s | ForEach-Object { $_ })
             Assert ($left.Count -eq 0) 'software still listed after uninstall'
             "uninstalled via agent: $($a.detail); protected software refused; removed from inventory"
         } | Out-Null
