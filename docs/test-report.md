@@ -1,9 +1,23 @@
 # Test report
 
-Latest: GitHub Actions run 38379601204 (commit `aeacfdc`), workflow `windows-release`, on a GitHub-hosted
-**Windows Server 2022 Datacenter 10.0.20348** VM. Release: `v1.1.1-build.29` (pre-release, **unsigned**).
+Latest: GitHub Actions run 38387384668 (commit `45fc338`), workflow `windows-release`, on a GitHub-hosted
+**Windows Server 2022 Datacenter 10.0.20348** VM. Release: `v1.1.1-build.31` (pre-release, **unsigned**), package
+version **1.1.1.31**.
 Results: unit + PostgreSQL integration tests 46/46 PASS; upgrade from published 1.0.2 (U01, U02) PASS;
-installer acceptance **36 passed, 0 failed, 0 blocked, 10 not run**. New and PASS in build 29: T45 software uninstall through the agent (protected software refused, item removed from inventory, Activity log); T46 dashboard drill-down matches the charts, offline fields. Build 27: T41 VM shown as
+installer acceptance **36 passed, 0 failed, 0 blocked, 10 not run**.
+
+In-place update of an earlier build of the same version (new in build 31, silent installs):
+
+| ID | Test | Result | Detail |
+|---|---|---|---|
+| S01 | Install published `v1.1.1-build.29` (reports 1.1.1) | **PASS** | schema 7 |
+| S03 | Enroll the build-29 agent | **PASS** | agent registered and checking in |
+| S02 | Run the build-31 Setup over it | **PASS** | updated in place to 1.1.1.31: data, sign-in and trial kept, services running, **one** 'Zentriq 1.1.1.31' entry in Apps and Features |
+| S04 | Install the build-31 agent MSI over the enrolled agent, no enrollment code | **PASS** | old agent checked in to the upgraded server first; same registration and certificate, new version 1.1.1.31 reported, one 'Zentriq Agent' entry, service running |
+| U02 | Upgrade published 1.0.2 → 1.1.1.31 | **PASS** | one 'Zentriq 1.1.1.31' entry |
+| — | Interactive *Update Zentriq* wizard page (server) and skipped licence/enrollment pages (agent) | **NOT RUN** | CI installs silently; the dialogs compiled and passed ICE validation |
+
+Build 29: T45 software uninstall through the agent (protected software refused, item removed from inventory, Activity log); T46 dashboard drill-down matches the charts, offline fields. Build 27: T41 VM shown as
 virtual machine, IPv4 (not IPv4-mapped IPv6) address, IPv6 display toggle, dashboard overview; T42 collect inventory
 now for all assets; T43 service restart through the agent (protected service refused); T44 service restart agentlessly
 over WinRM with a stored credential (credential prompt enforced). Earlier: T33–T37 (enrollment code, scan deletion,
