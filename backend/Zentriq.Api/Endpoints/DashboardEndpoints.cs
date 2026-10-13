@@ -52,6 +52,9 @@ public static class DashboardEndpoints
             db.DashboardWidgets.RemoveRange(d.Widgets);
             d.Widgets = [];
             Apply(d, body);
+            // New widgets carry their own Guid keys: add them explicitly, otherwise EF treats them as existing rows
+            // (UPDATE of 0 rows -> concurrency error -> 409, the layout was never saved).
+            db.DashboardWidgets.AddRange(d.Widgets);
             await db.SaveChangesAsync(ct);
             await rc.AuditAsync("dashboard.update", d.Name, detail: new { d.Id });
             return Results.Ok(Dto(d, rc.UserId));
