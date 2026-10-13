@@ -12,7 +12,15 @@ namespace Zentriq.Agent;
 internal static class Program
 {
     public const string ServiceName = "ZentriqAgent";
-    public static string Version => Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.0.0";
+    public static string Version
+    {
+        get
+        {
+            var v = Assembly.GetExecutingAssembly().GetName().Version;
+            if (v == null) return "1.0.0";
+            return v.Revision > 0 ? v.ToString(4) : v.ToString(3);   // 1.1.1.31 for CI builds
+        }
+    }
 
     private static int Main(string[] args)
     {

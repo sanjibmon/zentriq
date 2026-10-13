@@ -24,7 +24,7 @@
     <SummaryInformation Description="Zentriq $(var.ProductVersion) — IT Asset Intelligence" />
 
     <MajorUpgrade Schedule="afterInstallInitialize"
-                  AllowSameVersionUpgrades="no"
+                  AllowSameVersionUpgrades="yes"
                   DowngradeErrorMessage="A newer version of Zentriq is already installed. Setup will now exit." />
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" MaximumUncompressedMediaSize="500" />
 

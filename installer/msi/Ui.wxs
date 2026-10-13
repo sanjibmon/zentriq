@@ -6,6 +6,8 @@
     8 Ready  9 Progress (zentriqctl: PostgreSQL, database, migrations, HTTPS, services, admin, trial, health)
    10 Finish (opens the console)
   Pages 5-7 are skipped when existing Zentriq data is found (repair/upgrade reuse the saved settings).
+  When an earlier Zentriq is installed (WIX_UPGRADE_DETECTED) the wizard is Welcome > Update > Ready: the existing
+  installation is updated in place (MajorUpgrade), not installed a second time.
 -->
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
   <Fragment>
@@ -43,7 +45,8 @@
       <Publish Dialog="BrowseDlg" Control="OK" Event="SpawnDialog" Value="InvalidDirDlg" Order="4" Condition='NOT WIXUI_DONTVALIDATEPATH AND WIXUI_INSTALLDIR_VALID &lt;&gt; "1"' />
 
       <!-- Welcome / License -->
-      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="LicenseAgreementDlg" Condition="NOT Installed" />
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="LicenseAgreementDlg" Condition="NOT Installed AND NOT WIX_UPGRADE_DETECTED" />
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="ZqUpgradeDlg" Condition="NOT Installed AND WIX_UPGRADE_DETECTED" />
       <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" Condition="Installed AND PATCH" />
 
       <Publish Dialog="LicenseAgreementDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" />
@@ -51,7 +54,8 @@
       <Publish Dialog="LicenseAgreementDlg" Control="Next" Event="NewDialog" Value="ZqPrereqDlg" Order="2" Condition='LicenseAccepted = "1"' />
 
       <!-- Ready / maintenance -->
-      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="ZqAdminDlg" Order="1" Condition="NOT Installed" />
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="ZqAdminDlg" Order="1" Condition="NOT Installed AND NOT (WIX_UPGRADE_DETECTED AND ZQ_EXISTING)" />
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="ZqUpgradeDlg" Order="1" Condition="NOT Installed AND WIX_UPGRADE_DETECTED AND ZQ_EXISTING" />
       <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="MaintenanceTypeDlg" Order="2" Condition="Installed AND NOT PATCH" />
       <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" Order="2" Condition="Installed AND PATCH" />
 
@@ -64,6 +68,34 @@
       <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="ZqOpenConsole" Order="1"
                Condition='WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed AND NOT (REMOVE = "ALL")' />
       <Publish Dialog="ExitDialog" Control="Finish" Event="EndDialog" Value="Return" Order="999" />
+
+      <!-- ===== Upgrade (an earlier Zentriq is installed: update it in place) ============== -->
+      <Dialog Id="ZqUpgradeDlg" Width="370" Height="270" Title="[ProductName] Setup">
+        <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="WixUI_Bmp_Banner" />
+        <Control Id="Title" Type="Text" X="15" Y="6" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Text="{\WixUI_Font_Title}Update Zentriq" />
+        <Control Id="Description" Type="Text" X="25" Y="23" Width="300" Height="15" Transparent="yes" NoPrefix="yes" Text="An earlier version of Zentriq is installed on this server." />
+        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+        <Control Id="Intro" Type="Text" X="20" Y="56" Width="330" Height="28" NoPrefix="yes"
+                 Text="Setup will update the existing installation to version [ProductVersion]. It is not installed a second time: the earlier program files are replaced and one Zentriq entry remains in Apps and Features." />
+        <Control Id="Kept" Type="Text" X="20" Y="90" Width="330" Height="70" NoPrefix="yes"
+                 Text="Kept as they are: the data folder, database and all inventory, users and passwords, MFA, settings, HTTPS certificate, licence or trial, scheduled scans, credentials and enrolled agents. The database is backed up before any schema update. Agents keep reporting; they do not need to be reinstalled." />
+        <Control Id="Downtime" Type="Text" X="20" Y="164" Width="330" Height="28" NoPrefix="yes"
+                 Text="The Zentriq services stop briefly while files are replaced and start again automatically. Signed-in users may need to refresh the console." />
+        <Control Id="NoData" Type="Text" X="20" Y="196" Width="330" Height="30" NoPrefix="yes" HideCondition="ZQ_EXISTING" ShowCondition="NOT ZQ_EXISTING"
+                 Text="The earlier setup did not finish configuring Zentriq, so the next pages ask for the remaining settings." />
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)">
+          <Publish Event="NewDialog" Value="WelcomeDlg" />
+        </Control>
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)">
+          <Publish Event="DoAction" Value="ZqCheckPrerequisites" Order="1" />
+          <Publish Event="NewDialog" Value="ZqPrereqDlg" Order="2" Condition='ZQ_PREREQ_BLOCK = "1" OR NOT ZQ_EXISTING' />
+          <Publish Event="NewDialog" Value="VerifyReadyDlg" Order="3" Condition='ZQ_PREREQ_BLOCK &lt;&gt; "1" AND ZQ_EXISTING' />
+        </Control>
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
+          <Publish Event="SpawnDialog" Value="CancelDlg" />
+        </Control>
+      </Dialog>
 
       <!-- ===== 3. System check ========================================================== -->
       <Dialog Id="ZqPrereqDlg" Width="370" Height="270" Title="[ProductName] Setup">
@@ -80,7 +112,8 @@
           <Publish Event="NewDialog" Value="ZqPrereqDlg" Order="2" />
         </Control>
         <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)">
-          <Publish Event="NewDialog" Value="LicenseAgreementDlg" />
+          <Publish Event="NewDialog" Value="LicenseAgreementDlg" Condition="NOT WIX_UPGRADE_DETECTED" />
+          <Publish Event="NewDialog" Value="ZqUpgradeDlg" Condition="WIX_UPGRADE_DETECTED" />
         </Control>
         <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)"
                  DisableCondition='ZQ_PREREQ_BLOCK = "1"' EnableCondition='ZQ_PREREQ_BLOCK &lt;&gt; "1"'>

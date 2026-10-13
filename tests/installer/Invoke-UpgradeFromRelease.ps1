@@ -6,11 +6,21 @@
   over it and verifies the installation still works (services, schema, sign-in, trial kept and moved to the
   30-device policy). Finally removes everything (Zentriq, PostgreSQL, data) so the clean-install acceptance suite
   can run on the same machine. DESTRUCTIVE: disposable VM / CI runner only.
+
+  With -OldAgentMsi/-NewAgentMsi it also enrolls the old agent before the server upgrade and then installs the new
+  agent MSI over it: the agent must be updated in place (one product, same enrollment and certificate, service
+  running, new version reported) without an enrollment code.
+
+  -IdPrefix lets CI run it twice: from the last release of an earlier version (U) and from the last published
+  build of the same version (S, e.g. 1.1.1.29 -> 1.1.1.31), which must also update in place.
 #>
 param(
     [Parameter(Mandatory)] [string] $OldBundle,
     [Parameter(Mandatory)] [string] $NewBundle,
-    [string] $OutDir = (Join-Path $env:RUNNER_TEMP 'zentriq-upgrade-from-release')
+    [string] $OutDir = (Join-Path $env:RUNNER_TEMP 'zentriq-upgrade-from-release'),
+    [string] $OldAgentMsi,
+    [string] $NewAgentMsi,
+    [string] $IdPrefix = 'U'
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -41,6 +51,18 @@ function Login {
     $s
 }
 
+function Api([string] $Method, [string] $Path, $Body, $Session) {
+    $p = @{ Uri = "$base/api/v1$Path"; Method = $Method; WebSession = $Session; Headers = @{ 'X-Zentriq-Request' = '1' } }
+    if ($null -ne $Body) { $p.Body = ($Body | ConvertTo-Json -Depth 6); $p.ContentType = 'application/json' }
+    Invoke-RestMethod @p
+}
+function Arp([string] $Like) {
+    @(Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*', 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*' -ErrorAction SilentlyContinue |
+        Where-Object { $_.PSObject.Properties['DisplayName'] -and $_.DisplayName -like $Like -and -not ($_.PSObject.Properties['SystemComponent'] -and $_.SystemComponent -eq 1) })
+}
+$P1 = "${IdPrefix}01"; $P2 = "${IdPrefix}02"; $P3 = "${IdPrefix}03"; $P4 = "${IdPrefix}04"
+$withAgent = [bool]($OldAgentMsi -and $NewAgentMsi)
+
 $answer = Join-Path $OutDir 'answers.json'
 @{ postgres = @{ mode = 'bundled'; port = 5432; dataDir = 'C:\ZentriqUpgradeTest\postgresql' }
    https = @{ port = 443; hostName = 'localhost' }
@@ -52,8 +74,26 @@ try {
     $before = (Wait-Ready).checks
     $trialBefore = (Invoke-RestMethod "$base/api/v1/setup/status").trialExpiresAt
     $oldVersion = (Get-ItemProperty 'HKLM:\SOFTWARE\Zentriq\Console').Version
-    Record 'U01' "Install previous release $oldVersion" 'PASS' "schema $($before.schemaVersion)"
-} catch { Record 'U01' 'Install previous release' 'FAIL' $_.Exception.Message; $ok = $false }
+    Record $P1 "Install previous release $oldVersion" 'PASS' "schema $($before.schemaVersion)"
+} catch { Record $P1 'Install previous release' 'FAIL' $_.Exception.Message; $ok = $false }
+
+$agentOk = $false
+$agentFailed = $false
+if ($ok -and $withAgent) {
+    try {
+        $s = Login
+        $tok = Api POST '/agents/enrollment-tokens' @{ name = 'upgrade-ci'; validDays = 1; maxUses = 1; serverUrl = 'https://localhost:8444' } $s
+        $log = Join-Path $OutDir 'agent-old-install.log'
+        $p = Start-Process msiexec.exe -ArgumentList '/i', "`"$OldAgentMsi`"", '/qn', "ENROLLMENTCODE=$($tok.code)", '/l*v', "`"$log`"" -Wait -PassThru
+        if ($p.ExitCode -ne 0) { throw "old agent MSI exit $($p.ExitCode)" }
+        $deadline = (Get-Date).AddMinutes(4)
+        do { Start-Sleep 5; $ag = @(Api GET '/agents' $null $s | ForEach-Object { $_ }) | Where-Object { $_.lastCheckinAt -and $_.status -ne 'revoked' } | Select-Object -First 1 } while (-not $ag -and (Get-Date) -lt $deadline)
+        if (-not $ag) { throw 'old agent did not enroll within 4 minutes' }
+        $agentBefore = @{ id = $ag.id; version = $ag.version; thumb = (Get-ItemProperty 'HKLM:\SOFTWARE\Zentriq\Agent').CertThumbprint; product = (Arp 'Zentriq Agent')[0].PSChildName }
+        Record $P3 "Enroll previous agent $($ag.version)" 'PASS' "agent $($ag.id)"
+        $agentOk = $true
+    } catch { Record $P3 'Enroll previous agent' 'FAIL' $_.Exception.Message; $agentFailed = $true }
+}
 Remove-Item $answer -Force
 
 if ($ok) {
@@ -67,13 +107,52 @@ if ($ok) {
         if ($status.trialExpiresAt -ne $trialBefore) { throw "trial changed: $trialBefore -> $($status.trialExpiresAt)" }
         if ($st.limits.devices -ne 30) { throw "trial limits after upgrade: $($st.limits | ConvertTo-Json -Compress)" }
         $newVersion = (Get-ItemProperty 'HKLM:\SOFTWARE\Zentriq\Console').Version
-        $arp = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*', 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*' -ErrorAction SilentlyContinue |
-            Where-Object { $_.PSObject.Properties['DisplayName'] -and $_.DisplayName -like 'Zentriq*' -and -not ($_.PSObject.Properties['SystemComponent'] -and $_.SystemComponent -eq 1) }
-        $names = @($arp | ForEach-Object DisplayName | Sort-Object -Unique)
-        if ($names.Count -ne 1 -or $names[0] -ne 'Zentriq') { throw "Programs and Features shows: $($names -join ', ')" }
-        Record 'U02' "Upgrade $oldVersion -> $newVersion keeps data, sign-in and trial; trial moved to 30 devices" 'PASS' "schema $($r.checks.schemaVersion); Programs and Features: '$($names[0])'"
-    } catch { Record 'U02' 'Upgrade from the previous release' 'FAIL' $_.Exception.Message; $ok = $false }
-} else { Record 'U02' 'Upgrade from the previous release' 'BLOCKED' 'previous release did not install' }
+        if ($newVersion -eq $oldVersion) { throw "version unchanged ($newVersion): the new build was not applied" }
+        # Every entry, not unique names: a second 'Zentriq' entry means it was installed again instead of updated.
+        $entries = @(Arp 'Zentriq' )
+        if ($entries.Count -ne 1) { throw "Programs and Features shows $($entries.Count) 'Zentriq' entries: $(($entries | ForEach-Object { "$($_.DisplayName) $($_.DisplayVersion)" }) -join '; ')" }
+        $svc = @(Get-Service 'Zentriq*' | Where-Object { $_.Name -ne 'ZentriqAgent' -and $_.StartType -eq 'Automatic' })
+        if (@($svc | Where-Object Status -ne 'Running').Count) { throw "services not running: $(($svc | ForEach-Object { "$($_.Name)=$($_.Status)" }) -join ', ')" }
+        Record $P2 "Upgrade $oldVersion -> $newVersion in place keeps data, sign-in and trial (30 devices)" 'PASS' "schema $($r.checks.schemaVersion); Programs and Features: one entry '$($entries[0].DisplayName) $($entries[0].DisplayVersion)'"
+    } catch { Record $P2 'Upgrade from the previous release' 'FAIL' $_.Exception.Message; $ok = $false }
+} else { Record $P2 'Upgrade from the previous release' 'BLOCKED' 'previous release did not install' }
+
+if ($withAgent) {
+    if ($ok -and $agentOk) {
+        try {
+            # The previous agent must keep working against the upgraded server (servers and agents are updated separately).
+            $exe = Join-Path $env:ProgramFiles 'Zentriq Agent\ZentriqAgent.exe'
+            $s = Login
+            $t0 = (@(Api GET '/agents' $null $s | ForEach-Object { $_ }) | Where-Object { $_.id -eq $agentBefore.id }).lastCheckinAt
+            Start-Sleep 2
+            Stop-Service ZentriqAgent; & $exe --once *> $null; Start-Service ZentriqAgent
+            $t1 = (@(Api GET '/agents' $null $s | ForEach-Object { $_ }) | Where-Object { $_.id -eq $agentBefore.id }).lastCheckinAt
+            if (-not $t1 -or $t1 -eq $t0) { throw "previous agent did not check in to the upgraded server ($t0 -> $t1)" }
+            $log = Join-Path $OutDir 'agent-upgrade.log'
+            $p = Start-Process msiexec.exe -ArgumentList '/i', "`"$NewAgentMsi`"", '/qn', '/l*v', "`"$log`"" -Wait -PassThru
+            if ($p.ExitCode -notin 0, 3010) { throw "new agent MSI exit $($p.ExitCode); see $log" }
+            $entries = @(Arp 'Zentriq Agent')
+            if ($entries.Count -ne 1) { throw "Programs and Features shows $($entries.Count) 'Zentriq Agent' entries" }
+            if ($entries[0].PSChildName -eq $agentBefore.product) { throw 'agent product code unchanged: the new MSI did not replace the old one' }
+            $reg = Get-ItemProperty 'HKLM:\SOFTWARE\Zentriq\Agent'
+            if ($reg.CertThumbprint -ne $agentBefore.thumb) { throw 'agent certificate/enrollment was not kept' }
+            if ((Get-Service ZentriqAgent).Status -ne 'Running') { throw 'ZentriqAgent not running after upgrade' }
+            $deadline = (Get-Date).AddMinutes(3)
+            do {
+                Stop-Service ZentriqAgent; & $exe --once *> $null; Start-Service ZentriqAgent
+                $list = @(Api GET '/agents' $null $s | ForEach-Object { $_ } | Where-Object { $_.status -ne 'revoked' })
+                $ag = $list | Where-Object { $_.id -eq $agentBefore.id }
+                if ($ag -and $ag.version -ne $agentBefore.version) { break }
+                Start-Sleep 10
+            } while ((Get-Date) -lt $deadline)
+            if ($list.Count -ne 1) { throw "$($list.Count) agent registrations (expected the same single one)" }
+            if (-not $ag -or $ag.version -eq $agentBefore.version) { throw "agent still reports $($agentBefore.version)" }
+            Record $P4 "Agent $($agentBefore.version) -> $($ag.version) updated in place (no enrollment code)" 'PASS' "old agent checked in to the upgraded server; same registration $($ag.id) and certificate; one 'Zentriq Agent' entry ($($entries[0].DisplayVersion)); service running"
+        } catch { Record $P4 'Agent updated in place' 'FAIL' $_.Exception.Message; $ok = $false }
+    } else { Record $P4 'Agent updated in place' 'BLOCKED' 'server upgrade or old agent failed' }
+    $a = Arp 'Zentriq Agent' | Select-Object -First 1
+    if ($a) { Start-Process msiexec.exe -ArgumentList '/x', $a.PSChildName, '/qn' -Wait | Out-Null }
+}
 
 # ---- clean the machine for the clean-install suite -----------------------------------------------
 try { Run-Setup $NewBundle @('/uninstall') 'cleanup-uninstall' } catch { Write-Warning $_ }
@@ -89,5 +168,5 @@ Get-ChildItem Cert:\LocalMachine\Root | Where-Object Subject -like '*Zentriq (se
 
 $results | ConvertTo-Json -Depth 4 | Set-Content (Join-Path $OutDir 'upgrade-results.json') -Encoding UTF8
 ($results | ForEach-Object { "| $($_.id) | $($_.test) | **$($_.outcome)** | $($_.detail -replace '\|','/') |" }) | Set-Content (Join-Path $OutDir 'upgrade-results.md') -Encoding UTF8
-if (-not $ok) { exit 1 }
+if (-not $ok -or $agentFailed) { exit 1 }
 exit 0

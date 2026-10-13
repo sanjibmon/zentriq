@@ -28,6 +28,9 @@
 [CmdletBinding()]
 param(
     [string] $Version,
+    # Build number (CI run number). Installer packages get ProductVersion major.minor.patch.build so every build is
+    # a newer version of the same product and upgrades the existing installation in place instead of adding a second one.
+    [ValidateRange(0, 65535)] [int] $Build = $(if ($env:ZENTRIQ_BUILD) { [int]$env:ZENTRIQ_BUILD } else { 0 }),
     [string] $Configuration = 'Release',
     [switch] $SkipPublish,
     [switch] $OfflinePrereqs,
@@ -42,12 +45,13 @@ trap { Write-Failure $_; break }
 if (-not $IsWindows) { throw 'package-windows.ps1 must run on Windows (WiX and MSI validation require Windows Installer).' }
 
 $Version = Resolve-ZentriqVersion $Version
+$PackageVersion = "$Version.$Build"   # 4-part: MSI/Burn ProductVersion and the agent's assembly version
 $art = Join-Path $root 'artifacts'
 $staging = Join-Path $art 'staging'
 $prereqDir = Join-Path $art 'prereqs'
 $release = Join-Path $art 'release'
 $wixVersion = '5.0.2'
-Write-Section "Packaging Zentriq $Version"
+Write-Section "Packaging Zentriq $Version (package version $PackageVersion)"
 Assert-Tool dotnet 'Install the .NET SDK pinned in global.json.'
 
 # ---- 1. publish ------------------------------------------------------------------------------
@@ -150,13 +154,13 @@ Write-Section 'Zentriq Agent'
 $agentStage = Join-Path $art 'staging-agent'
 Remove-Item $agentStage -Recurse -Force -ErrorAction SilentlyContinue
 Invoke-Native { dotnet publish (Join-Path $root 'agent/Zentriq.Agent/Zentriq.Agent.csproj') --configuration $Configuration `
-    "-p:Version=$Version" '-p:DebugType=none' --output $agentStage }
+    "-p:Version=$PackageVersion" '-p:DebugType=none' --output $agentStage }
 Get-ChildItem $agentStage -Include '*.pdb', '*.xml' -Recurse | Remove-Item -Force
 if (-not (Test-Path (Join-Path $agentStage 'ZentriqAgent.exe'))) { throw 'ZentriqAgent.exe was not produced.' }
 Sign-Files @(Get-ChildItem $agentStage -Include 'ZentriqAgent.exe', 'Zentriq*.dll' -Recurse | Select-Object -ExpandProperty FullName)
 Remove-Item (Join-Path $art 'agent-msi') -Recurse -Force -ErrorAction SilentlyContinue
 Invoke-Native { dotnet build (Join-Path $root 'installer/agent-msi/Zentriq.AgentMsi.wixproj') --configuration $Configuration `
-    "-p:ProductVersion=$Version" "-p:AgentDir=$agentStage" "-p:CustomActionDll=$caDll" }
+    "-p:ProductVersion=$PackageVersion" "-p:AgentDir=$agentStage" "-p:CustomActionDll=$caDll" }
 $agentMsi = Join-Path $art 'agent-msi/ZentriqAgent-x64.msi'
 if (-not (Test-Path $agentMsi)) { throw "Agent MSI not found at $agentMsi" }
 Sign-Files @($agentMsi)
@@ -164,13 +168,13 @@ Sign-Files @($agentMsi)
 $downloads = Join-Path $wwwroot 'downloads'
 New-Item -ItemType Directory -Force -Path $downloads | Out-Null
 Copy-Item $agentMsi $downloads -Force
-Set-Content (Join-Path $downloads 'ZentriqAgent-x64.version') $Version -Encoding ascii -NoNewline
+Set-Content (Join-Path $downloads 'ZentriqAgent-x64.version') $PackageVersion -Encoding ascii -NoNewline
 
 # ---- 4b. server MSI ------------------------------------------------------------------------------
 Write-Section 'Zentriq.msi'
 Remove-Item (Join-Path $art 'msi') -Recurse -Force -ErrorAction SilentlyContinue
 Invoke-Native { dotnet build (Join-Path $root 'installer/msi/Zentriq.Msi.wixproj') --configuration $Configuration `
-    "-p:ProductVersion=$Version" "-p:StagingDir=$staging" "-p:CustomActionDll=$caDll" }
+    "-p:ProductVersion=$PackageVersion" "-p:StagingDir=$staging" "-p:CustomActionDll=$caDll" }
 $msi = Join-Path $art 'msi/Zentriq.msi'
 if (-not (Test-Path $msi)) { throw "MSI not found at $msi" }
 Sign-Files @($msi)
@@ -179,7 +183,7 @@ Sign-Files @($msi)
 Write-Section 'Zentriq-Setup-x64.exe'
 Remove-Item (Join-Path $art 'bundle') -Recurse -Force -ErrorAction SilentlyContinue
 Invoke-Native { dotnet build (Join-Path $root 'installer/bootstrapper/Zentriq.Bundle.wixproj') --configuration $Configuration `
-    "-p:ProductVersion=$Version" "-p:MsiPath=$msi" "-p:PrereqDir=$prereqDir" "-p:PgInstallerName=$pgFile" "-p:VcRedistMinBuild=$vcBuild" }
+    "-p:ProductVersion=$PackageVersion" "-p:MsiPath=$msi" "-p:PrereqDir=$prereqDir" "-p:PgInstallerName=$pgFile" "-p:VcRedistMinBuild=$vcBuild" }
 $bundle = Join-Path $art 'bundle/Zentriq-Setup-x64.exe'
 if (-not (Test-Path $bundle)) { throw "Bundle not found at $bundle" }
 
@@ -231,6 +235,8 @@ $commit = (git -C $root rev-parse HEAD 2>$null)
 $manifest = [ordered]@{
     product        = 'Zentriq'
     version        = $Version
+    build          = $Build
+    packageVersion = $PackageVersion
     builtAtUtc     = (Get-Date).ToUniversalTime().ToString('o')
     gitCommit      = $commit
     builder        = @{ os = [Environment]::OSVersion.VersionString; dotnetSdk = (dotnet --version); wix = $wixVersion }

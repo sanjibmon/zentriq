@@ -23,11 +23,14 @@
       <DialogRef Id="UserExit" />
 
       <Publish Dialog="LicenseAgreementDlg" Control="Print" Event="DoAction" Value="WixUIPrintEula_X64" />
-      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="LicenseAgreementDlg" Condition="NOT Installed" />
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="LicenseAgreementDlg" Condition="NOT Installed AND NOT WIX_UPGRADE_DETECTED" />
+      <!-- Upgrade: the enrollment and certificate are kept, so no licence or enrollment page. -->
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" Condition="NOT Installed AND WIX_UPGRADE_DETECTED" />
       <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" Condition="Installed AND PATCH" />
       <Publish Dialog="LicenseAgreementDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" />
       <Publish Dialog="LicenseAgreementDlg" Control="Next" Event="NewDialog" Value="ZqEnrollDlg" Condition='LicenseAccepted = "1"' />
-      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="ZqEnrollDlg" Order="1" Condition="NOT Installed" />
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="ZqEnrollDlg" Order="1" Condition="NOT Installed AND NOT WIX_UPGRADE_DETECTED" />
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" Order="1" Condition="NOT Installed AND WIX_UPGRADE_DETECTED" />
       <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="MaintenanceTypeDlg" Order="2" Condition="Installed AND NOT PATCH" />
       <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" Order="2" Condition="Installed AND PATCH" />
       <Publish Dialog="MaintenanceWelcomeDlg" Control="Next" Event="NewDialog" Value="MaintenanceTypeDlg" />

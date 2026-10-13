@@ -76,14 +76,14 @@ jobs:
       - name: Package release
         shell: pwsh
         run: |
-          ./package-windows.ps1 -Version $env:ZQ_VERSION *>&1 | Tee-Object -FilePath "$env:RUNNER_TEMP/ci-logs/3-package.log"
+          ./package-windows.ps1 -Version $env:ZQ_VERSION -Build $env:GITHUB_RUN_NUMBER *>&1 | Tee-Object -FilePath "$env:RUNNER_TEMP/ci-logs/3-package.log"
           Move-Item artifacts/release artifacts/release-main
           Get-Content artifacts/prereqs/prereqs.lock.json
 
       - name: Package upgrade target
         shell: pwsh
         run: |
-          ./package-windows.ps1 -Version $env:ZQ_UPGRADE_VERSION *>&1 | Tee-Object -FilePath "$env:RUNNER_TEMP/ci-logs/4-package-upgrade.log"
+          ./package-windows.ps1 -Version $env:ZQ_UPGRADE_VERSION -Build $env:GITHUB_RUN_NUMBER *>&1 | Tee-Object -FilePath "$env:RUNNER_TEMP/ci-logs/4-package-upgrade.log"
           Move-Item artifacts/release artifacts/release-upgrade
 
       - name: Free port 5432 (stop the runner's PostgreSQL)
@@ -101,6 +101,26 @@ jobs:
           gh release download $env:ZQ_PREVIOUS_RELEASE -R $env:GITHUB_REPOSITORY -p 'Zentriq-Setup-x64.exe' -D "$env:RUNNER_TEMP/previous"
           ./tests/installer/Invoke-UpgradeFromRelease.ps1 -OldBundle "$env:RUNNER_TEMP/previous/Zentriq-Setup-x64.exe" -NewBundle "$PWD/artifacts/release-main/Zentriq-Setup-x64.exe" -OutDir "$env:RUNNER_TEMP/acceptance-upgrade" *>&1 | Tee-Object -FilePath "$env:RUNNER_TEMP/ci-logs/5a-upgrade-from-release.log"
 
+      - name: Update the last published build of the same version in place
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Customers on an earlier build of the same version (e.g. 1.1.1.29) install this build: it must update the
+          # existing server and agent in place, not install a second copy.
+          $out = "$env:RUNNER_TEMP/acceptance-upgrade/same-version"
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          $tag = (gh api "repos/$env:GITHUB_REPOSITORY/releases?per_page=30" | ConvertFrom-Json | Where-Object { $_.tag_name -like "v$($env:ZQ_VERSION)-build.*" } | Select-Object -First 1).tag_name
+          if (-not $tag) {
+            "| S01 | Update an earlier $env:ZQ_VERSION build in place | **NOT RUN** | no earlier $env:ZQ_VERSION build has been published |" | Set-Content "$out/upgrade-results.md"
+            exit 0
+          }
+          Write-Host "Previous build of the same version: $tag"
+          gh release download $tag -R $env:GITHUB_REPOSITORY -p 'Zentriq-Setup-x64.exe' -p 'ZentriqAgent-x64.msi' -D "$env:RUNNER_TEMP/previous-same"
+          ./tests/installer/Invoke-UpgradeFromRelease.ps1 -IdPrefix S -OldBundle "$env:RUNNER_TEMP/previous-same/Zentriq-Setup-x64.exe" -NewBundle "$PWD/artifacts/release-main/Zentriq-Setup-x64.exe" `
+            -OldAgentMsi "$env:RUNNER_TEMP/previous-same/ZentriqAgent-x64.msi" -NewAgentMsi "$PWD/artifacts/release-main/ZentriqAgent-x64.msi" `
+            -OutDir $out *>&1 | Tee-Object -FilePath "$env:RUNNER_TEMP/ci-logs/5b-upgrade-same-version.log"
+
       - name: Installer acceptance suite
         shell: pwsh
         run: ./tests/installer/Invoke-InstallerAcceptance.ps1 -Bundle "$PWD/artifacts/release-main/Zentriq-Setup-x64.exe" -UpgradeBundle "$PWD/artifacts/release-upgrade/Zentriq-Setup-x64.exe" -OutDir "$env:RUNNER_TEMP/acceptance" *>&1 | Tee-Object -FilePath "$env:RUNNER_TEMP/ci-logs/5-acceptance.log"
@@ -113,6 +133,8 @@ jobs:
           if (Test-Path $md) { Get-Content $md | Out-File $env:GITHUB_STEP_SUMMARY -Append; Get-Content $md }
           $um = Join-Path $env:RUNNER_TEMP 'acceptance-upgrade/upgrade-results.md'
           if (Test-Path $um) { Get-Content $um | Out-File $env:GITHUB_STEP_SUMMARY -Append; Get-Content $um }
+          $sm = Join-Path $env:RUNNER_TEMP 'acceptance-upgrade/same-version/upgrade-results.md'
+          if (Test-Path $sm) { Get-Content $sm | Out-File $env:GITHUB_STEP_SUMMARY -Append; Get-Content $sm }
           $s = 'artifacts/test-results/summary.txt'
           if (Test-Path $s) { "`n**Unit/integration tests:** $(Get-Content $s)" | Out-File $env:GITHUB_STEP_SUMMARY -Append }
 

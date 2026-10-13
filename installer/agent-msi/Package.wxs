@@ -19,7 +19,7 @@
            Compressed="yes">
 
     <SummaryInformation Description="Zentriq Agent $(var.ProductVersion) — device inventory for Zentriq" />
-    <MajorUpgrade Schedule="afterInstallInitialize" AllowSameVersionUpgrades="no"
+    <MajorUpgrade Schedule="afterInstallInitialize" AllowSameVersionUpgrades="yes"
                   DowngradeErrorMessage="A newer version of the Zentriq Agent is already installed." />
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
 

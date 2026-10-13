@@ -37,7 +37,7 @@ Run `Zentriq-Setup-x64.exe` as an administrator. The wizard:
 7. **Ready** → **Progress**. Setup installs PostgreSQL, creates the database and least-privilege roles, applies migrations, issues/binds the certificate, starts the services, has the worker run a self-test job, creates the administrator, starts the 14-day trial and verifies the console over HTTPS.
 8. **Finish** – opens the console URL. A **Zentriq Web Console** shortcut (Zentriq icon) is created on the desktop (unless unticked on the Folders page) and in *Start › Zentriq*.
 
-If existing Zentriq data is found (reinstall, upgrade), pages 4–6 are skipped and the saved settings are reused.
+If existing Zentriq data is found (reinstall), pages 4–6 are skipped and the saved settings are reused. If Zentriq is already installed, Setup updates it in place instead (Welcome → Update Zentriq → Ready); see [upgrade.md](upgrade.md).
 
 **Setup reports success only after every verification passes.** If a step fails you get the failed step, the reason, what to do and the log path; Windows Installer then removes the program files, while PostgreSQL, the database and the data folder are kept, so running setup again continues where it stopped. See [troubleshooting.md](troubleshooting.md).
 
