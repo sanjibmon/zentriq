@@ -1,7 +1,10 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { api } from '../../api/client';
 import type { Asset, AssetInventory } from '../../api/types';
 import { Link } from '../../app/router';
+import { useAuth } from '../../app/auth';
+import { typeLabel } from '../assets/AssetsPage';
+import { ServiceActionDialog, type ControlInfo, type ServiceActionRow } from './ServiceControl';
 import { useApi } from '../../app/useApi';
 import { Callout, DataTable, ErrorBox, fmt, Loading, PageHead, Panel, Pill, statusTone } from '../../components/ui';
 
@@ -24,6 +27,23 @@ export function AssetDetailPage({ id }: { id: string }) {
   const inv = useApi(() => api.get<AssetInventory>(`/assets/${id}/inventory`), [id]);
   const [tab, setTab] = useState<Tab>('overview');
   const [filter, setFilter] = useState('');
+  const { can } = useAuth();
+  const control = useApi(() => (can('assets.control') ? api.get<ControlInfo>(`/assets/${id}/control`) : Promise.resolve(null)), [id]);
+  const actions = useApi(() => api.get<ServiceActionRow[]>(`/assets/${id}/actions`), [id]);
+  const [pending, setPending] = useState<{ name: string; display: string; op: string } | null>(null);
+  const [note, setNote] = useState<{ tone: 'info' | 'crit'; text: string } | null>(null);
+  const open = (actions.data ?? []).some((x) => ['queued', 'sent', 'running'].includes(x.status));
+  useEffect(() => {
+    if (!open) return;
+    const t = setInterval(() => { actions.reload(); inv.reload(); }, 5000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload() only bumps a counter
+  }, [open]);
+  async function collectNow() {
+    setNote(null);
+    try { setNote({ tone: 'info', text: (await api.post<{ message: string }>('/assets/collect', { assetIds: [id] })).message }); }
+    catch (e) { setNote({ tone: 'crit', text: e instanceof Error ? e.message : String(e) }); }
+  }
   const a = asset.data;
   const d = inv.data?.document ?? null;
   const sw = inv.data?.software ?? [];
@@ -38,8 +58,12 @@ export function AssetDetailPage({ id }: { id: string }) {
 
   return (
     <>
-      <PageHead title={a.hostname ?? a.ip ?? 'Asset'} desc={<>{fmt.label(a.category)} · {a.osName ?? fmt.label(a.osFamily)} · <Pill tone={statusTone(a.status)}>{fmt.label(a.status)}</Pill></>}
-        actions={<Link className="btn" to="/assets">All assets</Link>} />
+      <PageHead title={a.hostname ?? a.ip ?? 'Asset'} desc={<>{typeLabel({ ...a, chassis: d?.device.chassis ?? a.chassis, isVirtual: d?.hardware.isVirtual ?? a.isVirtual })} · {a.osName ?? fmt.label(a.osFamily)} · <Pill tone={statusTone(a.status)}>{fmt.label(a.status)}</Pill></>}
+        actions={<>
+          {can('scans.run') && <button className="btn primary" onClick={() => void collectNow()}>Collect inventory now</button>}
+          <Link className="btn" to="/assets">All assets</Link>
+        </>} />
+      {note && <Callout tone={note.tone} icon={note.tone === 'crit' ? 'alert' : 'info'}>{note.text}</Callout>}
       <ErrorBox error={inv.error} />
       {!inv.data?.document && !inv.loading && (
         <Callout>No detailed inventory yet. Install the Zentriq Agent on this device or scan it with a Windows, SSH or SNMP credential.</Callout>
@@ -54,9 +78,10 @@ export function AssetDetailPage({ id }: { id: string }) {
         <div className="grid-2">
           <Panel title="Device">
             <KV items={[
-              ['Hostname', a.hostname], ['FQDN', d?.device.fqdn ?? a.fqdn], ['Domain / workgroup', d?.device.domain], ['IP address', <span className="mono">{a.ip ?? '—'}</span>],
+              ['Hostname', a.hostname], ['FQDN', d?.device.fqdn ?? a.fqdn], ['Domain / workgroup', d?.device.domain], ['IPv4 address', <span className="mono">{(a.ipv4 && a.ipv4.length ? a.ipv4 : a.ip ? [a.ip] : []).join(', ') || '—'}</span>],
+              ...(a.ipv6 ? [['IPv6 address', <span className="mono">{a.ipv6.join(', ') || '—'}</span>] as [string, ReactNode]] : []),
               ['Manufacturer', d?.device.manufacturer ?? inv.data?.hardware?.vendor], ['Model', d?.device.model ?? inv.data?.hardware?.model],
-              ['Serial number', <span className="mono">{d?.device.serialNumber ?? a.serialNumber ?? '—'}</span>], ['Type', fmt.label(d?.device.chassis ?? a.category)],
+              ['Serial number', <span className="mono">{d?.device.serialNumber ?? a.serialNumber ?? '—'}</span>], ['Type', typeLabel({ ...a, chassis: d?.device.chassis ?? a.chassis, isVirtual: d?.hardware.isVirtual ?? a.isVirtual })],
               ['Logged-on user', d?.users.loggedOn], ['Owner', a.ownerName], ['Criticality', a.criticality],
             ]} />
           </Panel>
@@ -132,6 +157,7 @@ export function AssetDetailPage({ id }: { id: string }) {
             { key: 'n', label: 'Adapter', className: 'wrap', render: (x) => x.name ?? '—' },
             { key: 'm', label: 'MAC', render: (x) => <span className="mono">{x.mac ?? '—'}</span> },
             { key: '4', label: 'IPv4', render: (x) => <span className="mono">{x.ipv4.join(', ') || '—'}</span> },
+            ...(a.ipv6 ? [{ key: '6', label: 'IPv6', render: (x: { ipv6: string[] }) => <span className="mono">{x.ipv6.join(', ') || '—'}</span> }] : []),
             { key: 'g', label: 'Gateway', render: (x) => <span className="mono">{x.gateway ?? '—'}</span> },
             { key: 'd', label: 'DHCP', render: (x) => yesNo(x.dhcp) },
             { key: 's', label: 'Speed', render: (x) => (x.speedMbps ? `${x.speedMbps.toLocaleString()} Mbps` : '—') },
@@ -171,13 +197,48 @@ export function AssetDetailPage({ id }: { id: string }) {
       )}
 
       {tab === 'services' && (
-        <Panel flush right={<input className="in" placeholder="Filter…" value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Filter services" />} title="Services">
-          <DataTable rows={(d?.services ?? []).filter((s) => !f || s.name.toLowerCase().includes(f) || (s.displayName ?? '').toLowerCase().includes(f)).map((x, i) => ({ ...x, id: i }))} empty="No services collected." columns={[
-            { key: 'n', label: 'Service', className: 'wrap', render: (x) => <><b>{x.displayName ?? x.name}</b><div className="faint mono" style={{ fontSize: 11 }}>{x.name}</div></> },
-            { key: 's', label: 'State', render: (x) => <Pill tone={x.state === 'Running' || x.state === 'running' ? 'ok' : ''}>{x.state ?? '—'}</Pill> },
-            { key: 'm', label: 'Start mode', render: (x) => x.startMode ?? '—' },
-          ]} />
-        </Panel>
+        <>
+          {control.data?.note && <Callout tone="warn" icon="alert">{control.data.note}</Callout>}
+          {(actions.data ?? []).length > 0 && (
+            <Panel title="Recent service actions" flush>
+              <DataTable rows={(actions.data ?? []).slice(0, 8)} columns={[
+                { key: 't', label: 'When', render: (x) => fmt.ago(x.requestedAt) },
+                { key: 'a', label: 'Action', render: (x) => <><b>{fmt.label(x.operation)}</b> <span className="mono">{x.target}</span></> },
+                { key: 'c', label: 'Via', render: (x) => x.channel === 'agent' ? 'Agent' : 'WinRM / WMI' },
+                { key: 's', label: 'Result', render: (x) => <Pill tone={x.status === 'succeeded' ? 'ok' : x.status === 'failed' ? 'crit' : 'warn'}>{fmt.label(x.status)}</Pill> },
+                { key: 'd', label: 'Detail', className: 'wrap', render: (x) => <span style={{ fontSize: 12.5 }}>{x.detail ?? (x.status === 'sent' ? 'Delivered to the agent…' : x.status === 'queued' ? 'Waiting for the agent to check in…' : '')}</span> },
+                { key: 'b', label: 'By', render: (x) => x.requestedBy ?? '—' },
+              ]} />
+            </Panel>
+          )}
+          <Panel flush right={<input className="in" placeholder="Filter…" value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Filter services" />} title="Services"
+            sub={control.data ? (control.data.channel === 'agent' ? 'Start, stop and restart run through the Zentriq Agent' : 'Start, stop and restart run over WinRM/WMI with an administrator account') : undefined}>
+            <DataTable rows={(d?.services ?? []).filter((s) => !f || s.name.toLowerCase().includes(f) || (s.displayName ?? '').toLowerCase().includes(f)).map((x, i) => ({ ...x, id: i }))} empty="No services collected." columns={[
+              { key: 'n', label: 'Service', className: 'wrap', render: (x) => <><b>{x.displayName ?? x.name}</b><div className="faint mono" style={{ fontSize: 11 }}>{x.name}</div></> },
+              { key: 's', label: 'State', render: (x) => <Pill tone={/^running$/i.test(x.state ?? '') ? 'ok' : /pending/i.test(x.state ?? '') ? 'warn' : ''}>{x.state ?? '—'}</Pill> },
+              { key: 'm', label: 'Start mode', render: (x) => x.startMode ?? '—' },
+              ...(control.data && a.osFamily !== 'linux' ? [{
+                key: 'x', label: '', render: (x: { name: string; displayName?: string | null; state?: string | null; startMode?: string | null }) => {
+                  const running = /^running$/i.test(x.state ?? '');
+                  const prot = control.data!.protectedServices.some((p) => p.toLowerCase() === x.name.toLowerCase());
+                  const disabled = /^disabled$/i.test(x.startMode ?? '');
+                  const go = (op: string) => setPending({ name: x.name, display: x.displayName ?? x.name, op });
+                  return (
+                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                      {!running && <button className="btn sm" disabled={disabled} title={disabled ? 'Disabled service' : undefined} onClick={() => go('start')}>Start</button>}
+                      {running && <button className="btn sm" disabled={prot} title={prot ? 'Protected: manage it on the device' : undefined} onClick={() => go('restart')}>Restart</button>}
+                      {running && <button className="btn sm danger" disabled={prot} title={prot ? 'Protected: manage it on the device' : undefined} onClick={() => go('stop')}>Stop</button>}
+                    </div>
+                  );
+                },
+              }] : []),
+            ]} />
+          </Panel>
+        </>
+      )}
+      {pending && control.data && (
+        <ServiceActionDialog assetId={id} host={a.hostname ?? a.ip ?? 'device'} service={pending.name} display={pending.display} operation={pending.op} info={control.data}
+          onClose={() => setPending(null)} onDone={(m) => { setPending(null); setNote({ tone: 'info', text: m }); actions.reload(); }} />
       )}
     </>
   );

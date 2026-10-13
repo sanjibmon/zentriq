@@ -26,14 +26,15 @@ namespace Zentriq.Api.Endpoints;
 /// </summary>
 public static class AgentEndpoints
 {
-    public const int DefaultCheckinSeconds = 900;
+    public const int DefaultCheckinSeconds = 120;   // short, so "Collect now" and service actions run within ~2 minutes
     public const int DefaultInventoryHours = 12;
     private const long MaxInventoryCompressed = 8L * 1024 * 1024;
     private const long MaxInventoryJson = 48L * 1024 * 1024;
 
     public sealed record EnrollRequest(string Token, string Csr, string? Hostname, string? OsName, string? AgentVersion, string? SmbiosUuid);
     public sealed record RenewRequest(string Csr);
-    public sealed record CheckinRequest(string? AgentVersion, string? Hostname, string? OsName, string? LastError);
+    public sealed record CheckinRequest(string? AgentVersion, string? Hostname, string? OsName, string? LastError, string[]? Capabilities = null);
+    public sealed record ActionResult(bool Ok, string? State, string? Message);
 
     private sealed record AgentIdentity(Guid Id, Guid? AssetId, string Thumbprint);
 
@@ -116,7 +117,7 @@ public static class AgentEndpoints
             await using var cmd = ds.CreateCommand("""
                 UPDATE zentriq.agent_registrations
                    SET last_checkin_at = now(), last_ip = @ip, agent_version = COALESCE(@v, agent_version),
-                       hostname = COALESCE(@h, hostname), os_name = COALESCE(@os, os_name)
+                       hostname = COALESCE(@h, hostname), os_name = COALESCE(@os, os_name), capabilities = COALESCE(@cap, capabilities)
                  WHERE id = @id
                 RETURNING last_inventory_at, cert_not_after
                 """);
@@ -125,6 +126,7 @@ public static class AgentEndpoints
             cmd.Parameters.Add(Text("v", Trunc(req.AgentVersion, 40)));
             cmd.Parameters.Add(Text("h", Trunc(req.Hostname, 255)));
             cmd.Parameters.Add(Text("os", Trunc(req.OsName, 200)));
+            cmd.Parameters.Add(new NpgsqlParameter("cap", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = (object?)req.Capabilities?.Take(20).Select(c => Trunc(c, 40)!).ToArray() ?? DBNull.Value });
             DateTimeOffset? lastInv = null, notAfter = null;
             await using (var r = await cmd.ExecuteReaderAsync(ct))
                 if (await r.ReadAsync(ct))
@@ -133,8 +135,22 @@ public static class AgentEndpoints
                     notAfter = r.IsDBNull(1) ? null : r.GetFieldValue<DateTimeOffset>(1);
                 }
             var inventoryDue = lastInv is null || lastInv < DateTimeOffset.UtcNow.AddHours(-DefaultInventoryHours) || await RequestedAsync(ds, agent.Id, ct);
+            // Pending device actions (service start/stop/restart). Actions older than 1 hour are not handed out any more.
+            var actions = new List<object>();
+            if (req.Capabilities?.Contains("service-control") == true)
+            {
+                await using var act = ds.CreateCommand("""
+                    UPDATE zentriq.asset_actions SET status = 'sent', sent_at = now()
+                     WHERE agent_id = @a AND channel = 'agent' AND status IN ('queued','sent') AND requested_at > now() - interval '1 hour'
+                    RETURNING id, kind, target, operation
+                    """);
+                act.Parameters.AddWithValue("a", agent.Id);
+                await using var ar = await act.ExecuteReaderAsync(ct);
+                while (await ar.ReadAsync(ct)) actions.Add(new { id = ar.GetGuid(0), kind = ar.GetString(1), target = ar.GetString(2), operation = ar.GetString(3) });
+            }
             return Results.Ok(new
             {
+                actions,
                 agentId = agent.Id,
                 checkinSeconds = DefaultCheckinSeconds,
                 inventoryHours = DefaultInventoryHours,
@@ -142,6 +158,14 @@ public static class AgentEndpoints
                 renewCertificate = notAfter is { } na && na < DateTimeOffset.UtcNow.AddDays(30),
                 serverPins = Pins(server),
             });
+        }).AllowAnonymous();
+
+        g.MapPost("/actions/{actionId:guid}/result", async (Guid actionId, ActionResult body, HttpContext http, NpgsqlDataSource ds, AgentServer server, CancellationToken ct) =>
+        {
+            var (agent, error) = await AuthenticateAsync(http, ds, server, ct);
+            if (agent is null) return error!;
+            var ok = await AssetActionEndpoints.CompleteAsync(ds, actionId, agent.Id, body.Ok, Trunc(body.State, 40), Trunc(body.Message, 2000), ct);
+            return ok ? Results.NoContent() : Results.NotFound();
         }).AllowAnonymous();
 
         g.MapPost("/inventory", async (HttpContext http, NpgsqlDataSource ds, AgentServer server, InventoryStore store, LicensingService licensing, ILoggerFactory lf, CancellationToken ct) =>
@@ -272,7 +296,7 @@ public static class AgentEndpoints
             cmd.Parameters.AddWithValue("id", id);
             if (await cmd.ExecuteNonQueryAsync(ct) == 0) return Results.NotFound();
             await rc.AuditAsync("agent.collect_requested", id.ToString());
-            return Results.Accepted(value: new { message = "The agent will send inventory at its next check-in (within 15 minutes)." });
+            return Results.Accepted(value: new { message = "The agent will send inventory at its next check-in (within about 2 minutes)." });
         }).RequireAuthorization(Permissions.AgentsManage);
 
         g.MapGet("/enrollment-tokens", async (NpgsqlDataSource ds, CancellationToken ct) =>
@@ -387,7 +411,7 @@ public static class AgentEndpoints
 
     private static string[] Pins(AgentServer server) => server.ServerPin is { } p ? [p] : [];
 
-    private static string RequestKey(Guid agentId) => "agent.collect." + agentId.ToString("N");
+    internal static string RequestKey(Guid agentId) => "agent.collect." + agentId.ToString("N");
 
     private static async Task<bool> RequestedAsync(NpgsqlDataSource ds, Guid agentId, CancellationToken ct)
     {

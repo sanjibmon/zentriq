@@ -14,7 +14,15 @@ public static class WinRmCollector
 {
     public static Zentriq.Inventory.InventoryDocument Collect(string target, ScanCredential cred, bool useDcom, bool https, int port, TimeSpan timeout, string version)
     {
+        using var session = CreateSession(target, cred, useDcom, https, port, timeout);
+        var wmi = new CimWmiSource(session);
+        return WindowsCollector.Collect(wmi, new CimRegistrySource(session), "winrm", version, includeServices: true);
+    }
+
+    public static CimSession CreateSession(string target, ScanCredential cred, bool useDcom, bool https, int port, TimeSpan timeout)
+    {
         var (domain, user) = cred.SplitUser();
+        if (domain == ".") domain = null; // .\user = local account on the target
         using var secure = new SecureString();
         foreach (var c in cred.Secret.Password ?? "") secure.AppendChar(c);
         secure.MakeReadOnly();
@@ -34,11 +42,76 @@ public static class WinRmCollector
             w.AddDestinationCredentials(credential);
             options = w;
         }
-
-        using var session = CimSession.Create(target, options);
-        var wmi = new CimWmiSource(session);
-        return WindowsCollector.Collect(wmi, new CimRegistrySource(session), "winrm", version, includeServices: true);
+        return CimSession.Create(target, options);
     }
+
+    /// <summary>
+    /// Starts, stops or restarts one Windows service with the Win32_Service methods (the same thing services.msc does
+    /// remotely). Returns the final state. The service name has been validated against the device's inventory.
+    /// </summary>
+    public static (bool Ok, string? State, string Message) ControlService(CimSession session, string name, string operation, TimeSpan wait)
+    {
+        CimInstance? Find()
+        {
+            foreach (var i in session.QueryInstances(@"root\cimv2", "WQL", $"SELECT Name, State, StartMode FROM Win32_Service WHERE Name = '{name}'")) return i;
+            return null;
+        }
+        string? State(CimInstance? i) => i?.CimInstanceProperties["State"]?.Value as string;
+        string? Current() { using var i = Find(); return State(i); }
+        string? WaitFor(string desired)
+        {
+            var until = DateTime.UtcNow + wait;
+            string? st;
+            do
+            {
+                using var i = Find();
+                st = State(i);
+                if (string.Equals(st, desired, StringComparison.OrdinalIgnoreCase)) return st;
+                Thread.Sleep(1500);
+            } while (DateTime.UtcNow < until);
+            return st;
+        }
+        uint Call(string method)
+        {
+            using var i = Find() ?? throw new InvalidOperationException($"Service '{name}' does not exist on the device.");
+            if (method == "StartService" && i.CimInstanceProperties["StartMode"]?.Value is string mode && mode.Equals("Disabled", StringComparison.OrdinalIgnoreCase))
+                return 4; // reported as "disabled" below
+            return Convert.ToUInt32(session.InvokeMethod(i, method, null).ReturnValue.Value);
+        }
+
+        using (var first = Find())
+            if (first is null) return (false, null, $"Service '{name}' does not exist on the device.");
+
+        if (operation is "stop" or "restart")
+        {
+            var rc = Call("StopService");
+            if (rc != 0 && rc != 5) return (false, Current(), $"Stop failed: {Explain(rc)}.");
+            var st = WaitFor("Stopped");
+            if (!string.Equals(st, "Stopped", StringComparison.OrdinalIgnoreCase)) return (false, st, $"The service did not stop within {wait.TotalSeconds:0} seconds (state: {st}).");
+            if (operation == "stop") return (true, st, "Service stopped.");
+        }
+        var start = Call("StartService");
+        if (start == 4) return (false, "Stopped", "The service is disabled; change its startup type first.");
+        if (start != 0 && start != 10) return (false, Current(), $"Start failed: {Explain(start)}.");
+        var final = WaitFor("Running");
+        return string.Equals(final, "Running", StringComparison.OrdinalIgnoreCase)
+            ? (true, final, operation == "restart" ? "Service restarted." : "Service started.")
+            : (false, final, $"The service did not reach Running within {wait.TotalSeconds:0} seconds (state: {final}).");
+    }
+
+    private static string Explain(uint rc) => rc switch
+    {
+        2 => "access denied (the account is not an administrator on the device)",
+        3 => "other services depend on it and are running",
+        5 => "the service cannot accept this control now",
+        6 => "the service is not running",
+        7 => "the service did not respond in time",
+        8 => "unknown failure",
+        10 => "already running",
+        14 => "the service is disabled",
+        15 => "the service is marked for deletion",
+        _ => $"Win32_Service return code {rc}",
+    };
 
     private sealed class CimWmiSource(CimSession session) : IWmiSource
     {

@@ -144,6 +144,7 @@ public static class UnixCollector
         var who = Get(o, "who").Trim();
         if (who.Length > 0) doc.Users.LoggedOn = who.Split(' ')[0];
 
+        if (doc.Hardware.IsVirtual == true) doc.Device.Chassis = "virtual";
         doc.Os.IsServer = true; // Linux hosts reached over SSH are treated as servers unless the chassis says otherwise
         doc.Device.Category = doc.Device.Chassis == "laptop" || doc.Device.Chassis == "desktop" ? "endpoint" : "server";
         if (doc.Device.SerialNumber is null && doc.Device.SmbiosUuid is null) doc.Errors.Add("serial/uuid: readable only by root (/sys/class/dmi/id); use an agent or a sudo-capable account for these fields.");

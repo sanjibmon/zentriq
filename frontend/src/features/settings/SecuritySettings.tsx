@@ -36,6 +36,10 @@ export function SecuritySettings() {
               </label>
               <NumberSetting label="Lock an account after this many wrong passwords" value={Number(s['security.lockout_threshold'] ?? 5)} min={3} max={20} onSave={(v) => void put('security.lockout_threshold', v)} />
               <NumberSetting label="Lock for (minutes)" value={Number(s['security.lockout_minutes'] ?? 15)} min={1} max={1440} onSave={(v) => void put('security.lockout_minutes', v)} />
+              <label className="row-check" style={{ borderTop: '1px solid var(--line)', paddingTop: 10 }}>
+                <input type="checkbox" checked={s['display.show_ipv6'] === true} onChange={(e) => void put('display.show_ipv6', e.target.checked)} />
+                <span><b>Show IPv6 addresses in the asset inventory</b><br /><small className="muted">Off by default: assets show their IPv4 addresses only.</small></span>
+              </label>
               <NumberSetting label="Password reset link valid for (minutes)" value={Number(s['security.password_reset_minutes'] ?? 30)} min={5} max={1440} onSave={(v) => void put('security.password_reset_minutes', v)} />
             </div>
           )}

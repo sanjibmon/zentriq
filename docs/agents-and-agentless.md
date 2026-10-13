@@ -143,7 +143,10 @@ can read these attributes; no administrator account is needed for AD itself.
 3. The device appears under *Agents* within a minute and its inventory shortly after. If it does not, see
    `C:\ProgramData\Zentriq\Agent\Logs\agent.log` on the device; the *Agents* page lists the common causes.
 
-**Mass deployment** (no remote push from the Zentriq server – use your existing tools):
+**Mass deployment** with the tools you already use. *Asset Inventory › Deploy agent* lists the assets without an
+agent (CSV for building a collection or group), picks or creates an enrollment code and produces the ready-made
+content: a Group Policy startup script, the Intune command-line arguments, the Configuration Manager install command.
+Zentriq does not push software to computers itself.
 * **Intune**: *Apps › Windows › Line-of-business app*, upload the MSI, command-line arguments `ENROLLMENTCODE="ZQ1…"`.
 * **Configuration Manager**: application with the `msiexec /i … /qn ENROLLMENTCODE="ZQ1…"` command.
 * **Group Policy**: a computer startup script running the same `msiexec` command from a share
@@ -156,7 +159,7 @@ can read these attributes; no administrator account is needed for AD itself.
   in *Local Computer › Personal* with a non-exportable key. The enrollment code is deleted from the registry.
 * The server certificate is accepted when it is publicly trusted for the name **or** matches the pinned key; pins are
   refreshed at every check-in (so a renewed self-signed certificate is picked up while the old one is still valid).
-* Every 15 minutes it checks in; every 12 hours (or on *Collect now*) it sends a gzip-compressed inventory. If the
+* Every 2 minutes it checks in (and runs any service start/stop/restart requested in the console); every 12 hours (or on *Collect now*) it sends a gzip-compressed inventory. If the
   server is unreachable the inventory is queued and sent later; retries back off.
 * *Revoke* in the console blocks the agent immediately (its certificate is no longer accepted) and the agent removes
   its certificate. Uninstall removes the certificate and state (logs are kept in `C:\ProgramData\Zentriq\Agent\Logs`).

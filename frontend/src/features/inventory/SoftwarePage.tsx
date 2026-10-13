@@ -6,8 +6,9 @@ import { useApi } from '../../app/useApi';
 import { DataTable, ErrorBox, fmt, PageHead, Pager, Panel } from '../../components/ui';
 
 export function SoftwarePage() {
-  const [q, setQ] = useState('');
-  const [search, setSearch] = useState('');
+  const initialQ = new URLSearchParams(window.location.search).get('q') ?? '';
+  const [q, setQ] = useState(initialQ);
+  const [search, setSearch] = useState(initialQ);
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<string | null>(null);
   const pageSize = 50;

@@ -54,6 +54,25 @@ or why it was not). Finished scans can be deleted one by one, by selection, or w
 N days). Deleting a scan removes its results and log only; devices it found stay in the asset inventory. A running
 scan must be cancelled first.
 
+## Asset inventory: collect now, addresses, services
+
+* **Collect inventory now** (Asset Inventory, for selected assets or all; also on each asset and on the Dashboard):
+  assets with an agent report within about 2 minutes (agents check in every 2 minutes); assets without an agent are
+  collected agentlessly by a scan that uses every stored inventory credential (each still limited to its allowed
+  networks and the approved scan scopes).
+* **Addresses.** The inventory shows IPv4 addresses. To also show IPv6, tick *IPv6* on the Asset Inventory toolbar or
+  *System Settings › Sign-in security › Show IPv6 addresses* (administrators).
+* **Logged-on user** comes from the latest inventory (console user reported by Windows).
+* **Type.** Laptop / desktop / physical server from the chassis; any virtual machine (Hyper-V, VMware, VirtualBox,
+  KVM/QEMU, Xen, cloud VMs) is shown as *Virtual machine*, even when the hypervisor emulates a laptop chassis or battery.
+* **Services: start, stop, restart** (asset › Services; permission `assets.control`, Administrators by default).
+  On a device with the Zentriq Agent the agent does it at its next check-in — no credential needed. Without an agent,
+  Zentriq connects over WinRM (5985) or DCOM/WMI and asks for an administrator account on the device (a stored
+  credential or one typed for that action; a typed password is encrypted until the action runs and then deleted).
+  Every action is audited and listed under *Recent service actions*. Services that would cut the device off from
+  management or destabilise Windows (ZentriqAgent, WinRM, RPC, WMI, LSM, firewall/BFE, Event Log …) cannot be
+  stopped from the console.
+
 ## Moving data
 
 PostgreSQL data can be placed on another volume at installation. To move the Zentriq data folder later: stop the

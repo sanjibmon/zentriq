@@ -24,6 +24,9 @@ public sealed class InventoryStore(LicensingService licensing)
 
     public async Task<ApplyResult> ApplyAsync(NpgsqlConnection conn, InventoryDocument doc, MatchHints hints, LicenseStatus license, CancellationToken ct)
     {
+        if (hints.Ip is { IsIPv4MappedToIPv6: true } mapped) hints = hints with { Ip = mapped.MapToIPv4() };
+        // Hypervisors emulate laptop/desktop chassis and even batteries; a virtual machine is recorded as such.
+        if (doc.Hardware.IsVirtual == true) doc.Device.Chassis = "virtual";
         await using var tx = await conn.BeginTransactionAsync(ct);
         var assetId = await MatchAsync(conn, tx, doc, hints, ct);
         var created = false;

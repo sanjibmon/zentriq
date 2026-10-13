@@ -55,6 +55,7 @@ internal sealed class AgentWorker
             MergePins(state, resp.ServerPins);
 
             if (resp.RenewCertificate) Renew(state, client, ct);
+            if (resp.Actions is { Count: > 0 }) RunActions(client, resp.Actions, ct);
 
             state.LastError = null;
             var due = forceInventory || resp.InventoryDue || state.LastInventoryUtc is null || state.LastInventoryUtc < DateTime.UtcNow.AddHours(-state.InventoryHours);
@@ -188,6 +189,20 @@ internal sealed class AgentWorker
             File.WriteAllBytes(AgentPaths.QueuedInventory, payload);
             Log.Warn("Inventory queued for the next check-in: " + Describe(ex));
             throw;
+        }
+    }
+
+    /// <summary>Runs console-requested service actions and reports each result. Failures never stop the check-in.</summary>
+    private static void RunActions(ServerClient client, System.Collections.Generic.List<AgentAction> actions, CancellationToken ct)
+    {
+        foreach (var a in actions)
+        {
+            bool ok; string? st; string msg;
+            try { (ok, st, msg) = ServiceActions.Run(a.Kind, a.Target, a.Operation, TimeSpan.FromSeconds(60)); }
+            catch (Exception ex) { ok = false; st = null; msg = ex.Message; }
+            Log.Info($"Action {a.Operation} {a.Target}: {(ok ? "OK" : "FAILED")} - {msg}");
+            try { client.ReportActionAsync(a.Id, ok, st, msg, ct).GetAwaiter().GetResult(); }
+            catch (Exception ex) { Log.Warn("Could not report action result: " + ex.Message); }
         }
     }
 

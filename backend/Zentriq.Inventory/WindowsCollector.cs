@@ -251,7 +251,8 @@ public static class WindowsCollector
     {
         var model = (doc.Device.Model ?? "") + " " + (doc.Device.Manufacturer ?? "");
         doc.Hardware.IsVirtual ??= IsVirtualModel(model);
-        if (doc.Hardware.IsVirtual == true && doc.Device.Chassis is null or "desktop" or "other") doc.Device.Chassis = "virtual";
+        // VirtualBox, Hyper-V and others report a laptop chassis (PCSystemType 2) or pass the host battery through; a VM is a VM.
+        if (doc.Hardware.IsVirtual == true) doc.Device.Chassis = "virtual";
         doc.Device.Category = doc.Os.IsServer == true ? "server" : doc.Os.Family is "windows" or "macos" ? "endpoint" : doc.Device.Category;
     }
 

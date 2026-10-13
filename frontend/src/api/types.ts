@@ -79,6 +79,17 @@ export interface Asset {
   firstSeenAt: string;
   lastSeenAt: string;
   lastInventoryAt: string | null;
+  rowVersion?: number;
+  /** IPv4 addresses from the latest inventory (primary first). */
+  ipv4?: string[] | null;
+  /** Only present when System Settings › Display › Show IPv6 is on. */
+  ipv6?: string[] | null;
+  loggedOnUser?: string | null;
+  chassis?: string | null;
+  isVirtual?: boolean | null;
+  agentId?: string | null;
+  agentHealth?: 'online' | 'stale' | 'offline' | 'never' | null;
+  inventorySource?: string | null;
 }
 
 export interface KeyCount {
@@ -436,4 +447,14 @@ export interface DirectoryObject {
   syncedAt: string;
   connectionId: string;
   assetId: string | null;
+}
+
+export interface KC { key: string; count: number }
+export interface Overview {
+  kpi: Record<'assets' | 'servers' | 'endpoints' | 'networkDevices' | 'inventoried' | 'withAgent' | 'agentsOnline' | 'agents' | 'virtual' | 'stale' | 'newLast7' | 'retired' | 'softwareTitles' | 'softwareInstalls' | 'scans30' | 'lowDisk', number>;
+  byCategory: KC[]; byOs: KC[]; byInventory: KC[]; byCriticality: KC[]; byType: KC[]; byManufacturer: KC[]; coverage: KC[]; agentHealth: KC[];
+  ram: KC[]; topSoftware: KC[]; scanResults: KC[];
+  posture: { key: string; yes: number; no: number; unknown: number }[];
+  trend: { day: string; new: number; total: number }[];
+  generatedAt: string;
 }

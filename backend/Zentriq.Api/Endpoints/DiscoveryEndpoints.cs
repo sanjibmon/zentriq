@@ -179,7 +179,7 @@ public static class DiscoveryEndpoints
 
     public static readonly JsonSerializerOptions JsonOpts = new(JsonSerializerDefaults.Web);
 
-    private static async Task<(DiscoveryScan? Scan, IResult? Error)> CreateScanAsync(ScanRequest body, Guid? profileId, ZentriqDbContext db, JobQueue jobs, RequestContext rc, CancellationToken ct)
+    internal static async Task<(DiscoveryScan? Scan, IResult? Error)> CreateScanAsync(ScanRequest body, Guid? profileId, ZentriqDbContext db, JobQueue jobs, RequestContext rc, CancellationToken ct)
     {
         if (!SupportedTypes.Contains(body.ScanType))
             return (null, Validation.Problem("scanType", "Unsupported scan type."));

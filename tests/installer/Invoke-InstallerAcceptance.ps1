@@ -113,7 +113,7 @@ Remove-Item $answer -Force   # contains the administrator password
 
 if (-not $installed) {
     foreach ($t in 'T02 PostgreSQL provisioning', 'T03 Database migration', 'T04 Administrator sign-in', 'T05 API and worker services', 'T06 Trial initialization',
-                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection') {
+                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless') {
         Record $t.Substring(0, 3) $t.Substring(4) 'BLOCKED' 'installation failed'
     }
 } else {
@@ -306,6 +306,7 @@ if (-not $installed) {
         $s = Login
         $before = (Api GET '/assets/summary' -Session $s).total
         $cred = Api POST '/credentials' @{ name = 'ci-local-admin'; kind = 'windows_local'; username = "$env:COMPUTERNAME\$scanUser"; secret = @{ password = $scanPassword } } -Session $s
+        $script:ciCred = $cred.id
         $list = Invoke-WebRequest "$base/api/v1/credentials" -WebSession $s
         Assert ($list.Content -notmatch [regex]::Escape($scanPassword)) 'credential API returned the secret'
         $scan = Api POST '/discovery/scans' @{ name = 'ci-winrm'; scanType = 'single'; targetsText = $ip; credentialIds = @($cred.id) } -Session $s
@@ -325,6 +326,66 @@ if (-not $installed) {
         }
         "$ip via $($res.protocol): $(@($inv.software).Count) applications; assets $before -> $after; $($res.detail)"
     } | Out-Null
+    function Pick-Service($AssetId, $Session) {
+        $inv = Api GET "/assets/$AssetId/inventory" -Session $Session
+        foreach ($n in 'W32Time', 'Spooler', 'WSearch') {
+            $svc = @($inv.document.services) | Where-Object { $_.name -eq $n -and $_.state -eq 'Running' } | Select-Object -First 1
+            if ($svc) { return $svc.name }
+        }
+        return $null
+    }
+    function Wait-Action($AssetId, $ActionId, $Session, [int] $Seconds = 240, [scriptblock] $Nudge = $null) {
+        $deadline = (Get-Date).AddSeconds($Seconds)
+        do {
+            if ($Nudge) { & $Nudge }
+            Start-Sleep 5
+            $a = @(Api GET "/assets/$AssetId/actions" -Session $Session) | Where-Object id -eq $ActionId
+        } while ($a.status -notin 'succeeded', 'failed' -and (Get-Date) -lt $deadline)
+        return $a
+    }
+
+    Check 'T41' 'Asset type and address: VM recorded as virtual machine, IPv4 not IPv4-mapped IPv6, logged-on user present' {
+        $s = Login
+        Assert $script:agentAsset 'no agent asset from T26'
+        $a = Api GET "/assets/$($script:agentAsset)" -Session $s
+        Assert ($a.ip -and $a.ip -notlike '::ffff:*') "asset IP '$($a.ip)'"
+        Assert (@($a.ipv4).Count -ge 1 -and @($a.ipv4)[0] -match '^\d+\.\d+\.\d+\.\d+$') "ipv4: $($a.ipv4 -join ',')"
+        Assert ($null -eq $a.ipv6) 'IPv6 shown although display.show_ipv6 is off'
+        Assert ($a.isVirtual -eq $true -and $a.chassis -eq 'virtual') "type: chassis=$($a.chassis) virtual=$($a.isVirtual) (CI runs on an Azure/Hyper-V VM)"
+        Api PUT '/system/settings/display.show_ipv6' @{ value = $true } -Session $s | Out-Null
+        $a6 = Api GET "/assets/$($script:agentAsset)" -Session $s
+        Api PUT '/system/settings/display.show_ipv6' @{ value = $false } -Session $s | Out-Null
+        Assert ($null -ne $a6.ipv6) 'IPv6 list missing after enabling display.show_ipv6'
+        $o = Api GET '/dashboard/overview' -Session $s
+        Assert ($o.kpi.assets -ge 1 -and @($o.byCategory).Count -ge 1) 'dashboard overview empty'
+        "ip $($a.ip); type $($a.chassis); user '$($a.loggedOnUser)'; ipv6 toggle works; dashboard: $($o.kpi.assets) assets"
+    } | Out-Null
+
+    Check 'T42' 'Collect inventory now for all assets' {
+        $s = Login
+        $r = Api POST '/assets/collect' @{ all = $true } -Session $s
+        Assert ($r.agents -ge 1 -or $r.agentless -ge 1) "nothing collected: $($r.message)"
+        "agents $($r.agents), agentless $($r.agentless): $($r.message)"
+    } | Out-Null
+
+    if ($agentInstalled) {
+        Check 'T43' 'Restart a Windows service through the Zentriq Agent' {
+            $s = Login
+            $svc = Pick-Service $script:agentAsset $s
+            Assert $svc 'no suitable running service in the inventory'
+            $r = Api POST "/assets/$($script:agentAsset)/services/$svc/restart" @{} -Session $s
+            Assert ($r.channel -eq 'agent') "channel $($r.channel)"
+            $exe = Join-Path $env:ProgramFiles 'Zentriq Agent\ZentriqAgent.exe'
+            Stop-Service ZentriqAgent   # run check-ins in the foreground instead of waiting for the 2-minute interval
+            try { $a = Wait-Action $script:agentAsset $r.id $s 240 { & $exe --once *> $null } } finally { Start-Service ZentriqAgent }
+            Assert ($a.status -eq 'succeeded') "action $($a.status): $($a.detail)"
+            Assert ((Get-Service $svc).Status -eq 'Running') "$svc is $((Get-Service $svc).Status) after restart"
+            $p = Invoke-WebRequest "$base/api/v1/assets/$($script:agentAsset)/services/ZentriqAgent/stop" -Method Post -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } -ContentType 'application/json' -Body '{}' -SkipHttpErrorCheck
+            Assert ($p.StatusCode -eq 409) "stopping ZentriqAgent returned $($p.StatusCode)"
+            "$svc restarted by the agent ($($a.detail)); protected service refused"
+        } | Out-Null
+    } else { Record 'T43' 'Service restart through the agent' 'BLOCKED' 'agent install failed' }
+
     if ($agentInstalled) {
         Check 'T29' 'Agent revocation is enforced and uninstall removes the agent' {
             $s = Login
@@ -341,6 +402,22 @@ if (-not $installed) {
             'revoked agent refused; uninstalled cleanly'
         } | Out-Null
     } else { Record 'T29' 'Agent revocation and uninstall' 'BLOCKED' 'agent install failed' }
+    Check 'T44' 'Restart a Windows service agentlessly (WinRM, stored credential) on a device without an agent' {
+        $s = Login
+        Assert $script:agentAsset 'no asset'
+        Assert $script:ciCred 'no credential from T28'
+        $c = Api GET "/assets/$($script:agentAsset)/control" -Session $s
+        Assert ($c.channel -eq 'agentless') "channel $($c.channel) (agent should be gone after T29)"
+        $svc = Pick-Service $script:agentAsset $s
+        Assert $svc 'no suitable running service in the inventory'
+        $bad = Invoke-WebRequest "$base/api/v1/assets/$($script:agentAsset)/services/$svc/restart" -Method Post -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } -ContentType 'application/json' -Body '{}' -SkipHttpErrorCheck
+        Assert ($bad.StatusCode -eq 400 -and (Body $bad) -match 'credentialRequired') "no credential: $($bad.StatusCode)"
+        $r = Api POST "/assets/$($script:agentAsset)/services/$svc/restart" @{ credentialId = $script:ciCred } -Session $s
+        $a = Wait-Action $script:agentAsset $r.id $s 180
+        Assert ($a.status -eq 'succeeded') "action $($a.status): $($a.detail)"
+        Assert ((Get-Service $svc).Status -eq 'Running') "$svc is $((Get-Service $svc).Status)"
+        "credential prompt enforced; $svc restarted over WinRM: $($a.detail)"
+    } | Out-Null
 
     Check 'T33' 'Enrollment code can be shown again later; revoked codes cannot' {
         $s = Login

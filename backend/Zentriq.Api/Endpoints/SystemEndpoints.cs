@@ -20,6 +20,7 @@ public static class SystemEndpoints
         "discovery.approved_scopes", "discovery.max_targets", "discovery.confirm_above", "discovery.min_prefix",
         "discovery.default_concurrency", "discovery.max_concurrency", "discovery.probe_timeout_ms",
         "security.mfa_required", "security.lockout_threshold", "security.lockout_minutes", "security.password_reset_minutes",
+        "display.show_ipv6",
     ];
 
     public static void MapSystemEndpoints(this RouteGroupBuilder api)
@@ -122,6 +123,7 @@ public static class SystemEndpoints
                     return $"Invalid scope: {e}. Scopes must be CIDR networks no broader than /8.";
             return null;
         }
+        if (key == "display.show_ipv6") return v.ValueKind is JsonValueKind.True or JsonValueKind.False ? null : "Must be true or false.";
         if (key == "security.mfa_required") return v.ValueKind is JsonValueKind.True or JsonValueKind.False ? null : "Must be true or false.";
         if (v.ValueKind != JsonValueKind.Number || !v.TryGetInt32(out var n)) return "Must be a whole number.";
         return key switch

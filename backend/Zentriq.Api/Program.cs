@@ -117,6 +117,13 @@ builder.Services.ConfigureHttpJsonOptions(o =>
 
 var app = builder.Build();
 
+// The dual-stack listener reports IPv4 clients as IPv4-mapped IPv6 (::ffff:a.b.c.d); record them as plain IPv4.
+app.Use((ctx, next) =>
+{
+    if (ctx.Connection.RemoteIpAddress is { IsIPv4MappedToIPv6: true } mapped) ctx.Connection.RemoteIpAddress = mapped.MapToIPv4();
+    return next(ctx);
+});
+
 app.UseExceptionHandler(e => e.Run(async ctx =>
 {
     var ex = ctx.Features.Get<IExceptionHandlerFeature>()?.Error;
@@ -143,9 +150,11 @@ api.MapSetupEndpoints();
 api.MapAuthEndpoints();
 api.MapAccountEndpoints(options);
 api.MapAssetEndpoints();
+api.MapAssetActionEndpoints();
 api.MapDiscoveryEndpoints();
 api.MapJobEndpoints();
 api.MapDashboardEndpoints();
+api.MapOverviewEndpoints();
 api.MapLicensingEndpoints();
 api.MapUserEndpoints();
 api.MapAuditEndpoints();

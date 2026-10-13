@@ -132,7 +132,7 @@ export function AgentsPage() {
         <ul className="plain">
           <li>Install <b>ZentriqAgent-x64.msi</b> with the enrollment code (Windows 10/11, Windows Server 2016+ with .NET Framework 4.8).</li>
           <li>The agent creates its own key, receives a client certificate from this server and then authenticates with it (mutual TLS on port {pkg.data?.agentPort ?? 8444}). The enrollment code is deleted from the device after use.</li>
-          <li>It checks in every 15 minutes and sends full inventory every 12 hours, or at once when you click <i>Collect now</i>. Inventory is queued while the device is offline.</li>
+          <li>It checks in every 2 minutes and sends full inventory every 12 hours, or within about 2 minutes when you click <i>Collect now</i>. It also carries out service start/stop/restart requested on the asset page. Inventory is queued while the device is offline.</li>
           <li>Devices found by both an agent and an agentless scan are merged into one asset (matched by SMBIOS UUID, serial number and MAC address).</li>
         </ul>
       </Panel>

@@ -4,6 +4,7 @@ import type { LoginResult, SetupStatus } from '../../api/types';
 import { useAuth } from '../../app/auth';
 import { Icon } from '../../components/Icon';
 import { LogoMark, PRODUCT } from '../../components/Logo';
+import { BrandArt } from './BrandArt';
 
 export function LoginPage() {
   const { refresh } = useAuth();
@@ -76,21 +77,15 @@ export function LoginPage() {
 
   return (
     <div className="login">
-      <section className="login-brand" aria-label={PRODUCT.full}>
+      <section className="login-brand" aria-label={`${PRODUCT.name} – ${PRODUCT.tagline}`}>
         <div className="login-brand-top">
-          <LogoMark size={44} />
+          <LogoMark size={48} />
           <div>
-            <div className="login-product">{PRODUCT.full}</div>
+            <div className="login-product">{PRODUCT.name}</div>
             <div className="login-tagline">{PRODUCT.tagline}</div>
           </div>
         </div>
-        <p className="login-strap">{PRODUCT.strap}</p>
-        <ul className="login-points">
-          <li><Icon name="radar" /> Authorized network and directory discovery</li>
-          <li><Icon name="box" /> Hardware, software and license inventory</li>
-          <li><Icon name="lock" /> Your data stays on your servers</li>
-        </ul>
-        <div className="login-brand-foot">© Zentriq{status?.productVersion ? ` · version ${status.productVersion}` : ''}</div>
+        <BrandArt />
       </section>
 
       <section className="login-panel">

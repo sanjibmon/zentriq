@@ -29,6 +29,21 @@ public sealed class InventoryParserTests
     private static Dictionary<string, object?> Row(params (string K, object? V)[] kv) => kv.ToDictionary(x => x.K, x => x.V, StringComparer.OrdinalIgnoreCase);
 
     [Fact]
+    public void VirtualBox_guest_with_emulated_battery_is_a_virtual_machine_not_a_laptop()
+    {
+        var wmi = new FakeWmi(new()
+        {
+            ["Win32_ComputerSystem"] = [Row(("Name", "ZENTRIQ"), ("DNSHostName", "ZENTRIQ"), ("PartOfDomain", false), ("Manufacturer", "innotek GmbH"), ("Model", "VirtualBox"), ("PCSystemType", (ushort)2))],
+            ["Win32_SystemEnclosure"] = [Row(("ChassisTypes", new ushort[] { 1 }))],
+            ["Win32_OperatingSystem"] = [Row(("Caption", "Microsoft Windows Server 2019 Standard Evaluation"), ("Version", "10.0.17763"), ("BuildNumber", "17763"), ("ProductType", 3u))],
+        });
+        var doc = WindowsCollector.Collect(wmi, null, "agent", "1.1.1");
+        Assert.True(doc.Hardware.IsVirtual);
+        Assert.Equal("virtual", doc.Device.Chassis);
+        Assert.Equal("server", doc.Device.Category);
+    }
+
+    [Fact]
     public void Windows_collector_maps_wmi_and_registry_and_records_missing_sections()
     {
         const string uninstall = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall";

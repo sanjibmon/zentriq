@@ -34,6 +34,16 @@ internal sealed class CheckinResponse
     [JsonPropertyName("inventoryDue")] public bool InventoryDue { get; set; }
     [JsonPropertyName("renewCertificate")] public bool RenewCertificate { get; set; }
     [JsonPropertyName("serverPins")] public List<string>? ServerPins { get; set; }
+    [JsonPropertyName("actions")] public List<AgentAction>? Actions { get; set; }
+}
+
+/// <summary>A device action requested by an administrator in the console (service start/stop/restart).</summary>
+internal sealed class AgentAction
+{
+    [JsonPropertyName("id")] public string Id { get; set; } = "";
+    [JsonPropertyName("kind")] public string Kind { get; set; } = "";
+    [JsonPropertyName("target")] public string Target { get; set; } = "";
+    [JsonPropertyName("operation")] public string Operation { get; set; } = "";
 }
 
 internal sealed class RenewResponse
@@ -120,7 +130,16 @@ internal sealed class ServerClient : IDisposable
         PostJsonAsync<CheckinResponse>("api/agent/v1/checkin", new Dictionary<string, object?>
         {
             ["agentVersion"] = Program.Version, ["hostname"] = hostname, ["osName"] = osName, ["lastError"] = lastError,
+            ["capabilities"] = new[] { "service-control" },
         }, ct);
+
+    public async Task ReportActionAsync(string actionId, bool ok, string? state, string message, CancellationToken ct)
+    {
+        var body = new Dictionary<string, object?> { ["ok"] = ok, ["state"] = state, ["message"] = message };
+        using var content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
+        using var resp = await _http.PostAsync(new Uri(_base, "api/agent/v1/actions/" + Uri.EscapeDataString(actionId) + "/result"), content, ct).ConfigureAwait(false);
+        await EnsureAsync(resp).ConfigureAwait(false);
+    }
 
     public Task<RenewResponse> RenewAsync(string csr, CancellationToken ct) =>
         PostJsonAsync<RenewResponse>("api/agent/v1/renew", new Dictionary<string, object?> { ["csr"] = csr }, ct);

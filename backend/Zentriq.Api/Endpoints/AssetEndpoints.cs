@@ -13,7 +13,9 @@ public static class AssetEndpoints
 {
     public sealed record AssetDto(Guid Id, string? Hostname, string? Fqdn, string? Ip, string? SerialNumber, string Category,
         string Workload, string? OsFamily, string? OsName, string Status, string Criticality, string? OwnerName, string Source,
-        string InventoryStatus, DateTimeOffset FirstSeenAt, DateTimeOffset LastSeenAt, DateTimeOffset? LastInventoryAt, int RowVersion);
+        string InventoryStatus, DateTimeOffset FirstSeenAt, DateTimeOffset LastSeenAt, DateTimeOffset? LastInventoryAt, int RowVersion,
+        IReadOnlyList<string>? Ipv4 = null, IReadOnlyList<string>? Ipv6 = null, string? LoggedOnUser = null, string? Chassis = null,
+        bool? IsVirtual = null, Guid? AgentId = null, string? AgentHealth = null, string? InventorySource = null);
 
     public sealed record AssetBody(string? Hostname, string? Ip, string? SerialNumber, string Category, string? OsFamily,
         string? OsName, string? Criticality, string? OwnerName, int? RowVersion);
@@ -21,7 +23,7 @@ public static class AssetEndpoints
     private static readonly string[] Criticalities = ["Critical", "High", "Medium", "Low"];
     private static readonly string[] OsFamilies = ["windows", "linux", "macos", "network", "other"];
 
-    public static AssetDto ToDto(Asset a) => new(a.Id, a.Hostname, a.Fqdn, a.PrimaryIp?.ToString(), a.SerialNumber, a.Category,
+    public static AssetDto ToDto(Asset a) => new(a.Id, a.Hostname, a.Fqdn, Display(a.PrimaryIp), a.SerialNumber, a.Category,
         Workloads.FromAssetCategory(a.Category), a.OsFamily, a.OsName, a.Status, a.Criticality, a.OwnerName, a.Source,
         a.InventoryStatus, a.FirstSeenAt, a.LastSeenAt, a.LastInventoryAt, a.RowVersion);
 
@@ -29,18 +31,33 @@ public static class AssetEndpoints
     {
         var g = api.MapGroup("/assets").WithTags("Assets").RequireModule(Modules.Inventory);
 
-        g.MapGet("", async (ZentriqDbContext db, string? q, string? category, string? status, string? sort, string? dir, int? page, int? pageSize, CancellationToken ct) =>
+        g.MapGet("", async (ZentriqDbContext db, NpgsqlDataSource ds, string? q, string? category, string? status, string? agent, string? inventory, string? sort, string? dir, int? page, int? pageSize, CancellationToken ct) =>
         {
             var (p, ps) = Paging.Normalize(page, pageSize);
             var query = db.Assets.AsNoTracking().AsQueryable();
             if (!string.IsNullOrWhiteSpace(q))
             {
                 var term = q.Trim().ToLower();
+                // IP addresses and logged-on users live outside the EF model.
+                var like = "%" + term + "%";
+                var extraIds = await db.Database.SqlQuery<Guid>($$"""
+                    SELECT a.id AS "Value" FROM zentriq.assets a LEFT JOIN zentriq.asset_inventory_documents d ON d.asset_id = a.id
+                     WHERE host(a.primary_ip) LIKE {{like}} OR lower(d.document #>> '{users,loggedOn}') LIKE {{like}} OR lower((d.document -> 'network')::text) LIKE {{like}}
+                     LIMIT 5000
+                    """).ToListAsync(ct);
                 query = query.Where(a => (a.Hostname != null && a.Hostname.ToLower().Contains(term)) ||
                                          (a.SerialNumber != null && a.SerialNumber.ToLower().Contains(term)) ||
                                          (a.OsName != null && a.OsName.ToLower().Contains(term)) ||
-                                         (a.OwnerName != null && a.OwnerName.ToLower().Contains(term)));
+                                         (a.OwnerName != null && a.OwnerName.ToLower().Contains(term)) ||
+                                         extraIds.Contains(a.Id));
             }
+            if (agent is "with" or "without")
+            {
+                var withAgent = await db.Database.SqlQuery<Guid>($"SELECT DISTINCT asset_id AS \"Value\" FROM zentriq.agent_registrations WHERE status = 'active' AND asset_id IS NOT NULL").ToListAsync(ct);
+                query = agent == "with" ? query.Where(a => withAgent.Contains(a.Id)) : query.Where(a => !withAgent.Contains(a.Id));
+            }
+            if (inventory is "success" or "not_collected" or "failed" or "unavailable") query = query.Where(a => a.InventoryStatus == inventory);
+            if (inventory == "missing") query = query.Where(a => a.InventoryStatus != "success");
             if (!string.IsNullOrEmpty(category)) query = query.Where(a => a.Category == category);
             query = string.IsNullOrEmpty(status) ? query.Where(a => a.Status == "active") : status == "all" ? query : query.Where(a => a.Status == status);
             var desc = dir == "desc";
@@ -53,11 +70,11 @@ public static class AssetEndpoints
             };
             var total = await query.CountAsync(ct);
             var items = await query.Skip((p - 1) * ps).Take(ps).ToListAsync(ct);
-            return Results.Ok(new PagedResult<AssetDto>(items.Select(ToDto).ToList(), total, p, ps));
+            return Results.Ok(new PagedResult<AssetDto>(await EnrichAsync(ds, items.Select(ToDto).ToList(), ct), total, p, ps));
         }).RequireAuthorization(Permissions.AssetsView);
 
-        g.MapGet("/{id:guid}", async (Guid id, ZentriqDbContext db, CancellationToken ct) =>
-            await db.Assets.AsNoTracking().FirstOrDefaultAsync(a => a.Id == id, ct) is { } a ? Results.Ok(ToDto(a)) : Results.NotFound())
+        g.MapGet("/{id:guid}", async (Guid id, ZentriqDbContext db, NpgsqlDataSource ds, CancellationToken ct) =>
+            await db.Assets.AsNoTracking().FirstOrDefaultAsync(a => a.Id == id, ct) is { } a ? Results.Ok((await EnrichAsync(ds, [ToDto(a)], ct))[0]) : Results.NotFound())
             .RequireAuthorization(Permissions.AssetsView);
 
         g.MapPost("", async (AssetBody body, ZentriqDbContext db, LicensingService licensing, RequestContext rc, CancellationToken ct) =>
@@ -143,6 +160,57 @@ public static class AssetEndpoints
             var retired = await db.Assets.CountAsync(a => a.Status == "retired", ct);
             return Results.Ok(new { total, retired, stale, byCategory, byOs, byInventory, byCriticality });
         }).RequireAuthorization(Permissions.AssetsView);
+    }
+
+    private static string? Display(IPAddress? ip) => ip is null ? null : ip.IsIPv4MappedToIPv6 ? ip.MapToIPv4().ToString() : ip.ToString();
+
+    /// <summary>Addresses, logged-on user, device type and agent state from the latest inventory, for a page of assets.</summary>
+    public static async Task<List<AssetDto>> EnrichAsync(NpgsqlDataSource ds, List<AssetDto> items, CancellationToken ct)
+    {
+        if (items.Count == 0) return items;
+        await using var setting = ds.CreateCommand("SELECT value::text FROM zentriq.system_settings WHERE key = 'display.show_ipv6'");
+        var showV6 = ((await setting.ExecuteScalarAsync(ct)) as string)?.Trim() == "true";
+        await using var cmd = ds.CreateCommand("""
+            SELECT x.id, d.document #>> '{users,loggedOn}', d.document -> 'network', COALESCE(d.document #>> '{device,chassis}', h.chassis),
+                   (d.document #>> '{hardware,isVirtual}')::boolean, d.source, ag.id, ag.last_checkin_at
+              FROM unnest(@ids) AS x(id)
+              LEFT JOIN zentriq.asset_inventory_documents d ON d.asset_id = x.id
+              LEFT JOIN zentriq.hardware_inventory h ON h.asset_id = x.id
+              LEFT JOIN LATERAL (SELECT r.id, r.last_checkin_at FROM zentriq.agent_registrations r
+                                  WHERE r.asset_id = x.id AND r.status = 'active' ORDER BY r.last_checkin_at DESC NULLS LAST LIMIT 1) ag ON true
+            """);
+        cmd.Parameters.AddWithValue("ids", items.Select(i => i.Id).ToArray());
+        var extra = new Dictionary<Guid, AssetDto>();
+        var byId = items.ToDictionary(i => i.Id);
+        await using (var r = await cmd.ExecuteReaderAsync(ct))
+            while (await r.ReadAsync(ct))
+            {
+                var a = byId[r.GetGuid(0)];
+                var v4 = new List<string>(); var v6 = new List<string>();
+                if (!r.IsDBNull(2))
+                    using (var net = System.Text.Json.JsonDocument.Parse(r.GetString(2)))
+                        if (net.RootElement.ValueKind == System.Text.Json.JsonValueKind.Array)
+                            foreach (var n in net.RootElement.EnumerateArray())
+                            {
+                                if (n.TryGetProperty("ipv4", out var a4) && a4.ValueKind == System.Text.Json.JsonValueKind.Array)
+                                    foreach (var x in a4.EnumerateArray()) if (x.GetString() is { } s4 && !s4.StartsWith("169.254.") && !s4.StartsWith("127.")) v4.Add(s4);
+                                if (n.TryGetProperty("ipv6", out var a6) && a6.ValueKind == System.Text.Json.JsonValueKind.Array)
+                                    foreach (var x in a6.EnumerateArray()) if (x.GetString() is { } s6) v6.Add(s6);
+                            }
+                if (a.Ip is { } primary && primary.Contains('.') && !v4.Contains(primary)) v4.Insert(0, primary);
+                else if (a.Ip is { } p4 && v4.Remove(p4)) v4.Insert(0, p4);
+                DateTimeOffset? lastCheckin = r.IsDBNull(7) ? null : r.GetFieldValue<DateTimeOffset>(7);
+                var health = r.IsDBNull(6) ? null : lastCheckin is null ? "never" : lastCheckin > DateTimeOffset.UtcNow.AddMinutes(-45) ? "online" : lastCheckin > DateTimeOffset.UtcNow.AddDays(-7) ? "stale" : "offline";
+                extra[a.Id] = a with
+                {
+                    Ip = a.Ip is { } ip && ip.Contains(':') && v4.Count > 0 ? v4[0] : a.Ip,
+                    Ipv4 = v4.Distinct().ToList(), Ipv6 = showV6 ? v6.Distinct().ToList() : null,
+                    LoggedOnUser = r.IsDBNull(1) ? null : r.GetString(1), Chassis = r.IsDBNull(3) ? null : r.GetString(3),
+                    IsVirtual = r.IsDBNull(4) ? null : r.GetBoolean(4), InventorySource = r.IsDBNull(5) ? null : r.GetString(5),
+                    AgentId = r.IsDBNull(6) ? null : r.GetGuid(6), AgentHealth = health,
+                };
+            }
+        return items.Select(i => extra.TryGetValue(i.Id, out var e) ? e : i).ToList();
     }
 
     private static IResult? Validate(AssetBody b, out IPAddress? ip)

@@ -182,6 +182,7 @@ export function Pager({ page, pageSize, total, onPage }: { page: number; pageSiz
 const LABELS: Record<string, string> = {
   winrm: 'WinRM', ssh: 'SSH', snmp: 'SNMP', agent: 'Agent', smbios_uuid: 'SMBIOS UUID', mac: 'MAC address', agent_id: 'Agent ID',
   ad_object_guid: 'AD object GUID', hostname_fqdn: 'FQDN', ad: 'Active Directory', serial: 'Serial number', auth_failed: 'Credentials rejected',
+  virtual: 'Virtual machine', not_collected: 'Not collected', network_device: 'Network device', virtual_host: 'Virtualization host',
 };
 
 export const fmt = {

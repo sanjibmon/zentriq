@@ -6,8 +6,9 @@ import { useApi } from '../../app/useApi';
 import { DataTable, ErrorBox, fmt, PageHead, Pager, Panel } from '../../components/ui';
 
 export function HardwarePage() {
-  const [q, setQ] = useState('');
-  const [search, setSearch] = useState('');
+  const initialQ = new URLSearchParams(window.location.search).get('q') ?? '';
+  const [q, setQ] = useState(initialQ);
+  const [search, setSearch] = useState(initialQ);
   const [page, setPage] = useState(1);
   const pageSize = 50;
   const data = useApi(() => api.get<Paged<HardwareRow>>('/inventory/hardware', { q: search, page, pageSize }), [search, page]);
