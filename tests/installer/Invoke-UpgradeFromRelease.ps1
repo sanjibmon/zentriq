@@ -62,6 +62,8 @@ function Arp([string] $Like) {
 }
 $P1 = "${IdPrefix}01"; $P2 = "${IdPrefix}02"; $P3 = "${IdPrefix}03"; $P4 = "${IdPrefix}04"
 $withAgent = [bool]($OldAgentMsi -and $NewAgentMsi)
+# msiexec cannot open paths with forward slashes (error 1619), which CI passes in.
+if ($withAgent) { $OldAgentMsi = (Resolve-Path $OldAgentMsi).ProviderPath; $NewAgentMsi = (Resolve-Path $NewAgentMsi).ProviderPath }
 
 $answer = Join-Path $OutDir 'answers.json'
 @{ postgres = @{ mode = 'bundled'; port = 5432; dataDir = 'C:\ZentriqUpgradeTest\postgresql' }
