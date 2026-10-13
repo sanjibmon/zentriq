@@ -60,11 +60,15 @@ function Run-Setup([string] $Exe, [string[]] $SetupArgs, [string] $LogName) {
     return "exit $($p.ExitCode)"
 }
 function Login {
-    $s = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+    # Sign-in is rate limited (10 per minute per address); the suite signs in often, so wait out a 429.
     $body = @{ email = $adminEmail; password = $adminPassword } | ConvertTo-Json
-    $r = Invoke-WebRequest "$base/api/v1/auth/login" -Method Post -Body $body -ContentType 'application/json' -Headers @{ 'X-Zentriq-Request' = '1' } -WebSession $s
-    Assert ($r.StatusCode -eq 200) "login returned $($r.StatusCode)"
-    return $s
+    for ($i = 0; ; $i++) {
+        $s = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+        $r = Invoke-WebRequest "$base/api/v1/auth/login" -Method Post -Body $body -ContentType 'application/json' -Headers @{ 'X-Zentriq-Request' = '1' } -WebSession $s -SkipHttpErrorCheck
+        if ($r.StatusCode -eq 429 -and $i -lt 5) { Start-Sleep 15; continue }
+        Assert ($r.StatusCode -eq 200) "login returned $($r.StatusCode)"
+        return $s
+    }
 }
 # PowerShell returns non-text media types (e.g. application/problem+json) as byte[]; read them as UTF-8.
 function Body($Response) { if ($Response.Content -is [byte[]]) { [Text.Encoding]::UTF8.GetString($Response.Content) } else { [string]$Response.Content } }
@@ -339,8 +343,9 @@ if (-not $installed) {
         do {
             if ($Nudge) { & $Nudge }
             Start-Sleep 5
-            $a = @(Api GET "/assets/$AssetId/actions" -Session $Session) | Where-Object id -eq $ActionId
-        } while ($a.status -notin 'succeeded', 'failed' -and (Get-Date) -lt $deadline)
+            $a = @(Api GET "/assets/$AssetId/actions" -Session $Session) | Where-Object { $_.id -eq $ActionId } | Select-Object -First 1
+        } while ((-not $a -or $a.status -notin 'succeeded', 'failed') -and (Get-Date) -lt $deadline)
+        if (-not $a) { throw "action $ActionId not found" }
         return $a
     }
 
