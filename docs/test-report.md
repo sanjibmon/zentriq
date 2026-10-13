@@ -1,9 +1,9 @@
 # Test report
 
-Latest: GitHub Actions run 38355973548 (commit `ef92c65`), workflow `windows-release`, on a GitHub-hosted
-**Windows Server 2022 Datacenter 10.0.20348** VM. Release: `v1.1.1-build.27` (pre-release, **unsigned**).
+Latest: GitHub Actions run 38379601204 (commit `aeacfdc`), workflow `windows-release`, on a GitHub-hosted
+**Windows Server 2022 Datacenter 10.0.20348** VM. Release: `v1.1.1-build.29` (pre-release, **unsigned**).
 Results: unit + PostgreSQL integration tests 46/46 PASS; upgrade from published 1.0.2 (U01, U02) PASS;
-installer acceptance **34 passed, 0 failed, 0 blocked, 10 not run**. New and PASS in this build: T41 VM shown as
+installer acceptance **36 passed, 0 failed, 0 blocked, 10 not run**. New and PASS in build 29: T45 software uninstall through the agent (protected software refused, item removed from inventory, Activity log); T46 dashboard drill-down matches the charts, offline fields. Build 27: T41 VM shown as
 virtual machine, IPv4 (not IPv4-mapped IPv6) address, IPv6 display toggle, dashboard overview; T42 collect inventory
 now for all assets; T43 service restart through the agent (protected service refused); T44 service restart agentlessly
 over WinRM with a stored credential (credential prompt enforced). Earlier: T33–T37 (enrollment code, scan deletion,
