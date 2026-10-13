@@ -1,14 +1,16 @@
 # Test report
 
-Latest: GitHub Actions run 38278358328 (commit `576af7e`), workflow `windows-release`, on a GitHub-hosted
-**Windows Server 2022 Datacenter 10.0.20348** VM. Release: `v1.1.1-build.25` (pre-release, **unsigned**).
-Results: unit + PostgreSQL integration tests 45/45 PASS; upgrade from published 1.0.2 (U01, U02) PASS;
-installer acceptance **30 passed, 0 failed, 0 blocked, 10 not run** (full table in the release asset
-`installer-test-results.md`). New in this build and PASS: T33 show enrollment code again, T34 delete scans,
-T35 authenticator-app MFA (QR, TOTP sign-in, disable), T36 forgot-password without SMTP + `zentriqctl reset-password`,
-T37 Active Directory connection validation and error reporting. NOT RUN: T20 AD sync against a real domain,
-T38 reset e-mail delivery, T39 refusal on Server 2012 R2, T40 install on Server 2016 (no such systems in CI).
-The web console screens for these features were checked in a browser against a mock API, not against a live server.
+Latest: GitHub Actions run 38355973548 (commit `ef92c65`), workflow `windows-release`, on a GitHub-hosted
+**Windows Server 2022 Datacenter 10.0.20348** VM. Release: `v1.1.1-build.27` (pre-release, **unsigned**).
+Results: unit + PostgreSQL integration tests 46/46 PASS; upgrade from published 1.0.2 (U01, U02) PASS;
+installer acceptance **34 passed, 0 failed, 0 blocked, 10 not run**. New and PASS in this build: T41 VM shown as
+virtual machine, IPv4 (not IPv4-mapped IPv6) address, IPv6 display toggle, dashboard overview; T42 collect inventory
+now for all assets; T43 service restart through the agent (protected service refused); T44 service restart agentlessly
+over WinRM with a stored credential (credential prompt enforced). Earlier: T33–T37 (enrollment code, scan deletion,
+MFA, password reset, AD connection). NOT RUN: AD sync against a real domain, reset e-mail delivery, Server 2012 R2
+refusal, install on Server 2016, SSH/SNMP devices, agent over the internet, reboot persistence, interactive wizard.
+Web console screens (sign-in artwork, dashboard charts, asset list, deploy-agent helper, service dialog) were checked
+in a browser against a mock API, not against a live server.
 Raw logs: branch `ci-logs` of this repository.
 
 The detailed sections below are from the earlier run 38208536699 (`v1.1.0-build.19`).
