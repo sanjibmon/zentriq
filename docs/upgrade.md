@@ -22,22 +22,23 @@ older build (the database is never downgraded – an older build refuses a schem
 
 ## Agents
 
-Install the new `ZentriqAgent-x64.msi` over the existing agent (`msiexec /i ZentriqAgent-x64.msi /qn`, or let
-your GPO/Intune/SCCM deployment assign the new package). It updates the agent in place: **no enrollment code is
-needed**, the device keeps its registration and certificate, its history stays on the same asset, and the console
-shows the new agent version after the next check-in. The interactive wizard skips the licence and enrollment pages
-when an agent is already installed. Agents of the previous version keep working with the upgraded server, so
-servers and agents can be updated at different times.
+**From the console (agents that support it – installed from build 34 on):** after the server is upgraded, open **Agents**. Agents that
+run an older version show *… available*; click **Update** on one agent or **Update N agent(s)** for all. At its next
+check-in (within about 2 minutes) each agent downloads `ZentriqAgent-x64.msi` from this server over its mutually
+authenticated agent connection (port 8444), checks the SHA-256 checksum the server sent with the request, and installs
+it silently (Windows Installer major upgrade). The agent service restarts for a few seconds; the device keeps its
+registration, certificate and history. The agent row and the **Activity Log** (type *Agent updates*) show
+*Update requested → Updating → Succeeded*, or *Failed* with the reason. The Windows Installer log is on the device in
+`C:\ProgramData\Zentriq\Agent\Logs\update-<version>.log`. Older packages are never offered (no downgrade).
 
-What happens:
+**Once, for agents installed before console updates existed (builds up to 33):** those agents cannot download
+updates yet, and the Agents page lists them. Install the new MSI over them once – `msiexec /i ZentriqAgent-x64.msi /qn`
+or your GPO/Intune/SCCM deployment, **no enrollment code needed**. The agent is updated in place and keeps its
+registration and certificate; from then on it updates from the console. Software uninstall from the console also
+needs this agent version.
 
-* Services are stopped, program files replaced. The data folder, secrets, certificates and the database are not touched by file operations.
-* `zentriqctl` runs in **upgrade** mode: it records the installation history, **takes an encrypted pre-upgrade
-  backup if the database schema will change**, applies pending migrations (each in its own transaction, under an
-  advisory lock, with checksums of already-applied migrations verified), restarts the services and repeats every
-  health check (API readiness, worker self-test job, trial state, console over HTTPS).
-* The trial and license state are unchanged by upgrades.
-* Downgrades to an earlier *version* (e.g. 1.1.2 → 1.1.1) are blocked by the installer; a database created by a newer version is refused by an older build. See *Versions and builds* for older builds of the same version.
+Agents of the previous version keep working with the upgraded server, so servers and agents can be updated at
+different times.
 
 ## If an upgrade fails
 

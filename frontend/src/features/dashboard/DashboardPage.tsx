@@ -94,8 +94,11 @@ export function DashboardPage() {
 
   const mine = dashboards.data?.find((d) => d.owned) ?? null;
   const saved: Layout | null = useMemo(() => {
-    const known = (mine?.widgets ?? []).filter((w) => WIDGETS.some((d) => d.id === w.type));
-    return known.length > 0 ? known.map((w) => ({ id: w.type, wide: w.width >= 8 })) : null;
+    // Only a layout saved by this dashboard counts. Dashboards from earlier versions (kpi.assets, assets.byOs, …)
+    // would otherwise show just the two widget types that still exist; they get the default layout instead.
+    const ws = mine?.widgets ?? [];
+    const own = ws.length > 0 && ws.every((w) => WIDGETS.some((d) => d.id === w.type));
+    return own ? ws.map((w) => ({ id: w.type, wide: w.width >= 8 })) : null;
   }, [mine]);
   const layout = saved ?? DEFAULT_LAYOUT;
 
@@ -110,9 +113,15 @@ export function DashboardPage() {
   }
   async function saveLayout(next: Layout) {
     const body = { name: mine?.name ?? 'My dashboard', shared: false, filters: {}, refreshSeconds: 60, widgets: next.map((w) => ({ type: w.id, title: null, width: w.wide ? 8 : 4, height: 2, settings: {} })) };
-    if (mine) await api.put(`/dashboards/${mine.id}`, body); else await api.post('/dashboards', body);
-    dashboards.reload();
-    setEditing(false);
+    try {
+      if (mine) await api.put(`/dashboards/${mine.id}`, body); else await api.post('/dashboards', body);
+      dashboards.reload();
+      setEditing(false);
+      setMsg('Dashboard layout saved.');
+    } catch (e) {
+      // Keep the dialog open and say why (e.g. the server is older than this console).
+      throw e;   // shown in the dialog, which stays open
+    }
   }
 
   function render(id: string): ReactNode {
@@ -252,13 +261,18 @@ function CustomizeDialog({ layout, onClose, onSave }: { layout: Layout; onClose:
     return copy;
   });
   const set = (i: number, patch: Partial<{ on: boolean; wide: boolean }>) => setItems((xs) => xs.map((x, j) => (j === i ? { ...x, ...patch } : x)));
-  async function save(next: Layout) { setBusy(true); try { await onSave(next); } finally { setBusy(false); } }
+  const [error, setError] = useState<string | null>(null);
+  async function save(next: Layout) {
+    setBusy(true); setError(null);
+    try { await onSave(next); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(false); }
+  }
 
   return (
     <div className="modal-scrim" role="dialog" aria-modal="true" aria-labelledby="cz-title">
       <div className="modal-card" style={{ width: 'min(640px, 100%)' }}>
         <header><h2 id="cz-title">Customize dashboard</h2></header>
         <div className="body form-v">
+          {error && <Callout tone="crit" icon="alert">The layout was not saved: {error}</Callout>}
           <small className="muted">Tick the charts you want, drag them (or use the arrows) to change the order, and choose which ones are wide. Saved for your account.</small>
           <ul className="cz-list">
             {items.map((it, i) => {

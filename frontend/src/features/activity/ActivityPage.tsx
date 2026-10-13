@@ -6,15 +6,15 @@ import { useApi } from '../../app/useApi';
 import { DataTable, ErrorBox, fmt, PageHead, Pager, Panel, Pill } from '../../components/ui';
 
 export interface ActivityRow {
-  id: string; assetId: string; hostname: string | null; ip: string | null; channel: 'agent' | 'agentless'; kind: 'service' | 'uninstall';
+  id: string; assetId: string; hostname: string | null; ip: string | null; channel: 'agent' | 'agentless'; kind: 'service' | 'uninstall' | 'agent-update';
   target: string; argument: string | null; operation: string; status: string; detail: string | null; resultState: string | null;
   requestedAt: string; completedAt: string | null; requestedBy: string | null;
 }
 
 const STATUS: Record<string, ['ok' | 'crit' | 'warn' | '', string]> = {
-  succeeded: ['ok', 'Succeeded'], failed: ['crit', 'Failed'], queued: ['warn', 'Waiting for device'], sent: ['warn', 'Sent to agent'], running: ['warn', 'Running'], expired: ['', 'Expired'],
+  succeeded: ['ok', 'Succeeded'], failed: ['crit', 'Failed'], queued: ['warn', 'Waiting for device'], sent: ['warn', 'Sent to agent'], running: ['warn', 'In progress'], expired: ['', 'Expired'],
 };
-const OP: Record<string, string> = { start: 'Start service', stop: 'Stop service', restart: 'Restart service', uninstall: 'Uninstall software' };
+const OP: Record<string, string> = { start: 'Start service', stop: 'Stop service', restart: 'Restart service', uninstall: 'Uninstall software', update: 'Update agent' };
 
 /** Every service start/stop/restart and software uninstall requested from the console, across all devices. */
 export function ActivityPage() {
@@ -38,13 +38,14 @@ export function ActivityPage() {
 
   return (
     <>
-      <PageHead title="Activity Log" desc={assetId ? <>Device actions on <b>{host ?? 'this device'}</b> · <Link to="/activity">show all devices</Link></> : 'Every service start, stop and restart and every software uninstall requested from the console — who asked, how it ran and the result. Also recorded in the audit log.'} />
+      <PageHead title="Activity Log" desc={assetId ? <>Device actions on <b>{host ?? 'this device'}</b> · <Link to="/activity">show all devices</Link></> : 'Every service start, stop and restart, software uninstall and agent update requested from the console — who asked, how it ran and the result. Also recorded in the audit log.'} />
       <form className="toolbar-row" onSubmit={(e) => { e.preventDefault(); setPage(1); setSearch(q); }}>
         <input className="in grow" placeholder="Search device, service, software, user or result…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search activity" />
         <select className="in" value={kind} onChange={(e) => { setPage(1); setKind(e.target.value); }} aria-label="Type">
           <option value="">All actions</option>
           <option value="service">Service actions</option>
           <option value="uninstall">Software uninstalls</option>
+          <option value="agent-update">Agent updates</option>
         </select>
         <select className="in" value={status} onChange={(e) => { setPage(1); setStatus(e.target.value); }} aria-label="Result">
           <option value="">Any result</option>
@@ -59,7 +60,7 @@ export function ActivityPage() {
         <DataTable rows={rows} empty={data.loading ? 'Loading…' : 'No device actions yet. Start, stop or restart a service from an asset, or uninstall software from Software Inventory.'} columns={[
           { key: 't', label: 'Requested', render: (r) => <span title={fmt.date(r.requestedAt)}>{fmt.date(r.requestedAt)}</span> },
           { key: 'h', label: 'Device', render: (r) => <Link to={`/assets/${r.assetId}`}><b>{r.hostname ?? r.ip ?? '—'}</b></Link> },
-          { key: 'a', label: 'Action', render: (r) => <>{OP[r.operation] ?? fmt.label(r.operation)}<div className="faint mono" style={{ fontSize: 11.5 }}>{r.target}{r.argument ? ` ${r.argument}` : ''}</div></> },
+          { key: 'a', label: 'Action', render: (r) => <>{OP[r.operation] ?? fmt.label(r.operation)}<div className="faint mono" style={{ fontSize: 11.5 }}>{r.kind === 'agent-update' ? `to ${r.target}` : `${r.target}${r.argument ? ` ${r.argument}` : ''}`}</div></> },
           { key: 'c', label: 'Via', render: (r) => r.channel === 'agent' ? 'Zentriq Agent' : 'WinRM / WMI' },
           { key: 's', label: 'Result', render: (r) => <Pill tone={STATUS[r.status]?.[0] ?? ''}>{STATUS[r.status]?.[1] ?? fmt.label(r.status)}</Pill> },
           { key: 'd', label: 'Detail', className: 'wrap', render: (r) => <span style={{ fontSize: 12.5 }}>{r.detail ?? (r.status === 'queued' ? 'Runs at the device’s next check-in.' : '')}{r.completedAt ? <span className="faint"> · {fmt.ago(r.completedAt)}</span> : null}</span> },

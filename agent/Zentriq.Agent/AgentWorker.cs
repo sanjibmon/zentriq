@@ -56,6 +56,7 @@ internal sealed class AgentWorker
 
             if (resp.RenewCertificate) Renew(state, client, ct);
             if (resp.Actions is { Count: > 0 }) RunActions(client, resp.Actions, ct);
+            else AgentUpdater.CleanUp();
 
             state.LastError = null;
             var due = forceInventory || resp.InventoryDue || state.LastInventoryUtc is null || state.LastInventoryUtc < DateTime.UtcNow.AddHours(-state.InventoryHours);
@@ -195,8 +196,10 @@ internal sealed class AgentWorker
     /// <summary>Runs console-requested service actions and reports each result. Failures never stop the check-in.</summary>
     private static void RunActions(ServerClient client, System.Collections.Generic.List<AgentAction> actions, CancellationToken ct)
     {
+        AgentAction? update = null;
         foreach (var a in actions)
         {
+            if (a.Kind == "agent-update") { update = a; continue; }
             bool ok; string? st; string msg;
             try
             {
@@ -208,6 +211,16 @@ internal sealed class AgentWorker
             Log.Info($"Action {a.Operation} {a.Target}: {(ok ? "OK" : "FAILED")} - {msg}");
             try { client.ReportActionAsync(a.Id, ok, st, msg, ct).GetAwaiter().GetResult(); }
             catch (Exception ex) { Log.Warn("Could not report action result: " + ex.Message); }
+        }
+        // The agent update runs last: Windows Installer stops this service while it replaces the files.
+        if (update is not null)
+        {
+            bool ok; string? st; string msg;
+            try { (ok, st, msg) = AgentUpdater.Start(client, update.Id, update.Target, update.Argument, ct); }
+            catch (Exception ex) { ok = false; st = null; msg = "Update failed: " + Describe(ex); }
+            Log.Info($"Agent update to {update.Target}: {(ok ? st : "FAILED")} - {msg}");
+            if (st != "started") try { client.ReportActionAsync(update.Id, ok, st, msg, ct).GetAwaiter().GetResult(); }
+            catch (Exception ex) { Log.Warn("Could not report the update result: " + ex.Message); }
         }
     }
 

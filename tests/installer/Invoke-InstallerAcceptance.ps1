@@ -117,7 +117,7 @@ Remove-Item $answer -Force   # contains the administrator password
 
 if (-not $installed) {
     foreach ($t in 'T02 PostgreSQL provisioning', 'T03 Database migration', 'T04 Administrator sign-in', 'T05 API and worker services', 'T06 Trial initialization',
-                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline') {
+                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console') {
         Record $t.Substring(0, 3) $t.Substring(4) 'BLOCKED' 'installation failed'
     }
 } else {
@@ -583,7 +583,53 @@ if (-not $installed) {
             Login | Out-Null
             "now $ver (database reports $($s.productVersion)); trial unchanged"
         } | Out-Null
-    } else { Record 'T13' 'Upgrade to the next release' 'NOT RUN' 'no -UpgradeBundle supplied' }
+
+        # The upgraded server now serves the next agent package; the agent of this build updates itself from the console.
+        if (Test-Path $agentMsi) {
+            Check 'T47' 'Agent update from the console: agent downloads the package over mTLS, verifies it and updates in place' {
+                $s = Login
+                $tok = Api POST '/agents/enrollment-tokens' @{ name = 'ci-update'; validDays = 1; maxUses = 1; serverUrl = 'https://localhost:8444' } -Session $s
+                $log = Join-Path $OutDir 'agent-install-for-update.log'
+                $p = Start-Process msiexec.exe -ArgumentList '/i', "`"$agentMsi`"", '/qn', "ENROLLMENTCODE=$($tok.code)", '/l*v', "`"$log`"" -Wait -PassThru
+                Assert ($p.ExitCode -eq 0) "agent MSI exit $($p.ExitCode)"
+                $deadline = (Get-Date).AddMinutes(5)
+                do {
+                    Start-Sleep 5
+                    $a = @(Api GET '/agents' -Session $s | ForEach-Object { $_ }) | Where-Object { $_.status -eq 'active' -and $_.assetId -and $_.canSelfUpdate } | Select-Object -First 1
+                } while (-not $a -and (Get-Date) -lt $deadline)
+                Assert $a 'agent did not enroll, send inventory and report the self-update capability'
+                Assert ($a.updateAvailable) "no update offered: agent $($a.version), server package $($a.latestVersion)"
+                $before = @{ id = $a.id; version = $a.version; thumb = (Get-ItemProperty 'HKLM:\SOFTWARE\Zentriq\Agent').CertThumbprint }
+                $r = Api POST '/agents/update' @{ agentIds = @($a.id) } -Session $s
+                Assert ($r.queued -eq 1) "update not queued: $($r.message)"
+                $deadline = (Get-Date).AddMinutes(10)
+                do {
+                    Start-Sleep 15
+                    $a = @(Api GET '/agents' -Session $s | ForEach-Object { $_ }) | Where-Object { $_.id -eq $before.id } | Select-Object -First 1
+                } while (-not ($a.update -and $a.update.status -in 'succeeded', 'failed') -and (Get-Date) -lt $deadline)
+                if (-not ($a.update -and $a.update.status -eq 'succeeded')) {
+                    Get-ChildItem 'C:\ProgramData\Zentriq\Agent\Logs' -ErrorAction SilentlyContinue | Copy-Item -Destination $OutDir -ErrorAction SilentlyContinue
+                    $st = if ($a -and $a.update) { "$($a.update.status) - $($a.update.detail)" } else { 'no update record' }
+                    throw "update status: $st; agent reports $(if ($a) { $a.version } else { '?' })"
+                }
+                Assert ($a.version -eq $a.latestVersion) "agent reports $($a.version), expected $($a.latestVersion)"
+                Assert (-not $a.updateAvailable) 'still offered an update'
+                Assert ((Get-ItemProperty 'HKLM:\SOFTWARE\Zentriq\Agent').CertThumbprint -eq $before.thumb) 'enrollment/certificate not kept'
+                Assert ((Get-Service ZentriqAgent).Status -eq 'Running') 'agent service not running after the update'
+                $arp = @(Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*' -ErrorAction SilentlyContinue | Where-Object { $_.PSObject.Properties['DisplayName'] -and $_.DisplayName -eq 'Zentriq Agent' })
+                Assert ($arp.Count -eq 1) "$($arp.Count) 'Zentriq Agent' entries in Apps and Features"
+                $act = Api GET '/activity?kind=agent-update' -Session $s
+                Assert (@($act.items | Where-Object { $_.status -eq 'succeeded' -and $_.target -eq $a.version }).Count -eq 1) 'update not in the Activity log'
+                $again = Api POST '/agents/update' @{ all = $true } -Session $s
+                Assert ($again.queued -eq 0) 'an up-to-date agent was queued again'
+                foreach ($e in $arp) { Start-Process msiexec.exe -ArgumentList '/x', $e.PSChildName, '/qn' -Wait | Out-Null }
+                "$($before.version) -> $($a.version) in place (same registration and certificate, one Apps entry); Activity log: $($a.update.detail)"
+            } | Out-Null
+        } else { Record 'T47' 'Agent update from the console' 'BLOCKED' 'agent package from T26 not available' }
+    } else {
+        Record 'T13' 'Upgrade to the next release' 'NOT RUN' 'no -UpgradeBundle supplied'
+        Record 'T47' 'Agent update from the console' 'NOT RUN' 'needs -UpgradeBundle (a newer agent package on the server)'
+    }
 
     Check 'T14' 'Logs contain no administrator password or connection-string passwords' {
         $paths = @((Join-Path $dataDir 'Logs'), $env:TEMP, $OutDir, (Join-Path $env:SystemRoot 'Temp'))

@@ -121,6 +121,22 @@ jobs:
             -OldAgentMsi "$env:RUNNER_TEMP/previous-same/ZentriqAgent-x64.msi" -NewAgentMsi "$PWD/artifacts/release-main/ZentriqAgent-x64.msi" `
             -OutDir $out *>&1 | Tee-Object -FilePath "$env:RUNNER_TEMP/ci-logs/5b-upgrade-same-version.log"
 
+      - name: Update a half-updated server (build 27, then build 29 over it) in place
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Reproduces a customer server where build 29 was installed over build 27 before builds carried their own
+          # version: the new build must replace both and every feature must work afterwards.
+          $out = "$env:RUNNER_TEMP/acceptance-upgrade/half-updated"
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          gh release download v1.1.1-build.27 -R $env:GITHUB_REPOSITORY -p 'Zentriq-Setup-x64.exe' -p 'ZentriqAgent-x64.msi' -D "$env:RUNNER_TEMP/v1.1.1-build.27"
+          gh release download v1.1.1-build.29 -R $env:GITHUB_REPOSITORY -p 'Zentriq-Setup-x64.exe' -D "$env:RUNNER_TEMP/v1.1.1-build.29"
+          ./tests/installer/Invoke-UpgradeFromRelease.ps1 -IdPrefix H -OldBundle "$env:RUNNER_TEMP/v1.1.1-build.27/Zentriq-Setup-x64.exe" -MiddleBundle "$env:RUNNER_TEMP/v1.1.1-build.29/Zentriq-Setup-x64.exe" `
+            -NewBundle "$PWD/artifacts/release-main/Zentriq-Setup-x64.exe" `
+            -OldAgentMsi "$env:RUNNER_TEMP/v1.1.1-build.27/ZentriqAgent-x64.msi" -NewAgentMsi "$PWD/artifacts/release-main/ZentriqAgent-x64.msi" `
+            -OutDir $out *>&1 | Tee-Object -FilePath "$env:RUNNER_TEMP/ci-logs/5c-upgrade-half-updated.log"
+
       - name: Installer acceptance suite
         shell: pwsh
         run: ./tests/installer/Invoke-InstallerAcceptance.ps1 -Bundle "$PWD/artifacts/release-main/Zentriq-Setup-x64.exe" -UpgradeBundle "$PWD/artifacts/release-upgrade/Zentriq-Setup-x64.exe" -OutDir "$env:RUNNER_TEMP/acceptance" *>&1 | Tee-Object -FilePath "$env:RUNNER_TEMP/ci-logs/5-acceptance.log"
@@ -133,8 +149,10 @@ jobs:
           if (Test-Path $md) { Get-Content $md | Out-File $env:GITHUB_STEP_SUMMARY -Append; Get-Content $md }
           $um = Join-Path $env:RUNNER_TEMP 'acceptance-upgrade/upgrade-results.md'
           if (Test-Path $um) { Get-Content $um | Out-File $env:GITHUB_STEP_SUMMARY -Append; Get-Content $um }
-          $sm = Join-Path $env:RUNNER_TEMP 'acceptance-upgrade/same-version/upgrade-results.md'
-          if (Test-Path $sm) { Get-Content $sm | Out-File $env:GITHUB_STEP_SUMMARY -Append; Get-Content $sm }
+          foreach ($sub in 'same-version', 'half-updated') {
+            $sm = Join-Path $env:RUNNER_TEMP "acceptance-upgrade/$sub/upgrade-results.md"
+            if (Test-Path $sm) { Get-Content $sm | Out-File $env:GITHUB_STEP_SUMMARY -Append; Get-Content $sm }
+          }
           $s = 'artifacts/test-results/summary.txt'
           if (Test-Path $s) { "`n**Unit/integration tests:** $(Get-Content $s)" | Out-File $env:GITHUB_STEP_SUMMARY -Append }
 

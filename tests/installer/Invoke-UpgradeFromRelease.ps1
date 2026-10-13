@@ -20,7 +20,10 @@ param(
     [string] $OutDir = (Join-Path $env:RUNNER_TEMP 'zentriq-upgrade-from-release'),
     [string] $OldAgentMsi,
     [string] $NewAgentMsi,
-    [string] $IdPrefix = 'U'
+    [string] $IdPrefix = 'U',
+    # Optional: a second old bundle run over the first before the upgrade (reproduces a server where a later build of
+    # the same version was installed over an earlier one and only partly applied).
+    [string] $MiddleBundle
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -60,7 +63,7 @@ function Arp([string] $Like) {
     @(Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*', 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*' -ErrorAction SilentlyContinue |
         Where-Object { $_.PSObject.Properties['DisplayName'] -and $_.DisplayName -like $Like -and -not ($_.PSObject.Properties['SystemComponent'] -and $_.SystemComponent -eq 1) })
 }
-$P1 = "${IdPrefix}01"; $P2 = "${IdPrefix}02"; $P3 = "${IdPrefix}03"; $P4 = "${IdPrefix}04"
+$P1 = "${IdPrefix}01"; $P2 = "${IdPrefix}02"; $P3 = "${IdPrefix}03"; $P4 = "${IdPrefix}04"; $P5 = "${IdPrefix}05"; $P6 = "${IdPrefix}06"
 $withAgent = [bool]($OldAgentMsi -and $NewAgentMsi)
 # msiexec cannot open paths with forward slashes (error 1619), which CI passes in.
 if ($withAgent) { $OldAgentMsi = (Resolve-Path $OldAgentMsi).ProviderPath; $NewAgentMsi = (Resolve-Path $NewAgentMsi).ProviderPath }
@@ -78,6 +81,17 @@ try {
     $oldVersion = (Get-ItemProperty 'HKLM:\SOFTWARE\Zentriq\Console').Version
     Record $P1 "Install previous release $oldVersion" 'PASS' "schema $($before.schemaVersion)"
 } catch { Record $P1 'Install previous release' 'FAIL' $_.Exception.Message; $ok = $false }
+
+if ($ok -and $MiddleBundle) {
+    try {
+        Run-Setup $MiddleBundle @() 'middle-install'
+        $null = Wait-Ready
+        $m = Invoke-WebRequest "$base/api/v1/activity" -SkipHttpErrorCheck -WebSession (Login)
+        $entries = @(Arp 'Zentriq')
+        $state = if ($m.StatusCode -eq 404) { 'half-updated (new console pages, old server: /activity 404)' } else { "server answers /activity with $($m.StatusCode)" }
+        Record $P6 "Install $(Split-Path (Split-Path $MiddleBundle -Parent) -Leaf) over it" 'PASS' "$state; $($entries.Count) 'Zentriq' entr$(if ($entries.Count -eq 1) { 'y' } else { 'ies' }) in Apps and Features"
+    } catch { Record $P6 'Install the middle build over it' 'NOT RUN' "could not reproduce the half-updated state silently ($($_.Exception.Message)); continuing from the first build" }
+}
 
 $agentOk = $false
 $agentFailed = $false
@@ -119,6 +133,39 @@ if ($ok) {
     } catch { Record $P2 'Upgrade from the previous release' 'FAIL' $_.Exception.Message; $ok = $false }
 } else { Record $P2 'Upgrade from the previous release' 'BLOCKED' 'previous release did not install' }
 
+if ($ok) {
+    # Features of the new build answer on the upgraded server (a half-applied update leaves these at 404).
+    try {
+        $s = Login
+        $h = @{ 'X-Zentriq-Request' = '1' }
+        function Code($Method, $Path, $Body) {
+            $p = @{ Uri = "$base/api/v1$Path"; Method = $Method; WebSession = $s; Headers = $h; SkipHttpErrorCheck = $true }
+            if ($null -ne $Body) { $p.Body = ($Body | ConvertTo-Json -Depth 6); $p.ContentType = 'application/json' }
+            (Invoke-WebRequest @p).StatusCode
+        }
+        $checks = [ordered]@{
+            'activity log'         = Code GET '/activity' $null
+            'software uninstall'   = Code POST '/software/uninstall' @{}
+            'agent update'         = Code POST '/agents/update' @{}
+            'dashboard overview'   = Code GET '/dashboard/overview' $null
+        }
+        $bad = @($checks.GetEnumerator() | Where-Object { (($_.Key -in 'activity log', 'dashboard overview') -and $_.Value -ne 200) -or (($_.Key -in 'software uninstall', 'agent update') -and $_.Value -ne 400) })
+        if ($bad.Count) { throw "unexpected responses: $(($checks.GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)" }) -join ', ')" }
+        $ov = Invoke-RestMethod "$base/api/v1/dashboard/overview" -WebSession $s -Headers $h
+        if (-not $ov.facets.PSObject.Properties['cores']) { throw 'dashboard overview has no processor (cores) data' }
+        # Save a customised dashboard layout with the new chart types (rejected by older servers).
+        $dash = @(Invoke-RestMethod "$base/api/v1/dashboards" -WebSession $s -Headers $h | ForEach-Object { $_ }) | Where-Object { $_.owned } | Select-Object -First 1
+        $layout = @{ name = 'My dashboard'; shared = $false; filters = @{}; refreshSeconds = 60; widgets = @(
+            @{ type = 'kpi.tiles'; title = $null; width = 8; height = 2; settings = @{} }, @{ type = 'hw.cores'; title = $null; width = 4; height = 2; settings = @{} },
+            @{ type = 'hw.disk'; title = $null; width = 4; height = 2; settings = @{} }, @{ type = 'assets.seen'; title = $null; width = 4; height = 2; settings = @{} }) }
+        $code = if ($dash) { Code PUT "/dashboards/$($dash.id)" $layout } else { Code POST '/dashboards' $layout }
+        if ($code -notin 200, 201) { throw "saving a dashboard layout returned $code" }
+        $saved = @(Invoke-RestMethod "$base/api/v1/dashboards" -WebSession $s -Headers $h | ForEach-Object { $_ }) | Where-Object { $_.owned } | Select-Object -First 1
+        if ((@($saved.widgets) | ForEach-Object type) -join ',' -ne 'kpi.tiles,hw.cores,hw.disk,assets.seen') { throw "saved layout: $((@($saved.widgets) | ForEach-Object type) -join ',')" }
+        Record $P5 'New features work after the update' 'PASS' "$(($checks.GetEnumerator() | ForEach-Object { "$($_.Key) $($_.Value)" }) -join ', '); dashboard layout saved and read back"
+    } catch { Record $P5 'New features work after the update' 'FAIL' $_.Exception.Message; $ok = $false }
+}
+
 if ($withAgent) {
     if ($ok -and $agentOk) {
         try {
@@ -149,7 +196,8 @@ if ($withAgent) {
             } while ((Get-Date) -lt $deadline)
             if ($list.Count -ne 1) { throw "$($list.Count) agent registrations (expected the same single one)" }
             if (-not $ag -or $ag.version -eq $agentBefore.version) { throw "agent still reports $($agentBefore.version)" }
-            Record $P4 "Agent $($agentBefore.version) -> $($ag.version) updated in place (no enrollment code)" 'PASS' "old agent checked in to the upgraded server; same registration $($ag.id) and certificate; one 'Zentriq Agent' entry ($($entries[0].DisplayVersion)); service running"
+            if (-not $ag.canSelfUpdate) { throw 'the updated agent does not report the self-update capability' }
+            Record $P4 "Agent $($agentBefore.version) -> $($ag.version) updated in place (no enrollment code)" 'PASS' "old agent checked in to the upgraded server; same registration $($ag.id) and certificate; console updates now available; one 'Zentriq Agent' entry ($($entries[0].DisplayVersion)); service running"
         } catch { Record $P4 'Agent updated in place' 'FAIL' $_.Exception.Message; $ok = $false }
     } else { Record $P4 'Agent updated in place' 'BLOCKED' 'server upgrade or old agent failed' }
     $a = Arp 'Zentriq Agent' | Select-Object -First 1

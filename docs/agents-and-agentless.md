@@ -124,6 +124,12 @@ can read these attributes; no administrator account is needed for AD itself.
 * Each installation has its own **agent CA** (`Secrets\agent-ca.pfx`, readable by the API service only, included in
   backups). It issues one client certificate per agent (1 year, renewed automatically 30 days before expiry).
 
+### Updating agents
+
+*Agents › Update* (one device) or *Update N agent(s)* (all) – the agent fetches the package from this server over its
+authenticated connection, verifies its SHA-256 and upgrades itself in place, keeping its enrollment. Agents installed
+before this feature need the new MSI installed once (no enrollment code). Details: [upgrade.md](upgrade.md#agents).
+
 ### Deploying
 
 1. *Agents › New enrollment code*: name, validity (1–365 days), optional maximum number of devices and the address

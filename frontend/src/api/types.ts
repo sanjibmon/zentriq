@@ -285,6 +285,10 @@ export interface AgentRow {
   assetId: string | null;
   revokedAt: string | null;
   enrollmentCode: string | null;
+  canSelfUpdate?: boolean;
+  updateAvailable?: boolean;
+  latestVersion?: string | null;
+  update?: { status: string; target: string; detail: string | null; requestedAt: string; completedAt: string | null } | null;
 }
 
 export interface EnrollmentToken {

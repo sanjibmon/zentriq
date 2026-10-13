@@ -228,7 +228,7 @@ public static class AssetActionEndpoints
                 """;
             void P(NpgsqlCommand c)
             {
-                c.Parameters.Add(new NpgsqlParameter("k", NpgsqlDbType.Text) { Value = kind is "service" or "uninstall" ? kind : DBNull.Value });
+                c.Parameters.Add(new NpgsqlParameter("k", NpgsqlDbType.Text) { Value = kind is "service" or "uninstall" or "agent-update" ? kind : DBNull.Value });
                 c.Parameters.Add(new NpgsqlParameter("st", NpgsqlDbType.Text) { Value = status is "succeeded" or "failed" or "pending" or "expired" ? status : DBNull.Value });
                 c.Parameters.Add(new NpgsqlParameter("a", NpgsqlDbType.Uuid) { Value = (object?)assetId ?? DBNull.Value });
                 c.Parameters.Add(new NpgsqlParameter("q", NpgsqlDbType.Text) { Value = string.IsNullOrWhiteSpace(q) ? DBNull.Value : $"%{q.Trim()}%" });
@@ -316,13 +316,14 @@ public static class AssetActionEndpoints
     public static async Task<bool> CompleteAsync(NpgsqlDataSource ds, Guid actionId, Guid? agentId, bool ok, string? state, string? message, CancellationToken ct)
     {
         await using var cmd = ds.CreateCommand("""
-            UPDATE zentriq.asset_actions SET status = @st, result_state = @rs, detail = @d, completed_at = now(), secret_protected = NULL
+            UPDATE zentriq.asset_actions SET status = @st, result_state = @rs, detail = @d, completed_at = CASE WHEN @st = 'running' THEN NULL ELSE now() END, secret_protected = NULL
              WHERE id = @id AND (@ag::uuid IS NULL OR agent_id = @ag) AND status IN ('queued','sent','running')
             RETURNING asset_id, target
             """);
         cmd.Parameters.AddWithValue("id", actionId);
         cmd.Parameters.Add(new NpgsqlParameter("ag", NpgsqlDbType.Uuid) { Value = (object?)agentId ?? DBNull.Value });
-        cmd.Parameters.AddWithValue("st", ok ? "succeeded" : "failed");
+        // "started": a long-running action (agent update) whose outcome is confirmed later (next check-in).
+        cmd.Parameters.AddWithValue("st", !ok ? "failed" : state == "started" ? "running" : "succeeded");
         cmd.Parameters.Add(new NpgsqlParameter("rs", NpgsqlDbType.Text) { Value = (object?)state ?? DBNull.Value });
         cmd.Parameters.Add(new NpgsqlParameter("d", NpgsqlDbType.Text) { Value = (object?)Zentriq.Application.Security.Redactor.Redact(message ?? (ok ? "Done." : "Failed.")) });
         Guid assetId; string target;
@@ -338,7 +339,7 @@ public static class AssetActionEndpoints
             del.Parameters.AddWithValue("n", target);
             await del.ExecuteNonQueryAsync(ct);
         }
-        else if (state is not null)
+        else if (state is not null && state is not ("started" or "current" or "updated"))
         {
             await using var doc = ds.CreateCommand("""
                 UPDATE zentriq.asset_inventory_documents

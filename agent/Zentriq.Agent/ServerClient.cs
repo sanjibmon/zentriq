@@ -131,7 +131,7 @@ internal sealed class ServerClient : IDisposable
         PostJsonAsync<CheckinResponse>("api/agent/v1/checkin", new Dictionary<string, object?>
         {
             ["agentVersion"] = Program.Version, ["hostname"] = hostname, ["osName"] = osName, ["lastError"] = lastError,
-            ["capabilities"] = new[] { "service-control", "software-uninstall" },
+            ["capabilities"] = new[] { "service-control", "software-uninstall", "self-update" },
         }, ct);
 
     public async Task ReportActionAsync(string actionId, bool ok, string? state, string message, CancellationToken ct)
@@ -140,6 +140,16 @@ internal sealed class ServerClient : IDisposable
         using var content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
         using var resp = await _http.PostAsync(new Uri(_base, "api/agent/v1/actions/" + Uri.EscapeDataString(actionId) + "/result"), content, ct).ConfigureAwait(false);
         await EnsureAsync(resp).ConfigureAwait(false);
+    }
+
+    /// <summary>Downloads the agent package served by this server (agent port, client certificate).</summary>
+    public async Task DownloadPackageAsync(string file, CancellationToken ct)
+    {
+        using var resp = await _http.GetAsync(new Uri(_base, "api/agent/v1/package"), HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+        await EnsureAsync(resp).ConfigureAwait(false);
+        using var src = await resp.Content.ReadAsStreamAsync().ConfigureAwait(false);
+        using var dst = new FileStream(file, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+        await src.CopyToAsync(dst, 81920, ct).ConfigureAwait(false);
     }
 
     public Task<RenewResponse> RenewAsync(string csr, CancellationToken ct) =>

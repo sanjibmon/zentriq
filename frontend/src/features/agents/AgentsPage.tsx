@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../../api/client';
 import type { AgentPackage, AgentRow, EnrollmentToken, NewEnrollmentToken } from '../../api/types';
 import { useAuth } from '../../app/auth';
@@ -37,6 +37,16 @@ export function AgentsPage() {
   const tokens = useApi(() => (manage ? api.get<EnrollmentToken[]>('/agents/enrollment-tokens') : Promise.resolve([])), [manage]);
   const rows = agents.data ?? [];
   const count = (h: AgentRow['health']) => rows.filter((r) => r.health === h).length;
+  const outdated = rows.filter((r) => r.updateAvailable);
+  const selfUpdatable = outdated.filter((r) => r.canSelfUpdate && r.update?.status !== 'running' && r.update?.status !== 'queued' && r.update?.status !== 'sent');
+  const legacy = outdated.filter((r) => !r.canSelfUpdate);
+  const updating = rows.some((r) => r.update && ['queued', 'sent', 'running'].includes(r.update.status));
+  useEffect(() => {
+    if (!updating) return;
+    const t = setInterval(agents.reload, 10000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload only bumps a counter
+  }, [updating]);
 
   async function revoke(a: AgentRow) {
     if (!(await confirm({ title: `Revoke the agent on ${a.hostname ?? a.id}?`, danger: true, confirmLabel: 'Revoke agent', message: 'Its certificate is no longer accepted: the device stops reporting inventory and cannot receive service or uninstall actions until it is enrolled again. The asset and its history are kept.' }))) return;
@@ -46,6 +56,21 @@ export function AgentsPage() {
   async function collect(a: AgentRow) {
     const r = await api.post<{ message: string }>(`/agents/${a.id}/collect`);
     setMsg(r.message);
+  }
+  async function update(list: AgentRow[] | 'all') {
+    const n = list === 'all' ? outdated.length : list.length;
+    const target = pkg.data?.package?.version ?? rows.find((r) => r.latestVersion)?.latestVersion ?? 'the latest version';
+    if (!(await confirm({
+      title: list === 'all' ? `Update ${n} agent(s) to ${target}?` : `Update the agent on ${list[0]!.hostname ?? list[0]!.id} to ${target}?`,
+      confirmLabel: 'Update agent',
+      message: 'At its next check-in (within about 2 minutes) each agent downloads the package from this server over its secure agent connection, verifies the checksum and installs it silently. The agent service restarts for a few seconds; enrollment, certificate and history are kept. Inventory and device actions continue afterwards.',
+    }))) return;
+    setMsg(null);
+    try {
+      const r = await api.post<{ message: string }>('/agents/update', list === 'all' ? { all: true } : { agentIds: list.map((a) => a.id) });
+      setMsg(r.message);
+      agents.reload();
+    } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
   }
   async function showCode(t: EnrollmentToken) {
     setMsg(null);
@@ -72,6 +97,17 @@ export function AgentsPage() {
       {msg && <Callout>{msg}</Callout>}
       <ErrorBox error={agents.error ?? pkg.error} />
       {pkg.data && !pkg.data.enrollmentAvailable && <Callout tone="warn" icon="alert">Agent enrollment is not configured on this server (agent CA missing). Run <span className="mono">zentriqctl repair</span> on the server.</Callout>}
+      {manage && outdated.length > 0 && pkg.data?.package && (
+        <Callout tone="info" icon="info">
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+            <span style={{ flex: '1 1 320px' }}>
+              Agent version <b>{pkg.data.package.version ?? 'latest'}</b> is available on this server. {outdated.length} agent(s) run an earlier version.
+              {legacy.length > 0 && <> {legacy.length} of them ({legacy.slice(0, 3).map((r) => r.hostname ?? r.id).join(', ')}{legacy.length > 3 ? ', …' : ''}) run an agent from before console updates were added: install the new MSI on those once (Download agent, then <span className="mono">msiexec /i ZentriqAgent-x64.msi /qn</span> or your GPO/Intune/SCCM deployment — no enrollment code needed). After that they update from here.</>}
+            </span>
+            {selfUpdatable.length > 0 && <button className="btn primary sm" onClick={() => void update('all')}>Update {selfUpdatable.length} agent(s)</button>}
+          </div>
+        </Callout>
+      )}
       {created && (
         <Panel title={`Enrollment code “${created.name}”`} sub="You can show it again later from the Enrollment codes tab while it is active" right={<button className="btn sm" onClick={() => setCreated(null)}>Done</button>}>
           <div className="form-v">
@@ -100,9 +136,9 @@ export function AgentsPage() {
             { key: 'c', label: 'Last check-in', render: (r) => <span title={fmt.date(r.lastCheckinAt)}>{fmt.ago(r.lastCheckinAt)}</span> },
             { key: 'i', label: 'Last inventory', render: (r) => <span title={fmt.date(r.lastInventoryAt)}>{fmt.ago(r.lastInventoryAt)}</span> },
             { key: 'ip', label: 'Last address', render: (r) => <span className="mono">{r.lastIp ?? '—'}</span> },
-            { key: 'v', label: 'Version', render: (r) => r.version },
+            { key: 'v', label: 'Version', render: (r) => <>{r.version}<UpdateState r={r} /></> },
             { key: 'e', label: 'Certificate', render: (r) => r.certificateExpires ? `expires ${fmt.day(r.certificateExpires)}` : '—' },
-            { key: 'x', label: '', render: (r) => manage && r.status !== 'revoked' ? <div style={{ display: 'flex', gap: 6 }}><button className="btn sm" onClick={() => void collect(r)}>Collect now</button><button className="btn sm" onClick={() => void revoke(r)}>Revoke</button></div> : null },
+            { key: 'x', label: '', render: (r) => manage && r.status !== 'revoked' ? <div style={{ display: 'flex', gap: 6 }}>{r.updateAvailable && r.canSelfUpdate && !(r.update && ['queued', 'sent', 'running'].includes(r.update.status)) && <button className="btn sm primary" onClick={() => void update([r])}>Update</button>}<button className="btn sm" onClick={() => void collect(r)}>Collect now</button><button className="btn sm" onClick={() => void revoke(r)}>Revoke</button></div> : null },
           ]} />
         </Panel>
       ) : (
@@ -134,7 +170,8 @@ export function AgentsPage() {
         <ul className="plain">
           <li>Install <b>ZentriqAgent-x64.msi</b> with the enrollment code (Windows 10/11, Windows Server 2016+ with .NET Framework 4.8).</li>
           <li>The agent creates its own key, receives a client certificate from this server and then authenticates with it (mutual TLS on port {pkg.data?.agentPort ?? 8444}). The enrollment code is deleted from the device after use.</li>
-          <li>It checks in every 2 minutes and sends full inventory every 12 hours, or within about 2 minutes when you click <i>Collect now</i>. It also carries out service start/stop/restart requested on the asset page. Inventory is queued while the device is offline.</li>
+          <li>It checks in every 2 minutes and sends full inventory every 12 hours, or within about 2 minutes when you click <i>Collect now</i>. It also carries out service start/stop/restart and software uninstalls requested in the console. Inventory is queued while the device is offline.</li>
+          <li><b>Updating agents:</b> after the server is upgraded, click <i>Update</i> (one agent) or <i>Update agents</i> (all). The agent downloads the new package from this server over its authenticated connection, verifies its SHA-256 checksum and installs it silently; it keeps its enrollment. Progress and results are in the Activity Log. Agents installed before this feature existed need the new MSI installed once.</li>
           <li>Devices found by both an agent and an agentless scan are merged into one asset (matched by SMBIOS UUID, serial number and MAC address).</li>
         </ul>
       </Panel>
@@ -189,4 +226,13 @@ function NewCodeDialog({ defaultUrl, onClose, onCreated }: { defaultUrl: string;
       </form>
     </div>
   );
+}
+
+function UpdateState({ r }: { r: AgentRow }) {
+  const u = r.update;
+  if (u && ['queued', 'sent'].includes(u.status)) return <div><Pill tone="warn">Update to {u.target} requested</Pill></div>;
+  if (u && u.status === 'running') return <div><Pill tone="warn">Updating to {u.target}…</Pill></div>;
+  if (u && u.status === 'failed' && r.updateAvailable) return <div title={u.detail ?? ''}><Pill tone="crit">Update failed</Pill></div>;
+  if (r.updateAvailable) return <div className="faint" style={{ fontSize: 11.5 }} title={r.canSelfUpdate ? '' : 'This agent predates console updates: install the new MSI once.'}>{r.latestVersion} available{r.canSelfUpdate ? '' : ' · install MSI once'}</div>;
+  return null;
 }
