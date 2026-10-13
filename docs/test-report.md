@@ -1,21 +1,25 @@
 # Test report
 
-Latest: GitHub Actions run 38387384668 (commit `45fc338`), workflow `windows-release`, on a GitHub-hosted
-**Windows Server 2022 Datacenter 10.0.20348** VM. Release: `v1.1.1-build.31` (pre-release, **unsigned**), package
-version **1.1.1.31**.
-Results: unit + PostgreSQL integration tests 46/46 PASS; upgrade from published 1.0.2 (U01, U02) PASS;
-installer acceptance **36 passed, 0 failed, 0 blocked, 10 not run**.
+Latest: GitHub Actions run 38443777104 (commit `2f42d69`), workflow `windows-release`, on a GitHub-hosted
+**Windows Server 2022 Datacenter 10.0.20348** VM. Release: `v1.1.1-build.37` (pre-release, **unsigned**), package
+version **1.1.1.37**. Results: unit + PostgreSQL integration tests 53/53 PASS; installer acceptance
+**37 passed, 0 failed, 0 blocked, 10 not run**.
 
-In-place update of an earlier build of the same version (new in build 31, silent installs):
+New in build 37:
 
 | ID | Test | Result | Detail |
 |---|---|---|---|
-| S01 | Install published `v1.1.1-build.29` (reports 1.1.1) | **PASS** | schema 7 |
-| S03 | Enroll the build-29 agent | **PASS** | agent registered and checking in |
-| S02 | Run the build-31 Setup over it | **PASS** | updated in place to 1.1.1.31: data, sign-in and trial kept, services running, **one** 'Zentriq 1.1.1.31' entry in Apps and Features |
-| S04 | Install the build-31 agent MSI over the enrolled agent, no enrollment code | **PASS** | old agent checked in to the upgraded server first; same registration and certificate, new version 1.1.1.31 reported, one 'Zentriq Agent' entry, service running |
-| U02 | Upgrade published 1.0.2 → 1.1.1.31 | **PASS** | one 'Zentriq 1.1.1.31' entry |
-| — | Interactive *Update Zentriq* wizard page (server) and skipped licence/enrollment pages (agent) | **NOT RUN** | CI installs silently; the dialogs compiled and passed ICE validation |
+| H01 | Install published `v1.1.1-build.27` | **PASS** | schema 6 |
+| H06 | Install published `v1.1.1-build.29` over it | **PASS** | reproduces the half-updated server: new console pages, old server (`/activity` 404) |
+| H03 | Enroll the build-27 agent | **PASS** | |
+| H02 | Run build 37 Setup over the half-updated server | **PASS** | updated in place to 1.1.1.37, schema 8, data/sign-in/trial kept, one 'Zentriq' entry |
+| H05 | New features answer after the update | **PASS** | Activity log, software uninstall, agent update, dashboard overview; a customised dashboard layout is saved and read back |
+| H04 | Build-27 agent: new MSI installed over it once, no enrollment code | **PASS** | same registration and certificate; now reports the self-update capability |
+| S01–S05 | Same as above from published build 33 | **PASS** | |
+| U01, U02, U05 | Upgrade from published 1.0.2 | **PASS** | |
+| T47 | Agent update from the console | **PASS** | 1.1.1.37 → 1.1.2.37: agent downloaded the package over mTLS, verified SHA-256, updated in place; same registration and certificate; Activity log "Updated to 1.1.2.37"; an up-to-date agent is not queued again |
+| — | Dashboard layout save on an existing dashboard | fixed | returned 409 before (found by H05/S05/U05) |
+| — | Interactive wizard pages and the Agents/Dashboard screens on a live server | **NOT RUN** | CI installs silently; screens checked in a browser against a mock API |
 
 Build 29: T45 software uninstall through the agent (protected software refused, item removed from inventory, Activity log); T46 dashboard drill-down matches the charts, offline fields. Build 27: T41 VM shown as
 virtual machine, IPv4 (not IPv4-mapped IPv6) address, IPv6 display toggle, dashboard overview; T42 collect inventory
