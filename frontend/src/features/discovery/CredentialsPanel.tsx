@@ -4,6 +4,7 @@ import type { Credential, SshHostKey } from '../../api/types';
 import { useAuth } from '../../app/auth';
 import { useApi } from '../../app/useApi';
 import { Callout, DataTable, ErrorBox, fmt, Panel } from '../../components/ui';
+import { useConfirm } from '../../components/Confirm';
 
 export const KINDS: Record<string, string> = {
   windows_domain: 'Windows (domain account)',
@@ -18,17 +19,18 @@ export const KINDS: Record<string, string> = {
 export function CredentialsPanel() {
   const { can } = useAuth();
   const manage = can('credentials.manage');
+  const confirm = useConfirm();
   const creds = useApi(() => api.get<Credential[]>('/credentials'), []);
   const keys = useApi(() => (manage ? api.get<SshHostKey[]>('/credentials/ssh-host-keys') : Promise.resolve([])), [manage]);
   const [edit, setEdit] = useState<Credential | 'new' | null>(null);
 
   async function remove(c: Credential) {
-    if (!window.confirm(`Delete credential "${c.name}"? Scans and profiles that use it will no longer collect inventory with it.`)) return;
+    if (!(await confirm({ title: `Delete credential "${c.name}"?`, danger: true, message: 'The encrypted secret is destroyed. Scans, profiles and Active Directory scans that use it will no longer collect inventory with it.' }))) return;
     await api.del(`/credentials/${c.id}`);
     creds.reload();
   }
   async function forget(k: SshHostKey) {
-    if (!window.confirm(`Forget the SSH host key of ${k.host}? The next scan will trust the key it presents.`)) return;
+    if (!(await confirm({ title: `Forget the SSH host key of ${k.host}?`, danger: true, confirmLabel: 'Forget key', message: 'The next scan will trust whatever key the host presents. Only do this after verifying the host was rebuilt.' }))) return;
     await api.del(`/credentials/ssh-host-keys/${encodeURIComponent(k.host)}`);
     keys.reload();
   }

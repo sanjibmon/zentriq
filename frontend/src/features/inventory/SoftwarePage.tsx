@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import type { Paged, SoftwareInstall, SoftwareRow } from '../../api/types';
 import { Link } from '../../app/router';
+import { useAuth } from '../../app/auth';
+import { useConfirm } from '../../components/Confirm';
 import { useApi } from '../../app/useApi';
-import { DataTable, ErrorBox, fmt, PageHead, Pager, Panel } from '../../components/ui';
+import { Callout, DataTable, ErrorBox, fmt, PageHead, Pager, Panel, Pill } from '../../components/ui';
 
 export function SoftwarePage() {
   const initialQ = new URLSearchParams(window.location.search).get('q') ?? '';
@@ -14,6 +16,44 @@ export function SoftwarePage() {
   const pageSize = 50;
   const data = useApi(() => api.get<Paged<SoftwareRow>>('/inventory/software', { q: search, page, pageSize }), [search, page]);
   const installs = useApi(() => (selected ? api.get<SoftwareInstall[]>('/inventory/software/installs', { name: selected }) : Promise.resolve(null)), [selected]);
+  const { can } = useAuth();
+  const confirm = useConfirm();
+  const canUninstall = can('software.uninstall');
+  const [picked, setPicked] = useState<string[]>([]);
+  const [msg, setMsg] = useState<{ tone: 'info' | 'crit'; text: string } | null>(null);
+  const list = installs.data ?? [];
+  const ready = list.filter((r) => r.agent === 'ready');
+  const pending = list.some((r) => r.lastUninstall && ['queued', 'sent', 'running'].includes(r.lastUninstall.status));
+  useEffect(() => { setPicked([]); setMsg(null); }, [selected]);
+  useEffect(() => {
+    if (!pending) return;
+    const t = setInterval(installs.reload, 6000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload only bumps a counter
+  }, [pending]);
+
+  async function uninstall(all: boolean) {
+    if (!selected) return;
+    const targets = all ? list : list.filter((r) => picked.includes(r.assetId));
+    const n = targets.length;
+    const noAgent = targets.filter((r) => r.agent !== 'ready').length;
+    const ok = await confirm({
+      title: all ? `Uninstall ${selected} from all ${n} device(s)?` : `Uninstall ${selected} from ${n} device(s)?`,
+      danger: true, confirmLabel: 'Uninstall',
+      typeToConfirm: all && n > 1 ? 'UNINSTALL' : undefined,
+      message: <>
+        <p style={{ marginTop: 0 }}>The Zentriq Agent on each device removes the application silently at its next check-in (within about 2 minutes). Users may lose unsaved work in that application, and some uninstallers restart services.</p>
+        {noAgent > 0 && <p style={{ marginBottom: 0 }}>{noAgent} of these device(s) have no agent (or an outdated one) and will be skipped.</p>}
+      </>,
+    });
+    if (!ok) return;
+    try {
+      const r = await api.post<{ message: string }>('/software/uninstall', all ? { name: selected, all: true } : { name: selected, assetIds: picked });
+      setMsg({ tone: 'info', text: r.message });
+      setPicked([]);
+      installs.reload();
+    } catch (e) { setMsg({ tone: 'crit', text: e instanceof Error ? e.message : String(e) }); }
+  }
 
   return (
     <>
@@ -23,7 +63,7 @@ export function SoftwarePage() {
         <button className="btn" type="submit">Search</button>
       </form>
       <ErrorBox error={data.error} />
-      <div className="grid-2" style={{ gridTemplateColumns: selected ? 'minmax(0,3fr) minmax(0,2fr)' : '1fr' }}>
+      <div className="grid-2" style={{ gridTemplateColumns: selected ? 'minmax(0,2fr) minmax(0,3fr)' : '1fr' }}>
         <Panel flush>
           <DataTable rows={(data.data?.items ?? []).map((r) => ({ ...r, id: r.name }))} empty={data.loading ? 'Loading…' : 'No software inventory yet. Install agents or run a scan with credentials.'} columns={[
             { key: 'n', label: 'Product', render: (r) => <button className="linkish" onClick={() => setSelected(r.name)}><b>{r.name}</b></button> },
@@ -34,13 +74,28 @@ export function SoftwarePage() {
           {data.data && <Pager page={page} pageSize={pageSize} total={data.data.total} onPage={setPage} />}
         </Panel>
         {selected && (
-          <Panel title={selected} sub={installs.data ? `${installs.data.length} device(s)` : ''} right={<button className="btn sm" onClick={() => setSelected(null)}>Close</button>} flush>
+          <Panel title={selected} sub={installs.data ? `${list.length} device(s) · ${ready.length} can be uninstalled remotely` : ''} flush
+            right={<div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {canUninstall && picked.length > 0 && <button className="btn sm danger" onClick={() => void uninstall(false)}>Uninstall from selected ({picked.length})</button>}
+              {canUninstall && ready.length > 0 && <button className="btn sm danger" onClick={() => void uninstall(true)}>Uninstall from all</button>}
+              <button className="btn sm" onClick={() => setSelected(null)}>Close</button>
+            </div>}>
+            {msg && <div style={{ padding: '10px 12px 0' }}><Callout tone={msg.tone} icon={msg.tone === 'crit' ? 'alert' : 'info'}>{msg.text} <Link to="/activity?kind=uninstall">Activity log</Link></Callout></div>}
             <ErrorBox error={installs.error} />
-            <DataTable rows={(installs.data ?? []).map((r, i) => ({ ...r, id: `${r.assetId}-${i}` }))} empty={installs.loading ? 'Loading…' : 'None.'} columns={[
-              { key: 'h', label: 'Device', render: (r) => <Link to={`/assets/${r.assetId}`}>{r.hostname ?? r.ip ?? r.assetId}</Link> },
+            <DataTable rows={list.map((r, i) => ({ ...r, id: `${r.assetId}-${i}` }))} empty={installs.loading ? 'Loading…' : 'None.'} columns={[
+              ...(canUninstall ? [{
+                key: 'sel', label: <input type="checkbox" className="row-sel" aria-label="Select all devices that can be uninstalled" checked={ready.length > 0 && ready.every((r) => picked.includes(r.assetId))} onChange={(e) => setPicked(e.target.checked ? ready.map((r) => r.assetId) : [])} />,
+                render: (r: SoftwareInstall) => r.agent === 'ready'
+                  ? <input type="checkbox" className="row-sel" aria-label={`Select ${r.hostname ?? r.ip}`} checked={picked.includes(r.assetId)} onChange={(e) => setPicked((p) => e.target.checked ? [...p, r.assetId] : p.filter((x) => x !== r.assetId))} />
+                  : null,
+              }] : []),
+              { key: 'h', label: 'Device', render: (r) => <><Link to={`/assets/${r.assetId}`}>{r.hostname ?? r.ip ?? r.assetId}</Link><div className="faint" style={{ fontSize: 11.5 }}>{r.osName ?? ''}</div></> },
               { key: 'v', label: 'Version', render: (r) => r.version ?? '—' },
               { key: 'd', label: 'Installed', render: (r) => fmt.day(r.installedOn) },
-              { key: 's', label: 'Source', render: (r) => fmt.label(r.source) },
+              { key: 'a', label: 'Remote uninstall', render: (r) => r.lastUninstall
+                ? <span title={r.lastUninstall.detail ?? ''}><Pill tone={r.lastUninstall.status === 'succeeded' ? 'ok' : r.lastUninstall.status === 'failed' ? 'crit' : 'warn'}>{r.lastUninstall.status === 'failed' ? 'Failed' : r.lastUninstall.status === 'succeeded' ? 'Removed' : 'Pending'}</Pill></span>
+                : r.agent === 'ready' ? (canUninstall ? <button className="btn sm danger" onClick={() => { void (async () => { const ok = await confirm({ title: `Uninstall ${selected} from ${r.hostname ?? r.ip}?`, danger: true, confirmLabel: 'Uninstall', message: 'The Zentriq Agent removes the application silently at its next check-in (within about 2 minutes). The user may lose unsaved work in it.' }); if (!ok) return; try { const res = await api.post<{ message: string }>('/software/uninstall', { name: selected, assetIds: [r.assetId] }); setMsg({ tone: 'info', text: res.message }); installs.reload(); } catch (e) { setMsg({ tone: 'crit', text: e instanceof Error ? e.message : String(e) }); } })(); }}>Uninstall</button> : <span className="muted">Agent</span>)
+                : <span className="muted" title={r.agent === 'old' ? 'Update the agent to the latest version' : 'Install the Zentriq Agent to uninstall remotely'}>{r.agent === 'old' ? 'Agent update needed' : 'No agent'}</span> },
             ]} />
           </Panel>
         )}

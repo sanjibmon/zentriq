@@ -137,16 +137,24 @@ public static class AgentEndpoints
             var inventoryDue = lastInv is null || lastInv < DateTimeOffset.UtcNow.AddHours(-DefaultInventoryHours) || await RequestedAsync(ds, agent.Id, ct);
             // Pending device actions (service start/stop/restart). Actions older than 1 hour are not handed out any more.
             var actions = new List<object>();
-            if (req.Capabilities?.Contains("service-control") == true)
+            var caps = req.Capabilities ?? [];
+            var kinds = new List<string>();
+            if (caps.Contains("service-control")) kinds.Add("service");
+            if (caps.Contains("software-uninstall")) kinds.Add("uninstall");
+            if (kinds.Count > 0)
             {
+                // Hand out new actions, and re-send ones whose result never arrived (e.g. the device restarted mid-action).
                 await using var act = ds.CreateCommand("""
                     UPDATE zentriq.asset_actions SET status = 'sent', sent_at = now()
-                     WHERE agent_id = @a AND channel = 'agent' AND status IN ('queued','sent') AND requested_at > now() - interval '1 hour'
-                    RETURNING id, kind, target, operation
+                     WHERE agent_id = @a AND channel = 'agent' AND kind = ANY(@k) AND requested_at > now() - interval '24 hours'
+                       AND (status = 'queued' OR (status = 'sent' AND sent_at < now() - interval '30 minutes'))
+                    RETURNING id, kind, target, operation, argument
                     """);
                 act.Parameters.AddWithValue("a", agent.Id);
+                act.Parameters.AddWithValue("k", kinds.ToArray());
                 await using var ar = await act.ExecuteReaderAsync(ct);
-                while (await ar.ReadAsync(ct)) actions.Add(new { id = ar.GetGuid(0), kind = ar.GetString(1), target = ar.GetString(2), operation = ar.GetString(3) });
+                while (await ar.ReadAsync(ct))
+                    actions.Add(new { id = ar.GetGuid(0), kind = ar.GetString(1), target = ar.GetString(2), operation = ar.GetString(3), argument = ar.IsDBNull(4) ? null : ar.GetString(4) });
             }
             return Results.Ok(new
             {

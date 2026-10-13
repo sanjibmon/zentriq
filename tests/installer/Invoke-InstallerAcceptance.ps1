@@ -117,7 +117,7 @@ Remove-Item $answer -Force   # contains the administrator password
 
 if (-not $installed) {
     foreach ($t in 'T02 PostgreSQL provisioning', 'T03 Database migration', 'T04 Administrator sign-in', 'T05 API and worker services', 'T06 Trial initialization',
-                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless') {
+                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline') {
         Record $t.Substring(0, 3) $t.Substring(4) 'BLOCKED' 'installation failed'
     }
 } else {
@@ -390,6 +390,54 @@ if (-not $installed) {
             "$svc restarted by the agent ($($a.detail)); protected service refused"
         } | Out-Null
     } else { Record 'T43' 'Service restart through the agent' 'BLOCKED' 'agent install failed' }
+
+    if ($agentInstalled) {
+        Check 'T45' 'Uninstall software through the Zentriq Agent (single device), recorded in the Activity log' {
+            $s = Login
+            $key = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\CiDummyApp'
+            New-Item $key -Force | Out-Null
+            Set-ItemProperty $key DisplayName 'CI Dummy App'
+            Set-ItemProperty $key DisplayVersion '1.0'
+            Set-ItemProperty $key Publisher 'Zentriq CI'
+            Set-ItemProperty $key UninstallString 'cmd.exe /c exit 1'
+            Set-ItemProperty $key QuietUninstallString ('"' + $env:SystemRoot + '\System32\reg.exe" delete "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\CiDummyApp" /f')
+            $exe = Join-Path $env:ProgramFiles 'Zentriq Agent\ZentriqAgent.exe'
+            Api POST '/assets/collect' @{ assetIds = @($script:agentAsset) } -Session $s | Out-Null
+            Stop-Service ZentriqAgent
+            try {
+                $deadline = (Get-Date).AddMinutes(4)
+                do { & $exe --once *> $null; Start-Sleep 3; $inst = @(Api GET '/inventory/software/installs?name=CI%20Dummy%20App' -Session $s) } while ($inst.Count -eq 0 -and (Get-Date) -lt $deadline)
+                Assert ($inst.Count -ge 1) 'dummy application not in the inventory'
+                Assert ($inst[0].agent -eq 'ready') "agent state $($inst[0].agent)"
+                $r = Api POST '/software/uninstall' @{ name = 'CI Dummy App'; assetIds = @($script:agentAsset) } -Session $s
+                Assert ($r.sent -eq 1) "sent $($r.sent): $($r.message)"
+                $p = Invoke-WebRequest "$base/api/v1/software/uninstall" -Method Post -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } -ContentType 'application/json' -Body '{"name":"Zentriq Agent","all":true}' -SkipHttpErrorCheck
+                Assert ($p.StatusCode -eq 409) "uninstalling the Zentriq Agent returned $($p.StatusCode)"
+                $deadline = (Get-Date).AddMinutes(4)
+                do { & $exe --once *> $null; Start-Sleep 3; $a = (Api GET "/activity?kind=uninstall&assetId=$($script:agentAsset)" -Session $s).items | Select-Object -First 1 } while ($a.status -notin 'succeeded', 'failed' -and (Get-Date) -lt $deadline)
+            } finally { Start-Service ZentriqAgent }
+            Assert ($a.status -eq 'succeeded') "uninstall $($a.status): $($a.detail)"
+            Assert (-not (Test-Path $key)) 'uninstall registration still present'
+            $left = @(Api GET '/inventory/software/installs?name=CI%20Dummy%20App' -Session $s)
+            Assert ($left.Count -eq 0) 'software still listed after uninstall'
+            "uninstalled via agent: $($a.detail); protected software refused; removed from inventory"
+        } | Out-Null
+    } else { Record 'T45' 'Software uninstall through the agent' 'BLOCKED' 'agent install failed' }
+
+    Check 'T46' 'Dashboard drill-down filters and offline timeline on assets' {
+        $s = Login
+        $o = Api GET '/dashboard/overview' -Session $s
+        Assert ($null -ne $o.disk -and $null -ne $o.cores -and $null -ne $o.seen) 'overview lacks disk/cores/seen'
+        $v = Api GET '/assets?facet=type&value=virtual' -Session $s
+        Assert (@($v.items | Where-Object id -eq $script:agentAsset).Count -eq 1) 'type=virtual drill-down does not list the VM'
+        $c = (@($o.cores) | Select-Object -First 1)
+        if ($c) { $cl = Api GET "/assets?facet=cores&value=$([uri]::EscapeDataString($c.key))" -Session $s; Assert ($cl.total -eq $c.count) "cores '$($c.key)': chart $($c.count) vs list $($cl.total)" }
+        $a = Api GET "/assets/$($script:agentAsset)" -Session $s
+        Assert ($null -ne $a.lastContactAt -and $null -ne $a.offlineDays) 'no last-contact fields'
+        $old = Api GET '/assets?offlineDays=7' -Session $s
+        Assert (@($old.items | Where-Object id -eq $script:agentAsset).Count -eq 0) 'recently seen asset listed as offline 7+ days'
+        "drill-down by type and cores matches the charts; offlineDays $($a.offlineDays), online $($a.online)"
+    } | Out-Null
 
     if ($agentInstalled) {
         Check 'T29' 'Agent revocation is enforced and uninstall removes the agent' {

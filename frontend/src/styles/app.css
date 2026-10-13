@@ -158,3 +158,33 @@ button.link:hover { text-decoration: underline; }
 @keyframes ba-in { from { opacity: 0; transform: translateY(6px); } }
 @media (prefers-reduced-motion: reduce) { .ba-pulse, .ba-sweep, .ba-link, .ba-card { animation: none; } }
 @media (max-width: 860px) { .brand-art { display: none; } }
+
+/* ---- Confirmation dialog ---- */
+.modal-scrim:has(.confirm-card) { z-index: 120; }
+.confirm-card { width: min(480px, 100%); }
+.confirm-card header { gap: 10px; }
+.confirm-card header.danger { border-bottom-color: color-mix(in srgb, var(--crit) 35%, var(--line)); }
+.confirm-card .cf-icon { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--crit-soft); color: var(--crit); flex: none; }
+.confirm-card .cf-icon svg { width: 17px; height: 17px; }
+.btn.danger-solid { background: var(--crit); border-color: var(--crit); color: #fff; }
+.btn.danger-solid:hover:not(:disabled) { filter: brightness(1.08); }
+.btn.danger-solid:disabled { opacity: .5; }
+
+/* ---- Customizable dashboard grid ---- */
+.dash-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-bottom: 14px; align-items: start; }
+.dash-grid > div > .panel { height: 100%; }
+.dash-wide { grid-column: span 2; }
+.dash-full { grid-column: 1 / -1; }
+.dash-full .dash-hero { margin-bottom: 0; }
+@media (max-width: 1250px) { .dash-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 800px) { .dash-grid { grid-template-columns: 1fr; } .dash-wide { grid-column: auto; } }
+.big-stat b { font-size: 26px; font-variant-numeric: tabular-nums; }
+.posture .stack span.hit { cursor: pointer; }
+.posture .stack span.hit:hover { filter: brightness(1.15); }
+.cz-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; max-height: 60vh; overflow: auto; }
+.cz-list li { display: flex; gap: 8px; align-items: center; border: 1px solid var(--line); border-radius: 7px; padding: 7px 9px; background: var(--surface); }
+.cz-list li.off { opacity: .6; }
+.cz-list .grip { cursor: grab; color: var(--faint); letter-spacing: -2px; user-select: none; }
+.filter-chip { display: inline-flex; gap: 6px; align-items: center; background: var(--accent-soft); color: var(--accent); border-radius: 999px; padding: 4px 6px 4px 12px; font-size: 13px; font-weight: 500; }
+.filter-chip button { border: 0; background: none; color: inherit; cursor: pointer; font-size: 15px; line-height: 1; padding: 0 4px; }
+.offline-days { font-variant-numeric: tabular-nums; }

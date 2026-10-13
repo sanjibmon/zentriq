@@ -115,7 +115,11 @@ public static class InventoryEndpoints
         g.MapGet("/software/installs", async (NpgsqlDataSource ds, string name, CancellationToken ct) =>
         {
             await using var cmd = ds.CreateCommand("""
-                SELECT a.id, a.hostname, host(a.primary_ip), a.os_name, s.version, s.installed_on, s.source
+                SELECT a.id, a.hostname, host(a.primary_ip), a.os_name, s.version, s.installed_on, s.source,
+                       (SELECT CASE WHEN 'software-uninstall' = ANY(r.capabilities) THEN 'ready' ELSE 'old' END FROM zentriq.agent_registrations r
+                         WHERE r.asset_id = a.id AND r.status = 'active' ORDER BY r.last_checkin_at DESC NULLS LAST LIMIT 1),
+                       (SELECT x.status || '|' || COALESCE(x.detail, '') FROM zentriq.asset_actions x
+                         WHERE x.asset_id = a.id AND x.kind = 'uninstall' AND lower(x.target) = lower(s.name) ORDER BY x.requested_at DESC LIMIT 1)
                   FROM zentriq.software_inventory s JOIN zentriq.assets a ON a.id = s.asset_id AND a.status = 'active'
                  WHERE s.name = @n ORDER BY lower(a.hostname) LIMIT 2000
                 """);
@@ -127,6 +131,8 @@ public static class InventoryEndpoints
                 {
                     assetId = r.GetGuid(0), hostname = r.IsDBNull(1) ? null : r.GetString(1), ip = r.IsDBNull(2) ? null : r.GetString(2), osName = r.IsDBNull(3) ? null : r.GetString(3),
                     version = r.IsDBNull(4) ? null : r.GetString(4), installedOn = r.IsDBNull(5) ? (DateOnly?)null : r.GetFieldValue<DateOnly>(5), source = r.GetString(6),
+                    agent = r.IsDBNull(7) ? "none" : r.GetString(7),
+                    lastUninstall = r.IsDBNull(8) ? null : r.GetString(8).Split('|', 2) is var u ? new { status = u[0], detail = u.Length > 1 ? u[1] : null } : null,
                 });
             return Results.Ok(list);
         }).RequireAuthorization(Permissions.AssetsView);

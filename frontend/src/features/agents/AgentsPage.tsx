@@ -6,6 +6,7 @@ import { Link } from '../../app/router';
 import { useApi } from '../../app/useApi';
 import { CopyBox } from '../../components/CopyBox';
 import { Callout, DataTable, ErrorBox, fmt, Kpis, PageHead, Panel, Pill, type Tone } from '../../components/ui';
+import { useConfirm } from '../../components/Confirm';
 
 const HEALTH: Record<AgentRow['health'], [string, Tone]> = {
   online: ['Online', 'ok'],
@@ -26,6 +27,7 @@ function suggestedUrl(p: AgentPackage | null): string {
 export function AgentsPage() {
   const { can } = useAuth();
   const manage = can('agents.manage');
+  const confirm = useConfirm();
   const [tab, setTab] = useState<'agents' | 'codes'>('agents');
   const [created, setCreated] = useState<NewEnrollmentToken | null>(null);
   const [newOpen, setNewOpen] = useState(false);
@@ -37,7 +39,7 @@ export function AgentsPage() {
   const count = (h: AgentRow['health']) => rows.filter((r) => r.health === h).length;
 
   async function revoke(a: AgentRow) {
-    if (!window.confirm(`Revoke the agent on ${a.hostname ?? a.id}? It will stop reporting until it is enrolled again.`)) return;
+    if (!(await confirm({ title: `Revoke the agent on ${a.hostname ?? a.id}?`, danger: true, confirmLabel: 'Revoke agent', message: 'Its certificate is no longer accepted: the device stops reporting inventory and cannot receive service or uninstall actions until it is enrolled again. The asset and its history are kept.' }))) return;
     await api.post(`/agents/${a.id}/revoke`);
     agents.reload();
   }
@@ -55,7 +57,7 @@ export function AgentsPage() {
     }
   }
   async function revokeToken(t: EnrollmentToken) {
-    if (!window.confirm(`Revoke enrollment code "${t.name}"? Agents already enrolled are not affected.`)) return;
+    if (!(await confirm({ title: `Revoke enrollment code "${t.name}"?`, danger: true, confirmLabel: 'Revoke code', message: 'Devices can no longer enroll with this code (deployments that still use it will fail). Agents already enrolled are not affected.' }))) return;
     await api.post(`/agents/enrollment-tokens/${t.id}/revoke`);
     tokens.reload();
   }
@@ -64,7 +66,7 @@ export function AgentsPage() {
     <>
       <PageHead title="Agents" desc="The Zentriq Agent reports inventory from Windows devices that agentless scans cannot reach — laptops off the network, branch offices, locked-down hosts. It only connects out to this server over HTTPS."
         actions={<>
-          {pkg.data?.package && <a className="btn" href={pkg.data.package.url} download>Download agent (MSI{pkg.data.package.version ? ` ${pkg.data.package.version}` : ''})</a>}
+          {pkg.data?.package && <a className="btn" href={pkg.data.package.url} download>Download agent</a>}
           {manage && <button className="btn primary" onClick={() => setNewOpen(true)}>New enrollment code</button>}
         </>} />
       {msg && <Callout>{msg}</Callout>}

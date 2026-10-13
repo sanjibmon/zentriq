@@ -10,6 +10,7 @@ import { SoftwarePage } from '../features/inventory/SoftwarePage';
 import { HardwarePage } from '../features/inventory/HardwarePage';
 import { AssetDetailPage } from '../features/inventory/AssetDetailPage';
 import { ModulePage } from '../features/placeholder/ModulePage';
+import { ActivityPage } from '../features/activity/ActivityPage';
 import { LoginPage } from '../features/login/LoginPage';
 import { ResetPasswordPage } from '../features/login/ResetPasswordPage';
 import { AccountPage, MfaRequiredPage } from '../features/account/AccountPage';
@@ -17,6 +18,7 @@ import { Shell } from '../components/Shell';
 import { LogoMark } from '../components/Logo';
 import { AuthProvider, useAuth } from './auth';
 import { Router, useRouter } from './router';
+import { ConfirmProvider } from '../components/Confirm';
 
 function Routes() {
   const { path } = useRouter();
@@ -27,6 +29,7 @@ function Routes() {
   if (path === '/software') return <SoftwarePage />;
   if (path === '/hardware') return <HardwarePage />;
   if (path === '/agents') return <AgentsPage />;
+  if (path === '/activity') return <ActivityPage />;
   if (path === '/discovery') return <DiscoveryPage />;
   if (path === '/licensing') return <LicensingPage />;
   if (path === '/users') return <UsersPage />;
@@ -60,7 +63,9 @@ export function App() {
   return (
     <Router>
       <AuthProvider>
-        <Gate />
+        <ConfirmProvider>
+          <Gate />
+        </ConfirmProvider>
       </AuthProvider>
     </Router>
   );

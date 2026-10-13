@@ -3,7 +3,7 @@ import { api } from '../../api/client';
 import type { Asset, AssetInventory } from '../../api/types';
 import { Link } from '../../app/router';
 import { useAuth } from '../../app/auth';
-import { typeLabel } from '../assets/AssetsPage';
+import { Availability, typeLabel } from '../assets/AssetsPage';
 import { ServiceActionDialog, type ControlInfo, type ServiceActionRow } from './ServiceControl';
 import { useApi } from '../../app/useApi';
 import { Callout, DataTable, ErrorBox, fmt, Loading, PageHead, Panel, Pill, statusTone } from '../../components/ui';
@@ -58,7 +58,7 @@ export function AssetDetailPage({ id }: { id: string }) {
 
   return (
     <>
-      <PageHead title={a.hostname ?? a.ip ?? 'Asset'} desc={<>{typeLabel({ ...a, chassis: d?.device.chassis ?? a.chassis, isVirtual: d?.hardware.isVirtual ?? a.isVirtual })} · {a.osName ?? fmt.label(a.osFamily)} · <Pill tone={statusTone(a.status)}>{fmt.label(a.status)}</Pill></>}
+      <PageHead title={a.hostname ?? a.ip ?? 'Asset'} desc={<>{typeLabel({ ...a, chassis: d?.device.chassis ?? a.chassis, isVirtual: d?.hardware.isVirtual ?? a.isVirtual })} · {a.osName ?? fmt.label(a.osFamily)} · <Pill tone={statusTone(a.status)}>{fmt.label(a.status)}</Pill> · <Availability a={a} long /></>}
         actions={<>
           {can('scans.run') && <button className="btn primary" onClick={() => void collectNow()}>Collect inventory now</button>}
           <Link className="btn" to="/assets">All assets</Link>
@@ -91,7 +91,7 @@ export function AssetDetailPage({ id }: { id: string }) {
               ['Architecture', d?.os.architecture as string | null], ['Installed', fmt.day(d?.os.installDate as string | null)], ['Last boot', fmt.date(d?.os.lastBoot as string | null)],
               ['Inventory source', inv.data?.source ? fmt.label(inv.data.source) : null], ['Collected', fmt.date(inv.data?.collectedAt)],
               ['Agent', inv.data?.agent ? <><Pill tone={inv.data.agent.status === 'active' ? 'ok' : 'crit'}>{fmt.label(inv.data.agent.status)}</Pill> {inv.data.agent.version} · checked in {fmt.ago(inv.data.agent.lastCheckinAt)}</> : 'Not installed'],
-              ['First seen', fmt.date(a.firstSeenAt)], ['Last seen', fmt.date(a.lastSeenAt)],
+              ['First seen', fmt.date(a.firstSeenAt)], ['Last contact', <><Availability a={a} long /> <span className="muted">{fmt.date(a.lastContactAt ?? a.lastSeenAt)}</span></>],
             ]} />
             {d && d.errors.length > 0 && <Callout tone="warn" icon="alert">Some sections could not be collected: {d.errors.join('; ')}</Callout>}
           </Panel>
@@ -199,20 +199,17 @@ export function AssetDetailPage({ id }: { id: string }) {
       {tab === 'services' && (
         <>
           {control.data?.note && <Callout tone="warn" icon="alert">{control.data.note}</Callout>}
-          {(actions.data ?? []).length > 0 && (
-            <Panel title="Recent service actions" flush>
-              <DataTable rows={(actions.data ?? []).slice(0, 8)} columns={[
-                { key: 't', label: 'When', render: (x) => fmt.ago(x.requestedAt) },
-                { key: 'a', label: 'Action', render: (x) => <><b>{fmt.label(x.operation)}</b> <span className="mono">{x.target}</span></> },
-                { key: 'c', label: 'Via', render: (x) => x.channel === 'agent' ? 'Agent' : 'WinRM / WMI' },
-                { key: 's', label: 'Result', render: (x) => <Pill tone={x.status === 'succeeded' ? 'ok' : x.status === 'failed' ? 'crit' : 'warn'}>{fmt.label(x.status)}</Pill> },
-                { key: 'd', label: 'Detail', className: 'wrap', render: (x) => <span style={{ fontSize: 12.5 }}>{x.detail ?? (x.status === 'sent' ? 'Delivered to the agent…' : x.status === 'queued' ? 'Waiting for the agent to check in…' : '')}</span> },
-                { key: 'b', label: 'By', render: (x) => x.requestedBy ?? '—' },
-              ]} />
-            </Panel>
-          )}
+          {(() => {
+            const last = (actions.data ?? [])[0];
+            return last ? (
+              <Callout icon={last.status === 'failed' ? 'alert' : 'info'} tone={last.status === 'failed' ? 'crit' : last.status === 'succeeded' ? 'ok' : 'info'}>
+                Last action: <b>{fmt.label(last.operation)}</b> <span className="mono">{last.target}</span> — {fmt.label(last.status)}{last.detail ? `: ${last.detail}` : ''} ({fmt.ago(last.requestedAt)}).{' '}
+                <Link to={`/activity?assetId=${id}`}>Service activity log</Link>
+              </Callout>
+            ) : null;
+          })()}
           <Panel flush right={<input className="in" placeholder="Filter…" value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Filter services" />} title="Services"
-            sub={control.data ? (control.data.channel === 'agent' ? 'Start, stop and restart run through the Zentriq Agent' : 'Start, stop and restart run over WinRM/WMI with an administrator account') : undefined}>
+            sub={<>{control.data ? (control.data.channel === 'agent' ? 'Start, stop and restart run through the Zentriq Agent · ' : 'Start, stop and restart run over WinRM/WMI with an administrator account · ') : ''}<Link to={`/activity?assetId=${id}`}>Activity log</Link></>}>
             <DataTable rows={(d?.services ?? []).filter((s) => !f || s.name.toLowerCase().includes(f) || (s.displayName ?? '').toLowerCase().includes(f)).map((x, i) => ({ ...x, id: i }))} empty="No services collected." columns={[
               { key: 'n', label: 'Service', className: 'wrap', render: (x) => <><b>{x.displayName ?? x.name}</b><div className="faint mono" style={{ fontSize: 11 }}>{x.name}</div></> },
               { key: 's', label: 'State', render: (x) => <Pill tone={/^running$/i.test(x.state ?? '') ? 'ok' : /pending/i.test(x.state ?? '') ? 'warn' : ''}>{x.state ?? '—'}</Pill> },

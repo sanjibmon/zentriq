@@ -5,6 +5,7 @@ import { useAuth } from '../../app/auth';
 import { Link } from '../../app/router';
 import { useApi } from '../../app/useApi';
 import { Callout, DataTable, ErrorBox, fmt, Pager, Panel, Pill, statusTone } from '../../components/ui';
+import { useConfirm } from '../../components/Confirm';
 
 type ObjType = 'computers' | 'users' | 'groups' | 'ous';
 const OBJ_LABEL: Record<ObjType, string> = { computers: 'Computers', users: 'Users', groups: 'Groups', ous: 'Organizational units' };
@@ -21,6 +22,7 @@ export function errorText(err: unknown): string {
 export function DirectoryPanel({ onScan }: { onScan: (connectionId: string) => void }) {
   const { can } = useAuth();
   const manage = can('directory.manage');
+  const confirm = useConfirm();
   const conns = useApi(() => api.get<DirectoryConnection[]>('/directory/connections'), []);
   const [edit, setEdit] = useState<DirectoryConnection | 'new' | null>(null);
   const [msg, setMsg] = useState<{ tone: 'ok' | 'crit' | 'info'; text: string } | null>(null);
@@ -53,7 +55,7 @@ export function DirectoryPanel({ onScan }: { onScan: (connectionId: string) => v
     }
   }
   async function remove(c: DirectoryConnection) {
-    if (!window.confirm(`Delete the connection "${c.name}" and the directory objects read with it? Assets are not deleted.`)) return;
+    if (!(await confirm({ title: `Delete the connection "${c.name}"?`, danger: true, message: 'The connection, its encrypted password and the users, groups, OUs and computers read with it are deleted. Assets in the inventory are not deleted.' }))) return;
     await api.del(`/directory/connections/${c.id}`);
     if (selected === c.id) setSelected(null);
     conns.reload();

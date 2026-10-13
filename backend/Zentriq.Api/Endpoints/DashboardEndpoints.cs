@@ -13,7 +13,9 @@ public static class DashboardEndpoints
     public sealed record DashboardBody(string Name, bool Shared, JsonElement? Filters, int RefreshSeconds, WidgetBody[] Widgets);
 
     public static readonly string[] WidgetTypes =
-        ["kpi.assets", "assets.byCategory", "assets.byOs", "assets.byInventory", "assets.byCriticality", "scans.recent", "jobs.active", "license.status", "license.usage"];
+        ["kpi.assets", "assets.byCategory", "assets.byOs", "assets.byInventory", "assets.byCriticality", "scans.recent", "jobs.active", "license.status", "license.usage",
+         "kpi.tiles", "assets.category", "assets.type", "assets.coverage", "assets.trend", "assets.os", "assets.seen", "security.posture", "agents.health",
+         "software.top", "hw.vendor", "hw.cores", "hw.cpu", "hw.ram", "hw.disk", "hw.free", "scans.results", "scans.recent", "license.usage"];
 
     public static void MapDashboardEndpoints(this RouteGroupBuilder api)
     {

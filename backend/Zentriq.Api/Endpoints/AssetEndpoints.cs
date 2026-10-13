@@ -15,7 +15,8 @@ public static class AssetEndpoints
         string Workload, string? OsFamily, string? OsName, string Status, string Criticality, string? OwnerName, string Source,
         string InventoryStatus, DateTimeOffset FirstSeenAt, DateTimeOffset LastSeenAt, DateTimeOffset? LastInventoryAt, int RowVersion,
         IReadOnlyList<string>? Ipv4 = null, IReadOnlyList<string>? Ipv6 = null, string? LoggedOnUser = null, string? Chassis = null,
-        bool? IsVirtual = null, Guid? AgentId = null, string? AgentHealth = null, string? InventorySource = null);
+        bool? IsVirtual = null, Guid? AgentId = null, string? AgentHealth = null, string? InventorySource = null,
+        DateTimeOffset? AgentLastCheckinAt = null, DateTimeOffset? LastContactAt = null, int? OfflineDays = null, bool? Online = null);
 
     public sealed record AssetBody(string? Hostname, string? Ip, string? SerialNumber, string Category, string? OsFamily,
         string? OsName, string? Criticality, string? OwnerName, int? RowVersion);
@@ -31,7 +32,7 @@ public static class AssetEndpoints
     {
         var g = api.MapGroup("/assets").WithTags("Assets").RequireModule(Modules.Inventory);
 
-        g.MapGet("", async (ZentriqDbContext db, NpgsqlDataSource ds, string? q, string? category, string? status, string? agent, string? inventory, string? sort, string? dir, int? page, int? pageSize, CancellationToken ct) =>
+        g.MapGet("", async (ZentriqDbContext db, NpgsqlDataSource ds, string? q, string? category, string? status, string? agent, string? inventory, string? facet, string? value, int? offlineDays, string? sort, string? dir, int? page, int? pageSize, CancellationToken ct) =>
         {
             var (p, ps) = Paging.Normalize(page, pageSize);
             var query = db.Assets.AsNoTracking().AsQueryable();
@@ -56,6 +57,20 @@ public static class AssetEndpoints
                 var withAgent = await db.Database.SqlQuery<Guid>($"SELECT DISTINCT asset_id AS \"Value\" FROM zentriq.agent_registrations WHERE status = 'active' AND asset_id IS NOT NULL").ToListAsync(ct);
                 query = agent == "with" ? query.Where(a => withAgent.Contains(a.Id)) : query.Where(a => !withAgent.Contains(a.Id));
             }
+            if (!string.IsNullOrEmpty(facet) && AssetFacets.Expr.TryGetValue(facet, out var fexpr) && value is not null)
+            {
+                // Same expression as the dashboard chart that was clicked; "Other" is the remainder of a top-N chart.
+                var sql = value == "Other" && facet is "os" or "vendor" or "cpu"
+                    ? $"SELECT a.id AS \"Value\" {AssetFacets.From} WHERE {fexpr} IS NOT NULL AND {fexpr} NOT IN (SELECT k FROM (SELECT {fexpr} AS k, count(*) AS n {AssetFacets.From} WHERE a.status = 'active' AND {fexpr} IS NOT NULL GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 7) t)"
+                    : $"SELECT a.id AS \"Value\" {AssetFacets.From} WHERE {fexpr} = @v";
+                var facetIds = await IdsAsync(ds, sql, ct, new NpgsqlParameter("v", value));
+                query = query.Where(a => facetIds.Contains(a.Id));
+            }
+            if (offlineDays is > 0)
+            {
+                var offIds = await IdsAsync(ds, $"SELECT a.id {AssetFacets.From} WHERE {AssetFacets.OfflineDays} >= @d", ct, new NpgsqlParameter("d", offlineDays.Value));
+                query = query.Where(a => offIds.Contains(a.Id));
+            }
             if (inventory is "success" or "not_collected" or "failed" or "unavailable") query = query.Where(a => a.InventoryStatus == inventory);
             if (inventory == "missing") query = query.Where(a => a.InventoryStatus != "success");
             if (!string.IsNullOrEmpty(category)) query = query.Where(a => a.Category == category);
@@ -65,6 +80,7 @@ public static class AssetEndpoints
             {
                 "lastSeenAt" => desc ? query.OrderByDescending(a => a.LastSeenAt) : query.OrderBy(a => a.LastSeenAt),
                 "category" => desc ? query.OrderByDescending(a => a.Category) : query.OrderBy(a => a.Category),
+                "offline" => desc ? query.OrderBy(a => a.LastSeenAt) : query.OrderByDescending(a => a.LastSeenAt),
                 "criticality" => desc ? query.OrderByDescending(a => a.Criticality) : query.OrderBy(a => a.Criticality),
                 _ => desc ? query.OrderByDescending(a => a.Hostname) : query.OrderBy(a => a.Hostname),
             };
@@ -162,6 +178,18 @@ public static class AssetEndpoints
         }).RequireAuthorization(Permissions.AssetsView);
     }
 
+    private static async Task<List<Guid>> IdsAsync(NpgsqlDataSource ds, string sql, CancellationToken ct, params NpgsqlParameter[] ps)
+    {
+        await using var cmd = ds.CreateCommand(sql);
+        cmd.Parameters.AddRange(ps);
+        var ids = new List<Guid>();
+        await using var r = await cmd.ExecuteReaderAsync(ct);
+        while (await r.ReadAsync(ct)) ids.Add(r.GetGuid(0));
+        return ids;
+    }
+
+    private static DateTimeOffset Max(DateTimeOffset? a, DateTimeOffset b) => a is { } x && x > b ? x : b;
+
     private static string? Display(IPAddress? ip) => ip is null ? null : ip.IsIPv4MappedToIPv6 ? ip.MapToIPv4().ToString() : ip.ToString();
 
     /// <summary>Addresses, logged-on user, device type and agent state from the latest inventory, for a page of assets.</summary>
@@ -207,7 +235,10 @@ public static class AssetEndpoints
                     Ipv4 = v4.Distinct().ToList(), Ipv6 = showV6 ? v6.Distinct().ToList() : null,
                     LoggedOnUser = r.IsDBNull(1) ? null : r.GetString(1), Chassis = r.IsDBNull(3) ? null : r.GetString(3),
                     IsVirtual = r.IsDBNull(4) ? null : r.GetBoolean(4), InventorySource = r.IsDBNull(5) ? null : r.GetString(5),
-                    AgentId = r.IsDBNull(6) ? null : r.GetGuid(6), AgentHealth = health,
+                    AgentId = r.IsDBNull(6) ? null : r.GetGuid(6), AgentHealth = health, AgentLastCheckinAt = lastCheckin,
+                    LastContactAt = Max(lastCheckin, a.LastSeenAt),
+                    OfflineDays = (int)Math.Floor((DateTimeOffset.UtcNow - Max(lastCheckin, a.LastSeenAt)).TotalDays),
+                    Online = lastCheckin is { } lc && lc > DateTimeOffset.UtcNow.AddMinutes(-30) ? true : r.IsDBNull(6) ? null : false,
                 };
             }
         return items.Select(i => extra.TryGetValue(i.Id, out var e) ? e : i).ToList();

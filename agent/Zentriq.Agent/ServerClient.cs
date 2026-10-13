@@ -44,6 +44,7 @@ internal sealed class AgentAction
     [JsonPropertyName("kind")] public string Kind { get; set; } = "";
     [JsonPropertyName("target")] public string Target { get; set; } = "";
     [JsonPropertyName("operation")] public string Operation { get; set; } = "";
+    [JsonPropertyName("argument")] public string? Argument { get; set; }
 }
 
 internal sealed class RenewResponse
@@ -130,7 +131,7 @@ internal sealed class ServerClient : IDisposable
         PostJsonAsync<CheckinResponse>("api/agent/v1/checkin", new Dictionary<string, object?>
         {
             ["agentVersion"] = Program.Version, ["hostname"] = hostname, ["osName"] = osName, ["lastError"] = lastError,
-            ["capabilities"] = new[] { "service-control" },
+            ["capabilities"] = new[] { "service-control", "software-uninstall" },
         }, ct);
 
     public async Task ReportActionAsync(string actionId, bool ok, string? state, string message, CancellationToken ct)

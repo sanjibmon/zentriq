@@ -26,12 +26,13 @@ public static class Permissions
     public const string AgentsManage = "agents.manage";
     public const string DirectoryManage = "directory.manage";
     public const string AssetsControl = "assets.control";
+    public const string SoftwareUninstall = "software.uninstall";
 
     public static readonly IReadOnlyList<string> All =
     [
         AssetsView, AssetsManage, ScansRun, ScansProfiles, CredentialsManage, PatchApprove, PatchDeploy,
         DeployRun, RemoteStart, RemoteUnattended, ReportsDesign, ReportsExport, DashboardsShare, VulnExcept,
-        JobsView, UsersManage, LicensingManage, BackupRun, SettingsManage, AuditView, AgentsManage, DirectoryManage, AssetsControl
+        JobsView, UsersManage, LicensingManage, BackupRun, SettingsManage, AuditView, AgentsManage, DirectoryManage, AssetsControl, SoftwareUninstall
     ];
 }
 

@@ -198,7 +198,12 @@ internal sealed class AgentWorker
         foreach (var a in actions)
         {
             bool ok; string? st; string msg;
-            try { (ok, st, msg) = ServiceActions.Run(a.Kind, a.Target, a.Operation, TimeSpan.FromSeconds(60)); }
+            try
+            {
+                (ok, st, msg) = a.Kind == "uninstall"
+                    ? SoftwareActions.Uninstall(a.Target, a.Argument, TimeSpan.FromMinutes(20))
+                    : ServiceActions.Run(a.Kind, a.Target, a.Operation, TimeSpan.FromSeconds(60));
+            }
             catch (Exception ex) { ok = false; st = null; msg = ex.Message; }
             Log.Info($"Action {a.Operation} {a.Target}: {(ok ? "OK" : "FAILED")} - {msg}");
             try { client.ReportActionAsync(a.Id, ok, st, msg, ct).GetAwaiter().GetResult(); }

@@ -7,10 +7,12 @@ import { useAuth } from '../../app/auth';
 import { Link, useRouter } from '../../app/router';
 import { useApi } from '../../app/useApi';
 import { Callout, DataTable, ErrorBox, fmt, PageHead, Pager, Panel, Pill, statusTone } from '../../components/ui';
+import { useConfirm } from '../../components/Confirm';
 
 export function DiscoveryPage() {
   const { can } = useAuth();
   const { query, navigate } = useRouter();
+  const confirm = useConfirm();
   const [page, setPage] = useState(1);
   const [open, setOpen] = useState(query.get('new') === '1');
   const initialTab = query.get('tab');
@@ -35,19 +37,19 @@ export function DiscoveryPage() {
   }
   const finished = (sc: Scan) => !['queued', 'running', 'cancelling'].includes(sc.status);
   async function removeOne(sc: Scan) {
-    if (!window.confirm(`Delete scan "${sc.name || `#${sc.number}`}" and its results? Devices it found stay in the asset inventory.`)) return;
+    if (!(await confirm({ title: `Delete scan "${sc.name || `#${sc.number}`}"?`, danger: true, message: 'The scan, its per-device results and its log are deleted. Devices it found stay in the asset inventory.' }))) return;
     try { await api.del(`/discovery/scans/${sc.id}`); setNote({ tone: 'ok', text: 'Scan deleted.' }); } catch (e) { setNote({ tone: 'crit', text: errorText(e) }); }
     setPicked((p) => p.filter((x) => x !== sc.id));
     scans.reload();
   }
   async function removePicked() {
-    if (!window.confirm(`Delete ${picked.length} selected scan(s) and their results? Devices they found stay in the asset inventory.`)) return;
+    if (!(await confirm({ title: `Delete ${picked.length} selected scan(s)?`, danger: true, message: 'The scans, their per-device results and logs are deleted. Devices they found stay in the asset inventory.' }))) return;
     try { const r = await api.post<{ deleted: number }>('/discovery/scans/delete', { ids: picked }); setNote({ tone: 'ok', text: `${r.deleted} scan(s) deleted.` }); } catch (e) { setNote({ tone: 'crit', text: errorText(e) }); }
     setPicked([]);
     scans.reload();
   }
   async function removeOld() {
-    const v = window.prompt('Delete finished scans older than how many days?', '30');
+    const v = await confirm({ title: 'Delete old scans', danger: true, message: 'Finished scans older than the number of days you enter are deleted with their results and logs. Devices they found stay in the asset inventory.', input: { label: 'Older than (days)', defaultValue: '30', type: 'number', min: 1 } });
     if (v === null) return;
     const days = Number(v);
     if (!Number.isInteger(days) || days < 1) { setNote({ tone: 'crit', text: 'Enter a whole number of days (1 or more).' }); return; }

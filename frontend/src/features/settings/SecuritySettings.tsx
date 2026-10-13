@@ -3,6 +3,7 @@ import { api } from '../../api/client';
 import type { SmtpConfig } from '../../api/types';
 import { useApi } from '../../app/useApi';
 import { Callout, ErrorBox, Panel } from '../../components/ui';
+import { useConfirm } from '../../components/Confirm';
 import { errorText } from '../discovery/DirectoryPanel';
 
 type Settings = Record<string, unknown>;
@@ -10,6 +11,7 @@ type Settings = Record<string, unknown>;
 /** Sign-in policy (MFA, lockout, reset link lifetime) and the SMTP server used for password-reset e-mails. */
 export function SecuritySettings() {
   const settings = useApi(() => api.get<Settings>('/system/settings'), []);
+  const confirm = useConfirm();
   const smtp = useApi(() => api.get<SmtpConfig>('/system/smtp'), []);
   const [msg, setMsg] = useState<{ tone: 'ok' | 'crit'; text: string } | null>(null);
   const s = settings.data;
@@ -29,8 +31,11 @@ export function SecuritySettings() {
             <div className="form-v">
               <label className="row-check">
                 <input type="checkbox" checked={s['security.mfa_required'] === true} onChange={(e) => {
-                  if (e.target.checked && !window.confirm('Require two-step verification for every user? Users without it must set up an authenticator app at their next sign-in before they can use Zentriq. Set it up for your own account first (My account).')) return;
-                  void put('security.mfa_required', e.target.checked);
+                  const on = e.target.checked;
+                  void (async () => {
+                    if (on && !(await confirm({ title: 'Require two-step verification for every user?', confirmLabel: 'Require MFA', message: 'Users without MFA must set up an authenticator app at their next sign-in before they can use Zentriq. Set it up for your own account first (My account).' }))) return;
+                    await put('security.mfa_required', on);
+                  })();
                 }} />
                 <span><b>Require two-step verification (MFA) for all users</b><br /><small className="muted">Microsoft Authenticator, Google Authenticator or any TOTP app.</small></span>
               </label>

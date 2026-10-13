@@ -19,6 +19,7 @@ export const NAV: [string, NavItem[]][] = [
     { id: 'hardware', label: 'Hardware Inventory', icon: 'cpu', path: '/hardware', ready: true },
     { id: 'software', label: 'Software Inventory', icon: 'apps', path: '/software', ready: true },
     { id: 'agents', label: 'Agents', icon: 'host', path: '/agents', ready: true },
+    { id: 'activity', label: 'Activity Log', icon: 'activity', path: '/activity', ready: true },
     { id: 'licenses', label: 'Software Licenses', icon: 'key', path: '/modules/licenses', ready: false },
     { id: 'webapps', label: 'Web Apps & Accounts', icon: 'globe', path: '/modules/webapps', ready: false },
   ]],

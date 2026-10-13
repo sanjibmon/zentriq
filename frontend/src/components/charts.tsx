@@ -124,21 +124,25 @@ export function TrendArea({ points, height = 170 }: { points: { label: string; t
 }
 
 /** Security controls: compliant / not compliant / unknown as a stacked bar per control. */
-export function PostureBars({ rows, onSelect }: { rows: { key: string; yes: number; no: number; unknown: number }[]; onSelect?: (key: string) => void }) {
+export function PostureBars({ rows, onSelect }: { rows: { key: string; yes: number; no: number; unknown: number }[]; onSelect?: (key: string, part: 'yes' | 'no' | 'unknown') => void }) {
   const { ref, show, hide, el } = useTip();
   if (rows.every((r) => r.yes + r.no + r.unknown === 0)) return <div className="chart-empty">No Windows inventory yet.</div>;
+  const seg = (r: { key: string }, part: 'yes' | 'no' | 'unknown', n: number, t: number, color: string, label: string) => n > 0 && (
+    <span key={part} className={onSelect ? 'hit' : ''} role={onSelect ? 'button' : undefined} tabIndex={onSelect ? 0 : -1}
+      style={{ width: `${(n / t) * 100}%`, background: color }} onClick={() => onSelect?.(r.key, part)} onKeyDown={(e) => e.key === 'Enter' && onSelect?.(r.key, part)}
+      onMouseMove={(e) => show(e, <><b>{r.key}</b> · {label}: {n.toLocaleString()} ({pct(n, t)}){onSelect ? <><br /><span className="muted">Click to list these devices</span></> : null}</>)} />
+  );
   return (
     <div className="chart posture" ref={ref} onMouseLeave={hide}>
       {rows.map((r) => {
         const t = r.yes + r.no + r.unknown || 1;
-        const tip = <><b>{r.key}</b><br />Yes {r.yes} · No {r.no} · Unknown {r.unknown}</>;
         return (
-          <div className="row" key={r.key} onMouseMove={(e) => show(e, tip)} onClick={() => onSelect?.(r.key)} style={{ cursor: onSelect ? 'pointer' : 'default' }}>
+          <div className="row" key={r.key}>
             <span>{r.key}</span>
             <span className="stack" aria-label={`${r.key}: ${r.yes} yes, ${r.no} no, ${r.unknown} unknown`}>
-              {r.yes > 0 && <span style={{ width: `${(r.yes / t) * 100}%`, background: 'var(--ok)' }} />}
-              {r.no > 0 && <span style={{ width: `${(r.no / t) * 100}%`, background: 'var(--crit)' }} />}
-              {r.unknown > 0 && <span style={{ width: `${(r.unknown / t) * 100}%`, background: 'var(--line-strong)' }} />}
+              {seg(r, 'yes', r.yes, t, 'var(--ok)', 'Compliant')}
+              {seg(r, 'no', r.no, t, 'var(--crit)', 'Not compliant')}
+              {seg(r, 'unknown', r.unknown, t, 'var(--line-strong)', 'Unknown')}
             </span>
             <span className="pct" style={{ color: r.no > 0 ? 'var(--crit)' : 'var(--ok)' }}>{pct(r.yes, t)}</span>
           </div>

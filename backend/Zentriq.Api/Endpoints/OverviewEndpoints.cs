@@ -8,7 +8,7 @@ namespace Zentriq.Api.Endpoints;
 public static class OverviewEndpoints
 {
     public sealed record KeyCount(string Key, long Count);
-    public sealed record Posture(string Key, long Yes, long No, long Unknown);
+    public sealed record Posture(string Key, long Yes, long No, long Unknown) { public string? Facet { get; init; } }
     public sealed record DayPoint(DateOnly Day, long New, long Total);
 
     public static void MapOverviewEndpoints(this RouteGroupBuilder api)
@@ -32,7 +32,6 @@ public static class OverviewEndpoints
             }
 
             const string Active = "FROM zentriq.assets a WHERE a.status = 'active'";
-            const string AgentOf = "(SELECT r.last_checkin_at FROM zentriq.agent_registrations r WHERE r.asset_id = a.id AND r.status = 'active' ORDER BY r.last_checkin_at DESC NULLS LAST LIMIT 1)";
             const string HasAgent = "EXISTS (SELECT 1 FROM zentriq.agent_registrations r WHERE r.asset_id = a.id AND r.status = 'active')";
 
             var kpi = new Dictionary<string, long>
@@ -58,37 +57,28 @@ public static class OverviewEndpoints
                     """),
             };
 
-            var byCategory = await Counts($"SELECT a.category, count(*) {Active} GROUP BY 1 ORDER BY 2 DESC");
-            var byOs = await Counts($"""
-                SELECT CASE WHEN rn <= 7 THEN os ELSE 'Other' END, sum(n)::bigint FROM (
-                    SELECT COALESCE(a.os_name, initcap(a.os_family), 'Unknown') AS os, count(*) AS n, row_number() OVER (ORDER BY count(*) DESC) AS rn {Active} GROUP BY 1) t
-                 GROUP BY 1 ORDER BY 2 DESC
-                """);
-            var byInventory = await Counts($"SELECT a.inventory_status, count(*) {Active} GROUP BY 1 ORDER BY 2 DESC");
-            var byCriticality = await Counts($"SELECT a.criticality, count(*) {Active} GROUP BY 1 ORDER BY 2 DESC");
-            var byType = await Counts($$"""
-                SELECT COALESCE(d.document #>> '{device,chassis}', h.chassis, CASE WHEN a.category IN ('network_device','printer','iot') THEN a.category ELSE 'not inventoried' END), count(*)
-                  FROM zentriq.assets a LEFT JOIN zentriq.asset_inventory_documents d ON d.asset_id = a.id LEFT JOIN zentriq.hardware_inventory h ON h.asset_id = a.id
-                 WHERE a.status = 'active' GROUP BY 1 ORDER BY 2 DESC
-                """);
-            var byManufacturer = await Counts($"""
-                SELECT CASE WHEN rn <= 7 THEN v ELSE 'Other' END, sum(n)::bigint FROM (
-                    SELECT COALESCE(NULLIF(h.vendor, ''), 'Unknown') AS v, count(*) AS n, row_number() OVER (ORDER BY count(*) DESC) AS rn
-                      FROM zentriq.hardware_inventory h JOIN zentriq.assets a ON a.id = h.asset_id WHERE a.status = 'active' GROUP BY 1) t
-                 GROUP BY 1 ORDER BY 2 DESC
-                """);
-            var coverage = await Counts($"""
-                SELECT CASE WHEN {HasAgent} THEN 'agent' WHEN a.inventory_status = 'success' THEN 'agentless' ELSE 'discovered only' END, count(*) {Active} GROUP BY 1 ORDER BY 2 DESC
-                """);
-            var agentHealth = await Counts("""
-                SELECT CASE WHEN last_checkin_at IS NULL THEN 'never' WHEN last_checkin_at > now() - interval '45 minutes' THEN 'online'
-                            WHEN last_checkin_at > now() - interval '7 days' THEN 'stale' ELSE 'offline' END, count(*)
-                  FROM zentriq.agent_registrations WHERE status = 'active' GROUP BY 1
-                """);
-            var ram = await Counts("""
-                SELECT CASE WHEN h.ram_gb < 4 THEN '< 4 GB' WHEN h.ram_gb < 8 THEN '4–8 GB' WHEN h.ram_gb < 16 THEN '8–16 GB' WHEN h.ram_gb < 32 THEN '16–32 GB' ELSE '32 GB +' END, count(*)
-                  FROM zentriq.hardware_inventory h JOIN zentriq.assets a ON a.id = h.asset_id WHERE a.status = 'active' AND h.ram_gb IS NOT NULL GROUP BY 1
-                """);
+            async Task<List<KeyCount>> Facet(string facet, int top = 0)
+            {
+                var expr = AssetFacets.Expr[facet];
+                var sql = $"SELECT {expr} AS k, count(*) {AssetFacets.From} WHERE a.status = 'active' AND {expr} IS NOT NULL GROUP BY 1 ORDER BY 2 DESC, 1";
+                if (top > 0)
+                    sql = $"SELECT CASE WHEN rn <= {top} THEN k ELSE 'Other' END, sum(n)::bigint FROM (SELECT k, n, row_number() OVER (ORDER BY n DESC, k) rn FROM ({sql.Replace("count(*)", "count(*) AS n")}) t0) t GROUP BY 1 ORDER BY 2 DESC";
+                return await Counts(sql);
+            }
+
+            var facets = new Dictionary<string, List<KeyCount>>();
+            foreach (var (f, top) in new[] { ("category", 0), ("os", 7), ("inventory", 0), ("type", 0), ("vendor", 7), ("coverage", 0), ("health", 0), ("seen", 0),
+                                             ("ram", 0), ("cores", 0), ("cpu", 7), ("disk", 0), ("free", 0), ("criticality", 0) })
+                facets[f] = await Facet(f, top);
+            var byCategory = facets["category"];
+            var byOs = facets["os"];
+            var byInventory = facets["inventory"];
+            var byCriticality = facets["criticality"];
+            var byType = facets["type"];
+            var byManufacturer = facets["vendor"];
+            var coverage = facets["coverage"];
+            var agentHealth = facets["health"];
+            var ram = facets["ram"];
             var topSoftware = await Counts("""
                 SELECT min(s.name), count(DISTINCT s.asset_id) FROM zentriq.software_inventory s JOIN zentriq.assets a ON a.id = s.asset_id
                  WHERE a.status = 'active' GROUP BY lower(s.name) ORDER BY 2 DESC, 1 LIMIT 10
@@ -100,24 +90,13 @@ public static class OverviewEndpoints
 
             // Security posture (Windows inventory): yes / no / unknown per control.
             var posture = new List<Posture>();
-            foreach (var (key, expr) in new[]
+            foreach (var (key, facet) in new[] { ("Disk encryption", "encryption"), ("Firewall on", "firewall"), ("Secure Boot", "secureboot"), ("TPM present", "tpm"), ("Antivirus active", "antivirus") })
             {
-                ("Disk encryption", "d.document #>> '{security,diskEncryption}'"),
-                ("Firewall on", "d.document #>> '{security,firewallEnabled}'"),
-                ("Secure Boot", "d.document #>> '{security,secureBoot}'"),
-                ("TPM present", "d.document #>> '{hardware,tpmPresent}'"),
-                ("Antivirus active", "CASE WHEN jsonb_array_length(COALESCE(d.document #> '{security,antivirus}', '[]')) = 0 THEN NULL WHEN EXISTS (SELECT 1 FROM jsonb_array_elements(d.document #> '{security,antivirus}') x WHERE x ->> 'enabled' = 'true') THEN 'true' ELSE 'false' END"),
-            })
-            {
-                await using var cmd = new NpgsqlCommand($"""
-                    SELECT count(*) FILTER (WHERE v = 'true'), count(*) FILTER (WHERE v = 'false'), count(*) FILTER (WHERE v IS NULL)
-                      FROM (SELECT {expr} AS v FROM zentriq.assets a JOIN zentriq.asset_inventory_documents d ON d.asset_id = a.id
-                             WHERE a.status = 'active' AND a.os_family = 'windows') t
-                    """, conn);
-                await using var r = await cmd.ExecuteReaderAsync(ct);
-                await r.ReadAsync(ct);
-                posture.Add(new Posture(key, r.GetInt64(0), r.GetInt64(1), r.GetInt64(2)));
+                var c = await Facet(facet);
+                long V(string k) => c.FirstOrDefault(x => x.Key == k)?.Count ?? 0;
+                posture.Add(new Posture(key, V("yes"), V("no"), V("unknown")) { Facet = facet });
             }
+            kpi["offline7"] = await Scalar($"SELECT count(*) {AssetFacets.From} WHERE a.status = 'active' AND {AssetFacets.OfflineDays} >= 7");
 
             var trend = new List<DayPoint>();
             await using (var cmd = new NpgsqlCommand("""
@@ -131,6 +110,7 @@ public static class OverviewEndpoints
             return Results.Ok(new
             {
                 kpi, byCategory, byOs, byInventory, byCriticality, byType, byManufacturer, coverage, agentHealth, ram, topSoftware, scanResults, posture, trend,
+                seen = facets["seen"], cores = facets["cores"], cpu = facets["cpu"], disk = facets["disk"], free = facets["free"],
                 generatedAt = DateTimeOffset.UtcNow,
             });
         }).WithTags("Dashboards").RequireModule(Modules.Dashboards).RequireAuthorization(Permissions.AssetsView);

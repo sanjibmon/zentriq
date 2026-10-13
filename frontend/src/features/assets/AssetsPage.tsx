@@ -5,6 +5,7 @@ import { useAuth } from '../../app/auth';
 import { Link, useRouter } from '../../app/router';
 import { useApi } from '../../app/useApi';
 import { Callout, DataTable, ErrorBox, fmt, PageHead, Pager, Panel, Pill, statusTone, type Tone } from '../../components/ui';
+import { useConfirm } from '../../components/Confirm';
 import { DeployAgentDialog } from './DeployAgentDialog';
 
 const CATEGORIES = ['endpoint', 'server', 'virtual_host', 'network_device', 'printer', 'iot', 'other'];
@@ -22,22 +23,41 @@ function Ips({ list, primary }: { list?: string[] | null; primary?: string | nul
   return <span className="mono" title={all.join('\n')}>{all[0]}{all.length > 1 && <span className="muted"> +{all.length - 1}</span>}</span>;
 }
 
+/** "Online" for agents that checked in recently, otherwise how long the device has been out of contact. */
+export function Availability({ a, long }: { a: Asset; long?: boolean }) {
+  const last = a.lastContactAt ?? a.lastSeenAt;
+  const days = a.offlineDays ?? Math.floor((Date.now() - new Date(last).getTime()) / 86400000);
+  const when = fmt.date(last);
+  if (a.online) return <span title={`Agent checked in ${when}`}><Pill tone="ok">Online</Pill></span>;
+  if (days < 1) return <span title={when}>{fmt.ago(last)}</span>;
+  const tone: Tone = days >= 30 ? 'crit' : days >= 7 ? 'crit' : 'warn';
+  return (
+    <span title={`Last contact ${when}${a.agentId ? ' (agent)' : ' (scan or inventory)'}`} className="offline-days">
+      <Pill tone={tone}>Offline {days} day{days === 1 ? '' : 's'}</Pill>{long && <span className="muted"> · since {fmt.day(last)}</span>}
+    </span>
+  );
+}
+
 export function AssetsPage() {
   const { query } = useRouter();
   const { can } = useAuth();
+  const confirm = useConfirm();
   const [q, setQ] = useState(query.get('q') ?? '');
   const [search, setSearch] = useState(query.get('q') ?? '');
   const [category, setCategory] = useState(query.get('category') ?? '');
   const [status, setStatus] = useState('');
   const [agent, setAgent] = useState(query.get('agent') ?? '');
   const [inventory, setInventory] = useState(query.get('inventory') ?? '');
+  const [facet, setFacet] = useState<{ facet: string; value: string; label: string } | null>(
+    query.get('facet') && query.get('value') != null ? { facet: query.get('facet')!, value: query.get('value')!, label: query.get('label') ?? `${query.get('facet')}: ${query.get('value')}` } : null);
+  const [offline, setOffline] = useState(query.get('offlineDays') ?? '');
   const [page, setPage] = useState(1);
   const [picked, setPicked] = useState<string[]>([]);
   const [msg, setMsg] = useState<{ tone: 'info' | 'crit'; text: string } | null>(null);
   const [deploy, setDeploy] = useState(false);
   const [busy, setBusy] = useState(false);
   const pageSize = 50;
-  const data = useApi(() => api.get<Paged<Asset>>('/assets', { q: search, category, status, agent, inventory, page, pageSize, sort: 'hostname' }), [search, category, status, agent, inventory, page]);
+  const data = useApi(() => api.get<Paged<Asset>>('/assets', { q: search, category, status, agent, inventory, facet: facet?.facet, value: facet?.value, offlineDays: offline, page, pageSize, sort: offline ? 'offline' : 'hostname' }), [search, category, status, agent, inventory, facet, offline, page]);
   const settings = useApi(() => (can('settings.manage') ? api.get<Record<string, unknown>>('/system/settings') : Promise.resolve(null)), []);
   const rows = data.data?.items ?? [];
   const showV6 = rows.some((r) => r.ipv6 != null) || settings.data?.['display.show_ipv6'] === true;
@@ -45,7 +65,7 @@ export function AssetsPage() {
 
   async function collect(all: boolean) {
     const n = all ? data.data?.total ?? 0 : picked.length;
-    if (!window.confirm(`Collect inventory now from ${all ? `all ${n}` : n} asset(s)? Assets with an agent report within about 2 minutes; the others are collected agentlessly with your stored credentials (a scan is started).`)) return;
+    if (!(await confirm({ title: `Collect inventory now from ${all ? `all ${n}` : n} asset(s)?`, confirmLabel: 'Collect now', message: 'Assets with an agent report within about 2 minutes; the others are collected agentlessly with your stored credentials (a scan is started).' }))) return;
     setBusy(true); setMsg(null);
     try {
       const r = await api.post<{ message: string }>('/assets/collect', all ? { all: true } : { assetIds: picked });
@@ -85,6 +105,13 @@ export function AssetsPage() {
           <option value="success">Inventoried</option>
           <option value="missing">Not inventoried</option>
         </select>
+        <select className="in" value={offline} onChange={(e) => { reset(); setOffline(e.target.value); }} aria-label="Offline for">
+          <option value="">Last contact: any</option>
+          <option value="1">Offline 1+ day</option>
+          <option value="7">Offline 7+ days</option>
+          <option value="30">Offline 30+ days</option>
+          <option value="90">Offline 90+ days</option>
+        </select>
         <select className="in" value={status} onChange={(e) => { reset(); setStatus(e.target.value); }} aria-label="Status">
           <option value="">Active</option>
           <option value="retired">Retired</option>
@@ -97,6 +124,11 @@ export function AssetsPage() {
           </label>
         )}
       </form>
+      {facet && (
+        <div style={{ marginBottom: 10 }}>
+          <span className="filter-chip">Filtered from dashboard: {facet.label}<button type="button" aria-label="Clear dashboard filter" onClick={() => { reset(); setFacet(null); }}>×</button></span>
+        </div>
+      )}
       <ErrorBox error={data.error} />
       <Panel flush>
         <DataTable rows={rows} empty={data.loading ? 'Loading…' : 'No assets match. Run a discovery scan to find devices.'} columns={[
@@ -110,9 +142,8 @@ export function AssetsPage() {
           { key: 'u', label: 'Logged-on user', render: (r) => r.loggedOnUser ? <span title={r.loggedOnUser}>{r.loggedOnUser}</span> : <span className="muted">—</span> },
           { key: 't', label: 'Type', render: (r) => typeLabel(r) },
           { key: 'os', label: 'Operating system', render: (r) => r.osName ?? fmt.label(r.osFamily) },
-          { key: 'ag', label: 'Agent', render: (r) => r.agentHealth ? <Pill tone={AGENT[r.agentHealth]![1]}>{AGENT[r.agentHealth]![0]}</Pill> : <span className="muted">—</span> },
           { key: 'inv', label: 'Inventory', render: (r) => <span title={r.lastInventoryAt ? `${fmt.label(r.inventorySource)} · ${fmt.date(r.lastInventoryAt)}` : undefined}><Pill tone={r.inventoryStatus === 'success' ? 'ok' : r.inventoryStatus === 'not_collected' ? '' : 'warn'}>{fmt.label(r.inventoryStatus)}</Pill></span> },
-          { key: 'ls', label: 'Last seen', render: (r) => <span title={fmt.date(r.lastSeenAt)}>{fmt.ago(r.lastSeenAt)}</span> },
+          { key: 'ls', label: 'Last contact', render: (r) => <><Availability a={r} />{r.agentHealth && !r.online && <div className="faint" style={{ fontSize: 11.5 }}>Agent: {AGENT[r.agentHealth]![0].toLowerCase()}</div>}</> },
           ...(status ? [{ key: 'st', label: 'Status', render: (r: Asset) => <Pill tone={statusTone(r.status)}>{fmt.label(r.status)}</Pill> }] : []),
         ]} />
         {data.data && <Pager page={page} pageSize={pageSize} total={data.data.total} onPage={(p) => { setPage(p); setPicked([]); }} />}

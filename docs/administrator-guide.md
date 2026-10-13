@@ -73,6 +73,38 @@ scan must be cancelled first.
   management or destabilise Windows (ZentriqAgent, WinRM, RPC, WMI, LSM, firewall/BFE, Event Log …) cannot be
   stopped from the console.
 
+## Dashboard
+
+*Customize* (top right) shows, hides and reorders the charts and makes any of them wide; the layout is saved per user
+(*Reset to default* restores it). Every chart is interactive: hover for values, click a slice, bar or colour to open
+Asset Inventory filtered to exactly those devices (the filter is shown as a chip you can clear). Charts include device
+type, inventory coverage, last contact / offline, operating systems, security posture, agent health, most installed
+software, processor cores and models, memory, disk capacity, free disk space, manufacturers, discovery results and
+licence use.
+
+## Offline devices
+
+*Last contact* on Asset Inventory and on each asset shows **Online** when the device's agent checked in within 30
+minutes, otherwise **Offline N days** since the last agent check-in, scan response or inventory (amber under 7 days,
+red from 7 days). Filter with *Last contact: Offline 1+/7+/30+/90+ days*; the dashboard tile *Offline 7+ days* opens
+that list.
+
+## Software uninstall
+
+*Software Inventory › select an application* lists the devices that have it. With the permission `software.uninstall`
+(Administrators) you can uninstall it from one device, from selected devices, or from all devices (typing UNINSTALL to
+confirm). The Zentriq Agent on each device removes it silently at its next check-in: Windows Installer products with
+`msiexec /x {ProductCode} /qn`, other installers only if they register a silent uninstaller (QuietUninstallString);
+otherwise the result says so. Devices without an agent are skipped (there is no agentless uninstall). The Zentriq
+Agent itself and the .NET Framework cannot be uninstalled from the console. Results appear in the Activity Log and the
+application disappears from the inventory once removed.
+
+## Activity Log
+
+*Activity Log* (left menu) lists every service start/stop/restart and software uninstall requested from the console:
+device, action, how it ran (agent or WinRM/WMI), result, detail and who asked. Each asset's Services tab links to its
+own log. All of these are also in the audit log.
+
 ## Moving data
 
 PostgreSQL data can be placed on another volume at installation. To move the Zentriq data folder later: stop the

@@ -90,6 +90,10 @@ export interface Asset {
   agentId?: string | null;
   agentHealth?: 'online' | 'stale' | 'offline' | 'never' | null;
   inventorySource?: string | null;
+  agentLastCheckinAt?: string | null;
+  lastContactAt?: string | null;
+  offlineDays?: number | null;
+  online?: boolean | null;
 }
 
 export interface KeyCount {
@@ -329,6 +333,9 @@ export interface SoftwareInstall {
   version: string | null;
   installedOn: string | null;
   source: string;
+  /** ready = agent can uninstall; old = agent too old; none = no agent. */
+  agent?: 'ready' | 'old' | 'none';
+  lastUninstall?: { status: string; detail: string | null } | null;
 }
 
 export interface HardwareRow {
@@ -451,9 +458,9 @@ export interface DirectoryObject {
 
 export interface KC { key: string; count: number }
 export interface Overview {
-  kpi: Record<'assets' | 'servers' | 'endpoints' | 'networkDevices' | 'inventoried' | 'withAgent' | 'agentsOnline' | 'agents' | 'virtual' | 'stale' | 'newLast7' | 'retired' | 'softwareTitles' | 'softwareInstalls' | 'scans30' | 'lowDisk', number>;
+  kpi: Record<'assets' | 'servers' | 'endpoints' | 'networkDevices' | 'inventoried' | 'withAgent' | 'agentsOnline' | 'agents' | 'virtual' | 'stale' | 'newLast7' | 'retired' | 'softwareTitles' | 'softwareInstalls' | 'scans30' | 'lowDisk', number> & { offline7?: number };
   byCategory: KC[]; byOs: KC[]; byInventory: KC[]; byCriticality: KC[]; byType: KC[]; byManufacturer: KC[]; coverage: KC[]; agentHealth: KC[];
-  ram: KC[]; topSoftware: KC[]; scanResults: KC[];
+  ram: KC[]; topSoftware: KC[]; scanResults: KC[]; seen: KC[]; cores: KC[]; cpu: KC[]; disk: KC[]; free: KC[];
   posture: { key: string; yes: number; no: number; unknown: number }[];
   trend: { day: string; new: number; total: number }[];
   generatedAt: string;

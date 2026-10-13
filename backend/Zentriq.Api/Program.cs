@@ -151,6 +151,7 @@ api.MapAuthEndpoints();
 api.MapAccountEndpoints(options);
 api.MapAssetEndpoints();
 api.MapAssetActionEndpoints();
+api.MapActivityAndUninstallEndpoints();
 api.MapDiscoveryEndpoints();
 api.MapJobEndpoints();
 api.MapDashboardEndpoints();

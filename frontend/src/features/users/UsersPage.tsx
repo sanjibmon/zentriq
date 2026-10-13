@@ -3,6 +3,7 @@ import { api } from '../../api/client';
 import type { Role, UserRow } from '../../api/types';
 import { useApi } from '../../app/useApi';
 import { Callout, DataTable, ErrorBox, fmt, PageHead, Panel, Pill } from '../../components/ui';
+import { useConfirm } from '../../components/Confirm';
 import { useAuth } from '../../app/auth';
 import { UserDialog } from './UserDialogs';
 import { errorText } from '../discovery/DirectoryPanel';
@@ -12,11 +13,12 @@ export function UsersPage() {
   const users = useApi(() => api.get<UserRow[]>('/users'), []);
   const roles = useApi(() => api.get<Role[]>('/roles'), []);
   const { me } = useAuth();
+  const confirm = useConfirm();
   const [edit, setEdit] = useState<UserRow | 'new' | null>(null);
   const [msg, setMsg] = useState<{ tone: 'ok' | 'crit'; text: string } | null>(null);
 
   async function resetMfa(u: UserRow) {
-    if (!window.confirm(`Reset two-step verification for ${u.displayName}? They can sign in with the password only and must set up the authenticator app again.`)) return;
+    if (!(await confirm({ title: 'Reset two-step verification?', danger: true, confirmLabel: 'Reset MFA', message: <>{u.displayName} ({u.email}) will sign in with the password only and must set up the authenticator app again. Do this only after confirming the person's identity.</> }))) return;
     try { await api.post(`/users/${u.id}/mfa/reset`); setMsg({ tone: 'ok', text: `MFA reset for ${u.email}.` }); users.reload(); } catch (e) { setMsg({ tone: 'crit', text: errorText(e) }); }
   }
   return (
