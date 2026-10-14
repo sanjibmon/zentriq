@@ -21,12 +21,12 @@ const fmtN = (n: number) => n.toLocaleString();
 const pct = (v: number, t: number) => (t ? `${Math.round((v / t) * 100)}%` : '0%');
 
 /** Part-to-whole: donut with the total in the centre and a clickable legend (identity never by colour alone). */
-export function Donut({ data, onSelect, centerLabel = 'total', size = 150 }: { data: Slice[]; onSelect?: (s: Slice) => void; centerLabel?: string; size?: number }) {
+export function Donut({ data, onSelect, centerLabel = 'total', size = 150, pie = false }: { data: Slice[]; onSelect?: (s: Slice) => void; centerLabel?: string; size?: number; pie?: boolean }) {
   const { ref, show, hide, el } = useTip();
   const [hover, setHover] = useState<string | null>(null);
   const total = data.reduce((a, d) => a + d.value, 0);
   if (total === 0) return <div className="chart-empty">No data yet.</div>;
-  const r = size / 2, inner = r * 0.62, gap = data.length > 1 ? 0.012 : 0;
+  const r = size / 2, inner = pie ? 0.001 : r * 0.62, gap = data.length > 1 ? 0.012 : 0;
   let a0 = -Math.PI / 2;
   const arcs = data.map((d, i) => {
     const sweep = (d.value / total) * Math.PI * 2;
@@ -49,8 +49,8 @@ export function Donut({ data, onSelect, centerLabel = 'total', size = 150 }: { d
               tabIndex={onSelect ? 0 : -1} onClick={() => onSelect?.(d)} onKeyDown={(e) => e.key === 'Enter' && onSelect?.(d)}
               onMouseMove={(e) => { setHover(d.key); show(e, <><b>{d.label}</b> · {fmtN(d.value)} ({pct(d.value, total)})</>); }} />
           ))}
-          <text x={r} y={r - 2} textAnchor="middle" style={{ fontSize: 24, fontWeight: 700, fill: 'var(--fg)' }}>{fmtN(focus ? focus.value : total)}</text>
-          <text x={r} y={r + 16} textAnchor="middle" style={{ fontSize: 11.5, fill: 'var(--muted)' }}>{focus ? pct(focus.value, total) : centerLabel}</text>
+          {!pie && <text x={r} y={r - 2} textAnchor="middle" style={{ fontSize: 24, fontWeight: 700, fill: 'var(--fg)' }}>{fmtN(focus ? focus.value : total)}</text>}
+          {!pie && <text x={r} y={r + 16} textAnchor="middle" style={{ fontSize: 11.5, fill: 'var(--muted)' }}>{focus ? pct(focus.value, total) : centerLabel}</text>}
         </svg>
         {el}
       </div>
@@ -83,6 +83,36 @@ export function HBars({ data, onSelect, color = 'var(--s1)', max }: { data: Slic
       {el}
     </div>
   );
+}
+
+/** Column chart: vertical bars with the value on top and the label underneath; clickable columns. */
+export function VBars({ data, onSelect, color = 'var(--s1)', max, height = 170 }: { data: Slice[]; onSelect?: (s: Slice) => void; color?: string; max?: number; height?: number }) {
+  const { ref, show, hide, el } = useTip();
+  if (data.length === 0) return <div className="chart-empty">No data yet.</div>;
+  const m = max ?? Math.max(1, ...data.map((d) => d.value));
+  return (
+    <div className="chart vbars" ref={ref} onMouseLeave={hide} style={{ height }}>
+      {data.map((d) => (
+        <button key={d.key} type="button" onClick={() => onSelect?.(d)} disabled={!onSelect} title={d.label}
+          onMouseMove={(e) => show(e, <><b>{d.label}</b> · {fmtN(d.value)}</>)}>
+          <span className="n">{fmtN(d.value)}</span>
+          <span className="col"><i style={{ height: `${Math.max(2, (d.value / m) * 100)}%`, background: d.color ?? color }} /></span>
+          <span className="lbl">{d.label}</span>
+        </button>
+      ))}
+      {el}
+    </div>
+  );
+}
+
+export type ChartKind = 'donut' | 'pie' | 'bar' | 'column';
+export const CHART_KINDS: [ChartKind, string][] = [['donut', 'Donut'], ['pie', 'Pie'], ['bar', 'Bar'], ['column', 'Column']];
+
+/** One categorical dataset drawn as the chart type chosen for the widget. */
+export function CategoryChart({ kind, data, onSelect, centerLabel, color, max }: { kind: ChartKind; data: Slice[]; onSelect?: (s: Slice) => void; centerLabel?: string; color?: string; max?: number }) {
+  if (kind === 'donut' || kind === 'pie') return <Donut data={data.filter((d) => d.value > 0)} onSelect={onSelect} centerLabel={centerLabel} pie={kind === 'pie'} />;
+  if (kind === 'column') return <VBars data={data} onSelect={onSelect} color={color} max={max} />;
+  return <HBars data={data} onSelect={onSelect} color={color} max={max} />;
 }
 
 /** Change over time: area + line with a crosshair tooltip. */

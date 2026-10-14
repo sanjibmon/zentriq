@@ -130,7 +130,7 @@ button.link:hover { text-decoration: underline; }
 @media (max-width: 1100px) { .dash-hero { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .posture-legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-top: 4px; }
 .posture-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
-.hero-card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; text-decoration: none; color: inherit; display: grid; gap: 4px; position: relative; overflow: hidden; }
+.hero-card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; text-decoration: none; color: inherit; display: grid; grid-template-rows: auto auto 9px 1fr; gap: 4px; position: relative; overflow: hidden; min-height: 118px; }
 .hero-card:hover { border-color: var(--accent); }
 .hero-card .k { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
 .hero-card .v { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
@@ -171,7 +171,7 @@ button.link:hover { text-decoration: underline; }
 .btn.danger-solid:disabled { opacity: .5; }
 
 /* ---- Customizable dashboard grid ---- */
-.dash-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-bottom: 14px; align-items: start; }
+.dash-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-bottom: 14px; align-items: stretch; }
 .dash-grid > div > .panel { height: 100%; }
 .dash-wide { grid-column: span 2; }
 .dash-full { grid-column: 1 / -1; }
@@ -188,3 +188,25 @@ button.link:hover { text-decoration: underline; }
 .filter-chip { display: inline-flex; gap: 6px; align-items: center; background: var(--accent-soft); color: var(--accent); border-radius: 999px; padding: 4px 6px 4px 12px; font-size: 13px; font-weight: 500; }
 .filter-chip button { border: 0; background: none; color: inherit; cursor: pointer; font-size: 15px; line-height: 1; padding: 0 4px; }
 .offline-days { font-variant-numeric: tabular-nums; }
+
+/* Uniform dashboard tiles: every chart tile has the same height; long content scrolls inside the tile. */
+.dash-tile > .panel { height: 340px; display: flex; flex-direction: column; }
+.dash-tile > .panel > .panel-h { flex: none; min-height: 47px; }
+.dash-tile > .panel > .panel-h .sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.dash-tile > .panel > .panel-h h3 { white-space: nowrap; }
+.dash-tile > .panel > div:last-child { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; justify-content: center; }
+.dash-tile > .panel > div:last-child > * { width: 100%; }
+.dash-tile .donut-wrap { justify-content: center; }
+.dash-tile .legend { max-height: 220px; overflow: auto; }
+.hero-card .s { align-self: end; }
+/* Column chart */
+.vbars { display: flex; align-items: stretch; gap: 8px; padding-top: 4px; }
+.vbars button { flex: 1 1 0; min-width: 0; max-width: 72px; display: grid; grid-template-rows: auto 1fr auto; gap: 4px; border: 0; background: none; padding: 0; color: var(--fg); font: inherit; cursor: pointer; }
+.vbars button:disabled { cursor: default; }
+.vbars .n { font-size: 11.5px; color: var(--muted); text-align: center; font-variant-numeric: tabular-nums; }
+.vbars .col { display: flex; align-items: flex-end; background: var(--surface-2); border-radius: 4px 4px 0 0; min-height: 0; }
+.vbars .col i { display: block; width: 100%; border-radius: 4px 4px 0 0; }
+.vbars button:hover .col i { filter: brightness(1.12); }
+.vbars .lbl { font-size: 11.5px; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vbars { justify-content: center; }
+.cz-list select.in.sm { height: 28px; padding: 2px 6px; font-size: 12.5px; width: auto; }

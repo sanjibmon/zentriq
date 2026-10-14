@@ -68,7 +68,7 @@ public static class OverviewEndpoints
 
             var facets = new Dictionary<string, List<KeyCount>>();
             foreach (var (f, top) in new[] { ("category", 0), ("os", 7), ("inventory", 0), ("type", 0), ("vendor", 7), ("coverage", 0), ("health", 0), ("seen", 0),
-                                             ("ram", 0), ("cores", 0), ("cpu", 7), ("disk", 0), ("free", 0), ("criticality", 0) })
+                                             ("ram", 0), ("cores", 0), ("cpu", 0), ("disk", 0), ("free", 0), ("criticality", 0) })
                 facets[f] = await Facet(f, top);
             var byCategory = facets["category"];
             var byOs = facets["os"];

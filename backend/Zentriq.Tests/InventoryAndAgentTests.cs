@@ -44,6 +44,31 @@ public sealed class InventoryParserTests
     }
 
     [Fact]
+    public void Server_without_console_user_reports_the_newest_remote_desktop_user()
+    {
+        var wmi = new FakeWmi(new()
+        {
+            ["Win32_ComputerSystem"] = [Row(("Name", "ZENTRIQ"), ("DNSHostName", "ZENTRIQ"), ("PartOfDomain", false), ("UserName", null))],
+            ["Win32_OperatingSystem"] = [Row(("Caption", "Microsoft Windows Server 2019 Standard"), ("ProductType", 3u))],
+            ["Win32_LogonSession"] =
+            [
+                Row(("LogonId", "1001"), ("LogonType", 10u), ("StartTime", "20261014023100.000000+000")),
+                Row(("LogonId", "2002"), ("LogonType", 10u), ("StartTime", "20261014083000.000000+000")),
+                Row(("LogonId", "3003"), ("LogonType", 2u), ("StartTime", "20261014090000.000000+000")),
+            ],
+            ["Win32_LoggedOnUser"] =
+            [
+                Row(("Antecedent", "\\\\.\\root\\cimv2:Win32_Account.Domain=\"ZENTRIQ\",Name=\"Administrator\""), ("Dependent", "\\\\.\\root\\cimv2:Win32_LogonSession.LogonId=\"1001\"")),
+                // CIM instance text form (agentless over WinRM)
+                Row(("Antecedent", "Win32_UserAccount (Name = \"sanjib\", Domain = \"CORP\")"), ("Dependent", "Win32_LogonSession (LogonId = \"2002\")")),
+                Row(("Antecedent", "\\\\.\\root\\cimv2:Win32_Account.Domain=\"Window Manager\",Name=\"DWM-3\""), ("Dependent", "\\\\.\\root\\cimv2:Win32_LogonSession.LogonId=\"3003\"")),
+            ],
+        });
+        var doc = WindowsCollector.Collect(wmi, null, "agent", "1.1.1");
+        Assert.Equal(@"CORP\sanjib", doc.Users.LoggedOn);
+    }
+
+    [Fact]
     public void Windows_collector_maps_wmi_and_registry_and_records_missing_sections()
     {
         const string uninstall = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall";

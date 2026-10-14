@@ -273,7 +273,7 @@ export interface SshHostKey {
 export interface AgentRow {
   id: string;
   status: string;
-  health: 'online' | 'stale' | 'offline' | 'never' | 'revoked';
+  health: 'online' | 'stale' | 'offline' | 'never' | 'revoked' | 'replaced';
   version: string;
   hostname: string | null;
   osName: string | null;

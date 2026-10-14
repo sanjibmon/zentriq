@@ -53,6 +53,11 @@ public static class WindowsCollector
             if (Int(cs, "PCSystemType") == 2) doc.Device.Chassis = "laptop";
         });
 
+        // Win32_ComputerSystem.UserName is only the console session. Servers are used over Remote Desktop, so when it
+        // is empty take the most recent interactive / Remote Desktop logon session instead.
+        if (doc.Users.LoggedOn is null)
+            Section(doc, "logon sessions", () => doc.Users.LoggedOn = InteractiveUser(wmi), optional: true);
+
         Section(doc, "system product", () =>
         {
             var p = First(wmi, Cimv2, "SELECT UUID, IdentifyingNumber FROM Win32_ComputerSystemProduct");
@@ -286,6 +291,43 @@ public static class WindowsCollector
     private static string Short(string s) => s.Length > 200 ? s.Substring(0, 200) : s;
 
     private static IReadOnlyDictionary<string, object?>? First(IWmiSource wmi, string ns, string wql) => wmi.Query(ns, wql).FirstOrDefault();
+
+    private static readonly System.Text.RegularExpressions.Regex RefDomain = new("Domain\\s*=\\s*\"([^\"]*)\"", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+    private static readonly System.Text.RegularExpressions.Regex RefName = new("(?<![A-Za-z])Name\\s*=\\s*\"([^\"]*)\"", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+    private static readonly System.Text.RegularExpressions.Regex RefLogonId = new("LogonId\\s*=\\s*\"?(\\d+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+    /// <summary>
+    /// User of the newest interactive (2), Remote Desktop (10) or cached interactive (11) logon session, as DOMAIN\user.
+    /// References are strings locally ("Win32_Account.Domain=\"X\",Name=\"y\"") and CIM instances over WinRM, whose text
+    /// form has the same key = "value" pairs. Windows' own sessions (DWM-*, UMFD-*) are ignored.
+    /// </summary>
+    internal static string? InteractiveUser(IWmiSource wmi)
+    {
+        var sessions = new Dictionary<string, DateTimeOffset>();
+        foreach (var r in wmi.Query(Cimv2, "SELECT LogonId, LogonType, StartTime FROM Win32_LogonSession WHERE LogonType = 2 OR LogonType = 10 OR LogonType = 11"))
+        {
+            var id = Convert.ToString(r.TryGetValue("LogonId", out var v) ? v : null, CultureInfo.InvariantCulture);
+            if (!string.IsNullOrEmpty(id)) sessions[id!] = Date(r, "StartTime") ?? DateTimeOffset.MinValue;
+        }
+        if (sessions.Count == 0) return null;
+        string? best = null;
+        var bestStart = DateTimeOffset.MinValue;
+        foreach (var r in wmi.Query(Cimv2, "SELECT Antecedent, Dependent FROM Win32_LoggedOnUser"))
+        {
+            var dep = Convert.ToString(r.TryGetValue("Dependent", out var d) ? d : null, CultureInfo.InvariantCulture) ?? "";
+            var ant = Convert.ToString(r.TryGetValue("Antecedent", out var a) ? a : null, CultureInfo.InvariantCulture) ?? "";
+            var lid = RefLogonId.Match(dep);
+            if (!lid.Success || !sessions.TryGetValue(lid.Groups[1].Value, out var start)) continue;
+            var name = RefName.Match(ant);
+            if (!name.Success) continue;
+            var user = name.Groups[1].Value;
+            var domain = RefDomain.Match(ant) is { Success: true } dm ? dm.Groups[1].Value : null;
+            if (user.Length == 0 || user.StartsWith("DWM-", StringComparison.OrdinalIgnoreCase) || user.StartsWith("UMFD-", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(domain, "Window Manager", StringComparison.OrdinalIgnoreCase) || string.Equals(domain, "Font Driver Host", StringComparison.OrdinalIgnoreCase)) continue;
+            if (best is null || start > bestStart) { best = string.IsNullOrEmpty(domain) ? user : domain + "\\" + user; bestStart = start; }
+        }
+        return best;
+    }
 
     internal static string? Str(IReadOnlyDictionary<string, object?> r, string k) =>
         r.TryGetValue(k, out var v) && v is not null ? (v is string s ? (s.Length == 0 ? null : s) : Convert.ToString(v, CultureInfo.InvariantCulture)) : null;

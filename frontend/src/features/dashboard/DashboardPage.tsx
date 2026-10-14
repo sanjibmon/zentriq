@@ -6,7 +6,7 @@ import { useApi } from '../../app/useApi';
 import { Link, useRouter } from '../../app/router';
 import { Callout, DataTable, ErrorBox, fmt, Loading, PageHead, Panel, Pill, statusTone } from '../../components/ui';
 import { useConfirm } from '../../components/Confirm';
-import { Donut, HBars, PostureBars, TrendArea, type Slice } from '../../components/charts';
+import { CategoryChart, CHART_KINDS, HBars, PostureBars, TrendArea, type ChartKind, type Slice } from '../../components/charts';
 
 const TYPE_LABEL: Record<string, string> = {
   laptop: 'Laptop', desktop: 'Desktop', server: 'Physical server', virtual: 'Virtual machine', other: 'Other hardware',
@@ -28,9 +28,6 @@ const RESULT_LABEL: Record<string, string> = {
 };
 const RESULT_COLOR: Record<string, string> = { success: 'var(--ok)', reachable_unauthenticated: 'var(--warn)', inventory_unavailable: 'var(--info)', auth_failed: 'var(--crit)', inventory_failed: 'var(--crit)' };
 const ORDER: Record<string, string[]> = {
-  ram: ['< 4 GB', '4–8 GB', '8–16 GB', '16–32 GB', '32 GB +'],
-  cores: ['1–2 cores', '3–4 cores', '5–8 cores', '9–16 cores', '17+ cores'],
-  disk: ['< 128 GB', '128–256 GB', '256–512 GB', '512 GB–1 TB', '1–2 TB', '> 2 TB'],
   free: ['Critical (< 10% free)', 'Low (10–25% free)', 'OK (25–50% free)', 'Plenty (> 50% free)'],
 };
 const FREE_COLOR: Record<string, string> = { 'Critical (< 10% free)': 'var(--crit)', 'Low (10–25% free)': 'var(--warn)', 'OK (25–50% free)': 'var(--info)', 'Plenty (> 50% free)': 'var(--ok)' };
@@ -39,45 +36,49 @@ const POSTURE_FACET: Record<string, string> = { 'Disk encryption': 'encryption',
 const slices = (rows: KC[], label: (k: string) => string = fmt.label, color?: (k: string) => string | undefined): Slice[] =>
   rows.map((r) => ({ key: r.key, label: label(r.key), value: r.count, color: color?.(r.key) }));
 const ordered = (rows: KC[], order: string[]) => order.map((k) => ({ key: k, count: rows.find((r) => r.key === k)?.count ?? 0 }));
+/** Actual sizes ("8 GB", "1.9 TB", "12 cores") in ascending order. */
+const bySize = (rows: KC[]) => [...rows].sort((a, b) => size(a.key) - size(b.key));
+function size(k: string) { const n = parseFloat(k); return Number.isNaN(n) ? Number.MAX_VALUE : /TB/i.test(k) ? n * 1024 : n; }
 
 function Hero({ label, value, sub, to, meter, tone }: { label: string; value: string; sub?: string; to?: string; meter?: number; tone?: 'crit' }) {
   const body = (
     <>
       <span className="k">{label}</span>
       <span className="v" style={tone === 'crit' ? { color: 'var(--crit)' } : undefined}>{value}</span>
-      {meter != null && <span className="meter" aria-hidden="true"><i style={{ width: `${Math.min(100, Math.max(0, meter))}%` }} /></span>}
-      {sub && <span className="s">{sub}</span>}
+      <span className="meter" aria-hidden="true" style={meter == null ? { visibility: 'hidden' } : undefined}><i style={{ width: `${Math.min(100, Math.max(0, meter ?? 0))}%` }} /></span>
+      <span className="s">{sub ?? ''}</span>
     </>
   );
   return to ? <Link to={to} className="hero-card">{body}</Link> : <div className="hero-card">{body}</div>;
 }
 
 // ---- Widget registry ---------------------------------------------------------------------------------------
-interface WidgetDef { id: string; title: string; wide?: boolean; full?: boolean; defaultOn: boolean; description: string }
+interface WidgetDef { id: string; title: string; wide?: boolean; full?: boolean; defaultOn: boolean; description: string; chart?: ChartKind }
 const WIDGETS: WidgetDef[] = [
   { id: 'kpi.tiles', title: 'Summary tiles', full: true, defaultOn: true, description: 'Assets, servers, endpoints, coverage, offline devices, software' },
-  { id: 'assets.category', title: 'Assets by category', defaultOn: true, description: 'Donut · click a slice to list those assets' },
-  { id: 'assets.type', title: 'Device type', defaultOn: true, description: 'Laptop, desktop, physical server, virtual machine' },
-  { id: 'assets.coverage', title: 'How assets are inventoried', defaultOn: true, description: 'Agent, agentless or discovered only' },
+  { id: 'assets.category', chart: 'donut', title: 'Assets by category', defaultOn: true, description: 'Endpoints, servers, network devices · click to list those assets' },
+  { id: 'assets.type', chart: 'donut', title: 'Device type', defaultOn: true, description: 'Laptop, desktop, physical server, virtual machine' },
+  { id: 'assets.coverage', chart: 'donut', title: 'How assets are inventoried', defaultOn: true, description: 'Agent, agentless or discovered only' },
   { id: 'assets.trend', title: 'Asset growth', wide: true, defaultOn: true, description: 'Active assets per day, last 30 days' },
-  { id: 'assets.seen', title: 'Last contact / offline', defaultOn: true, description: 'Online now … offline more than 30 days' },
-  { id: 'assets.os', title: 'Operating systems', wide: true, defaultOn: true, description: 'Top operating systems' },
+  { id: 'assets.seen', chart: 'bar', title: 'Last contact / offline', defaultOn: true, description: 'Online now … offline more than 30 days' },
+  { id: 'assets.os', chart: 'bar', title: 'Operating systems', wide: true, defaultOn: true, description: 'Top operating systems' },
   { id: 'security.posture', title: 'Security posture', defaultOn: true, description: 'Encryption, firewall, Secure Boot, TPM, antivirus' },
-  { id: 'agents.health', title: 'Agent health', defaultOn: true, description: 'Online, not seen recently, offline, never checked in' },
-  { id: 'software.top', title: 'Most installed software', defaultOn: true, description: 'Top 10 applications by devices' },
-  { id: 'hw.cores', title: 'Processor (cores)', defaultOn: true, description: 'Devices by number of CPU cores' },
-  { id: 'hw.ram', title: 'Memory (RAM)', defaultOn: true, description: 'Devices by installed memory' },
-  { id: 'hw.disk', title: 'Disk capacity (HDD/SSD)', defaultOn: true, description: 'Devices by total disk size' },
-  { id: 'hw.free', title: 'Free disk space', defaultOn: true, description: 'Lowest free space on any volume' },
-  { id: 'hw.cpu', title: 'Processor models', defaultOn: false, description: 'Top CPU models' },
-  { id: 'hw.vendor', title: 'Manufacturers', defaultOn: true, description: 'Hardware vendors' },
-  { id: 'scans.results', title: 'Discovery results', defaultOn: true, description: 'Outcome of scans in the last 30 days' },
+  { id: 'agents.health', chart: 'bar', title: 'Agent health', defaultOn: true, description: 'Online, not seen recently, offline, never checked in' },
+  { id: 'software.top', chart: 'bar', title: 'Most installed software', defaultOn: true, description: 'Top 10 applications by devices' },
+  { id: 'hw.cores', chart: 'column', title: 'Processor (cores)', defaultOn: true, description: 'Devices by number of CPU cores' },
+  { id: 'hw.ram', chart: 'column', title: 'Memory (RAM)', defaultOn: true, description: 'Devices by installed memory' },
+  { id: 'hw.disk', chart: 'column', title: 'Disk capacity (HDD/SSD)', defaultOn: true, description: 'Devices by total disk size' },
+  { id: 'hw.free', chart: 'bar', title: 'Free disk space', defaultOn: true, description: 'Lowest free space on any volume' },
+  { id: 'hw.cpu', chart: 'bar', title: 'Processor models', defaultOn: false, description: 'Top CPU models' },
+  { id: 'hw.vendor', chart: 'bar', title: 'Manufacturers', defaultOn: true, description: 'Hardware vendors' },
+  { id: 'scans.results', chart: 'donut', title: 'Discovery results', defaultOn: true, description: 'Outcome of scans in the last 30 days' },
   { id: 'license.usage', title: 'Licensing', defaultOn: true, description: 'Trial or license and device usage' },
   { id: 'scans.recent', title: 'Recent scans', defaultOn: false, description: 'Last five scans' },
 ];
-const DEFAULT_LAYOUT = WIDGETS.filter((w) => w.defaultOn).map((w) => ({ id: w.id, wide: !!w.wide }));
-type Layout = { id: string; wide: boolean }[];
-interface DashboardDto { id: string; name: string; owned: boolean; widgets: { type: string; width: number }[] }
+type Layout = { id: string; wide: boolean; chart?: ChartKind }[];
+const DEFAULT_LAYOUT: Layout = WIDGETS.filter((w) => w.defaultOn).map((w) => ({ id: w.id, wide: !!w.wide, chart: w.chart }));
+interface DashboardDto { id: string; name: string; owned: boolean; widgets: { type: string; width: number; settings?: { chart?: ChartKind } | null }[] }
+const isKind = (k: unknown): k is ChartKind => CHART_KINDS.some(([c]) => c === k);
 
 export function DashboardPage() {
   const { me, can } = useAuth();
@@ -98,7 +99,7 @@ export function DashboardPage() {
     // would otherwise show just the two widget types that still exist; they get the default layout instead.
     const ws = mine?.widgets ?? [];
     const own = ws.length > 0 && ws.every((w) => WIDGETS.some((d) => d.id === w.type));
-    return own ? ws.map((w) => ({ id: w.type, wide: w.width >= 8 })) : null;
+    return own ? ws.map((w) => ({ id: w.type, wide: w.width >= 8, chart: isKind(w.settings?.chart) ? w.settings!.chart : WIDGETS.find((d) => d.id === w.type)?.chart })) : null;
   }, [mine]);
   const layout = saved ?? DEFAULT_LAYOUT;
 
@@ -112,7 +113,7 @@ export function DashboardPage() {
     try { setMsg((await api.post<{ message: string }>('/assets/collect', { all: true })).message); } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
   }
   async function saveLayout(next: Layout) {
-    const body = { name: mine?.name ?? 'My dashboard', shared: false, filters: {}, refreshSeconds: 60, widgets: next.map((w) => ({ type: w.id, title: null, width: w.wide ? 8 : 4, height: 2, settings: {} })) };
+    const body = { name: mine?.name ?? 'My dashboard', shared: false, filters: {}, refreshSeconds: 60, widgets: next.map((w) => ({ type: w.id, title: null, width: w.wide ? 8 : 4, height: 2, settings: w.chart ? { chart: w.chart } : {} })) };
     try {
       if (mine) await api.put(`/dashboards/${mine.id}`, body); else await api.post('/dashboards', body);
       dashboards.reload();
@@ -124,8 +125,10 @@ export function DashboardPage() {
     }
   }
 
-  function render(id: string): ReactNode {
+  function render(id: string, chart: ChartKind = 'bar'): ReactNode {
     if (!o || !k) return null;
+    const C = (data: Slice[], onSelect?: (s: Slice) => void, opts: { centerLabel?: string; color?: string; max?: number } = {}) =>
+      <CategoryChart kind={chart} data={data} onSelect={onSelect} {...opts} />;
     switch (id) {
       case 'kpi.tiles':
         return (
@@ -141,18 +144,18 @@ export function DashboardPage() {
           </div>
         );
       case 'assets.category':
-        return <Donut data={slices(o.byCategory)} onSelect={(s) => navigate(`/assets?category=${encodeURIComponent(s.key)}`)} centerLabel="assets" />;
+        return C(slices(o.byCategory), (s) => navigate(`/assets?category=${encodeURIComponent(s.key)}`), { centerLabel: 'assets' });
       case 'assets.type':
-        return <Donut data={slices(o.byType, (t) => TYPE_LABEL[t] ?? fmt.label(t))} centerLabel="devices" onSelect={(s) => go('type', s.key, `Type: ${s.label}`)} />;
+        return C(slices(o.byType, (t) => TYPE_LABEL[t] ?? fmt.label(t)), (s) => go('type', s.key, `Type: ${s.label}`), { centerLabel: 'devices' });
       case 'assets.coverage':
-        return <Donut data={slices(o.coverage, (c) => COVERAGE[c]?.[0] ?? c, (c) => COVERAGE[c]?.[1])} centerLabel="assets" onSelect={(s) => go('coverage', s.key, `Inventoried by: ${s.label}`)} />;
+        return C(slices(o.coverage, (c) => COVERAGE[c]?.[0] ?? c, (c) => COVERAGE[c]?.[1]), (s) => go('coverage', s.key, `Inventoried by: ${s.label}`), { centerLabel: 'assets' });
       case 'assets.trend':
         return <TrendArea points={o.trend.map((t) => ({ label: new Date(t.day).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }), total: t.total, added: t.new }))} />;
       case 'assets.seen':
-        return <HBars data={SEEN.map(([key, color]) => ({ key, label: key === 'Online now' ? 'Online now' : key === 'Last 24 hours' ? 'Last 24 hours' : `Offline ${key}`, value: o.seen.find((r) => r.key === key)?.count ?? 0, color }))}
-          onSelect={(s) => go('seen', s.key, `Last contact: ${s.label}`)} />;
+        return C(SEEN.map(([key, color]) => ({ key, label: key === 'Online now' ? 'Online now' : key === 'Last 24 hours' ? 'Last 24 hours' : `Offline ${key}`, value: o.seen.find((r) => r.key === key)?.count ?? 0, color })),
+          (s) => go('seen', s.key, `Last contact: ${s.label}`), { centerLabel: 'assets' });
       case 'assets.os':
-        return <HBars data={slices(o.byOs, (x) => x)} onSelect={(s) => go('os', s.key, `OS: ${s.label}`)} />;
+        return C(slices(o.byOs, (x) => x), (s) => go('os', s.key, `OS: ${s.label}`), { centerLabel: 'assets' });
       case 'security.posture':
         return <PostureBars rows={o.posture} onSelect={(key, part) => go(POSTURE_FACET[key]!, part, `${key}: ${part === 'yes' ? 'compliant' : part === 'no' ? 'not compliant' : 'unknown'}`)} />;
       case 'agents.health': {
@@ -161,27 +164,27 @@ export function DashboardPage() {
         return total === 0 ? <div className="chart-empty">No agents yet. <Link to="/agents">Deploy the agent</Link>.</div> : (
           <div className="stack-v">
             <div className="big-stat"><b>{pctOf(online, total)}%</b> <span className="muted">of {total} agents online</span></div>
-            <HBars data={HEALTH.map(([key, label, color]) => ({ key, label, value: o.agentHealth.find((r) => r.key === key)?.count ?? 0, color }))} max={total}
-              onSelect={(s) => go('health', s.key, `Agent: ${s.label}`)} />
+            {C(HEALTH.map(([key, label, color]) => ({ key, label, value: o.agentHealth.find((r) => r.key === key)?.count ?? 0, color })),
+              (s) => go('health', s.key, `Agent: ${s.label}`), { max: total, centerLabel: 'agents' })}
           </div>
         );
       }
       case 'software.top':
-        return <HBars data={slices(o.topSoftware, (x) => x)} color="var(--s7)" onSelect={(s) => navigate(`/software?q=${encodeURIComponent(s.key)}`)} />;
+        return C(slices(o.topSoftware, (x) => x), (s) => navigate(`/software?q=${encodeURIComponent(s.key)}`), { color: 'var(--s7)', centerLabel: 'installs' });
       case 'hw.cores':
-        return <HBars data={slices(ordered(o.cores, ORDER.cores!), (x) => x)} color="var(--s1)" onSelect={(s) => go('cores', s.key, `Processor: ${s.label}`)} />;
+        return C(slices(bySize(o.cores), (x) => x), (s) => go('cores', s.key, `Processor: ${s.label}`), { color: 'var(--s1)', centerLabel: 'devices' });
       case 'hw.cpu':
-        return <HBars data={slices(o.cpu, (x) => x)} color="var(--s1)" onSelect={(s) => go('cpu', s.key, `CPU: ${s.label}`)} />;
+        return C(slices(o.cpu, (x) => x), (s) => go('cpu', s.key, `CPU: ${s.label}`), { color: 'var(--s1)', centerLabel: 'devices' });
       case 'hw.ram':
-        return <HBars data={slices(ordered(o.ram, ORDER.ram!), (x) => x)} color="var(--s3)" onSelect={(s) => go('ram', s.key, `Memory: ${s.label}`)} />;
+        return C(slices(bySize(o.ram), (x) => x), (s) => go('ram', s.key, `Memory: ${s.label}`), { color: 'var(--s3)', centerLabel: 'devices' });
       case 'hw.disk':
-        return <HBars data={slices(ordered(o.disk, ORDER.disk!), (x) => x)} color="var(--s4)" onSelect={(s) => go('disk', s.key, `Disk capacity: ${s.label}`)} />;
+        return C(slices(bySize(o.disk), (x) => x), (s) => go('disk', s.key, `Disk capacity: ${s.label}`), { color: 'var(--s4)', centerLabel: 'devices' });
       case 'hw.free':
-        return <HBars data={slices(ordered(o.free, ORDER.free!), (x) => x, (x) => FREE_COLOR[x])} onSelect={(s) => go('free', s.key, `Free disk: ${s.label}`)} />;
+        return C(slices(ordered(o.free, ORDER.free!), (x) => x, (x) => FREE_COLOR[x]), (s) => go('free', s.key, `Free disk: ${s.label}`), { centerLabel: 'devices' });
       case 'hw.vendor':
-        return <HBars data={slices(o.byManufacturer, (x) => x)} color="var(--s2)" onSelect={(s) => go('vendor', s.key, `Manufacturer: ${s.label}`)} />;
+        return C(slices(o.byManufacturer, (x) => x), (s) => go('vendor', s.key, `Manufacturer: ${s.label}`), { color: 'var(--s2)', centerLabel: 'devices' });
       case 'scans.results':
-        return <Donut data={slices(o.scanResults, (r) => RESULT_LABEL[r] ?? fmt.label(r), (r) => RESULT_COLOR[r])} centerLabel="results" onSelect={() => navigate('/discovery')} />;
+        return C(slices(o.scanResults, (r) => RESULT_LABEL[r] ?? fmt.label(r), (r) => RESULT_COLOR[r]), () => navigate('/discovery'), { centerLabel: 'results' });
       case 'license.usage':
         return lic.data ? (
           <div className="stack-v">
@@ -226,13 +229,13 @@ export function DashboardPage() {
       {!o || !k ? <Loading /> : (
         <>
           <div className="dash-grid">
-            {layout.map(({ id, wide }) => {
+            {layout.map(({ id, wide, chart }) => {
               const def = WIDGETS.find((w) => w.id === id);
               if (!def) return null;
               if (def.full) return <div key={id} className="dash-full">{render(id)}</div>;
               return (
-                <div key={id} className={wide ? 'dash-wide' : ''}>
-                  <Panel title={def.title} sub={sub[id]} right={links[id]} flush={id === 'scans.recent'}>{render(id)}</Panel>
+                <div key={id} className={`dash-tile${wide ? ' dash-wide' : ''}`}>
+                  <Panel title={def.title} sub={sub[id]} right={links[id]} flush={id === 'scans.recent'}>{render(id, chart ?? def.chart)}</Panel>
                 </div>
               );
             })}
@@ -248,8 +251,8 @@ export function DashboardPage() {
 function CustomizeDialog({ layout, onClose, onSave }: { layout: Layout; onClose: () => void; onSave: (l: Layout) => Promise<void> }) {
   // Visible widgets in their order, then the hidden ones.
   const [items, setItems] = useState(() => [
-    ...layout.map((l) => ({ ...l, on: true })),
-    ...WIDGETS.filter((w) => !layout.some((l) => l.id === w.id)).map((w) => ({ id: w.id, wide: !!w.wide, on: false })),
+    ...layout.map((l) => ({ ...l, chart: l.chart ?? WIDGETS.find((w) => w.id === l.id)?.chart, on: true })),
+    ...WIDGETS.filter((w) => !layout.some((l) => l.id === w.id)).map((w) => ({ id: w.id, wide: !!w.wide, chart: w.chart, on: false })),
   ]);
   const [drag, setDrag] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
@@ -260,7 +263,7 @@ function CustomizeDialog({ layout, onClose, onSave }: { layout: Layout; onClose:
     copy.splice(to, 0, x!);
     return copy;
   });
-  const set = (i: number, patch: Partial<{ on: boolean; wide: boolean }>) => setItems((xs) => xs.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+  const set = (i: number, patch: Partial<{ on: boolean; wide: boolean; chart: ChartKind }>) => setItems((xs) => xs.map((x, j) => (j === i ? { ...x, ...patch } : x)));
   const [error, setError] = useState<string | null>(null);
   async function save(next: Layout) {
     setBusy(true); setError(null);
@@ -273,7 +276,7 @@ function CustomizeDialog({ layout, onClose, onSave }: { layout: Layout; onClose:
         <header><h2 id="cz-title">Customize dashboard</h2></header>
         <div className="body form-v">
           {error && <Callout tone="crit" icon="alert">The layout was not saved: {error}</Callout>}
-          <small className="muted">Tick the charts you want, drag them (or use the arrows) to change the order, and choose which ones are wide. Saved for your account.</small>
+          <small className="muted">Tick the charts you want, choose how each is drawn (donut, pie, bar or column), drag them (or use the arrows) to change the order, and choose which ones are wide. Saved for your account.</small>
           <ul className="cz-list">
             {items.map((it, i) => {
               const def = WIDGETS.find((w) => w.id === it.id)!;
@@ -285,6 +288,11 @@ function CustomizeDialog({ layout, onClose, onSave }: { layout: Layout; onClose:
                     <input type="checkbox" checked={it.on} onChange={(e) => set(i, { on: e.target.checked })} />
                     <span><b>{def.title}</b><br /><small className="muted">{def.description}</small></span>
                   </label>
+                  {def.chart && (
+                    <select className="in sm" aria-label={`Chart type for ${def.title}`} value={it.chart ?? def.chart} disabled={!it.on} onChange={(e) => set(i, { chart: e.target.value as ChartKind })}>
+                      {CHART_KINDS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+                    </select>
+                  )}
                   {!def.full && <label className="row-check" title="Wide: spans two columns"><input type="checkbox" checked={it.wide} disabled={!it.on} onChange={(e) => set(i, { wide: e.target.checked })} /> Wide</label>}
                   <button type="button" className="btn sm" aria-label={`Move ${def.title} up`} disabled={i === 0} onClick={() => move(i, i - 1)}>↑</button>
                   <button type="button" className="btn sm" aria-label={`Move ${def.title} down`} disabled={i === items.length - 1} onClick={() => move(i, i + 1)}>↓</button>
@@ -296,7 +304,7 @@ function CustomizeDialog({ layout, onClose, onSave }: { layout: Layout; onClose:
         <footer>
           <button type="button" className="btn" style={{ marginRight: 'auto' }} disabled={busy} onClick={() => void save(DEFAULT_LAYOUT)}>Reset to default</button>
           <button type="button" className="btn" onClick={onClose} disabled={busy}>Cancel</button>
-          <button type="button" className="btn primary" disabled={busy || !items.some((x) => x.on)} onClick={() => void save(items.filter((x) => x.on).map(({ id, wide }) => ({ id, wide })))}>{busy ? 'Saving…' : 'Save'}</button>
+          <button type="button" className="btn primary" disabled={busy || !items.some((x) => x.on)} onClick={() => void save(items.filter((x) => x.on).map(({ id, wide, chart }) => ({ id, wide, chart })))}>{busy ? 'Saving…' : 'Save'}</button>
         </footer>
       </div>
     </div>

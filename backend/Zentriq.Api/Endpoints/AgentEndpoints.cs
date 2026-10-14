@@ -222,6 +222,11 @@ public static class AgentEndpoints
             }
             await using (var upd = new NpgsqlCommand("""
                 UPDATE zentriq.agent_registrations SET asset_id = @a, last_inventory_at = now(), last_checkin_at = now() WHERE id = @id;
+                -- A device enrolled again (agent reinstalled with a new code) replaces its earlier registration.
+                UPDATE zentriq.agent_registrations o SET status = 'replaced', revoked_at = now()
+                  FROM zentriq.agent_registrations n
+                 WHERE n.id = @id AND o.id <> n.id AND o.status = 'active' AND o.asset_id = @a AND o.enrolled_at < n.enrolled_at
+                   AND lower(COALESCE(o.hostname, '')) = lower(COALESCE(n.hostname, ''));
                 DELETE FROM zentriq.system_settings WHERE key = @req;
                 """, conn))
             {
@@ -284,7 +289,7 @@ public static class AgentEndpoints
                 string? S(int i) => r.IsDBNull(i) ? null : r.GetString(i);
                 var lastCheckin = D(7);
                 var status = r.GetString(1);
-                var health = status == "revoked" ? "revoked"
+                var health = status == "revoked" ? "revoked" : status == "replaced" ? "replaced"
                     : lastCheckin is null ? "never"
                     : lastCheckin > DateTimeOffset.UtcNow.AddSeconds(-DefaultCheckinSeconds * 3) ? "online"
                     : lastCheckin > DateTimeOffset.UtcNow.AddDays(-7) ? "stale" : "offline";
@@ -570,6 +575,7 @@ public static class AgentEndpoints
         if (!await r.ReadAsync(ct)) return (null, Results.Problem(statusCode: 401, title: "Unknown agent. Re-enroll it."));
         var status = r.GetString(0);
         if (status == "revoked") return (null, Results.Problem(statusCode: 403, title: "This agent has been revoked."));
+        if (status == "replaced") return (null, Results.Problem(statusCode: 403, title: "This agent has been revoked: the device was enrolled again and uses its newer registration."));
         // Only the latest issued certificate is valid (a renewed certificate replaces the old one).
         if (r.IsDBNull(1) || !string.Equals(r.GetString(1), cert.Thumbprint, StringComparison.OrdinalIgnoreCase))
             return (null, Results.Problem(statusCode: 401, title: "This certificate has been superseded."));

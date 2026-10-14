@@ -14,6 +14,7 @@ const HEALTH: Record<AgentRow['health'], [string, Tone]> = {
   offline: ['Offline > 7 days', 'crit'],
   never: ['Never checked in', ''],
   revoked: ['Revoked', 'crit'],
+  replaced: ['Replaced by a newer enrollment', ''],
 };
 
 /** Agents must reach the server by an address that resolves for them; the address used for this console is the best default. */
@@ -37,7 +38,7 @@ export function AgentsPage() {
   const tokens = useApi(() => (manage ? api.get<EnrollmentToken[]>('/agents/enrollment-tokens') : Promise.resolve([])), [manage]);
   const rows = agents.data ?? [];
   const count = (h: AgentRow['health']) => rows.filter((r) => r.health === h).length;
-  const outdated = rows.filter((r) => r.updateAvailable);
+  const outdated = rows.filter((r) => r.status === 'active' && r.updateAvailable);
   const selfUpdatable = outdated.filter((r) => r.canSelfUpdate && r.update?.status !== 'running' && r.update?.status !== 'queued' && r.update?.status !== 'sent');
   const legacy = outdated.filter((r) => !r.canSelfUpdate);
   const updating = rows.some((r) => r.update && ['queued', 'sent', 'running'].includes(r.update.status));
@@ -71,6 +72,14 @@ export function AgentsPage() {
       setMsg(r.message);
       agents.reload();
     } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+  }
+  async function manualUpdate(a: AgentRow) {
+    const ok = await confirm({
+      title: `Update the agent on ${a.hostname ?? a.id}`,
+      confirmLabel: 'Download agent MSI',
+      message: `This agent (${a.version}) was installed before agents could update themselves, so it cannot receive the update from here. Install the new MSI on ${a.hostname ?? 'the device'} once: copy ZentriqAgent-x64.msi to it and run "msiexec /i ZentriqAgent-x64.msi /qn" in an elevated prompt, or assign the package with GPO, Intune or SCCM. No enrollment code is needed; the device keeps its registration and history. Afterwards the Update button works for it.`,
+    });
+    if (ok && pkg.data?.package) window.location.href = pkg.data.package.url;
   }
   async function showCode(t: EnrollmentToken) {
     setMsg(null);
@@ -119,7 +128,7 @@ export function AgentsPage() {
         </Panel>
       )}
       <Kpis items={[
-        { label: 'Agents', value: rows.filter((r) => r.status !== 'revoked').length },
+        { label: 'Agents', value: rows.filter((r) => r.status === 'active').length },
         { label: 'Online', value: count('online') },
         { label: 'Not seen recently', value: count('stale') + count('offline') },
         { label: 'Agent port', value: pkg.data ? <span className="mono">{pkg.data.agentPort || 'disabled'}</span> : '—' },
@@ -138,7 +147,7 @@ export function AgentsPage() {
             { key: 'ip', label: 'Last address', render: (r) => <span className="mono">{r.lastIp ?? '—'}</span> },
             { key: 'v', label: 'Version', render: (r) => <>{r.version}<UpdateState r={r} /></> },
             { key: 'e', label: 'Certificate', render: (r) => r.certificateExpires ? `expires ${fmt.day(r.certificateExpires)}` : '—' },
-            { key: 'x', label: '', render: (r) => manage && r.status !== 'revoked' ? <div style={{ display: 'flex', gap: 6 }}>{r.updateAvailable && r.canSelfUpdate && !(r.update && ['queued', 'sent', 'running'].includes(r.update.status)) && <button className="btn sm primary" onClick={() => void update([r])}>Update</button>}<button className="btn sm" onClick={() => void collect(r)}>Collect now</button><button className="btn sm" onClick={() => void revoke(r)}>Revoke</button></div> : null },
+            { key: 'x', label: '', render: (r) => manage && r.status === 'active' ? <div style={{ display: 'flex', gap: 6 }}>{r.status === 'active' && r.updateAvailable && r.canSelfUpdate && !(r.update && ['queued', 'sent', 'running'].includes(r.update.status)) && <button className="btn sm primary" onClick={() => void update([r])}>Update</button>}{r.status === 'active' && r.updateAvailable && !r.canSelfUpdate && <button className="btn sm" onClick={() => void manualUpdate(r)}>Update (manual)</button>}<button className="btn sm" onClick={() => void collect(r)}>Collect now</button><button className="btn sm" onClick={() => void revoke(r)}>Revoke</button></div> : null },
           ]} />
         </Panel>
       ) : (
@@ -230,6 +239,7 @@ function NewCodeDialog({ defaultUrl, onClose, onCreated }: { defaultUrl: string;
 
 function UpdateState({ r }: { r: AgentRow }) {
   const u = r.update;
+  if (r.status !== 'active') return null;
   if (u && ['queued', 'sent'].includes(u.status)) return <div><Pill tone="warn">Update to {u.target} requested</Pill></div>;
   if (u && u.status === 'running') return <div><Pill tone="warn">Updating to {u.target}…</Pill></div>;
   if (u && u.status === 'failed' && r.updateAvailable) return <div title={u.detail ?? ''}><Pill tone="crit">Update failed</Pill></div>;
