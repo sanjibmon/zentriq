@@ -4,7 +4,11 @@ export interface Slice { key: string; label: string; value: number; color?: stri
 
 const SLOTS = ['var(--s1)', 'var(--s2)', 'var(--s3)', 'var(--s4)', 'var(--s5)', 'var(--s6)', 'var(--s7)', 'var(--s8)'];
 /** Colour follows the entity: the same key always gets the same slot (by first appearance in a stable order). */
-export function slotColor(index: number, key?: string) { return key && /^other$/i.test(key) ? 'var(--s-other)' : SLOTS[index % SLOTS.length]!; }
+export function slotColor(index: number, key?: string) {
+  if (key && /^other$/i.test(key)) return 'var(--s-other)';
+  // Beyond the 8 palette colours every further category still gets its own hue (golden-angle spacing).
+  return index < SLOTS.length ? SLOTS[index]! : `hsl(${Math.round((index * 137.508 + 20) % 360)} 58% 48%)`;
+}
 
 function useTip() {
   const [tip, setTip] = useState<{ x: number; y: number; body: ReactNode } | null>(null);
@@ -67,16 +71,16 @@ export function Donut({ data, onSelect, centerLabel = 'total', size = 150, pie =
 }
 
 /** Ranked magnitudes: horizontal bars, one hue, clickable rows. */
-export function HBars({ data, onSelect, color = 'var(--s1)', max }: { data: Slice[]; onSelect?: (s: Slice) => void; color?: string; max?: number }) {
+export function HBars({ data, onSelect, color, max }: { data: Slice[]; onSelect?: (s: Slice) => void; color?: string; max?: number }) {
   const { ref, show, hide, el } = useTip();
   if (data.length === 0) return <div className="chart-empty">No data yet.</div>;
   const m = max ?? Math.max(1, ...data.map((d) => d.value));
   return (
     <div className="chart hbars" ref={ref} onMouseLeave={hide}>
-      {data.map((d) => (
+      {data.map((d, i) => (
         <button key={d.key} type="button" onClick={() => onSelect?.(d)} disabled={!onSelect} onMouseMove={(e) => show(e, <><b>{d.label}</b> · {fmtN(d.value)}</>)}>
           <span className="lbl" title={d.label}>{d.label}</span>
-          <span className="bar"><i style={{ width: `${Math.max(2, (d.value / m) * 100)}%`, background: d.color ?? color }} /></span>
+          <span className="bar"><i style={{ width: `${Math.max(2, (d.value / m) * 100)}%`, background: d.color ?? color ?? slotColor(i, d.key) }} /></span>
           <span className="n">{fmtN(d.value)}</span>
         </button>
       ))}
@@ -86,17 +90,17 @@ export function HBars({ data, onSelect, color = 'var(--s1)', max }: { data: Slic
 }
 
 /** Column chart: vertical bars with the value on top and the label underneath; clickable columns. */
-export function VBars({ data, onSelect, color = 'var(--s1)', max, height = 170 }: { data: Slice[]; onSelect?: (s: Slice) => void; color?: string; max?: number; height?: number }) {
+export function VBars({ data, onSelect, color, max, height = 170 }: { data: Slice[]; onSelect?: (s: Slice) => void; color?: string; max?: number; height?: number }) {
   const { ref, show, hide, el } = useTip();
   if (data.length === 0) return <div className="chart-empty">No data yet.</div>;
   const m = max ?? Math.max(1, ...data.map((d) => d.value));
   return (
     <div className="chart vbars" ref={ref} onMouseLeave={hide} style={{ height }}>
-      {data.map((d) => (
+      {data.map((d, i) => (
         <button key={d.key} type="button" onClick={() => onSelect?.(d)} disabled={!onSelect} title={d.label}
           onMouseMove={(e) => show(e, <><b>{d.label}</b> · {fmtN(d.value)}</>)}>
           <span className="n">{fmtN(d.value)}</span>
-          <span className="col"><i style={{ height: `${Math.max(2, (d.value / m) * 100)}%`, background: d.color ?? color }} /></span>
+          <span className="col"><i style={{ height: `${Math.max(2, (d.value / m) * 100)}%`, background: d.color ?? color ?? slotColor(i, d.key) }} /></span>
           <span className="lbl">{d.label}</span>
         </button>
       ))}

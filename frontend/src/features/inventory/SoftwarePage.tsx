@@ -57,7 +57,7 @@ export function SoftwarePage() {
 
   return (
     <>
-      <PageHead title="Software Inventory" desc="Installed applications reported by agents and credentialed (agentless) scans, grouped by product." />
+      <PageHead title="Software Inventory" desc="Every application, on every device." />
       <form className="toolbar-row" onSubmit={(e) => { e.preventDefault(); setPage(1); setSearch(q); }}>
         <input className="in grow" placeholder="Search product or publisher…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search software" />
         <button className="btn" type="submit">Search</button>

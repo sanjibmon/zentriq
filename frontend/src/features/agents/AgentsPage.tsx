@@ -36,9 +36,15 @@ export function AgentsPage() {
   const agents = useApi(() => api.get<AgentRow[]>('/agents'), []);
   const pkg = useApi(() => api.get<AgentPackage>('/agents/package'), []);
   const tokens = useApi(() => (manage ? api.get<EnrollmentToken[]>('/agents/enrollment-tokens') : Promise.resolve([])), [manage]);
-  const rows = agents.data ?? [];
-  const count = (h: AgentRow['health']) => rows.filter((r) => r.health === h).length;
-  const outdated = rows.filter((r) => r.status === 'active' && r.updateAvailable);
+  const all = agents.data ?? [];
+  const [showOld, setShowOld] = useState(false);
+  // One row per device: when a device was enrolled more than once, keep the registration with the latest agent
+  // (newest version, then most recent check-in). Replaced and revoked registrations are hidden unless asked for.
+  const current = latestPerDevice(all.filter((r) => r.status === 'active'));
+  const hidden = all.length - current.length;
+  const rows = showOld ? all : current;
+  const count = (h: AgentRow['health']) => current.filter((r) => r.health === h).length;
+  const outdated = current.filter((r) => r.updateAvailable);
   const selfUpdatable = outdated.filter((r) => r.canSelfUpdate && r.update?.status !== 'running' && r.update?.status !== 'queued' && r.update?.status !== 'sent');
   const legacy = outdated.filter((r) => !r.canSelfUpdate);
   const updating = rows.some((r) => r.update && ['queued', 'sent', 'running'].includes(r.update.status));
@@ -98,7 +104,7 @@ export function AgentsPage() {
 
   return (
     <>
-      <PageHead title="Agents" desc="The Zentriq Agent reports inventory from Windows devices that agentless scans cannot reach — laptops off the network, branch offices, locked-down hosts. It only connects out to this server over HTTPS."
+      <PageHead title="Agents" desc="Always-on inventory from every Windows device."
         actions={<>
           {pkg.data?.package && <a className="btn" href={pkg.data.package.url} download>Download agent</a>}
           {manage && <button className="btn primary" onClick={() => setNewOpen(true)}>New enrollment code</button>}
@@ -110,8 +116,7 @@ export function AgentsPage() {
         <Callout tone="info" icon="info">
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
             <span style={{ flex: '1 1 320px' }}>
-              Agent version <b>{pkg.data.package.version ?? 'latest'}</b> is available on this server. {outdated.length} agent(s) run an earlier version.
-              {legacy.length > 0 && <> {legacy.length} of them ({legacy.slice(0, 3).map((r) => r.hostname ?? r.id).join(', ')}{legacy.length > 3 ? ', …' : ''}) run an agent from before console updates were added: install the new MSI on those once (Download agent, then <span className="mono">msiexec /i ZentriqAgent-x64.msi /qn</span> or your GPO/Intune/SCCM deployment — no enrollment code needed). After that they update from here.</>}
+              Agent <b>{pkg.data.package.version ?? 'latest'}</b> is available · {outdated.length} agent(s) out of date{legacy.length > 0 ? ` · ${legacy.length} need a one-time manual install (Update (manual))` : ''}
             </span>
             {selfUpdatable.length > 0 && <button className="btn primary sm" onClick={() => void update('all')}>Update {selfUpdatable.length} agent(s)</button>}
           </div>
@@ -128,15 +133,20 @@ export function AgentsPage() {
         </Panel>
       )}
       <Kpis items={[
-        { label: 'Agents', value: rows.filter((r) => r.status === 'active').length },
+        { label: 'Agents', value: current.length },
         { label: 'Online', value: count('online') },
         { label: 'Not seen recently', value: count('stale') + count('offline') },
         { label: 'Agent port', value: pkg.data ? <span className="mono">{pkg.data.agentPort || 'disabled'}</span> : '—' },
       ]} />
       <div className="tabs" role="tablist">
-        <button className={tab === 'agents' ? 'on' : ''} onClick={() => setTab('agents')}>Agents<span className="cnt">{rows.length}</span></button>
+        <button className={tab === 'agents' ? 'on' : ''} onClick={() => setTab('agents')}>Agents<span className="cnt">{current.length}</span></button>
         {manage && <button className={tab === 'codes' ? 'on' : ''} onClick={() => setTab('codes')}>Enrollment codes<span className="cnt">{tokens.data?.length ?? 0}</span></button>}
       </div>
+      {tab === 'agents' && hidden > 0 && (
+        <label className="row-check" style={{ margin: '0 0 8px', fontSize: 12.5 }}>
+          <input type="checkbox" checked={showOld} onChange={(e) => setShowOld(e.target.checked)} /> Show {hidden} older, replaced or revoked registration(s)
+        </label>
+      )}
       {tab === 'agents' ? (
         <Panel flush>
           <DataTable rows={rows} empty={agents.loading ? 'Loading…' : 'No agents yet. Create an enrollment code and install the agent MSI on a device.'} columns={[
@@ -175,15 +185,6 @@ export function AgentsPage() {
           </ul>
         </Panel>
       )}
-      <Panel title="How agents connect">
-        <ul className="plain">
-          <li>Install <b>ZentriqAgent-x64.msi</b> with the enrollment code (Windows 10/11, Windows Server 2016+ with .NET Framework 4.8).</li>
-          <li>The agent creates its own key, receives a client certificate from this server and then authenticates with it (mutual TLS on port {pkg.data?.agentPort ?? 8444}). The enrollment code is deleted from the device after use.</li>
-          <li>It checks in every 2 minutes and sends full inventory every 12 hours, or within about 2 minutes when you click <i>Collect now</i>. It also carries out service start/stop/restart and software uninstalls requested in the console. Inventory is queued while the device is offline.</li>
-          <li><b>Updating agents:</b> after the server is upgraded, click <i>Update</i> (one agent) or <i>Update agents</i> (all). The agent downloads the new package from this server over its authenticated connection, verifies its SHA-256 checksum and installs it silently; it keeps its enrollment. Progress and results are in the Activity Log. Agents installed before this feature existed need the new MSI installed once.</li>
-          <li>Devices found by both an agent and an agentless scan are merged into one asset (matched by SMBIOS UUID, serial number and MAC address).</li>
-        </ul>
-      </Panel>
       {newOpen && <NewCodeDialog defaultUrl={suggestedUrl(pkg.data)} onClose={() => setNewOpen(false)} onCreated={(t) => { setNewOpen(false); setCreated(t); setTab('codes'); tokens.reload(); }} />}
     </>
   );
@@ -245,4 +246,21 @@ function UpdateState({ r }: { r: AgentRow }) {
   if (u && u.status === 'failed' && r.updateAvailable) return <div title={u.detail ?? ''}><Pill tone="crit">Update failed</Pill></div>;
   if (r.updateAvailable) return <div className="faint" style={{ fontSize: 11.5 }} title={r.canSelfUpdate ? '' : 'This agent predates console updates: install the new MSI once.'}>{r.latestVersion} available{r.canSelfUpdate ? '' : ' · install MSI once'}</div>;
   return null;
+}
+
+const ver = (v: string) => v.split('.').map((x) => parseInt(x, 10) || 0);
+function newer(a: AgentRow, b: AgentRow) {
+  const va = ver(a.version), vb = ver(b.version);
+  for (let i = 0; i < 4; i++) if ((va[i] ?? 0) !== (vb[i] ?? 0)) return (va[i] ?? 0) > (vb[i] ?? 0);
+  return (a.lastCheckinAt ?? '') > (b.lastCheckinAt ?? '');
+}
+/** The registration with the latest agent for each device (same asset, or same host name when not matched yet). */
+function latestPerDevice(rows: AgentRow[]): AgentRow[] {
+  const best = new Map<string, AgentRow>();
+  for (const r of rows) {
+    const key = r.assetId ?? `host:${(r.hostname ?? r.id).toLowerCase()}`;
+    const cur = best.get(key);
+    if (!cur || newer(r, cur)) best.set(key, r);
+  }
+  return rows.filter((r) => best.get(r.assetId ?? `host:${(r.hostname ?? r.id).toLowerCase()}`) === r);
 }

@@ -14,7 +14,7 @@ export function HardwarePage() {
   const data = useApi(() => api.get<Paged<HardwareRow>>('/inventory/hardware', { q: search, page, pageSize }), [search, page]);
   return (
     <>
-      <PageHead title="Hardware Inventory" desc="Manufacturer, model, serial number, processor, memory and storage from agents and credentialed scans." />
+      <PageHead title="Hardware Inventory" desc="What every device is made of." />
       <form className="toolbar-row" onSubmit={(e) => { e.preventDefault(); setPage(1); setSearch(q); }}>
         <input className="in grow" placeholder="Search hostname, vendor, model, serial or CPU…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search hardware" />
         <button className="btn" type="submit">Search</button>

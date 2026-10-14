@@ -63,7 +63,7 @@ export function DiscoveryPage() {
 
   return (
     <>
-      <PageHead title="Discovery & Scans" desc="Find devices on authorized networks. Scans run in the Zentriq Worker service and continue if you close the browser."
+      <PageHead title="Discovery & Scans" desc="Find every device on your network."
         actions={can('scans.run') && <button className="btn primary" onClick={() => setOpen(true)}>New scan</button>} />
       <div className="tabs" role="tablist">
         <button className={tab === 'scans' ? 'on' : ''} onClick={() => setTab('scans')}>Scans</button>

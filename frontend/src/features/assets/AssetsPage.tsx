@@ -81,7 +81,7 @@ export function AssetsPage() {
 
   return (
     <>
-      <PageHead title="Asset Inventory" desc="Every device Zentriq has discovered, inventoried with the agent or agentlessly, or added manually."
+      <PageHead title="Asset Inventory" desc="Every device, in one place."
         actions={<>
           {can('agents.manage') && <button className="btn" onClick={() => setDeploy(true)}>Deploy agent</button>}
           {can('scans.run') && (picked.length > 0

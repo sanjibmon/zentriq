@@ -89,6 +89,8 @@ export function DashboardPage() {
   const lic = useApi(() => api.get<LicensingStatus>('/licensing/status'), []);
   const scans = useApi(() => api.get<Paged<Scan>>('/discovery/scans', { pageSize: 5 }), [tick]);
   const dashboards = useApi(() => api.get<DashboardDto[]>('/dashboards'), []);
+  const org = useApi(() => api.get<{ profile: { name?: string | null } | null }>('/organization'), []);
+  const company = org.data?.profile?.name?.trim();
   const [msg, setMsg] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   useEffect(() => { const t = setInterval(() => setTick((x) => x + 1), 60000); return () => clearInterval(t); }, []);
@@ -170,19 +172,19 @@ export function DashboardPage() {
         );
       }
       case 'software.top':
-        return C(slices(o.topSoftware, (x) => x), (s) => navigate(`/software?q=${encodeURIComponent(s.key)}`), { color: 'var(--s7)', centerLabel: 'installs' });
+        return C(slices(o.topSoftware, (x) => x), (s) => navigate(`/software?q=${encodeURIComponent(s.key)}`), { centerLabel: 'installs' });
       case 'hw.cores':
-        return C(slices(bySize(o.cores), (x) => x), (s) => go('cores', s.key, `Processor: ${s.label}`), { color: 'var(--s1)', centerLabel: 'devices' });
+        return C(slices(bySize(o.cores), (x) => x), (s) => go('cores', s.key, `Processor: ${s.label}`), { centerLabel: 'devices' });
       case 'hw.cpu':
-        return C(slices(o.cpu, (x) => x), (s) => go('cpu', s.key, `CPU: ${s.label}`), { color: 'var(--s1)', centerLabel: 'devices' });
+        return C(slices(o.cpu, (x) => x), (s) => go('cpu', s.key, `CPU: ${s.label}`), { centerLabel: 'devices' });
       case 'hw.ram':
-        return C(slices(bySize(o.ram), (x) => x), (s) => go('ram', s.key, `Memory: ${s.label}`), { color: 'var(--s3)', centerLabel: 'devices' });
+        return C(slices(bySize(o.ram), (x) => x), (s) => go('ram', s.key, `Memory: ${s.label}`), { centerLabel: 'devices' });
       case 'hw.disk':
-        return C(slices(bySize(o.disk), (x) => x), (s) => go('disk', s.key, `Disk capacity: ${s.label}`), { color: 'var(--s4)', centerLabel: 'devices' });
+        return C(slices(bySize(o.disk), (x) => x), (s) => go('disk', s.key, `Disk capacity: ${s.label}`), { centerLabel: 'devices' });
       case 'hw.free':
         return C(slices(ordered(o.free, ORDER.free!), (x) => x, (x) => FREE_COLOR[x]), (s) => go('free', s.key, `Free disk: ${s.label}`), { centerLabel: 'devices' });
       case 'hw.vendor':
-        return C(slices(o.byManufacturer, (x) => x), (s) => go('vendor', s.key, `Manufacturer: ${s.label}`), { color: 'var(--s2)', centerLabel: 'devices' });
+        return C(slices(o.byManufacturer, (x) => x), (s) => go('vendor', s.key, `Manufacturer: ${s.label}`), { centerLabel: 'devices' });
       case 'scans.results':
         return C(slices(o.scanResults, (r) => RESULT_LABEL[r] ?? fmt.label(r), (r) => RESULT_COLOR[r]), () => navigate('/discovery'), { centerLabel: 'results' });
       case 'license.usage':
@@ -190,7 +192,7 @@ export function DashboardPage() {
           <div className="stack-v">
             <div><Pill tone={statusTone(lic.data.mode)}>{fmt.label(lic.data.mode)}</Pill> <span className="muted">{lic.data.summary}</span></div>
             <HBars data={lic.data.usage.filter((u) => u.limit != null || u.billable > 0).map((u) => ({ key: u.workload, label: `${fmt.label(u.workload)}${u.limit != null ? ` (limit ${u.limit})` : ''}`, value: u.billable }))}
-              max={Math.max(1, ...lic.data.usage.map((u) => u.limit ?? u.billable))} color="var(--accent)" onSelect={() => navigate('/licensing')} />
+              max={Math.max(1, ...lic.data.usage.map((u) => u.limit ?? u.billable))} onSelect={() => navigate('/licensing')} />
           </div>
         ) : <ErrorBox error={lic.error} />;
       case 'scans.recent':
@@ -218,7 +220,7 @@ export function DashboardPage() {
 
   return (
     <>
-      <PageHead title="Dashboard" desc={`Welcome back, ${me?.displayName ?? ''}. Click any chart to open the matching devices.`} crumbs={false}
+      <PageHead title={company ? `${company} Dashboard` : 'Dashboard'} desc={`Welcome back, ${me?.displayName ?? ''}`} crumbs={false}
         actions={<>
           <button className="btn" onClick={() => setEditing(true)}>Customize</button>
           {can('scans.run') && <button className="btn" onClick={() => void collectAll()}>Collect inventory now</button>}
