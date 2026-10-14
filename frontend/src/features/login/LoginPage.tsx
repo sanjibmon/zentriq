@@ -120,7 +120,6 @@ export function LoginPage() {
             <LogoMark size={40} />
           </div>
           <h1>Sign in</h1>
-          <p className="muted">Use your Zentriq account.</p>
 
           {notice && <div className="callout ok login-error" role="status"><Icon name="info" /><div>{notice}</div></div>}
           {error && (
@@ -133,7 +132,7 @@ export function LoginPage() {
           {!mfaStep ? (
             <>
               <label className="login-field">
-                <span>Username (e-mail)</span>
+                <span>Username</span>
                 <input className="in" type="email" name="username" autoComplete="username" autoFocus value={email}
                   onChange={(e) => setEmail(e.target.value)} placeholder="name@company.com" disabled={busy} required />
               </label>
