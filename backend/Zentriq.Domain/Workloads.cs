@@ -64,6 +64,10 @@ public static class JobTypes
     public const string DiscoveryScan = "discovery.scan";
     public const string DirectorySync = "directory.sync";
     public const string AssetAction = "asset.action";
+    public const string ReportDeliver = "report.deliver";
+    public const string VulnSync = "vuln.sync";
+    public const string VulnEvaluate = "vuln.evaluate";
+    public const string VulnImport = "vuln.import";
     public const string UsageSnapshot = "license.usage_snapshot";
     public const string MaintenanceBackup = "maintenance.backup";
 

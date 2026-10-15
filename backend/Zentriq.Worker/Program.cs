@@ -26,6 +26,10 @@ builder.Services.AddScoped<IJobHandler, DiscoveryScanHandler>();
 builder.Services.AddScoped<IJobHandler, UsageSnapshotHandler>();
 builder.Services.AddScoped<IJobHandler, DirectorySyncHandler>();
 builder.Services.AddScoped<IJobHandler, AssetActionHandler>();
+builder.Services.AddScoped<IJobHandler, ReportDeliveryHandler>();
+builder.Services.AddScoped<IJobHandler, VulnSyncHandler>();
+builder.Services.AddScoped<IJobHandler, VulnEvaluateHandler>();
+builder.Services.AddScoped<IJobHandler, VulnImportHandler>();
 builder.Services.AddSingleton<IHostPinger, TcpHostPinger>();
 builder.Services.AddSingleton<Zentriq.Worker.Agentless.AgentlessInventory>();
 

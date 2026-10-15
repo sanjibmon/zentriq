@@ -165,6 +165,8 @@ api.MapCredentialEndpoints();
 api.MapDirectoryEndpoints();
 api.MapInventoryEndpoints();
 api.MapAgentAdminEndpoints();
+api.MapReportEndpoints();
+api.MapVulnerabilityEndpoints();
 app.MapAgentEndpoints();
 api.MapPendingModuleEndpoints();
 app.MapOpenApi("/api/openapi/{documentName}.json").RequireAuthorization(Permissions.SettingsManage);

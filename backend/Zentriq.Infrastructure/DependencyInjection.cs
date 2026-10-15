@@ -51,6 +51,9 @@ public static class DependencyInjection
         services.AddSingleton<CredentialProtector>();
         services.AddSingleton<Zentriq.Infrastructure.ActiveDirectory.DirectoryStore>();
         services.AddSingleton<Zentriq.Infrastructure.Mail.MailService>();
+        services.AddSingleton<Zentriq.Infrastructure.Vulnerabilities.VulnStore>();
+        services.AddSingleton<Zentriq.Infrastructure.Vulnerabilities.VulnFeedService>();
+        services.AddSingleton<Zentriq.Infrastructure.Reports.ReportDelivery>();
         services.AddScoped<Zentriq.Infrastructure.Inventory.InventoryStore>();
         return services;
     }

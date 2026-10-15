@@ -53,7 +53,12 @@ public sealed class MailService(NpgsqlDataSource ds, CredentialProtector protect
 
     public static bool IsUsable(SmtpSettings s) => s.Enabled && !string.IsNullOrWhiteSpace(s.Host) && !string.IsNullOrWhiteSpace(s.FromAddress);
 
-    public async Task SendAsync(SmtpSettings s, string to, string subject, string textBody, string? htmlBody, CancellationToken ct)
+    public Task SendAsync(SmtpSettings s, string to, string subject, string textBody, string? htmlBody, CancellationToken ct) =>
+        SendAsync(s, to, subject, textBody, htmlBody, null, ct);
+
+    /// <summary>Sends one message; attachments are (file name, content type, bytes).</summary>
+    public async Task SendAsync(SmtpSettings s, string to, string subject, string textBody, string? htmlBody,
+        IReadOnlyList<(string Name, string ContentType, byte[] Content)>? attachments, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(s.Host) || string.IsNullOrWhiteSpace(s.FromAddress)) throw new MailException("E-mail (SMTP) is not configured.");
         using var client = new SmtpClient(s.Host.Trim(), s.Port)
@@ -77,6 +82,8 @@ public sealed class MailService(NpgsqlDataSource ds, CredentialProtector protect
         msg.To.Add(new MailAddress(to));
         if (htmlBody is not null)
             msg.AlternateViews.Add(AlternateView.CreateAlternateViewFromString(htmlBody, System.Text.Encoding.UTF8, "text/html"));
+        foreach (var (name, type, content) in attachments ?? [])
+            msg.Attachments.Add(new Attachment(new MemoryStream(content), name, type));
         try { await client.SendMailAsync(msg, ct); }
         catch (SmtpException ex)
         {

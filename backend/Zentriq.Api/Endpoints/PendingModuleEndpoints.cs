@@ -8,9 +8,7 @@ public static class PendingModuleEndpoints
 {
     private static readonly (string Path, string Name)[] Pending =
     [
-        ("/reports", "Report designer, scheduled reports and XLSX/PDF exports"),
         ("/patch", "Patch management"),
-        ("/vulnerabilities", "Vulnerability management"),
         ("/configuration", "Security configuration assessment"),
         ("/deployment", "Software deployment"),
         ("/remote", "Remote support"),

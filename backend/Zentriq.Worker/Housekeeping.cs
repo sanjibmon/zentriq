@@ -28,12 +28,65 @@ public sealed class Housekeeping(NpgsqlDataSource ds, JobQueue jobs, WorkerIdent
                 if (tick % 20 == 0)
                     await jobs.EnqueueAsync(new EnqueueRequest(JobTypes.UsageSnapshot, new { source = "scheduled" },
                         $"usage:{DateTimeOffset.UtcNow:yyyy-MM-dd}", Priority: 200, MaxAttempts: 5, TimeoutSeconds: 600), ct: stoppingToken);
+                if (tick % 2 == 0) await ScheduledReportsAsync(stoppingToken);
+                if (tick % 20 == 5) await VulnerabilityJobsAsync(stoppingToken);
+                if (tick % 120 == 7) await PurgeAsync(stoppingToken);
             }
             catch (OperationCanceledException) { break; }
             catch (Exception ex) { logger.LogWarning(ex, "Housekeeping cycle failed"); }
             tick++;
             try { await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken); } catch (OperationCanceledException) { break; }
         }
+    }
+
+    /// <summary>Queues a delivery job for every scheduled report that is due and moves its next run forward.</summary>
+    private async Task ScheduledReportsAsync(CancellationToken ct)
+    {
+        var due = new List<(Guid Id, DateTimeOffset At, string Schedule)>();
+        await using (var cmd = ds.CreateCommand("""
+            SELECT id, next_run_at, schedule::text FROM zentriq.report_definitions
+             WHERE schedule IS NOT NULL AND (schedule ->> 'enabled')::boolean AND next_run_at <= now() LIMIT 50
+            """))
+        await using (var r = await cmd.ExecuteReaderAsync(ct))
+            while (await r.ReadAsync(ct)) due.Add((r.GetGuid(0), r.GetFieldValue<DateTimeOffset>(1), r.GetString(2)));
+        foreach (var (id, at, json) in due)
+        {
+            var schedule = System.Text.Json.JsonSerializer.Deserialize<Zentriq.Infrastructure.Reports.ReportSchedule>(json) ?? new();
+            await jobs.EnqueueAsync(new EnqueueRequest(JobTypes.ReportDeliver, new { reportId = id, trigger = "schedule" },
+                $"report:{id}:{at.UtcDateTime:yyyyMMddHHmm}", Priority: 150, MaxAttempts: 2, TimeoutSeconds: 1800), ct: ct);
+            await using var upd = ds.CreateCommand("UPDATE zentriq.report_definitions SET next_run_at = @n WHERE id = @id");
+            upd.Parameters.AddWithValue("id", id);
+            upd.Parameters.AddWithValue("n", schedule.NextRun(DateTimeOffset.UtcNow));
+            await upd.ExecuteNonQueryAsync(ct);
+            logger.LogInformation("Scheduled report {Report} queued", id);
+        }
+    }
+
+    /// <summary>Daily feed update (when automatic updates are on) and a findings re-evaluation every 30 minutes.</summary>
+    private async Task VulnerabilityJobsAsync(CancellationToken ct)
+    {
+        await using (var cmd = ds.CreateCommand("SELECT value::text FROM zentriq.system_settings WHERE key = 'vuln.auto_sync'"))
+        {
+            var v = await cmd.ExecuteScalarAsync(ct) as string;
+            if (v is null || v.Trim() == "true")
+                await jobs.EnqueueAsync(new EnqueueRequest(JobTypes.VulnSync, new { source = "scheduled" }, $"vuln-sync:{DateTimeOffset.UtcNow:yyyy-MM-dd}",
+                    Priority: 180, MaxAttempts: 2, TimeoutSeconds: 4 * 3600, RunAfter: DateTimeOffset.UtcNow.AddMinutes(2)), ct: ct);
+        }
+        var slot = DateTimeOffset.UtcNow;
+        await jobs.EnqueueAsync(new EnqueueRequest(JobTypes.VulnEvaluate, new { source = "scheduled" }, $"vuln-eval:{slot:yyyy-MM-dd-HH}:{slot.Minute / 30}",
+            Priority: 190, MaxAttempts: 2, TimeoutSeconds: 1800), ct: ct);
+    }
+
+    /// <summary>Report files are kept 30 days; uploaded feed files are dropped once processed (or after a day).</summary>
+    private async Task PurgeAsync(CancellationToken ct)
+    {
+        await using var cmd = ds.CreateCommand("""
+            UPDATE zentriq.report_runs SET content = NULL WHERE content IS NOT NULL AND started_at < now() - interval '30 days';
+            DELETE FROM zentriq.report_runs WHERE started_at < now() - interval '365 days';
+            UPDATE zentriq.vuln_imports SET content = NULL, status = CASE WHEN status IN ('queued','running') THEN 'failed' ELSE status END,
+                   message = COALESCE(message, 'Not processed within a day.') WHERE content IS NOT NULL AND created_at < now() - interval '1 day';
+            """);
+        await cmd.ExecuteNonQueryAsync(ct);
     }
 
     /// <summary>Scans whose job ended without the handler finishing them (timeout, exhausted retries).</summary>
