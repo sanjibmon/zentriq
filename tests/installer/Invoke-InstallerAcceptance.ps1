@@ -579,7 +579,7 @@ if (-not $installed) {
         Assert ($sets.Count -ge 6) "only $($sets.Count) dataset(s)"
         $lib = @(Api GET '/reports' -Session $s | ForEach-Object { $_ })
         Assert (@($lib | Where-Object system).Count -ge 10) "built-in reports: $(@($lib | Where-Object system).Count)"
-        $r = Api POST '/reports/run' @{ dataset = 'assets'; definition = @{ columns = @('hostname', 'ip', 'os', 'agent', 'last_seen'); filters = @(@{ column = 'hostname'; op = 'not_empty' }) } } -Session $s
+        $r = Api POST '/reports/run' @{ dataset = 'assets'; definition = @{ columns = @('hostname', 'ip', 'os', 'agent', 'last_contact'); filters = @(@{ column = 'hostname'; op = 'not_empty' }) } } -Session $s
         Assert ($r.columns.Count -eq 5) "columns: $($r.columns.Count)"
         $g = Api POST '/reports/run' @{ dataset = 'assets'; definition = @{ columns = @(); filters = @(); groupBy = @('category') } } -Session $s
         Assert ($g.columns[-1].key -eq 'count') 'grouped run has no count column'
@@ -598,7 +598,7 @@ if (-not $installed) {
         Assert ($names -contains 'xl/worksheets/sheet1.xml') "xlsx parts: $($names -join ',')"
         $c = Invoke-WebRequest "$base/api/v1/reports/export" -Method Post -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } -ContentType 'application/json' -Body (@{ dataset = 'assets'; definition = $spec; format = 'csv' } | ConvertTo-Json -Depth 5)
         Assert ($c.Content -match 'Hostname') 'CSV has no header'
-        $new = Api POST '/reports' @{ name = 'CI report'; dataset = 'software'; definition = @{ columns = @('name', 'version', 'hostname'); filters = @() }; shared = $false } -Session $s
+        $new = Api POST '/reports' @{ name = 'CI report'; dataset = 'software'; definition = @{ columns = @('software', 'version', 'hostname'); filters = @() }; shared = $false } -Session $s
         $sch = Api PUT "/reports/$($new.id)/schedule" @{ schedule = @{ enabled = $true; frequency = 'weekly'; hour = 6; weekday = 1; day = 1 }; recipients = @('ci@example.invalid'); format = 'xlsx' } -Session $s
         Assert ($sch.nextRunAt) 'schedule has no next run'
         Api POST "/reports/$($new.id)/send" -Session $s | Out-Null
