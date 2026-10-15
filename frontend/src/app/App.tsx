@@ -10,6 +10,9 @@ import { SoftwarePage } from '../features/inventory/SoftwarePage';
 import { HardwarePage } from '../features/inventory/HardwarePage';
 import { AssetDetailPage } from '../features/inventory/AssetDetailPage';
 import { ModulePage } from '../features/placeholder/ModulePage';
+import { ReportsPage } from '../features/reports/ReportsPage';
+import { ReportBuilder } from '../features/reports/ReportBuilder';
+import { VulnerabilitiesPage } from '../features/vulnerabilities/VulnerabilitiesPage';
 import { ActivityPage } from '../features/activity/ActivityPage';
 import { LoginPage } from '../features/login/LoginPage';
 import { ResetPasswordPage } from '../features/login/ResetPasswordPage';
@@ -36,6 +39,11 @@ function Routes() {
   if (path === '/audit') return <AuditPage />;
   if (path === '/settings') return <SettingsPage />;
   if (path === '/account') return <AccountPage />;
+  if (path === '/reports' || path === '/modules/reports') return <ReportsPage />;
+  if (path === '/reports/new') return <ReportBuilder id={null} />;
+  const reportMatch = /^\/reports\/([0-9a-f-]{36})$/i.exec(path);
+  if (reportMatch) return <ReportBuilder key={reportMatch[1]} id={reportMatch[1]!} />;
+  if (path === '/vulnerabilities' || path === '/modules/vuln') return <VulnerabilitiesPage />;
   if (path.startsWith('/modules/')) return <ModulePage id={path.slice('/modules/'.length)} />;
   return <ModulePage id="" />;
 }

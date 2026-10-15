@@ -117,7 +117,7 @@ Remove-Item $answer -Force   # contains the administrator password
 
 if (-not $installed) {
     foreach ($t in 'T02 PostgreSQL provisioning', 'T03 Database migration', 'T04 Administrator sign-in', 'T05 API and worker services', 'T06 Trial initialization',
-                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console') {
+                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management') {
         Record $t.Substring(0, 3) $t.Substring(4) 'BLOCKED' 'installation failed'
     }
 } else {
@@ -571,6 +571,80 @@ if (-not $installed) {
         Assert ((Body $list) -notmatch 'not-a-password') 'connection list exposes the password'
         Api DELETE "/directory/connections/$($c.id)" -Session $s | Out-Null
         "invalid DN rejected; no DC: $($t.message); password not returned"
+    } | Out-Null
+
+    Check 'T48' 'Reports: run, group, export (XLSX/CSV), injection-safe filters, save, schedule and deliver' {
+        $s = Login
+        $sets = @(Api GET '/reports/datasets' -Session $s | ForEach-Object { $_ })
+        Assert ($sets.Count -ge 6) "only $($sets.Count) dataset(s)"
+        $lib = @(Api GET '/reports' -Session $s | ForEach-Object { $_ })
+        Assert (@($lib | Where-Object system).Count -ge 10) "built-in reports: $(@($lib | Where-Object system).Count)"
+        $r = Api POST '/reports/run' @{ dataset = 'assets'; definition = @{ columns = @('hostname', 'ip', 'os', 'agent', 'last_seen'); filters = @(@{ column = 'hostname'; op = 'not_empty' }) } } -Session $s
+        Assert ($r.columns.Count -eq 5) "columns: $($r.columns.Count)"
+        $g = Api POST '/reports/run' @{ dataset = 'assets'; definition = @{ columns = @(); filters = @(); groupBy = @('category') } } -Session $s
+        Assert ($g.columns[-1].key -eq 'count') 'grouped run has no count column'
+        $inj = Api POST '/reports/run' @{ dataset = 'assets'; definition = @{ columns = @('hostname'); filters = @(@{ column = 'hostname'; op = 'eq'; value = "x'); DROP TABLE zentriq.assets; --" }) } } -Session $s
+        Assert ($inj.total -eq 0) 'injection-like value matched rows'
+        Assert ((Api GET '/assets?page=1&pageSize=1' -Session $s).total -ge 0) 'assets table damaged'
+        $bad = Invoke-WebRequest "$base/api/v1/reports/run" -Method Post -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } -ContentType 'application/json' -SkipHttpErrorCheck `
+            -Body (@{ dataset = 'assets'; definition = @{ columns = @('hostname; DROP TABLE x'); filters = @() } } | ConvertTo-Json -Depth 5)
+        Assert ($bad.StatusCode -eq 400) "unknown column accepted: $($bad.StatusCode)"
+        $spec = @{ columns = @('hostname', 'ip', 'os'); filters = @() }
+        $x = Invoke-WebRequest "$base/api/v1/reports/export" -Method Post -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } -ContentType 'application/json' -Body (@{ dataset = 'assets'; definition = $spec; format = 'xlsx'; name = 'CI devices' } | ConvertTo-Json -Depth 5)
+        Assert ($x.RawContentStream.ToArray()[0] -eq 0x50 -and $x.RawContentStream.ToArray()[1] -eq 0x4B) 'xlsx is not a ZIP package'
+        $xlsx = Join-Path $OutDir 'ci-report.xlsx'; [IO.File]::WriteAllBytes($xlsx, $x.RawContentStream.ToArray())
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        $zip = [IO.Compression.ZipFile]::OpenRead($xlsx); $names = $zip.Entries.FullName; $zip.Dispose()
+        Assert ($names -contains 'xl/worksheets/sheet1.xml') "xlsx parts: $($names -join ',')"
+        $c = Invoke-WebRequest "$base/api/v1/reports/export" -Method Post -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } -ContentType 'application/json' -Body (@{ dataset = 'assets'; definition = $spec; format = 'csv' } | ConvertTo-Json -Depth 5)
+        Assert ($c.Content -match 'Hostname') 'CSV has no header'
+        $new = Api POST '/reports' @{ name = 'CI report'; dataset = 'software'; definition = @{ columns = @('name', 'version', 'hostname'); filters = @() }; shared = $false } -Session $s
+        $sch = Api PUT "/reports/$($new.id)/schedule" @{ schedule = @{ enabled = $true; frequency = 'weekly'; hour = 6; weekday = 1; day = 1 }; recipients = @('ci@example.invalid'); format = 'xlsx' } -Session $s
+        Assert ($sch.nextRunAt) 'schedule has no next run'
+        Api POST "/reports/$($new.id)/send" -Session $s | Out-Null
+        $deadline = (Get-Date).AddMinutes(3)
+        do { Start-Sleep 5; $run = @((Api GET "/reports/runs?reportId=$($new.id)" -Session $s).items)[0] } while ((-not $run -or $run.status -eq 'running') -and (Get-Date) -lt $deadline)
+        Assert ($run -and $run.status -ne 'running') 'delivery did not finish'
+        Assert ($run.downloadable) 'run file not kept'
+        $f = Invoke-WebRequest "$base/api/v1/reports/runs/$($run.id)/file" -WebSession $s
+        Assert ($f.RawContentStream.Length -gt 100) 'run file empty'
+        Api DELETE "/reports/$($new.id)" -Session $s | Out-Null
+        "$($sets.Count) datasets, $($lib.Count) reports; xlsx $((Get-Item $xlsx).Length) bytes; delivery '$($run.status)': $($run.error)"
+    } | Out-Null
+
+    Check 'T49' 'Vulnerability management: NVD file import, CPE mapping, evaluation, risk acceptance' {
+        $s = Login
+        $maps = @((Api GET '/vulnerabilities/products?pageSize=200' -Session $s).items)
+        $pick = @($maps | Select-Object -First 3)
+        foreach ($m in $pick) { Api PUT "/vulnerabilities/products/$($m.id)" @{ status = 'manual'; vendor = 'zentriqci'; product = 'ci_product' } -Session $s | Out-Null }
+        $nvd = @{ resultsPerPage = 1; startIndex = 0; totalResults = 1; format = 'NVD_CVE'; version = '2.0'; vulnerabilities = @(@{ cve = @{
+            id = 'CVE-2099-4242'; published = '2099-01-02T10:15:00.000'; lastModified = '2099-01-03T08:00:00.000'; vulnStatus = 'Analyzed'
+            descriptions = @(@{ lang = 'en'; value = 'Zentriq CI test vulnerability.' })
+            metrics = @{ cvssMetricV31 = @(@{ type = 'Primary'; cvssData = @{ version = '3.1'; vectorString = 'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H'; baseScore = 9.8 } }) }
+            configurations = @(@{ nodes = @(@{ operator = 'OR'; negate = $false; cpeMatch = @(@{ vulnerable = $true; criteria = 'cpe:2.3:a:zentriqci:ci_product:*:*:*:*:*:*:*:*'; versionEndExcluding = '999999' }) }) })
+            references = @(@{ url = 'https://example.invalid/ci' }) } }) } | ConvertTo-Json -Depth 12
+        $up = Invoke-RestMethod "$base/api/v1/vulnerabilities/import?source=nvd&name=ci-nvd.json" -Method Post -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } -ContentType 'application/octet-stream' -Body ([Text.Encoding]::UTF8.GetBytes($nvd))
+        $deadline = (Get-Date).AddMinutes(4)
+        do { Start-Sleep 5; $imp = @(Api GET '/vulnerabilities/imports' -Session $s | ForEach-Object { $_ }) | Where-Object id -eq $up.id } while ($imp.status -in 'queued', 'running' -and (Get-Date) -lt $deadline)
+        Assert ($imp.status -eq 'done') "import $($imp.status): $($imp.message)"
+        $cve = Api GET '/vulnerabilities/cves/CVE-2099-4242' -Session $s
+        Assert ($cve.cve.severity -eq 'critical' -and $cve.products.Count -eq 1) 'CVE not stored with severity and product range'
+        Start-Sleep 10
+        $f = Api GET '/vulnerabilities/findings?cve=CVE-2099-4242&status=all' -Session $s
+        $detail = "import ok; $($pick.Count) product(s) mapped; $($f.total) finding(s)"
+        if ($pick.Count -gt 0 -and $f.total -gt 0) {
+            Assert ($f.items[0].priority -in 'P1', 'P2') "priority $($f.items[0].priority)"
+            $acc = Api POST '/vulnerabilities/findings/status' @{ ids = @($f.items[0].id); status = 'accepted'; reason = 'CI risk acceptance test'; until = (Get-Date).AddDays(30).ToUniversalTime().ToString('o') } -Session $s
+            Assert ($acc.updated -eq 1) 'risk acceptance not applied'
+            $noReason = Invoke-WebRequest "$base/api/v1/vulnerabilities/findings/status" -Method Post -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } -ContentType 'application/json' -SkipHttpErrorCheck -Body (@{ ids = @($f.items[0].id); status = 'accepted' } | ConvertTo-Json)
+            Assert ($noReason.StatusCode -eq 400) 'acceptance without reason/expiry accepted'
+            Api POST '/vulnerabilities/findings/status' @{ ids = @($f.items[0].id); status = 'open' } -Session $s | Out-Null
+            $detail += "; $($f.items[0].priority) risk $($f.items[0].risk); acceptance and re-open OK"
+        } elseif ($pick.Count -gt 0) { throw "no finding for the mapped product(s) $($pick.software -join ', ')" }
+        $o = Api GET '/vulnerabilities/overview' -Session $s
+        Assert ($o.kpi.cveCatalogue -ge 1) 'overview does not count the CVE'
+        foreach ($m in $pick) { Api PUT "/vulnerabilities/products/$($m.id)" @{ status = 'auto' } -Session $s | Out-Null }
+        $detail
     } | Out-Null
 
     if ($UpgradeBundle) {

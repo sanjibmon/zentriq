@@ -6,6 +6,7 @@ import { useAuth } from '../../app/auth';
 import { Availability, typeLabel } from '../assets/AssetsPage';
 import { ServiceActionDialog, type ControlInfo, type ServiceActionRow } from './ServiceControl';
 import { useApi } from '../../app/useApi';
+import { AssetVulnerabilities } from '../vulnerabilities/AssetVulnerabilities';
 import { Callout, DataTable, ErrorBox, fmt, Loading, PageHead, Panel, Pill, statusTone } from '../../components/ui';
 
 const yesNo = (b: boolean | null | undefined) => (b == null ? '—' : b ? 'Yes' : 'No');
@@ -20,7 +21,7 @@ function KV({ items }: { items: [string, ReactNode][] }) {
   );
 }
 
-type Tab = 'overview' | 'hardware' | 'software' | 'network' | 'updates' | 'security' | 'services';
+type Tab = 'overview' | 'hardware' | 'software' | 'network' | 'updates' | 'security' | 'services' | 'vulnerabilities';
 
 export function AssetDetailPage({ id }: { id: string }) {
   const asset = useApi(() => api.get<Asset>(`/assets/${id}`), [id]);
@@ -53,6 +54,7 @@ export function AssetDetailPage({ id }: { id: string }) {
   const tabs: [Tab, string, number?][] = [
     ['overview', 'Overview'], ['hardware', 'Hardware'], ['software', 'Software', sw.length], ['network', 'Network', d?.network.length],
     ['updates', 'Updates', d?.patches.length], ['security', 'Security'], ['services', 'Services', d?.services.length],
+    ...(can('vuln.view') ? [['vulnerabilities', 'Vulnerabilities'] as [Tab, string]] : []),
   ];
   const f = filter.trim().toLowerCase();
 
@@ -195,6 +197,8 @@ export function AssetDetailPage({ id }: { id: string }) {
           </Panel>
         </div>
       )}
+
+      {tab === 'vulnerabilities' && <AssetVulnerabilities assetId={id} />}
 
       {tab === 'services' && (
         <>

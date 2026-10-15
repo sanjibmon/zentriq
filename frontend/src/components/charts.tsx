@@ -120,7 +120,7 @@ export function CategoryChart({ kind, data, onSelect, centerLabel, color, max }:
 }
 
 /** Change over time: area + line with a crosshair tooltip. */
-export function TrendArea({ points, height = 170 }: { points: { label: string; total: number; added: number }[]; height?: number }) {
+export function TrendArea({ points, height = 170, unit = 'assets', addedLabel = 'new' }: { points: { label: string; total: number; added: number }[]; height?: number; unit?: string; addedLabel?: string }) {
   const { ref, show, hide, el } = useTip();
   const [idx, setIdx] = useState<number | null>(null);
   const [w, setW] = useState(600);
@@ -136,14 +136,14 @@ export function TrendArea({ points, height = 170 }: { points: { label: string; t
   return (
     <div className="chart" ref={(el2) => { (ref as { current: HTMLDivElement | null }).current = el2; if (el2 && Math.abs(el2.clientWidth - w) > 4) setW(el2.clientWidth); }}
       onMouseLeave={() => { hide(); setIdx(null); }}>
-      <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label="Assets over the last 30 days"
+      <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label={`${unit} over the last 30 days`}
         onMouseMove={(e) => {
           const r = (e.currentTarget as SVGSVGElement).getBoundingClientRect();
           const rel = ((e.clientX - r.left) / r.width) * W;
           const i = Math.max(0, Math.min(points.length - 1, Math.round(((rel - padL) / (W - padL - 6)) * (points.length - 1))));
           setIdx(i);
           const p = points[i]!;
-          show(e, <><b>{p.label}</b><br />{fmtN(p.total)} assets{p.added ? ` · +${fmtN(p.added)} new` : ''}</>);
+          show(e, <><b>{p.label}</b><br />{fmtN(p.total)} {unit}{p.added ? ` · +${fmtN(p.added)} ${addedLabel}` : ''}</>);
         }}>
         {ticks.map((t) => <g key={t}><line x1={padL} x2={W} y1={y(t)} y2={y(t)} stroke="var(--line)" strokeDasharray={t ? '3 4' : undefined} /><text x={padL - 6} y={y(t) + 4} textAnchor="end" style={{ fontSize: 10.5, fill: 'var(--muted)' }}>{fmtN(t)}</text></g>)}
         <path d={area} fill="var(--s1)" opacity={0.14} />
