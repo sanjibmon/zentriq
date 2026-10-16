@@ -24,6 +24,7 @@ public sealed class InventoryStore(LicensingService licensing)
 
     public async Task<ApplyResult> ApplyAsync(NpgsqlConnection conn, InventoryDocument doc, MatchHints hints, LicenseStatus license, CancellationToken ct)
     {
+        doc = WithoutNulChars(doc);
         if (hints.Ip is { IsIPv4MappedToIPv6: true } mapped) hints = hints with { Ip = mapped.MapToIPv4() };
         // Hypervisors emulate laptop/desktop chassis and even batteries; a virtual machine is recorded as such.
         if (doc.Hardware.IsVirtual == true) doc.Device.Chassis = "virtual";
@@ -267,6 +268,19 @@ public sealed class InventoryStore(LicensingService licensing)
 
     /// <summary>Serial numbers are only unique per manufacturer.</summary>
     private static string Key(string? manufacturer, string serial) => $"{(manufacturer ?? "").Trim().ToLowerInvariant()}|{serial.Trim().ToUpperInvariant()}";
+
+    private static readonly System.Text.RegularExpressions.Regex EscapedNul = new(@"(?<!\\)((?:\\\\)*)\\u0000", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    /// <summary>
+    /// PostgreSQL text and jsonb cannot hold U+0000, but Windows registry values sometimes end with one (for example the
+    /// uninstall entry of some installers). Removes it from every string of the document.
+    /// </summary>
+    public static InventoryDocument WithoutNulChars(InventoryDocument doc)
+    {
+        var json = JsonSerializer.Serialize(doc, Json);
+        if (!json.Contains("\\u0000", StringComparison.Ordinal)) return doc;
+        return JsonSerializer.Deserialize<InventoryDocument>(EscapedNul.Replace(json, "$1"), Json)!;
+    }
 
     public static string NormalizeCategory(string? c) => c is "endpoint" or "server" or "network_device" or "printer" or "iot" or "virtual_host" or "other" ? c : "other";
     private static string? Trunc(string? s, int max) => s is null ? null : s.Length <= max ? s : s[..max];

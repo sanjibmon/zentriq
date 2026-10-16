@@ -43,6 +43,9 @@ public sealed class RemoteSupportTests
         Assert.True(s["allowLoginToken"]!.GetValue<bool>());
         Assert.False(s["selfUpdate"]!.GetValue<bool>());
         Assert.Equal("zentriq.contoso.local", s["cert"]!.GetValue<string>());
+        Assert.Equal("localhost.", RemoteServerConfig.CertificateName("localhost"));
+        Assert.Equal("ZQ-SERVER.", RemoteServerConfig.CertificateName("ZQ-SERVER"));
+        Assert.Equal("192.168.1.8", RemoteServerConfig.CertificateName("192.168.1.8"));
         var d = cfg["domains"]![""]!.AsObject();
         Assert.Equal("Zentriq", d["title"]!.GetValue<string>());
         Assert.False(d["newAccounts"]!.GetValue<bool>());
@@ -186,6 +189,13 @@ public sealed class RemoteSupportLiveTests : IAsyncLifetime
         var (bytes, sha) = installer;
         Assert.Equal((byte)'M', bytes[0]);
         Assert.Equal(64, sha.Length);
+        // Devices must be told where the server is (WAN mode), not to look for it by multicast (LAN mode), even for a
+        // host name without a dot such as "localhost".
+        string meshId;
+        await using (var mc = await MeshControlClient.ConnectAsync(new Uri($"https://127.0.0.1:{Port}/"), options.Remote.ServiceUser, key, default))
+            meshId = await remote.EnsureGroupAsync(mc, null, default);
+        var msh = await (await http.GetAsync($"https://127.0.0.1:{Port}/meshsettings?id={Uri.EscapeDataString(meshId[(meshId.LastIndexOf('/') + 1)..])}")).Content.ReadAsStringAsync();
+        Assert.Contains($"MeshServer=wss://localhost:{Port}/agent.ashx", msh);
         var sync = await remote.SyncAsync(default);
         Assert.Equal(0, sync.Nodes);
         await remote.SaveSettingsAsync(new RemoteSettings { Prompt = false, Notify = true, PrivacyBar = true }, default);

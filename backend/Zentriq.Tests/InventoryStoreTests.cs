@@ -94,4 +94,26 @@ public sealed class InventoryStoreTests : IAsyncLifetime
         // An existing device can still update its inventory at the cap.
         Assert.NotNull((await store.ApplyAsync(conn, Doc("cap-0", "agent", uuid: "uuid-0", serial: null, mac: null, "New App"), new MatchHints(), Trial(3), default)).AssetId);
     }
+
+    [Fact]
+    public void Nul_characters_are_removed_and_escaped_text_is_kept()
+    {
+        var d = Doc("PC-NUL", "agent", null, null, null, "Remote Support\0", "C:\\u0000 literal");
+        d.Software[0].Publisher = "Vendor\0\0";
+        var clean = InventoryStore.WithoutNulChars(d);
+        Assert.Equal("Remote Support", clean.Software[0].Name);
+        Assert.Equal("Vendor", clean.Software[0].Publisher);
+        Assert.Equal("C:\\u0000 literal", clean.Software[1].Name); // a backslash followed by "u0000" is ordinary text
+        var ok = Doc("PC-OK", "agent", null, null, null, "7-Zip");
+        Assert.Same(ok, InventoryStore.WithoutNulChars(ok));
+    }
+
+    [DbFact]
+    public async Task Software_with_a_nul_character_is_stored()
+    {
+        await using var conn = new NpgsqlConnection(_db.AppConnection);
+        await conn.OpenAsync();
+        var r = await Store().ApplyAsync(conn, Doc("PC-NUL", "agent", uuid: "uuid-nul", serial: null, mac: null, "Zentriq Remote Support\0"), new MatchHints(AgentId: Guid.NewGuid()), Trial(30), default);
+        Assert.NotNull(r.AssetId);
+    }
 }
