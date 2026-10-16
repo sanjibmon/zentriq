@@ -16,7 +16,7 @@ public static class DashboardEndpoints
         ["kpi.assets", "assets.byCategory", "assets.byOs", "assets.byInventory", "assets.byCriticality", "scans.recent", "jobs.active", "license.status", "license.usage",
          "kpi.tiles", "assets.category", "assets.type", "assets.coverage", "assets.trend", "assets.os", "assets.seen", "security.posture", "agents.health",
          "software.top", "hw.vendor", "hw.cores", "hw.cpu", "hw.ram", "hw.disk", "hw.free", "scans.results", "scans.recent", "license.usage",
-         "report", "vuln.severity", "vuln.aging", "security.score", "security.failing"];
+         "report", "vuln.severity", "vuln.aging", "security.score", "security.failing", "assets.department", "changes.hardware", "changes.software"];
 
     public static void MapDashboardEndpoints(this RouteGroupBuilder api)
     {

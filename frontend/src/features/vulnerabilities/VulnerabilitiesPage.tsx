@@ -4,7 +4,7 @@ import type { Paged } from '../../api/types';
 import { useAuth } from '../../app/auth';
 import { Link, useRouter } from '../../app/router';
 import { useApi } from '../../app/useApi';
-import { CategoryChart, HBars, TrendArea } from '../../components/charts';
+import { CategoryChart, ChartKindPicker, TrendArea, useChartKind, type ChartKind, type Slice } from '../../components/charts';
 import { Icon } from '../../components/Icon';
 import { Callout, DataTable, ErrorBox, fmt, Kpis, PageHead, Pager, Panel, Pill } from '../../components/ui';
 import {
@@ -67,26 +67,17 @@ function Overview({ onCve, go }: { onCve: (c: string) => void; go: (t: Tab, extr
         { label: 'Fixed (30 d)', value: k.fixed30.toLocaleString(), sub: 'detected as fixed', to: '/vulnerabilities?tab=findings&status=fixed' },
       ]} />
       <div className="grid-3">
-        <Panel title="Open by severity">
-          <CategoryChart kind="donut" centerLabel="open" data={o.data.bySeverity.map((s) => ({ key: s.key, label: cap(s.key), value: s.count, color: SEVERITY_COLOR[s.key] }))}
-            onSelect={(s) => go('findings', `&severity=${s.key}`)} />
-        </Panel>
-        <Panel title="Open by priority" sub="Risk-based: CVSS + KEV + EPSS">
-          <HBars data={o.data.byPriority.map((p) => ({ key: p.key, label: PRIORITY_SHORT[p.key] ?? p.key, value: p.count, color: PRIORITY_COLOR[p.key] }))}
-            onSelect={(s) => go('findings', `&priority=${s.key}`)} />
-        </Panel>
-        <Panel title="Most vulnerable software">
-          <HBars data={o.data.topSoftware.map((s, i) => ({ key: `${i}`, label: s.key, value: s.count }))} onSelect={(s) => go('findings', `&q=${encodeURIComponent(s.label)}`)} />
-        </Panel>
+        <ChartTile id="vuln.severity" title="Open by severity" fallback="donut" centerLabel="open"
+          data={o.data.bySeverity.map((s) => ({ key: s.key, label: cap(s.key), value: s.count, color: SEVERITY_COLOR[s.key] }))} onSelect={(s) => go('findings', `&severity=${s.key}`)} />
+        <ChartTile id="vuln.priority" title="Open by priority" sub="Risk-based: CVSS + KEV + EPSS" fallback="bar" centerLabel="open"
+          data={o.data.byPriority.map((p) => ({ key: p.key, label: PRIORITY_SHORT[p.key] ?? p.key, value: p.count, color: PRIORITY_COLOR[p.key] }))} onSelect={(s) => go('findings', `&priority=${s.key}`)} />
+        <ChartTile id="vuln.software" title="Most vulnerable software" fallback="bar" centerLabel="open"
+          data={o.data.topSoftware.map((s, i) => ({ key: `${i}`, label: s.key, value: s.count }))} onSelect={(s) => go('findings', `&q=${encodeURIComponent(s.label)}`)} />
       </div>
       <div className="grid-2" style={{ marginBottom: 14 }}>
-        <Panel title="Aging" sub="How long open findings have been open">
-          <AgingBars rows={o.data.aging} onSelect={() => go('findings', '&sort=age')} />
-        </Panel>
-        <Panel title="Where they are" sub="Windows itself or installed applications">
-          <CategoryChart kind="donut" centerLabel="open" data={o.data.bySource.map((s) => ({ key: s.key, label: s.key === 'os' ? 'Windows (OS)' : 'Applications', value: s.count, color: s.key === 'os' ? '#2f7dbd' : '#7a5af8' }))}
-            onSelect={(s) => go('findings', `&source=${s.key}`)} />
-        </Panel>
+        <AgingTile rows={o.data.aging} onSelect={() => go('findings', '&sort=age')} />
+        <ChartTile id="vuln.source" title="Where they are" sub="Windows itself or installed applications" fallback="donut" centerLabel="open"
+          data={o.data.bySource.map((s) => ({ key: s.key, label: s.key === 'os' ? 'Windows (OS)' : 'Applications', value: s.count, color: s.key === 'os' ? '#2f7dbd' : '#7a5af8' }))} onSelect={(s) => go('findings', `&source=${s.key}`)} />
       </div>
       <Panel title="Findings over the last 30 days" sub="Line: open findings · bars: newly detected">
         <TrendArea unit="open findings" addedLabel="new" points={o.data.trend.map((t) => ({ label: new Date(`${t.day}T00:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }), total: t.open, added: t.opened }))} />
@@ -112,6 +103,33 @@ function Overview({ onCve, go }: { onCve: (c: string) => void; go: (t: Tab, extr
         </Panel>
       </div>
     </>
+  );
+}
+
+/** A chart tile whose type (donut, pie, bar, column) the viewer can switch; the choice is remembered. */
+function ChartTile({ id, title, sub, data, onSelect, fallback, centerLabel }: { id: string; title: string; sub?: string; data: Slice[]; onSelect?: (s: Slice) => void; fallback: ChartKind; centerLabel?: string }) {
+  const [kind, setKind] = useChartKind(id, fallback);
+  return (
+    <Panel title={title} sub={sub} right={<ChartKindPicker value={kind} onChange={setKind} />}>
+      {data.every((d) => d.value === 0) ? <div className="chart-empty">No open findings.</div> : <CategoryChart kind={kind} data={data} onSelect={onSelect} centerLabel={centerLabel} />}
+    </Panel>
+  );
+}
+
+/** Aging: stacked by severity (default) or totals per age bucket as donut, pie, bar or column. */
+function AgingTile({ rows, onSelect }: { rows: VulnOverview['aging']; onSelect: () => void }) {
+  const [kind, setKind] = useChartKind('vuln.aging', 'bar');
+  const [stacked, setStacked] = useState(() => { try { return localStorage.getItem('zq.chart.vuln.aging.stacked') !== 'false'; } catch { return true; } });
+  const pick = (v: boolean, k?: ChartKind) => { setStacked(v); if (k) setKind(k); try { localStorage.setItem('zq.chart.vuln.aging.stacked', String(v)); } catch { /* storage unavailable */ } };
+  const AGE_COLOR = ['#2f9e6e', '#e0a100', '#e8590c', '#d9480f', '#c92a2a'];
+  return (
+    <Panel title="Aging" sub="How long open findings have been open"
+      right={<ChartKindPicker value={stacked ? 'stacked' : kind} onChange={(k) => pick(false, k)} extra={['stacked', 'Stacked', () => pick(true)]} />}>
+      {stacked ? <AgingBars rows={rows} onSelect={onSelect} />
+        : rows.length === 0 ? <div className="chart-empty">No open findings.</div>
+        : <CategoryChart kind={kind} centerLabel="open" onSelect={onSelect}
+            data={rows.map((r, i) => ({ key: r.bucket, label: r.bucket, value: r.critical + r.high + r.medium + r.low, color: AGE_COLOR[i] }))} />}
+    </Panel>
   );
 }
 

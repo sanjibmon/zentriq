@@ -7,6 +7,7 @@ import { useApi } from '../../app/useApi';
 import { Callout, DataTable, ErrorBox, fmt, PageHead, Pager, Panel, Pill, statusTone, type Tone } from '../../components/ui';
 import { useConfirm } from '../../components/Confirm';
 import { DeployAgentDialog } from './DeployAgentDialog';
+import { AssignDepartmentDialog, ManageDepartmentsDialog, useDepartments } from '../departments/Departments';
 
 const CATEGORIES = ['endpoint', 'server', 'virtual_host', 'network_device', 'printer', 'iot', 'other'];
 const AGENT: Record<string, [string, Tone]> = { online: ['Online', 'ok'], stale: ['Not seen recently', 'warn'], offline: ['Offline', 'crit'], never: ['Never checked in', ''] };
@@ -45,6 +46,10 @@ export function AssetsPage() {
   const [q, setQ] = useState(query.get('q') ?? '');
   const [search, setSearch] = useState(query.get('q') ?? '');
   const [category, setCategory] = useState(query.get('category') ?? '');
+  const [department, setDepartment] = useState(query.get('department') ?? '');
+  const [assign, setAssign] = useState(false);
+  const [manageDeps, setManageDeps] = useState(false);
+  const deps = useDepartments();
   const [status, setStatus] = useState('');
   const [agent, setAgent] = useState(query.get('agent') ?? '');
   const [inventory, setInventory] = useState(query.get('inventory') ?? '');
@@ -57,7 +62,7 @@ export function AssetsPage() {
   const [deploy, setDeploy] = useState(false);
   const [busy, setBusy] = useState(false);
   const pageSize = 50;
-  const data = useApi(() => api.get<Paged<Asset>>('/assets', { q: search, category, status, agent, inventory, facet: facet?.facet, value: facet?.value, offlineDays: offline, page, pageSize, sort: offline ? 'offline' : 'hostname' }), [search, category, status, agent, inventory, facet, offline, page]);
+  const data = useApi(() => api.get<Paged<Asset>>('/assets', { q: search, category, department, status, agent, inventory, facet: facet?.facet, value: facet?.value, offlineDays: offline, page, pageSize, sort: offline ? 'offline' : 'hostname' }), [search, category, department, status, agent, inventory, facet, offline, page]);
   const settings = useApi(() => (can('settings.manage') ? api.get<Record<string, unknown>>('/system/settings') : Promise.resolve(null)), []);
   const rows = data.data?.items ?? [];
   const showV6 = rows.some((r) => r.ipv6 != null) || settings.data?.['display.show_ipv6'] === true;
@@ -83,6 +88,8 @@ export function AssetsPage() {
     <>
       <PageHead title="Asset Inventory" desc="Every device, in one place."
         actions={<>
+          <button className="btn" onClick={() => setManageDeps(true)}>Departments</button>
+          {can('assets.manage') && picked.length > 0 && <button className="btn" onClick={() => setAssign(true)}>Assign department ({picked.length})</button>}
           {can('agents.manage') && <button className="btn" onClick={() => setDeploy(true)}>Deploy agent</button>}
           {can('scans.run') && (picked.length > 0
             ? <button className="btn primary" disabled={busy} onClick={() => void collect(false)}>Collect inventory now ({picked.length})</button>
@@ -94,6 +101,11 @@ export function AssetsPage() {
         <select className="in" value={category} onChange={(e) => { reset(); setCategory(e.target.value); }} aria-label="Category">
           <option value="">All categories</option>
           {CATEGORIES.map((c) => <option key={c} value={c}>{fmt.label(c)}</option>)}
+        </select>
+        <select className="in" value={department} onChange={(e) => { reset(); setDepartment(e.target.value); }} aria-label="Department">
+          <option value="">All departments</option>
+          <option value="none">Not assigned</option>
+          {(deps.data?.items ?? []).map((d) => <option key={d.id} value={d.id}>{d.name} ({d.assets})</option>)}
         </select>
         <select className="in" value={agent} onChange={(e) => { reset(); setAgent(e.target.value); }} aria-label="Agent">
           <option value="">Agent: any</option>
@@ -132,13 +144,14 @@ export function AssetsPage() {
       <ErrorBox error={data.error} />
       <Panel flush>
         <DataTable rows={rows} empty={data.loading ? 'Loading…' : 'No assets match. Run a discovery scan to find devices.'} columns={[
-          ...(can('scans.run') ? [{
+          ...(can('scans.run') || can('assets.manage') ? [{
             key: 'sel', label: <input type="checkbox" className="row-sel" aria-label="Select all on this page" checked={allPicked} onChange={(e) => setPicked(e.target.checked ? rows.map((r) => r.id) : [])} />,
             render: (r: Asset) => <input type="checkbox" className="row-sel" aria-label={`Select ${r.hostname ?? r.ip}`} checked={picked.includes(r.id)} onChange={(e) => setPicked((p) => e.target.checked ? [...p, r.id] : p.filter((x) => x !== r.id))} />,
           }] : []),
           { key: 'h', label: 'Hostname', render: (r) => <><Link to={`/assets/${r.id}`}><b>{r.hostname ?? r.ip ?? '—'}</b></Link>{r.fqdn && r.fqdn.toLowerCase() !== r.hostname?.toLowerCase() && <div className="faint" style={{ fontSize: 11.5 }}>{r.fqdn}</div>}</> },
           { key: 'ip', label: 'IPv4 address', render: (r) => <Ips list={r.ipv4} primary={r.ip?.includes('.') ? r.ip : null} /> },
           ...(showV6 ? [{ key: 'ip6', label: 'IPv6 address', render: (r: Asset) => <Ips list={r.ipv6} /> }] : []),
+          { key: 'dep', label: 'Department', render: (r) => r.department ?? <span className="muted">—</span> },
           { key: 'u', label: 'Logged-on user', render: (r) => r.loggedOnUser ? <span title={r.loggedOnUser}>{r.loggedOnUser}</span> : <span className="muted">—</span> },
           { key: 't', label: 'Type', render: (r) => typeLabel(r) },
           { key: 'os', label: 'Operating system', render: (r) => r.osName ?? fmt.label(r.osFamily) },
@@ -149,6 +162,8 @@ export function AssetsPage() {
         {data.data && <Pager page={page} pageSize={pageSize} total={data.data.total} onPage={(p) => { setPage(p); setPicked([]); }} />}
       </Panel>
       {deploy && <DeployAgentDialog onClose={() => setDeploy(false)} />}
+      {assign && <AssignDepartmentDialog assetIds={picked} onClose={() => setAssign(false)} onDone={(m) => { setAssign(false); setPicked([]); setMsg({ tone: 'info', text: m }); data.reload(); deps.reload(); }} />}
+      {manageDeps && <ManageDepartmentsDialog canEdit={can('assets.manage')} onClose={() => { setManageDeps(false); deps.reload(); data.reload(); }} />}
     </>
   );
 }

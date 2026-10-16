@@ -7,6 +7,8 @@ import { Availability, typeLabel } from '../assets/AssetsPage';
 import { ServiceActionDialog, type ControlInfo, type ServiceActionRow } from './ServiceControl';
 import { useApi } from '../../app/useApi';
 import { AssetSecurity } from '../security/AssetSecurity';
+import { ChangesView } from './Changes';
+import { DepartmentSelect, useDepartments } from '../departments/Departments';
 import { AssetVulnerabilities } from '../vulnerabilities/AssetVulnerabilities';
 import { Callout, DataTable, ErrorBox, fmt, Loading, PageHead, Panel, Pill, statusTone } from '../../components/ui';
 
@@ -22,13 +24,13 @@ function KV({ items }: { items: [string, ReactNode][] }) {
   );
 }
 
-type Tab = 'overview' | 'hardware' | 'software' | 'network' | 'updates' | 'security' | 'services' | 'vulnerabilities';
+type Tab = 'overview' | 'hardware' | 'software' | 'network' | 'updates' | 'security' | 'services' | 'vulnerabilities' | 'changes';
 
 export function AssetDetailPage({ id }: { id: string }) {
   const asset = useApi(() => api.get<Asset>(`/assets/${id}`), [id]);
   const inv = useApi(() => api.get<AssetInventory>(`/assets/${id}/inventory`), [id]);
   const { query } = useRouter();
-  const [tab, setTab] = useState<Tab>((['overview', 'hardware', 'software', 'network', 'updates', 'security', 'services', 'vulnerabilities'] as Tab[]).find((t) => t === query.get('tab')) ?? 'overview');
+  const [tab, setTab] = useState<Tab>((['overview', 'hardware', 'software', 'network', 'updates', 'security', 'services', 'vulnerabilities', 'changes'] as Tab[]).find((t) => t === query.get('tab')) ?? 'overview');
   const [filter, setFilter] = useState('');
   const { can } = useAuth();
   const control = useApi(() => (can('assets.control') ? api.get<ControlInfo>(`/assets/${id}/control`) : Promise.resolve(null)), [id]);
@@ -57,6 +59,7 @@ export function AssetDetailPage({ id }: { id: string }) {
     ['overview', 'Overview'], ['hardware', 'Hardware'], ['software', 'Software', sw.length], ['network', 'Network', d?.network.length],
     ['updates', 'Updates', d?.patches.length], ['security', 'Security'], ['services', 'Services', d?.services.length],
     ...(can('vuln.view') ? [['vulnerabilities', 'Vulnerabilities'] as [Tab, string]] : []),
+    ['changes', 'Changes'],
   ];
   const f = filter.trim().toLowerCase();
 
@@ -86,6 +89,7 @@ export function AssetDetailPage({ id }: { id: string }) {
               ...(a.ipv6 ? [['IPv6 address', <span className="mono">{a.ipv6.join(', ') || '—'}</span>] as [string, ReactNode]] : []),
               ['Manufacturer', d?.device.manufacturer ?? inv.data?.hardware?.vendor], ['Model', d?.device.model ?? inv.data?.hardware?.model],
               ['Serial number', <span className="mono">{d?.device.serialNumber ?? a.serialNumber ?? '—'}</span>], ['Type', typeLabel({ ...a, chassis: d?.device.chassis ?? a.chassis, isVirtual: d?.hardware.isVirtual ?? a.isVirtual })],
+              ['Department / unit', <DepartmentField asset={a} onSaved={asset.reload} />],
               ['Logged-on user', d?.users.loggedOn], ['Owner', a.ownerName], ['Criticality', a.criticality],
             ]} />
           </Panel>
@@ -202,6 +206,7 @@ export function AssetDetailPage({ id }: { id: string }) {
       )}
 
       {tab === 'vulnerabilities' && <AssetVulnerabilities assetId={id} />}
+      {tab === 'changes' && <ChangesView assetId={id} title="Hardware and software changes" />}
 
       {tab === 'services' && (
         <>
@@ -245,5 +250,24 @@ export function AssetDetailPage({ id }: { id: string }) {
           onClose={() => setPending(null)} onDone={(m) => { setPending(null); setNote({ tone: 'info', text: m }); actions.reload(); }} />
       )}
     </>
+  );
+}
+
+/** Department of the device; editable in place by asset managers. */
+function DepartmentField({ asset, onSaved }: { asset: Asset; onSaved: () => void }) {
+  const { can } = useAuth();
+  const deps = useDepartments();
+  const [error, setError] = useState<string | null>(null);
+  if (!can('assets.manage')) return <>{asset.department ?? '—'}</>;
+  async function set(id: string) {
+    setError(null);
+    try { await api.post('/assets/department', { assetIds: [asset.id], departmentId: id || null }); onSaved(); deps.reload(); }
+    catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+  }
+  return (
+    <span style={{ display: 'inline-grid', gap: 2, minWidth: 220 }}>
+      <DepartmentSelect value={asset.departmentId ?? ''} onChange={(v) => void set(v)} list={deps.data?.items ?? []} onAdded={deps.reload} canAdd />
+      {error && <small style={{ color: 'var(--crit)' }}>{error}</small>}
+    </span>
   );
 }

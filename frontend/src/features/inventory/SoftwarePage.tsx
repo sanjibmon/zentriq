@@ -5,6 +5,7 @@ import { Link } from '../../app/router';
 import { useAuth } from '../../app/auth';
 import { useConfirm } from '../../components/Confirm';
 import { useApi } from '../../app/useApi';
+import { ChangesTab } from './Changes';
 import { Callout, DataTable, ErrorBox, fmt, PageHead, Pager, Panel, Pill } from '../../components/ui';
 
 export function SoftwarePage() {
@@ -13,6 +14,7 @@ export function SoftwarePage() {
   const [search, setSearch] = useState(initialQ);
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<string | null>(null);
+  const [tab, setTab] = useState<'all' | 'changes'>(new URLSearchParams(window.location.search).get('tab') === 'changes' ? 'changes' : 'all');
   const pageSize = 50;
   const data = useApi(() => api.get<Paged<SoftwareRow>>('/inventory/software', { q: search, page, pageSize }), [search, page]);
   const installs = useApi(() => (selected ? api.get<SoftwareInstall[]>('/inventory/software/installs', { name: selected }) : Promise.resolve(null)), [selected]);
@@ -58,6 +60,11 @@ export function SoftwarePage() {
   return (
     <>
       <PageHead title="Software Inventory" desc="Every application, on every device." />
+      <div className="tabs" role="tablist">
+        <button role="tab" aria-selected={tab === 'all'} className={tab === 'all' ? 'on' : ''} onClick={() => setTab('all')}>Installed software</button>
+        <button role="tab" aria-selected={tab === 'changes'} className={tab === 'changes' ? 'on' : ''} onClick={() => setTab('changes')}>Changes</button>
+      </div>
+      {tab === 'changes' ? <ChangesTab kind="software" /> : <>
       <form className="toolbar-row" onSubmit={(e) => { e.preventDefault(); setPage(1); setSearch(q); }}>
         <input className="in grow" placeholder="Search product or publisher…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search software" />
         <button className="btn" type="submit">Search</button>
@@ -100,6 +107,7 @@ export function SoftwarePage() {
           </Panel>
         )}
       </div>
+      </>}
     </>
   );
 }

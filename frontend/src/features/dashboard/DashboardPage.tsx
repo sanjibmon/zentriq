@@ -8,6 +8,7 @@ import { Callout, DataTable, ErrorBox, fmt, Loading, PageHead, Panel, Pill, stat
 import { useConfirm } from '../../components/Confirm';
 import { CategoryChart, CHART_KINDS, HBars, PostureBars, TrendArea, type ChartKind, type Slice } from '../../components/charts';
 import { ReportWidget } from './ReportWidget';
+import { ChangedDevices, type ChangeSummary } from '../inventory/Changes';
 
 const TYPE_LABEL: Record<string, string> = {
   laptop: 'Laptop', desktop: 'Desktop', server: 'Physical server', virtual: 'Virtual machine', other: 'Other hardware',
@@ -64,6 +65,9 @@ const WIDGETS: WidgetDef[] = [
   { id: 'assets.type', chart: 'donut', title: 'Device type', defaultOn: true, description: 'Laptop, desktop, physical server, virtual machine' },
   { id: 'assets.coverage', chart: 'donut', title: 'How assets are inventoried', defaultOn: true, description: 'Agent, agentless or discovered only' },
   { id: 'assets.trend', title: 'Asset growth', wide: true, defaultOn: true, description: 'Active assets per day, last 30 days' },
+  { id: 'assets.department', chart: 'bar', title: 'Assets by department', defaultOn: true, description: 'Devices per department / unit · click to list them' },
+  { id: 'changes.hardware', title: 'Hardware changes', wide: true, defaultOn: true, description: 'Devices whose hardware changed in the last 30 days (memory, disks, CPU, serial…)' },
+  { id: 'changes.software', title: 'Software changes', wide: true, defaultOn: true, description: 'Devices with software installed, uninstalled or updated in the last 30 days' },
   { id: 'assets.seen', chart: 'bar', title: 'Last contact / offline', defaultOn: true, description: 'Online now … offline more than 30 days' },
   { id: 'assets.os', chart: 'bar', title: 'Operating systems', wide: true, defaultOn: true, description: 'Top operating systems' },
   { id: 'security.posture', title: 'Security posture', defaultOn: true, description: 'Encryption, firewall, Secure Boot, TPM, antivirus' },
@@ -142,6 +146,8 @@ export function DashboardPage() {
   const layout = saved ?? DEFAULT_LAYOUT;
   const wantsVulns = layout.some((w) => w.id.startsWith('vuln.')) && can('vuln.view');
   const vulns = useApi(() => (wantsVulns ? api.get<VulnSummary>('/vulnerabilities/overview') : Promise.resolve(null)), [tick, wantsVulns]);
+  const wantsChanges = layout.some((w) => w.id.startsWith('changes.'));
+  const changes = useApi(() => (wantsChanges ? api.get<ChangeSummary>('/inventory/changes/summary', { days: 30 }) : Promise.resolve(null)), [tick, wantsChanges]);
   const wantsSecurity = layout.some((w) => w.id.startsWith('security.') && w.id !== 'security.posture') && can('security.view');
   const sec = useApi(() => (wantsSecurity ? api.get<SecuritySummary>('/security/overview') : Promise.resolve(null)), [tick, wantsSecurity]);
 
@@ -186,6 +192,27 @@ export function DashboardPage() {
         if (!v) return <div className="chart-empty">Loading…</div>;
         return C(v.aging.map((b) => ({ key: b.bucket, label: b.bucket, value: b.critical + b.high + b.medium + b.low })),
           () => navigate('/vulnerabilities?tab=findings&sort=age'), { centerLabel: 'open' });
+      }
+      case 'assets.department': {
+        const rows = o.byDepartment ?? [];
+        if (rows.length === 0 || (rows.length === 1 && rows[0]!.key === 'Unassigned'))
+          return <div className="chart-empty">No departments assigned yet. Select assets in Asset Inventory and choose <b>Assign department</b>.</div>;
+        return C(slices(rows, (k) => k), (s) => go('department', s.key, `Department: ${s.label}`), { centerLabel: 'assets' });
+      }
+      case 'changes.hardware':
+      case 'changes.software': {
+        const v = changes.data;
+        if (!v) return <div className="chart-empty">Loading…</div>;
+        const hw = id === 'changes.hardware';
+        return (
+          <>
+            <div className="faint" style={{ fontSize: 12, marginBottom: 6 }}>
+              {hw ? `${v.kpi.hardware} change(s) on ${v.kpi.hardwareDevices} device(s)` : `${v.kpi.installed} installed · ${v.kpi.uninstalled} uninstalled · ${v.kpi.updated} updated · ${v.kpi.windowsUpdates} Windows updates on ${v.kpi.softwareDevices} device(s)`} — last 30 days ·{' '}
+              <Link to={hw ? '/hardware?tab=changes' : '/software?tab=changes'}>All changes</Link>
+            </div>
+            <ChangedDevices compact rows={hw ? v.hardwareDevices : v.softwareDevices} empty={hw ? 'No hardware changes in the last 30 days.' : 'No software changes in the last 30 days.'} />
+          </>
+        );
       }
       case 'security.score':
       case 'security.failing': {
@@ -262,7 +289,7 @@ export function DashboardPage() {
         return lic.data ? (
           <div className="stack-v">
             <div><Pill tone={statusTone(lic.data.mode)}>{fmt.label(lic.data.mode)}</Pill> <span className="muted">{lic.data.summary}</span></div>
-            <HBars data={lic.data.usage.filter((u) => u.limit != null || u.billable > 0).map((u) => ({ key: u.workload, label: `${fmt.label(u.workload)}${u.limit != null ? ` (limit ${u.limit})` : ''}`, value: u.billable }))}
+            <HBars data={lic.data.usage.filter((u) => u.limit != null || u.billable > 0).map((u) => ({ key: u.workload, label: `${fmt.label(u.workload)}${u.limit != null ? ` (used of ${u.limit} entitled)` : ' (used)'}`, value: u.billable }))}
               max={Math.max(1, ...lic.data.usage.map((u) => u.limit ?? u.billable))} onSelect={() => navigate('/licensing')} />
           </div>
         ) : <ErrorBox error={lic.error} />;

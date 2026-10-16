@@ -3,6 +3,7 @@ import { api } from '../../api/client';
 import type { HardwareRow, Paged } from '../../api/types';
 import { Link } from '../../app/router';
 import { useApi } from '../../app/useApi';
+import { ChangesTab } from './Changes';
 import { DataTable, ErrorBox, fmt, PageHead, Pager, Panel } from '../../components/ui';
 
 export function HardwarePage() {
@@ -11,10 +12,16 @@ export function HardwarePage() {
   const [search, setSearch] = useState(initialQ);
   const [page, setPage] = useState(1);
   const pageSize = 50;
+  const [tab, setTab] = useState<'all' | 'changes'>(new URLSearchParams(window.location.search).get('tab') === 'changes' ? 'changes' : 'all');
   const data = useApi(() => api.get<Paged<HardwareRow>>('/inventory/hardware', { q: search, page, pageSize }), [search, page]);
   return (
     <>
       <PageHead title="Hardware Inventory" desc="What every device is made of." />
+      <div className="tabs" role="tablist">
+        <button role="tab" aria-selected={tab === 'all'} className={tab === 'all' ? 'on' : ''} onClick={() => setTab('all')}>Devices</button>
+        <button role="tab" aria-selected={tab === 'changes'} className={tab === 'changes' ? 'on' : ''} onClick={() => setTab('changes')}>Changes</button>
+      </div>
+      {tab === 'changes' ? <ChangesTab kind="hardware" /> : <>
       <form className="toolbar-row" onSubmit={(e) => { e.preventDefault(); setPage(1); setSearch(q); }}>
         <input className="in grow" placeholder="Search hostname, vendor, model, serial or CPU…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search hardware" />
         <button className="btn" type="submit">Search</button>
@@ -33,6 +40,7 @@ export function HardwarePage() {
         ]} />
         {data.data && <Pager page={page} pageSize={pageSize} total={data.data.total} onPage={setPage} />}
       </Panel>
+      </>}
     </>
   );
 }

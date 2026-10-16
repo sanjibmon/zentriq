@@ -61,9 +61,10 @@ export function LicensingPage() {
             <Panel title="Workload usage" sub="Active assets seen in the last 30 days" flush>
               <DataTable rows={d.usage.map((u) => ({ ...u, id: u.workload }))} columns={[
                 { key: 'w', label: 'Workload', render: (r) => (r.workload === 'devices' ? <b>All devices (total)</b> : fmt.label(r.workload)) },
-                { key: 'b', label: 'Billable', render: (r) => r.billable.toLocaleString() },
                 { key: 'l', label: 'Entitled', render: (r) => (r.limit == null ? 'Unlimited' : r.limit.toLocaleString()) },
-                { key: 'p', label: 'Use', render: (r) => r.limit ? <div className="progress" title={`${Math.round((r.billable / r.limit) * 100)}%`}><i style={{ width: `${Math.min(100, (r.billable / r.limit) * 100)}%` }} /></div> : '—' },
+                { key: 'b', label: 'Used', render: (r) => r.billable.toLocaleString() },
+                { key: 'a', label: 'Available', render: (r) => (r.limit == null ? '—' : Math.max(0, r.limit - r.billable).toLocaleString()) },
+                { key: 'p', label: 'Utilization', render: (r) => r.limit ? <div className="progress" title={`${Math.round((r.billable / r.limit) * 100)}%`}><i style={{ width: `${Math.min(100, (r.billable / r.limit) * 100)}%` }} /></div> : '—' },
               ]} />
             </Panel>
             <Panel title="Details">

@@ -4,6 +4,7 @@ import type { LoginResult, SetupStatus } from '../../api/types';
 import { useAuth } from '../../app/auth';
 import { Icon } from '../../components/Icon';
 import { LogoMark, PRODUCT } from '../../components/Logo';
+import { CompanyLogo } from '../../components/CompanyLogo';
 import { BrandArt } from './BrandArt';
 
 export function LoginPage() {
@@ -91,7 +92,7 @@ export function LoginPage() {
       <section className="login-panel">
         {forgot ? (
         <form className="login-card" onSubmit={sendReset} noValidate>
-          <div className="login-card-logo"><LogoMark size={40} /></div>
+          <div className="login-card-logo"><CompanyLogo height={44} /><LogoMark size={40} /></div>
           <h1>Reset password</h1>
           {resetByEmail === false ? (
             <>
@@ -117,6 +118,7 @@ export function LoginPage() {
         ) : (
         <form className="login-card" onSubmit={submit} noValidate>
           <div className="login-card-logo">
+            <CompanyLogo height={44} />
             <LogoMark size={40} />
           </div>
           <h1>Sign in</h1>

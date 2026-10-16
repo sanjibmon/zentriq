@@ -4,6 +4,7 @@ import { NAV } from '../app/nav';
 import { Link, useRouter } from '../app/router';
 import { Icon } from './Icon';
 import { LogoMark, PRODUCT } from './Logo';
+import { CompanyLogo } from './CompanyLogo';
 
 function initials(name: string) {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((x) => x[0]!.toUpperCase()).join('') || 'U';
@@ -62,6 +63,7 @@ export function Shell({ children }: { children: ReactNode }) {
           <button className="icon-btn" onClick={() => setCollapsed((c) => !c)} title="Collapse navigation" aria-label="Toggle navigation">
             <Icon name="menu" />
           </button>
+          <CompanyLogo className="top-logo" height={30} />
           <span className="top-spacer" />
           <LicenseBadge mode={lic.mode} days={lic.daysRemaining} onClick={() => navigate('/licensing')} />
           <div className="user-menu" ref={menuRef}>

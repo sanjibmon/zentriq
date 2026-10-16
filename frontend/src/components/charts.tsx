@@ -191,3 +191,23 @@ export function PostureBars({ rows, onSelect }: { rows: { key: string; yes: numb
     </div>
   );
 }
+
+/** The chart type a viewer picked for one tile, remembered in this browser. */
+export function useChartKind(key: string, fallback: ChartKind): [ChartKind, (k: ChartKind) => void] {
+  const read = (): ChartKind => {
+    try { const v = localStorage.getItem(`zq.chart.${key}`); return CHART_KINDS.some(([k]) => k === v) ? (v as ChartKind) : fallback; } catch { return fallback; }
+  };
+  const [kind, setKind] = useState<ChartKind>(read);
+  const set = (k: ChartKind) => { setKind(k); try { localStorage.setItem(`zq.chart.${key}`, k); } catch { /* storage unavailable */ } };
+  return [kind, set];
+}
+
+/** Small segmented control to switch a tile between donut, pie, bar and column. */
+export function ChartKindPicker({ value, onChange, extra }: { value: string; onChange: (k: ChartKind) => void; extra?: [string, string, () => void] }) {
+  return (
+    <div className="seg seg-xs" role="group" aria-label="Chart type">
+      {extra && <button type="button" className={value === extra[0] ? 'on' : ''} onClick={extra[2]} title={extra[1]}>{extra[1]}</button>}
+      {CHART_KINDS.map(([k, l]) => <button key={k} type="button" className={value === k ? 'on' : ''} onClick={() => onChange(k)} title={`Show as ${l.toLowerCase()} chart`}>{l}</button>)}
+    </div>
+  );
+}
