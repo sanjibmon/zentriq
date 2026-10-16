@@ -119,7 +119,7 @@ Remove-Item $answer -Force   # contains the administrator password
 
 if (-not $installed) {
     foreach ($t in 'T02 PostgreSQL provisioning', 'T03 Database migration', 'T04 Administrator sign-in', 'T05 API and worker services', 'T06 Trial initialization',
-                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens') {
+                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo') {
         Record $t.Substring(0, 3) $t.Substring(4) 'BLOCKED' 'installation failed'
     }
 } else {
@@ -922,6 +922,93 @@ if (-not $installed) {
         Api DELETE "/integrations/tokens/$($tok.id)" -Session $s | Out-Null
         Assert ((Invoke-WebRequest "$base/api/v1/reports/$($all.id)/data" -Headers $h -SkipHttpErrorCheck).StatusCode -eq 401) 'revoked token still works'
         "CSV $((Body $csv).Length) bytes and $($json.total) JSON row(s) with the token; 403 without permission; POST refused; revoked -> 401"
+    } | Out-Null
+
+    Check 'T56' 'Departments: create, assign assets, filter, dashboard and reports, rename, delete' {
+        $s = Login
+        $dep = Api POST '/departments' @{ name = 'CI Finance' } -Session $s
+        $dup = Invoke-WebRequest "$base/api/v1/departments" -Method Post -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } -ContentType 'application/json' -SkipHttpErrorCheck -Body (@{ name = 'ci finance' } | ConvertTo-Json)
+        Assert ($dup.StatusCode -eq 400) "duplicate department name accepted: $($dup.StatusCode)"
+        $assets = (Api GET '/assets?pageSize=5' -Session $s).items
+        Assert (@($assets).Count -ge 1) 'no assets'
+        $ids = @($assets | Select-Object -First 2 | ForEach-Object id)
+        $r = Api POST '/assets/department' @{ assetIds = $ids; departmentId = $dep.id } -Session $s
+        Assert ($r.updated -eq $ids.Count -and $r.department -eq 'CI Finance') "assign: $($r | ConvertTo-Json -Compress)"
+        $f = Api GET "/assets?department=$($dep.id)" -Session $s
+        Assert ($f.total -eq $ids.Count -and $f.items[0].department -eq 'CI Finance') "filter by department: $($f.total)"
+        $o = Api GET '/dashboard/overview' -Session $s
+        Assert (@($o.byDepartment | Where-Object { $_.key -eq 'CI Finance' -and $_.count -eq $ids.Count }).Count -eq 1) 'dashboard has no department chart data'
+        $rep = Api POST '/reports/run' @{ dataset = 'assets'; definition = @{ columns = @('department', 'hostname'); filters = @(@{ column = 'department'; op = 'eq'; value = 'CI Finance' }) } } -Session $s
+        Assert ($rep.total -eq $ids.Count) "report filtered by department: $($rep.total)"
+        $lib = @(Api GET '/reports' -Session $s | ForEach-Object { $_ }) | Where-Object { $_.system -and $_.name -eq 'Assets by department' }
+        $run = Api POST '/reports/run' @{ dataset = 'assets'; definition = (Api GET "/reports/$($lib.id)" -Session $s).definition } -Session $s
+        Assert (@($run.rows | Where-Object { $_[0] -eq 'CI Finance' }).Count -eq 1) 'built-in "Assets by department" lacks the department'
+        Api PUT "/departments/$($dep.id)" @{ name = 'CI Finance & Accounts' } -Session $s | Out-Null
+        Assert ((Api GET "/assets/$($ids[0])" -Session $s).department -eq 'CI Finance & Accounts') 'rename not shown on the asset'
+        Api DELETE "/departments/$($dep.id)" -Session $s | Out-Null
+        Assert ($null -eq (Api GET "/assets/$($ids[0])" -Session $s).departmentId) 'asset still assigned after the department was deleted'
+        "$($ids.Count) asset(s) assigned, filtered, charted and reported; rename and delete OK; duplicate name refused"
+    } | Out-Null
+
+    Check 'T57' 'Change history: software installed, updated and uninstalled on this server is recorded and shown device-wise' {
+        $s = Login
+        $me = (Api GET "/assets?q=$env:COMPUTERNAME&pageSize=10" -Session $s).items | Where-Object { $_.inventoryStatus -eq 'success' } | Select-Object -First 1
+        Assert $me "no inventoried asset for $env:COMPUTERNAME"
+        $key = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\ZentriqCiChangeTest'
+        function Collect-Wait {
+            $before = (Api GET "/assets/$($me.id)" -Session $s).lastInventoryAt
+            Api POST '/assets/collect' @{ assetIds = @($me.id) } -Session $s | Out-Null
+            $deadline = (Get-Date).AddMinutes(6)
+            do { Start-Sleep 15; $now = (Api GET "/assets/$($me.id)" -Session $s).lastInventoryAt } while ($now -eq $before -and (Get-Date) -lt $deadline)
+            if ($now -eq $before) { throw "inventory of $($me.hostname) was not collected again within 6 minutes" }
+        }
+        function Find-Change([string] $change) {
+            @((Api GET "/inventory/changes?assetId=$($me.id)&kind=software&days=1&pageSize=200" -Session $s).items | Where-Object { $_.item -eq 'Zentriq CI Change Test' -and $_.change -eq $change })
+        }
+        try {
+            Remove-Item $key -Recurse -ErrorAction SilentlyContinue
+            Collect-Wait   # baseline without the test application
+            New-Item $key -Force | Out-Null
+            New-ItemProperty $key -Name DisplayName -Value 'Zentriq CI Change Test' -Force | Out-Null
+            New-ItemProperty $key -Name DisplayVersion -Value '1.0.0' -Force | Out-Null
+            New-ItemProperty $key -Name Publisher -Value 'Zentriq CI' -Force | Out-Null
+            Collect-Wait
+            $i = Find-Change 'installed'
+            Assert ($i.Count -eq 1 -and $i[0].newValue -eq '1.0.0') "installation not recorded: $((Api GET "/inventory/changes?assetId=$($me.id)&days=1" -Session $s).items | ConvertTo-Json -Compress -Depth 3)"
+            Set-ItemProperty $key -Name DisplayVersion -Value '2.0.0'
+            Collect-Wait
+            $u = Find-Change 'updated'
+            Assert ($u.Count -eq 1 -and $u[0].oldValue -eq '1.0.0' -and $u[0].newValue -eq '2.0.0') 'update not recorded'
+            Remove-Item $key -Recurse
+            Collect-Wait
+            Assert ((Find-Change 'uninstalled').Count -eq 1) 'uninstallation not recorded'
+        } finally { Remove-Item $key -Recurse -ErrorAction SilentlyContinue }
+        $sum = Api GET '/inventory/changes/summary?days=1' -Session $s
+        $row = @($sum.softwareDevices | Where-Object assetId -eq $me.id)
+        Assert ($row.Count -eq 1 -and $row[0].changes -ge 3 -and $row[0].summary -match 'Zentriq CI Change Test') 'device-wise summary lacks the changes'
+        $lib = @(Api GET '/reports' -Session $s | ForEach-Object { $_ }) | Where-Object { $_.system -and $_.name -eq 'Software changes (30 days)' }
+        $run = Api POST '/reports/run' @{ dataset = 'changes'; definition = (Api GET "/reports/$($lib.id)" -Session $s).definition } -Session $s
+        Assert ($run.total -ge 3) "software changes report: $($run.total) row(s)"
+        $hw = @((Api GET "/inventory/changes?assetId=$($me.id)&kind=hardware&days=1" -Session $s).items)
+        "$($me.hostname): installed 1.0.0 -> updated to 2.0.0 -> uninstalled, all recorded; device-wise summary $($row[0].changes) change(s); report $($run.total) row(s); hardware changes during the test: $($hw.Count)"
+    } | Out-Null
+
+    Check 'T58' 'Company logo: upload (PNG), shown without sign-in, unsafe types refused, removal' {
+        $s = Login
+        $png = [Convert]::FromBase64String('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==')
+        $svg = [Text.Encoding]::UTF8.GetBytes('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>')
+        $bad = Invoke-WebRequest "$base/api/v1/organization/logo" -Method Put -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } -ContentType 'application/octet-stream' -Body $svg -SkipHttpErrorCheck
+        Assert ($bad.StatusCode -eq 400) "SVG logo accepted: $($bad.StatusCode)"
+        $ok = Invoke-WebRequest "$base/api/v1/organization/logo" -Method Put -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } -ContentType 'application/octet-stream' -Body $png -SkipHttpErrorCheck
+        Assert ($ok.StatusCode -eq 204) "upload returned $($ok.StatusCode)"
+        $get = Invoke-WebRequest "$base/api/v1/organization/logo" -SkipHttpErrorCheck   # no session: the sign-in page shows it
+        Assert ($get.StatusCode -eq 200 -and $get.Headers['Content-Type'] -match 'image/png' -and $get.RawContentStream.Length -eq $png.Length) "anonymous GET: $($get.StatusCode) $($get.Headers['Content-Type'])"
+        Assert ((Api GET '/organization' -Session $s).logoUpdatedAt) 'logoUpdatedAt missing'
+        Api DELETE '/organization/logo' -Session $s | Out-Null
+        Assert ((Invoke-WebRequest "$base/api/v1/organization/logo" -SkipHttpErrorCheck).StatusCode -eq 404) 'logo still served after removal'
+        $lic = Api GET '/licensing/status' -Session $s
+        Assert (@($lic.usage | Where-Object workload -eq 'devices').Count -eq 1) 'licensing usage missing'
+        "PNG stored and served anonymously ($($png.Length) bytes); SVG refused; removed"
     } | Out-Null
 
     if ($UpgradeBundle) {
