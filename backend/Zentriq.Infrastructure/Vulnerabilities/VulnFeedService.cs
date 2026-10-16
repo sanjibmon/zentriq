@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using Npgsql;
@@ -24,7 +25,45 @@ public sealed class VulnFeedService(NpgsqlDataSource ds, VulnStore store, Creden
 
     public string ProtectApiKey(string key) => protector.Protect(ApiKeyAad, new CredentialSecret { Password = key.Trim() });
 
-    public sealed record SyncSummary(int NewTitles, int Products, int Cves, int Kev, int Epss, EvaluationResult? Evaluation, List<string> Problems);
+    public sealed record SyncSummary(int NewTitles, int Products, int Cves, int Kev, int Epss, EvaluationResult? Evaluation, List<string> Problems)
+    {
+        public int WindowsCves { get; init; }
+    }
+
+    /// <summary>How many monthly Microsoft security updates to keep loaded (1–36; default 12).</summary>
+    public async Task<int> MsrcMonthsAsync(CancellationToken ct) =>
+        await store.SettingAsync("vuln.msrc_months", ct) is { ValueKind: JsonValueKind.Number } n && n.TryGetInt32(out var m) ? Math.Clamp(m, 1, 36) : 12;
+
+    /// <summary>
+    /// Loads Microsoft's monthly Security Update documents for the configured window. A month is downloaded again only
+    /// when Microsoft has revised it (its current release date changed). Months already loaded stay, so devices that are
+    /// far behind still show older vulnerabilities.
+    /// </summary>
+    public async Task<(int Months, int Downloaded, int Cves, int Rules)> SyncMsrcAsync(FeedClient client, Func<string, Task> log, CancellationToken ct)
+    {
+        var months = await MsrcMonthsAsync(ct);
+        var loaded = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (await store.SettingAsync("vuln.msrc_loaded", ct) is { ValueKind: JsonValueKind.Object } o)
+            foreach (var p in o.EnumerateObject()) if (p.Value.ValueKind == JsonValueKind.String) loaded[p.Name] = p.Value.GetString()!;
+        var oldest = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1).AddMonths(-(months - 1));
+        var updates = (await client.MsrcUpdatesAsync(ct))
+            .Where(u => DateTime.TryParseExact(u.Id, "yyyy-MMM", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) && d >= oldest)
+            .ToList();
+        int downloaded = 0, cves = 0, rules = 0;
+        foreach (var u in updates)
+        {
+            var stamp = u.CurrentRelease?.ToString("o", CultureInfo.InvariantCulture) ?? "";
+            if (stamp.Length > 0 && loaded.TryGetValue(u.Id, out var prev) && prev == stamp) continue;
+            var doc = await client.MsrcDocumentAsync(u.Id, ct);
+            if (doc is null) continue;
+            var (c, r) = await store.UpsertMsrcAsync(doc, ct);
+            downloaded++; cves += c; rules += r;
+            loaded[u.Id] = stamp.Length > 0 ? stamp : DateTimeOffset.UtcNow.ToString("o", CultureInfo.InvariantCulture);
+            await store.SetSettingAsync("vuln.msrc_loaded", JsonSerializer.Serialize(loaded), ct);
+            await log($"Microsoft {u.Id}: {c} Windows CVE(s), {r} fixed build(s).");
+        }
+        return (updates.Count, downloaded, cves, rules);
+    }
 
     public async Task<SyncSummary> SyncAsync(Func<string, Task> log, Func<int, string, Task> progress, CancellationToken ct)
     {
@@ -33,9 +72,30 @@ public sealed class VulnFeedService(NpgsqlDataSource ds, VulnStore store, Creden
         await log($"{newTitles} new software title(s) added to the product mapping.");
         using var client = new FeedClient(await NvdApiKeyAsync(ct));
 
+        // 0. Microsoft Security Updates (Windows) — before KEV, so new Windows CVEs get their KEV flag in this run.
+        var windowsCves = 0;
+        await progress(2, "Microsoft security updates (Windows)");
+        try
+        {
+            var (months, downloaded, mc, mr) = await SyncMsrcAsync(client, log, ct);
+            windowsCves = mc;
+            await using var count = ds.CreateCommand("SELECT count(DISTINCT cve_id), count(DISTINCT month) FROM zentriq.vuln_os_rules");
+            await using var cr = await count.ExecuteReaderAsync(ct);
+            var (total, loadedMonths) = await cr.ReadAsync(ct) ? (cr.GetInt64(0), cr.GetInt64(1)) : (0L, 0L);
+            await store.SetFeedStatusAsync("msrc", true, (int)total,
+                $"{loadedMonths} monthly update(s) loaded ({downloaded} of the last {months} downloaded now): {total} Windows CVE(s) with fixed builds.", ct);
+            await log($"Microsoft: {months} month(s) checked, {downloaded} downloaded, {mc} CVE(s), {mr} fixed build(s).");
+        }
+        catch (Exception ex) when (ex is FeedException or JsonException)
+        {
+            problems.Add("Microsoft: " + ex.Message);
+            await store.SetFeedStatusAsync("msrc", false, null, ex.Message, ct);
+            await log("Microsoft security updates failed: " + ex.Message);
+        }
+
         // 1. CISA KEV
         var kevCount = 0;
-        await progress(5, "CISA Known Exploited Vulnerabilities");
+        await progress(8, "CISA Known Exploited Vulnerabilities");
         try
         {
             var kev = await client.KevAsync(ct);
@@ -104,7 +164,7 @@ public sealed class VulnFeedService(NpgsqlDataSource ds, VulnStore store, Creden
         await progress(92, "Evaluating installed software");
         var eval = await EvaluateAsync(ct);
         await log($"Evaluation: {eval.Open} open finding(s); {eval.New} new, {eval.Fixed} fixed, {eval.Reopened} reopened.");
-        return new SyncSummary(newTitles, products.Count, cveCount, kevCount, epssCount, eval, problems);
+        return new SyncSummary(newTitles, products.Count, cveCount, kevCount, epssCount, eval, problems) { WindowsCves = windowsCves };
     }
 
     public async Task<EvaluationResult> EvaluateAsync(CancellationToken ct)
@@ -112,7 +172,9 @@ public sealed class VulnFeedService(NpgsqlDataSource ds, VulnStore store, Creden
         await store.EnsureMappingsAsync(ct);
         var eval = await store.EvaluateAsync(ct);
         await store.SetFeedStatusAsync("evaluate", true, eval.Open,
-            $"{eval.Installs} installation(s) of {eval.Products} product(s) checked; {eval.Open} open, {eval.New} new, {eval.Fixed} fixed.", ct);
+            $"{eval.Installs} installation(s) of {eval.Products} product(s) and {eval.OsAssessed} Windows device(s) checked" +
+            (eval.OsNotAssessed > 0 ? $" ({eval.OsNotAssessed} Windows device(s) without a full build number: update their agent or collect inventory again)" : "") +
+            $"; {eval.Open} open, {eval.New} new, {eval.Fixed} fixed.", ct);
         return eval;
     }
 
@@ -159,6 +221,16 @@ public sealed class VulnFeedService(NpgsqlDataSource ds, VulnStore store, Creden
                 var n = await store.ApplyEpssAsync(scores, ct);
                 await store.SetFeedStatusAsync("epss", true, n, $"Imported {scores.Count} EPSS score(s) from a file; {n} matched CVEs in Zentriq.", ct);
                 return (scores.Count, $"{scores.Count} EPSS score(s) imported ({n} for CVEs in Zentriq).");
+            }
+            case "msrc":
+            {
+                using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
+                var msrc = Msrc.ParseDocument(doc.RootElement);
+                if (msrc.Cves.Count == 0)
+                    throw new FeedException("The file contains no Windows fixes (expected a Microsoft CVRF JSON document, e.g. from https://api.msrc.microsoft.com/cvrf/v3.0/cvrf/2026-Oct downloaded with 'Accept: application/json').");
+                var (c, r) = await store.UpsertMsrcAsync(msrc, ct);
+                await store.SetFeedStatusAsync("msrc", true, c, $"Imported {msrc.Id} from a file: {c} Windows CVE(s), {r} fixed build(s).", ct);
+                return (c, $"{msrc.Id}: {c} Windows CVE(s) and {r} fixed build(s) imported.");
             }
             default:
                 throw new FeedException($"Unknown feed '{source}'.");

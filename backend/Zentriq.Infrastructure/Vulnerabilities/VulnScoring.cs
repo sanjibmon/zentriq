@@ -3,7 +3,7 @@ namespace Zentriq.Infrastructure.Vulnerabilities;
 /// <summary>
 /// Prioritisation, following common risk-based vulnerability management practice: severity from CVSS, raised when
 /// the CVE is known to be exploited (CISA KEV) or likely to be exploited soon (FIRST EPSS).
-///   P1  on the CISA KEV list, or CVSS ≥ 9.0 with EPSS ≥ 10 %
+///   P1  known to be exploited (CISA KEV, or Microsoft "Exploited: Yes"), or CVSS ≥ 9.0 with EPSS ≥ 10 %
 ///   P2  CVSS ≥ 9.0, or CVSS ≥ 7.0 with EPSS ≥ 10 %
 ///   P3  CVSS ≥ 7.0, or CVSS ≥ 4.0 with EPSS ≥ 10 %
 ///   P4  everything else
@@ -35,4 +35,29 @@ public static class VulnScoring
 
     public static int Risk(decimal? cvss, decimal? epss, bool kev) =>
         (int)Math.Min(100, Math.Round((cvss ?? 0) * 7 + Math.Min(1, epss ?? 0) * 20 + (kev ? 10 : 0)));
+
+    /// <summary>
+    /// Business-criticality weight of the device (asset criticality rating), applied to the risk score so the same CVE
+    /// ranks higher on a critical server than on a low-value test machine: Critical ×1.25, High ×1.1, Medium ×1, Low ×0.8.
+    /// </summary>
+    public static decimal CriticalityFactor(string? criticality) => criticality switch
+    {
+        "Critical" => 1.25m,
+        "High" => 1.10m,
+        "Low" => 0.80m,
+        _ => 1.00m,
+    };
+
+    public static int Risk(decimal? cvss, decimal? epss, bool kev, decimal factor) =>
+        (int)Math.Min(100, Math.Round(Risk(cvss, epss, kev) * factor));
+
+    /// <summary>Severity from CVSS, or from Microsoft's rating when no CVSS score is known.</summary>
+    public static string SeverityFor(decimal? cvss, string? msSeverity) => cvss is not null ? SeverityFor(cvss) : msSeverity switch
+    {
+        "Critical" => "critical",
+        "Important" => "high",
+        "Moderate" => "medium",
+        "Low" => "low",
+        _ => "none",
+    };
 }

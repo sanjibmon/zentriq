@@ -20,6 +20,15 @@ public sealed class ReportSort
     [JsonPropertyName("dir")] public string Dir { get; set; } = "asc";
 }
 
+/// <summary>A calculation per group: count_distinct, sum, avg, min or max of a column.</summary>
+public sealed class ReportAggregate
+{
+    [JsonPropertyName("fn")] public string Fn { get; set; } = "sum";
+    [JsonPropertyName("column")] public string Column { get; set; } = "";
+
+    public string Key => $"agg_{Fn}_{Column}";
+}
+
 /// <summary>What a saved report stores: only column keys, filters, grouping and sorting — never SQL.</summary>
 public sealed class ReportSpec
 {
@@ -27,6 +36,12 @@ public sealed class ReportSpec
     [JsonPropertyName("filters")] public List<ReportFilter> Filters { get; set; } = [];
     [JsonPropertyName("groupBy")] public List<string>? GroupBy { get; set; }
     [JsonPropertyName("sort")] public List<ReportSort>? Sort { get; set; }
+    /// <summary>Summary reports: calculations per group besides the row count.</summary>
+    [JsonPropertyName("aggregates")] public List<ReportAggregate>? Aggregates { get; set; }
+    /// <summary>Summary reports: date columns in the grouping are bucketed by day, week, month, quarter or year.</summary>
+    [JsonPropertyName("dateBucket")] public string? DateBucket { get; set; }
+    /// <summary>How the console draws a summary (donut, pie, bar, column, line); kept with the report for dashboards and PDF.</summary>
+    [JsonPropertyName("chart")] public string? Chart { get; set; }
 
     public static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     public static ReportSpec Parse(string json) => JsonSerializer.Deserialize<ReportSpec>(json, Json) ?? new ReportSpec();
@@ -42,8 +57,22 @@ public sealed class ReportValidationException(string message) : Exception(messag
 public static class ReportEngine
 {
     public static readonly string[] Operators = ["eq", "neq", "contains", "not_contains", "starts", "gt", "gte", "lt", "lte", "empty", "not_empty", "last_days", "older_days", "in"];
+    public static readonly string[] AggregateFunctions = ["count_distinct", "sum", "avg", "min", "max"];
+    public static readonly string[] DateBuckets = ["day", "week", "month", "quarter", "year"];
+    public static readonly string[] Charts = ["donut", "pie", "bar", "column", "line", "table"];
     public const int MaxColumns = 40;
     public const int MaxFilters = 25;
+    public const int MaxAggregates = 6;
+
+    public static string AggregateLabel(ReportAggregate a, ReportColumn c) => a.Fn switch
+    {
+        "count_distinct" => $"Distinct {c.Label}",
+        "sum" => $"Total {c.Label}",
+        "avg" => $"Average {c.Label}",
+        "min" => $"Lowest {c.Label}",
+        "max" => $"Highest {c.Label}",
+        _ => c.Label,
+    };
 
     /// <summary>Checks the spec against the dataset; throws <see cref="ReportValidationException"/> with a readable message.</summary>
     public static void Validate(ReportDataset ds, ReportSpec spec)
@@ -55,6 +84,19 @@ public static class ReportEngine
         foreach (var c in spec.Columns.Concat(spec.GroupBy ?? []))
             if (ds.Column(c) is null) throw new ReportValidationException($"Unknown column '{c}' for {ds.Name}.");
         if (grouped && spec.GroupBy!.Count > 3) throw new ReportValidationException("Group by up to three columns.");
+        if (spec.DateBucket is not null && !DateBuckets.Contains(spec.DateBucket)) throw new ReportValidationException($"Unknown date grouping '{spec.DateBucket}'.");
+        if (spec.Chart is not null && !Charts.Contains(spec.Chart)) throw new ReportValidationException($"Unknown chart type '{spec.Chart}'.");
+        var aggregates = spec.Aggregates ?? [];
+        if (aggregates.Count > 0 && !grouped) throw new ReportValidationException("Calculations (total, average, …) need a summary report: group by at least one column.");
+        if (aggregates.Count > MaxAggregates) throw new ReportValidationException($"Up to {MaxAggregates} calculations.");
+        foreach (var a in aggregates)
+        {
+            var col = ds.Column(a.Column) ?? throw new ReportValidationException($"Unknown column '{a.Column}' for a calculation.");
+            if (!AggregateFunctions.Contains(a.Fn)) throw new ReportValidationException($"Unknown calculation '{a.Fn}'.");
+            if (a.Fn is "sum" or "avg" && col.Type != ReportColumnType.Number) throw new ReportValidationException($"{col.Label} is not a number: it can be counted, not added up or averaged.");
+            if (a.Fn is "min" or "max" && col.Type is not (ReportColumnType.Number or ReportColumnType.Date)) throw new ReportValidationException($"Lowest/highest needs a number or date column ({col.Label} is neither).");
+        }
+        if (aggregates.Select(a => a.Key).Distinct().Count() != aggregates.Count) throw new ReportValidationException("The same calculation is listed twice.");
         foreach (var f in spec.Filters)
         {
             var col = ds.Column(f.Column) ?? throw new ReportValidationException($"Unknown filter column '{f.Column}'.");
@@ -76,7 +118,9 @@ public static class ReportEngine
         }
         foreach (var s in spec.Sort ?? [])
         {
-            var ok = s.Column == "count" ? grouped : grouped ? spec.GroupBy!.Contains(s.Column) : ds.Column(s.Column) is not null;
+            var ok = s.Column == "count" ? grouped
+                : grouped ? spec.GroupBy!.Contains(s.Column) || aggregates.Any(a => a.Key == s.Column)
+                : ds.Column(s.Column) is not null;
             if (!ok) throw new ReportValidationException($"Cannot sort by '{s.Column}'.");
         }
     }
@@ -86,7 +130,9 @@ public static class ReportEngine
     {
         Validate(ds, spec);
         var grouped = spec.GroupBy is { Count: > 0 };
-        var needed = spec.Columns.Concat(spec.GroupBy ?? []).Concat(spec.Filters.Select(f => f.Column)).Concat((spec.Sort ?? []).Select(s => s.Column)).Where(c => c != "count").Distinct().ToList();
+        var aggs = grouped ? spec.Aggregates ?? [] : [];
+        var needed = spec.Columns.Concat(spec.GroupBy ?? []).Concat(spec.Filters.Select(f => f.Column)).Concat((spec.Sort ?? []).Select(s => s.Column))
+            .Concat(aggs.Select(a => a.Column)).Where(c => c != "count" && ds.Column(c) is not null).Distinct().ToList();
         var inner = $"SELECT {string.Join(", ", needed.Select(k => $"{ds.Column(k)!.Expr} AS \"{k}\""))} FROM {ds.From}";
 
         var ps = new List<NpgsqlParameter>();
@@ -115,17 +161,42 @@ public static class ReportEngine
         var cols = new List<ReportResultColumn>();
         if (grouped)
         {
-            select = string.Join(", ", spec.GroupBy!.Select(g => $"t.\"{g}\"")) + ", count(*) AS \"count\"";
-            groupClause = " GROUP BY " + string.Join(", ", spec.GroupBy!.Select(g => $"t.\"{g}\""));
-            cols.AddRange(spec.GroupBy!.Select(g => Col(ds.Column(g)!)));
+            // Date columns in the grouping can be bucketed (2026-10, 2026-Q4, …); the label sorts chronologically.
+            string GroupExpr(string g) => ds.Column(g)!.Type == ReportColumnType.Date && spec.DateBucket is { } b
+                ? $"to_char(date_trunc('{b}', t.\"{g}\"), '{BucketFormat(b)}')"
+                : $"t.\"{g}\"";
+            select = string.Join(", ", spec.GroupBy!.Select(g => $"{GroupExpr(g)} AS \"{g}\"")) + ", count(*) AS \"count\"";
+            foreach (var a in aggs)
+            {
+                var c = $"t.\"{a.Column}\"";
+                select += a.Fn switch
+                {
+                    "count_distinct" => $", count(DISTINCT {c}) AS \"{a.Key}\"",
+                    "sum" => $", sum(({c})::numeric) AS \"{a.Key}\"",
+                    "avg" => $", round(avg(({c})::numeric), 2) AS \"{a.Key}\"",
+                    "min" => $", min({c}) AS \"{a.Key}\"",
+                    _ => $", max({c}) AS \"{a.Key}\"",
+                };
+            }
+            groupClause = " GROUP BY " + string.Join(", ", spec.GroupBy!.Select(GroupExpr));
+            cols.AddRange(spec.GroupBy!.Select(g => ds.Column(g)!.Type == ReportColumnType.Date && spec.DateBucket is { } b
+                ? new ReportResultColumn(g, $"{ds.Column(g)!.Label} ({b})", "text")
+                : Col(ds.Column(g)!)));
             cols.Add(new ReportResultColumn("count", "Count", "number"));
+            foreach (var a in aggs)
+            {
+                var col = ds.Column(a.Column)!;
+                var type = a.Fn is "min" or "max" && col.Type == ReportColumnType.Date ? "date" : "number";
+                cols.Add(new ReportResultColumn(a.Key, AggregateLabel(a, col), type));
+            }
         }
         else
         {
             select = string.Join(", ", spec.Columns.Select(k => $"t.\"{k}\""));
             cols.AddRange(spec.Columns.Select(k => Col(ds.Column(k)!)));
         }
-        var sorts = (spec.Sort ?? []).Select(s => $"{(s.Column == "count" ? "\"count\"" : $"t.\"{s.Column}\"")} {(s.Dir == "desc" ? "DESC" : "ASC")} NULLS LAST").ToList();
+        // Summary reports sort by output columns (group labels, count, calculations); detail reports by source columns.
+        var sorts = (spec.Sort ?? []).Select(s => $"{(grouped ? $"\"{s.Column}\"" : $"t.\"{s.Column}\"")} {(s.Dir == "desc" ? "DESC" : "ASC")} NULLS LAST").ToList();
         if (sorts.Count == 0) sorts.Add(grouped ? "\"count\" DESC" : "1");
         order = " ORDER BY " + string.Join(", ", sorts);
         var whereSql = where.Count > 0 ? " WHERE " + string.Join(" AND ", where) : "";
@@ -155,6 +226,15 @@ public static class ReportEngine
                 };
         }
     }
+
+    private static string BucketFormat(string bucket) => bucket switch
+    {
+        "day" => "YYYY-MM-DD",
+        "week" => "IYYY-\"W\"IW",
+        "month" => "YYYY-MM",
+        "quarter" => "YYYY-\"Q\"Q",
+        _ => "YYYY",
+    };
 
     private static string Escape(string s) => s.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
     private static ReportResultColumn Col(ReportColumn c) => new(c.Key, c.Label, c.Type switch { ReportColumnType.Number => "number", ReportColumnType.Date => "date", ReportColumnType.YesNo => "yesno", _ => "text" });

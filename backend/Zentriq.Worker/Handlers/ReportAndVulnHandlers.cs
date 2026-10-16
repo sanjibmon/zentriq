@@ -35,7 +35,7 @@ public sealed class VulnSyncHandler(VulnFeedService feeds) : IJobHandler
         var s = await feeds.SyncAsync(m => context.LogAsync(m, ct: ct), (pct, text) => context.ProgressAsync(pct, text, ct), ct);
         return new
         {
-            s.NewTitles, s.Products, s.Cves, s.Kev, s.Epss,
+            s.NewTitles, s.Products, s.Cves, s.WindowsCves, s.Kev, s.Epss,
             open = s.Evaluation?.Open, added = s.Evaluation?.New, fixedCount = s.Evaluation?.Fixed,
             problems = s.Problems.Take(20),
         };
@@ -50,7 +50,7 @@ public sealed class VulnEvaluateHandler(VulnFeedService feeds) : IJobHandler
     public async Task<object?> ExecuteAsync(JobContext context, CancellationToken ct)
     {
         var e = await feeds.EvaluateAsync(ct);
-        await context.LogAsync($"{e.Installs} installation(s) of {e.Products} product(s) checked: {e.Open} open finding(s); {e.New} new, {e.Fixed} fixed, {e.Reopened} reopened.", ct: ct);
+        await context.LogAsync($"{e.Installs} installation(s) of {e.Products} product(s) and {e.OsAssessed} Windows device(s) checked ({e.OsNotAssessed} without a full build): {e.Open} open finding(s); {e.New} new, {e.Fixed} fixed, {e.Reopened} reopened.", ct: ct);
         return e;
     }
 }

@@ -64,25 +64,50 @@ public sealed class ReportDelivery(NpgsqlDataSource ds, MailService mail)
 {
     public const int MaxExportRows = 100_000;
 
-    public sealed record Definition(Guid Id, string Name, string Dataset, ReportSpec Spec, string Format, string[] Recipients, string? Description);
+    public sealed record Definition(Guid Id, string Name, string Dataset, ReportSpec Spec, string Format, string[] Recipients, string? Description, Guid? OwnerId = null);
 
     public async Task<Definition?> LoadAsync(Guid id, CancellationToken ct)
     {
-        await using var cmd = ds.CreateCommand("SELECT name, dataset, definition::text, format, recipients, description FROM zentriq.report_definitions WHERE id = @id");
+        await using var cmd = ds.CreateCommand("SELECT name, dataset, definition::text, format, recipients, description, owner_id FROM zentriq.report_definitions WHERE id = @id");
         cmd.Parameters.AddWithValue("id", id);
         await using var r = await cmd.ExecuteReaderAsync(ct);
         if (!await r.ReadAsync(ct)) return null;
-        return new Definition(id, r.GetString(0), r.GetString(1), ReportSpec.Parse(r.GetString(2)), r.GetString(3), r.GetFieldValue<string[]>(4), r.IsDBNull(5) ? null : r.GetString(5));
+        return new Definition(id, r.GetString(0), r.GetString(1), ReportSpec.Parse(r.GetString(2)), r.GetString(3), r.GetFieldValue<string[]>(4),
+            r.IsDBNull(5) ? null : r.GetString(5), r.IsDBNull(6) ? null : r.GetGuid(6));
     }
 
-    public static (byte[] Content, string FileName, string ContentType) Render(string name, string format, ReportResult result)
+    public static string ContentType(string format) => format switch
+    {
+        "csv" => "text/csv",
+        "pdf" => "application/pdf",
+        _ => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    };
+
+    public static (byte[] Content, string FileName, string ContentType) Render(string name, string format, ReportResult result, string? subtitle = null, string? chart = null)
     {
         var safe = new string(name.Select(c => char.IsLetterOrDigit(c) || c is '-' or '_' ? c : '-').ToArray()).Trim('-');
         if (safe.Length == 0) safe = "report";
         var stamp = DateTime.Now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
-        return format == "csv"
-            ? (ReportEngine.ToCsv(result), $"{safe}-{stamp}.csv", "text/csv")
-            : (XlsxWriter.Write(name, result), $"{safe}-{stamp}.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        return format switch
+        {
+            "csv" => (ReportEngine.ToCsv(result), $"{safe}-{stamp}.csv", ContentType("csv")),
+            "pdf" => (PdfWriter.Write(name, subtitle ?? $"{result.Rows.Count:N0} row(s) · generated {DateTime.Now:yyyy-MM-dd HH:mm}", result, chart), $"{safe}-{stamp}.pdf", ContentType("pdf")),
+            _ => (XlsxWriter.Write(name, result), $"{safe}-{stamp}.xlsx", ContentType("xlsx")),
+        };
+    }
+
+    /// <summary>Scheduled runs act for the report's owner: a data source with its own permission needs it (or administrator rights).</summary>
+    public async Task<bool> OwnerMayUseAsync(Definition def, CancellationToken ct)
+    {
+        if (ReportCatalog.Find(def.Dataset) is not { Permission: { } perm } || def.OwnerId is null) return true;
+        await using var cmd = ds.CreateCommand("""
+            SELECT EXISTS (SELECT 1 FROM zentriq.user_roles ur JOIN zentriq.role_permissions rp ON rp.role_id = ur.role_id
+                             JOIN zentriq.users u ON u.id = ur.user_id AND u.status = 'active'
+                            WHERE ur.user_id = @u AND (rp.permission_code = @p OR rp.permission_code = 'settings.manage'))
+            """);
+        cmd.Parameters.AddWithValue("u", def.OwnerId.Value);
+        cmd.Parameters.AddWithValue("p", perm);
+        return await cmd.ExecuteScalarAsync(ct) is true;
     }
 
     /// <summary>Runs the report and records a run; returns the run id. Throws only for unexpected failures.</summary>
@@ -105,8 +130,10 @@ public sealed class ReportDelivery(NpgsqlDataSource ds, MailService mail)
         }
         try
         {
+            if (!await OwnerMayUseAsync(def, ct))
+                throw new ReportValidationException("The report's owner no longer has permission to use this data source; the report was not run.");
             var result = await ReportEngine.RunAsync(ds, def.Dataset, def.Spec, MaxExportRows, ct);
-            var (content, fileName, contentType) = Render(def.Name, def.Format, result);
+            var (content, fileName, contentType) = Render(def.Name, def.Format, result, def.Description is null ? null : $"{def.Description} · {result.Rows.Count:N0} row(s) · generated {DateTime.Now:yyyy-MM-dd HH:mm}", def.Spec.Chart);
             string message;
             var status = "succeeded";
             if (def.Recipients.Length == 0) message = $"{result.Rows.Count} row(s); no recipients, kept in the run history.";
@@ -126,7 +153,7 @@ public sealed class ReportDelivery(NpgsqlDataSource ds, MailService mail)
                         .AppendLine(def.Description ?? "")
                         .AppendLine()
                         .AppendLine($"{result.Rows.Count} row(s){(result.Truncated ? $" (first {result.Rows.Count} of {result.Total})" : "")}, generated {DateTime.Now:yyyy-MM-dd HH:mm}.")
-                        .AppendLine($"The {(def.Format == "csv" ? "CSV" : "Excel")} file is attached.")
+                        .AppendLine($"The {(def.Format switch { "csv" => "CSV", "pdf" => "PDF", _ => "Excel" })} file is attached.")
                         .ToString();
                     var html = $"<p><b>Zentriq report: {WebUtility.HtmlEncode(def.Name)}</b></p>"
                                + (def.Description is null ? "" : $"<p>{WebUtility.HtmlEncode(def.Description)}</p>")

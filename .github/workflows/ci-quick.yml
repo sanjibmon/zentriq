@@ -1,0 +1,60 @@
+name: ci-quick
+
+# Fast feedback for work branches (dev/**): compile the server, run the unit and PostgreSQL integration tests on
+# Linux, and type-check/build the web console. No installers, nothing published; main runs windows-release.
+
+on:
+  push:
+    branches: ['dev/**']
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: '1'
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+
+jobs:
+  quick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: root
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Build server
+        run: |
+          set -o pipefail
+          for p in Zentriq.Api Zentriq.Worker Zentriq.Tests; do
+            dotnet build backend/$p/$p.csproj -c Release 2>&1 | tee -a build.log
+          done
+      - name: Tests (unit + PostgreSQL)
+        env:
+          ZENTRIQ_TEST_PG: Host=localhost;Port=5432;Username=postgres;Password=root
+        run: |
+          set -o pipefail
+          dotnet test backend/Zentriq.Tests/Zentriq.Tests.csproj -c Release --no-build --logger "console;verbosity=normal" 2>&1 | tee test.log
+      - name: Web console
+        working-directory: frontend
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+      - name: Logs
+        if: always()
+        run: |
+          grep -E "error [A-Z]+[0-9]+" build.log | sort -u | head -80 || true
+          grep -E "Failed |\[FAIL\]|Error Message|Assert\." test.log | head -80 || true

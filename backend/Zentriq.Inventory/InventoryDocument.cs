@@ -58,6 +58,12 @@ public sealed class OsInfo
     [JsonPropertyName("installDate")] public DateTimeOffset? InstallDate { get; set; }
     [JsonPropertyName("lastBoot")] public DateTimeOffset? LastBoot { get; set; }
     [JsonPropertyName("isServer")] public bool? IsServer { get; set; }
+    /// <summary>Update Build Revision: the monthly patch level (10.0.17763.<b>6893</b>). Needed to match Windows vulnerabilities.</summary>
+    [JsonPropertyName("ubr")] public int? Ubr { get; set; }
+    /// <summary>Feature update, e.g. 22H2 / 23H2 (DisplayVersion, or ReleaseId on older builds).</summary>
+    [JsonPropertyName("displayVersion")] public string? DisplayVersion { get; set; }
+    /// <summary>Client, Server or Server Core.</summary>
+    [JsonPropertyName("installationType")] public string? InstallationType { get; set; }
 }
 
 public sealed class HardwareInfo

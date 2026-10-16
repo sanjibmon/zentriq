@@ -140,6 +140,52 @@ public sealed class FeedClient : IDisposable
         return all;
     }
 
+    // ---- Microsoft Security Response Center (CVRF v3) ----------------------------------------------
+
+    /// <summary>Published monthly documents with their current release dates.</summary>
+    public async Task<List<MsrcUpdateInfo>> MsrcUpdatesAsync(CancellationToken ct)
+    {
+        using var doc = await GetMsrcAsync($"{Msrc.Api}/updates", ct) ?? throw new FeedException("api.msrc.microsoft.com returned no update list.");
+        return Msrc.ParseUpdates(doc.RootElement);
+    }
+
+    /// <summary>One monthly document (e.g. 2026-Oct) as JSON; null when Microsoft has not published it.</summary>
+    public async Task<MsrcDocument?> MsrcDocumentAsync(string id, CancellationToken ct)
+    {
+        using var doc = await GetMsrcAsync($"{Msrc.Api}/cvrf/{Uri.EscapeDataString(id)}", ct);
+        return doc is null ? null : Msrc.ParseDocument(doc.RootElement, id);
+    }
+
+    private async Task<JsonDocument?> GetMsrcAsync(string url, CancellationToken ct)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            using var req = new HttpRequestMessage(HttpMethod.Get, url);
+            req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            HttpResponseMessage resp;
+            try { resp = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct); }
+            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException && !ct.IsCancellationRequested)
+            {
+                if (attempt < 3) { await Task.Delay(TimeSpan.FromSeconds(10 * attempt), ct); continue; }
+                throw new FeedException($"Could not reach api.msrc.microsoft.com: {ex.Message}. The server needs outbound HTTPS to this site (or use Import feed files).", ex);
+            }
+            using (resp)
+            {
+                if (resp.StatusCode == HttpStatusCode.NotFound) return null;
+                if ((resp.StatusCode is HttpStatusCode.TooManyRequests or HttpStatusCode.ServiceUnavailable or HttpStatusCode.GatewayTimeout or HttpStatusCode.BadGateway) && attempt < 4)
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(20 * attempt), ct);
+                    continue;
+                }
+                if (!resp.IsSuccessStatusCode) throw new FeedException($"api.msrc.microsoft.com answered {(int)resp.StatusCode} {resp.ReasonPhrase}.");
+                var type = resp.Content.Headers.ContentType?.MediaType ?? "";
+                if (type.Contains("xml", StringComparison.OrdinalIgnoreCase)) throw new FeedException("api.msrc.microsoft.com returned XML instead of JSON.");
+                await using var s = await resp.Content.ReadAsStreamAsync(ct);
+                return await JsonDocument.ParseAsync(s, cancellationToken: ct);
+            }
+        }
+    }
+
     /// <summary>Opens an uploaded file, transparently un-gzipping it.</summary>
     public static Stream OpenMaybeGzip(byte[] content) =>
         content.Length > 2 && content[0] == 0x1f && content[1] == 0x8b

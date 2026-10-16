@@ -166,6 +166,17 @@ public static class WindowsCollector
             }, optional: true);
         }
 
+        // Full OS build (10.0.17763 + UBR) and feature update from the registry: the build alone does not say which
+        // monthly cumulative update is installed, and that is what Windows vulnerability matching compares.
+        if (registry is not null && doc.Os.Family == "windows")
+            Section(doc, "os build", () =>
+            {
+                const string cv = @"SOFTWARE\Microsoft\Windows NT\CurrentVersion";
+                doc.Os.Ubr = registry.GetDword(cv, "UBR");
+                doc.Os.DisplayVersion = registry.GetString(cv, "DisplayVersion") ?? registry.GetString(cv, "ReleaseId");
+                doc.Os.InstallationType = registry.GetString(cv, "InstallationType");
+            }, optional: true);
+
         Section(doc, "patches", () =>
         {
             foreach (var q in wmi.Query(Cimv2, "SELECT HotFixID, Description, InstalledOn FROM Win32_QuickFixEngineering"))

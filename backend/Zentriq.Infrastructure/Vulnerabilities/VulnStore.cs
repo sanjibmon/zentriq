@@ -11,7 +11,13 @@ public sealed record SlaDays(int Critical, int High, int Medium, int Low)
     public int For(string? severity) => severity switch { "critical" => Critical, "high" => High, "medium" => Medium, _ => Low };
 }
 
-public sealed record EvaluationResult(int Products, int Installs, int Open, int New, int Fixed, int Reopened);
+public sealed record EvaluationResult(int Products, int Installs, int Open, int New, int Fixed, int Reopened)
+{
+    /// <summary>Windows devices whose build was compared with Microsoft's fixed builds.</summary>
+    public int OsAssessed { get; init; }
+    /// <summary>Windows devices that could not be assessed (no UBR in the inventory, or a build Microsoft does not list).</summary>
+    public int OsNotAssessed { get; init; }
+}
 
 /// <summary>Vulnerability data: CVE catalogue, KEV/EPSS enrichment, software mappings and the findings evaluation.</summary>
 public sealed class VulnStore(NpgsqlDataSource ds)
@@ -24,6 +30,17 @@ public sealed class VulnStore(NpgsqlDataSource ds)
         cmd.Parameters.AddWithValue("k", key);
         var v = await cmd.ExecuteScalarAsync(ct) as string;
         return v is null ? null : JsonDocument.Parse(v).RootElement.Clone();
+    }
+
+    public async Task SetSettingAsync(string key, string json, CancellationToken ct)
+    {
+        await using var cmd = ds.CreateCommand("""
+            INSERT INTO zentriq.system_settings (key, value) VALUES (@k, @v::jsonb)
+            ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()
+            """);
+        cmd.Parameters.AddWithValue("k", key);
+        cmd.Parameters.AddWithValue("v", json);
+        await cmd.ExecuteNonQueryAsync(ct);
     }
 
     public async Task<SlaDays> SlaAsync(CancellationToken ct)
@@ -231,10 +248,12 @@ public sealed class VulnStore(NpgsqlDataSource ds)
     public async Task<List<string>> CvesNeedingEpssAsync(int max, CancellationToken ct)
     {
         await using var cmd = ds.CreateCommand("""
-            SELECT DISTINCT c.cve_id FROM zentriq.vuln_cves c
-              JOIN zentriq.vuln_cpe_rules r ON r.cve_id = c.cve_id
-              JOIN zentriq.vuln_product_map m ON m.vendor = r.vendor AND m.product = r.product AND m.status IN ('auto','manual')
-             WHERE c.epss_date IS NULL OR c.epss_date < current_date - 1
+            SELECT c.cve_id FROM zentriq.vuln_cves c
+             WHERE (c.epss_date IS NULL OR c.epss_date < current_date - 1)
+               AND (EXISTS (SELECT 1 FROM zentriq.vuln_cpe_rules r
+                              JOIN zentriq.vuln_product_map m ON m.vendor = r.vendor AND m.product = r.product AND m.status IN ('auto','manual')
+                             WHERE r.cve_id = c.cve_id)
+                    OR EXISTS (SELECT 1 FROM zentriq.vuln_os_rules o WHERE o.cve_id = c.cve_id))
              LIMIT @n
             """);
         cmd.Parameters.AddWithValue("n", max);
@@ -244,15 +263,89 @@ public sealed class VulnStore(NpgsqlDataSource ds)
         return list;
     }
 
+    /// <summary>
+    /// Stores one monthly Microsoft document: CVEs are added or enriched (title, Microsoft severity, exploited) without
+    /// overwriting NVD data, and the month's Windows fixed builds replace those stored before for that month.
+    /// </summary>
+    public async Task<(int Cves, int Rules)> UpsertMsrcAsync(MsrcDocument doc, CancellationToken ct)
+    {
+        await using var conn = await ds.OpenConnectionAsync(ct);
+        await using var tx = await conn.BeginTransactionAsync(ct);
+        foreach (var c in doc.Cves)
+        {
+            await using var cmd = new NpgsqlCommand("""
+                INSERT INTO zentriq.vuln_cves (cve_id, published_at, status, title, description, cvss_version, cvss_score, cvss_vector, severity, cwes,
+                                               reference_urls, ms_severity, ms_exploited, ms_disclosed, updated_at)
+                VALUES (@id, @pub, 'Microsoft', @t, @d, @cv, @cs, @vec, @sev, @cwe, @refs, @ms, @ex, @di, now())
+                ON CONFLICT (cve_id) DO UPDATE SET
+                    title = EXCLUDED.title, ms_severity = EXCLUDED.ms_severity, ms_exploited = EXCLUDED.ms_exploited, ms_disclosed = EXCLUDED.ms_disclosed,
+                    published_at = COALESCE(vuln_cves.published_at, EXCLUDED.published_at),
+                    description = COALESCE(vuln_cves.description, EXCLUDED.description),
+                    cvss_version = COALESCE(vuln_cves.cvss_version, EXCLUDED.cvss_version),
+                    cvss_vector = COALESCE(vuln_cves.cvss_vector, EXCLUDED.cvss_vector),
+                    severity = CASE WHEN vuln_cves.cvss_score IS NULL THEN EXCLUDED.severity ELSE vuln_cves.severity END,
+                    cvss_score = COALESCE(vuln_cves.cvss_score, EXCLUDED.cvss_score),
+                    cwes = CASE WHEN cardinality(vuln_cves.cwes) = 0 THEN EXCLUDED.cwes ELSE vuln_cves.cwes END,
+                    reference_urls = CASE WHEN cardinality(vuln_cves.reference_urls) = 0 THEN EXCLUDED.reference_urls ELSE vuln_cves.reference_urls END,
+                    updated_at = now()
+                """, conn, tx);
+            cmd.Parameters.AddWithValue("id", c.Id);
+            cmd.Parameters.Add(Ts("pub", c.Published));
+            cmd.Parameters.Add(Txt("t", c.Title));
+            cmd.Parameters.Add(Txt("d", c.Description ?? c.Title));
+            cmd.Parameters.Add(Txt("cv", c.CvssScore is null ? null : c.CvssVector?.StartsWith("CVSS:4", StringComparison.Ordinal) == true ? "4.0" : "3.1"));
+            cmd.Parameters.Add(new NpgsqlParameter("cs", NpgsqlDbType.Numeric) { Value = (object?)c.CvssScore ?? DBNull.Value });
+            cmd.Parameters.Add(Txt("vec", c.CvssVector));
+            cmd.Parameters.AddWithValue("sev", VulnScoring.SeverityFor(c.CvssScore, c.MsSeverity));
+            cmd.Parameters.Add(new NpgsqlParameter("cwe", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = c.Cwes.ToArray() });
+            cmd.Parameters.Add(new NpgsqlParameter("refs", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = new[] { $"https://msrc.microsoft.com/update-guide/vulnerability/{c.Id}" } });
+            cmd.Parameters.Add(Txt("ms", c.MsSeverity));
+            cmd.Parameters.AddWithValue("ex", c.Exploited);
+            cmd.Parameters.AddWithValue("di", c.Disclosed);
+            await cmd.ExecuteNonQueryAsync(ct);
+        }
+        await using (var del = new NpgsqlCommand("DELETE FROM zentriq.vuln_os_rules WHERE month = @m", conn, tx))
+        {
+            del.Parameters.AddWithValue("m", doc.Id);
+            await del.ExecuteNonQueryAsync(ct);
+        }
+        var rules = 0;
+        await using (var copy = await conn.BeginBinaryImportAsync(
+            "COPY zentriq.vuln_os_rules (cve_id, month, product, product_key, fixed_build, kb, kb_url, supersedes, restart) FROM STDIN (FORMAT BINARY)", ct))
+        {
+            foreach (var c in doc.Cves)
+                foreach (var f in c.Fixes)
+                {
+                    await copy.StartRowAsync(ct);
+                    await copy.WriteAsync(c.Id, NpgsqlDbType.Text, ct);
+                    await copy.WriteAsync(doc.Id, NpgsqlDbType.Text, ct);
+                    await copy.WriteAsync(f.Product, NpgsqlDbType.Text, ct);
+                    await copy.WriteAsync(Msrc.Key(f.Product), NpgsqlDbType.Text, ct);
+                    await copy.WriteAsync(f.FixedBuild, NpgsqlDbType.Text, ct);
+                    if (f.Kb is null) await copy.WriteNullAsync(ct); else await copy.WriteAsync(f.Kb, NpgsqlDbType.Text, ct);
+                    if (f.KbUrl is null) await copy.WriteNullAsync(ct); else await copy.WriteAsync(f.KbUrl, NpgsqlDbType.Text, ct);
+                    if (f.Supersedes is null) await copy.WriteNullAsync(ct); else await copy.WriteAsync(f.Supersedes.Length > 200 ? f.Supersedes[..200] : f.Supersedes, NpgsqlDbType.Text, ct);
+                    if (f.Restart is null) await copy.WriteNullAsync(ct); else await copy.WriteAsync(f.Restart.Value, NpgsqlDbType.Boolean, ct);
+                    rules++;
+                }
+            await copy.CompleteAsync(ct);
+        }
+        await tx.CommitAsync(ct);
+        return (doc.Cves.Count, rules);
+    }
+
     // ---- evaluation ---------------------------------------------------------------------------------
 
     private sealed record Rule(string CveId, string? Version, string? StartIncl, string? StartExcl, string? EndIncl, string? EndExcl, decimal? Cvss, decimal? Epss, bool Kev, string Severity, DateOnly? KevDue);
-    private sealed record Match(Guid AssetId, string CveId, string Name, string Version, string Vendor, string Product, string? Fixed, string Priority, int Risk, string Severity, DateOnly? KevDue);
+    private sealed record OsRule(string CveId, string FixedBuild, string? Kb, decimal? Cvss, decimal? Epss, bool Exploited, string Severity, DateOnly? KevDue);
+    private sealed record Match(Guid AssetId, string CveId, string Name, string Version, string Vendor, string Product, string? Fixed, string Priority, int Risk,
+                                string Severity, DateOnly? KevDue, string Source = "software", string? Kb = null, string? Installed = null);
 
     /// <summary>
-    /// Matches installed software against the CVE rules of its mapped product and updates findings: new matches open
-    /// findings (due date from the SLA, or the CISA due date when earlier); findings whose software was removed or
-    /// updated are closed as fixed; a fixed finding that matches again is reopened; expired risk acceptances reopen.
+    /// Matches installed software against the CVE rules of its mapped product, and Windows devices against Microsoft's
+    /// fixed builds, then updates findings: new matches open findings (due date from the SLA, or the CISA due date when
+    /// earlier); findings no longer matched are closed as fixed (with a history entry); a fixed finding that matches
+    /// again is reopened; expired risk acceptances reopen. Findings being worked on keep their status and assignee.
     /// </summary>
     public async Task<EvaluationResult> EvaluateAsync(CancellationToken ct)
     {
@@ -260,12 +353,24 @@ public sealed class VulnStore(NpgsqlDataSource ds)
         await using (var now = ds.CreateCommand("SELECT now()")) started = new DateTimeOffset(DateTime.SpecifyKind((DateTime)(await now.ExecuteScalarAsync(ct))!, DateTimeKind.Utc));
         var sla = await SlaAsync(ct);
         var minCvss = await MinCvssAsync(ct);
+        var weighted = await SettingAsync("vuln.criticality_weight", ct) is not { ValueKind: JsonValueKind.False };
 
         await using (var expire = ds.CreateCommand("""
-            UPDATE zentriq.vuln_findings SET status = 'open', exception_reason = NULL, exception_until = NULL, exception_by = NULL, exception_at = NULL
-             WHERE status = 'accepted' AND exception_until IS NOT NULL AND exception_until < now()
+            WITH x AS (
+                UPDATE zentriq.vuln_findings SET status = 'open', status_changed_at = now(), exception_reason = NULL, exception_until = NULL, exception_by = NULL, exception_at = NULL
+                 WHERE status = 'accepted' AND exception_until IS NOT NULL AND exception_until < now() RETURNING id)
+            INSERT INTO zentriq.vuln_finding_events (finding_id, kind, text) SELECT id, 'status', 'Risk acceptance expired; reopened.' FROM x
             """))
             await expire.ExecuteNonQueryAsync(ct);
+
+        var factor = new Dictionary<Guid, decimal>();
+        if (weighted)
+        {
+            await using var cmd = ds.CreateCommand("SELECT id, criticality FROM zentriq.assets WHERE status = 'active' AND criticality <> 'Medium'");
+            await using var r = await cmd.ExecuteReaderAsync(ct);
+            while (await r.ReadAsync(ct)) factor[r.GetGuid(0)] = VulnScoring.CriticalityFactor(r.GetString(1));
+        }
+        decimal F(Guid asset) => factor.TryGetValue(asset, out var f) ? f : 1m;
 
         var mapping = new Dictionary<string, (string Vendor, string Product)>(StringComparer.Ordinal);
         await using (var cmd = ds.CreateCommand("SELECT software_key, vendor, product FROM zentriq.vuln_product_map WHERE status IN ('auto','manual') AND vendor IS NOT NULL AND product IS NOT NULL"))
@@ -290,7 +395,7 @@ public sealed class VulnStore(NpgsqlDataSource ds)
             var rules = new List<Rule>();
             await using (var cmd = ds.CreateCommand("""
                 SELECT r.cve_id, r.version, r.version_start_incl, r.version_start_excl, r.version_end_incl, r.version_end_excl,
-                       c.cvss_score, c.epss, c.kev, COALESCE(c.severity, 'none'), c.kev_due
+                       c.cvss_score, c.epss, c.kev OR c.ms_exploited, COALESCE(c.severity, 'none'), c.kev_due
                   FROM zentriq.vuln_cpe_rules r JOIN zentriq.vuln_cves c ON c.cve_id = r.cve_id
                  WHERE r.vendor = @v AND r.product = @p AND r.part = 'a'
                    AND COALESCE(c.status, '') NOT IN ('Rejected', 'REJECTED')
@@ -329,8 +434,62 @@ public sealed class VulnStore(NpgsqlDataSource ds)
                         var key = (asset, rule.CveId, name, version);
                         if (matches.ContainsKey(key)) continue;
                         matches[key] = new Match(asset, rule.CveId, name, version, vendor, product, rule.EndExcl,
-                            VulnScoring.Priority(rule.Cvss, rule.Epss, rule.Kev), VulnScoring.Risk(rule.Cvss, rule.Epss, rule.Kev), rule.Severity, rule.KevDue);
+                            VulnScoring.Priority(rule.Cvss, rule.Epss, rule.Kev), VulnScoring.Risk(rule.Cvss, rule.Epss, rule.Kev, F(asset)), rule.Severity, rule.KevDue);
                     }
+                }
+            }
+        }
+
+        // ---- Windows: device build vs. Microsoft fixed builds ----------------------------------------------
+        var osRules = new Dictionary<string, List<OsRule>>(StringComparer.Ordinal);
+        await using (var cmd = ds.CreateCommand("""
+            SELECT o.product_key, o.cve_id, o.fixed_build, o.kb, c.cvss_score, c.epss, c.kev OR c.ms_exploited, COALESCE(c.severity, 'none'), c.kev_due
+              FROM zentriq.vuln_os_rules o JOIN zentriq.vuln_cves c ON c.cve_id = o.cve_id
+             WHERE o.fixed_build IS NOT NULL AND (c.cvss_score IS NULL OR c.cvss_score >= @min)
+            """))
+        {
+            cmd.Parameters.AddWithValue("min", minCvss);
+            await using var r = await cmd.ExecuteReaderAsync(ct);
+            while (await r.ReadAsync(ct))
+            {
+                var pk = r.GetString(0);
+                if (!osRules.TryGetValue(pk, out var list)) osRules[pk] = list = [];
+                list.Add(new OsRule(r.GetString(1), r.GetString(2), r.IsDBNull(3) ? null : r.GetString(3), r.IsDBNull(4) ? null : r.GetDecimal(4),
+                    r.IsDBNull(5) ? null : r.GetDecimal(5), r.GetBoolean(6), r.GetString(7), r.IsDBNull(8) ? null : r.GetFieldValue<DateOnly>(8)));
+            }
+        }
+        int osAssessed = 0, osNotAssessed = 0;
+        var keepOs = new List<Guid>();      // Windows devices not assessable now: keep their OS findings as they are
+        if (osRules.Count > 0)
+        {
+            await using var cmd = ds.CreateCommand("""
+                SELECT a.id, COALESCE(d.document #>> '{os,name}', a.os_name, 'Windows'), d.document #>> '{os,version}', d.document #>> '{os,ubr}',
+                       d.document #>> '{os,architecture}', d.document #>> '{os,isServer}', d.document #>> '{os,installationType}'
+                  FROM zentriq.assets a JOIN zentriq.asset_inventory_documents d ON d.asset_id = a.id
+                 WHERE a.status = 'active' AND d.document #>> '{os,family}' = 'windows'
+                """);
+            await using var r = await cmd.ExecuteReaderAsync(ct);
+            while (await r.ReadAsync(ct))
+            {
+                string? S(int i) => r.IsDBNull(i) ? null : r.GetString(i);
+                var asset = r.GetGuid(0);
+                var osName = r.GetString(1);
+                var version = S(2);
+                var ubr = int.TryParse(S(3), NumberStyles.Integer, CultureInfo.InvariantCulture, out var u) ? u : (int?)null;
+                var product = Msrc.ProductFor(version, S(5) is { } srv ? srv == "true" : null, S(4), S(6), osName);
+                var build = Msrc.FullBuild(version, ubr);
+                if (product is null || build is null || !osRules.TryGetValue(Msrc.Key(product), out var rules)) { osNotAssessed++; keepOs.Add(asset); continue; }
+                osAssessed++;
+                var baseBuild = Msrc.BaseBuild(build);
+                // Per CVE the highest fixed build of this build line (a re-released fix supersedes the first one).
+                foreach (var g in rules.Where(x => Msrc.BaseBuild(x.FixedBuild) == baseBuild).GroupBy(x => x.CveId))
+                {
+                    var rule = g.Aggregate((a, b) => VersionComparer.Compare(a.FixedBuild, b.FixedBuild) >= 0 ? a : b);
+                    if (!Msrc.IsVulnerable(build, rule.FixedBuild)) continue;
+                    var key = (asset, rule.CveId, osName, baseBuild);
+                    matches[key] = new Match(asset, rule.CveId, osName, baseBuild, "microsoft", product, rule.FixedBuild,
+                        VulnScoring.Priority(rule.Cvss, rule.Epss, rule.Exploited), VulnScoring.Risk(rule.Cvss, rule.Epss, rule.Exploited, F(asset)),
+                        rule.Severity, rule.KevDue, "os", rule.Kb, build);
                 }
             }
         }
@@ -341,10 +500,10 @@ public sealed class VulnStore(NpgsqlDataSource ds)
             await using var tx = await conn.BeginTransactionAsync(ct);
             await using (var create = new NpgsqlCommand("""
                 CREATE TEMP TABLE vf_new (asset_id uuid, cve_id text, name text, version text, vendor text, product text, fixed text,
-                                          priority text, risk int, severity text, kev_due date) ON COMMIT DROP
+                                          priority text, risk int, severity text, kev_due date, source text, kb text, installed text) ON COMMIT DROP
                 """, conn, tx))
                 await create.ExecuteNonQueryAsync(ct);
-            await using (var copy = await conn.BeginBinaryImportAsync("COPY vf_new (asset_id, cve_id, name, version, vendor, product, fixed, priority, risk, severity, kev_due) FROM STDIN (FORMAT BINARY)", ct))
+            await using (var copy = await conn.BeginBinaryImportAsync("COPY vf_new (asset_id, cve_id, name, version, vendor, product, fixed, priority, risk, severity, kev_due, source, kb, installed) FROM STDIN (FORMAT BINARY)", ct))
             {
                 foreach (var m in matches.Values)
                 {
@@ -360,24 +519,33 @@ public sealed class VulnStore(NpgsqlDataSource ds)
                     await copy.WriteAsync(m.Risk, NpgsqlDbType.Integer, ct);
                     await copy.WriteAsync(m.Severity, NpgsqlDbType.Text, ct);
                     if (m.KevDue is null) await copy.WriteNullAsync(ct); else await copy.WriteAsync(m.KevDue.Value, NpgsqlDbType.Date, ct);
+                    await copy.WriteAsync(m.Source, NpgsqlDbType.Text, ct);
+                    if (m.Kb is null) await copy.WriteNullAsync(ct); else await copy.WriteAsync(m.Kb, NpgsqlDbType.Text, ct);
+                    if (m.Installed is null) await copy.WriteNullAsync(ct); else await copy.WriteAsync(m.Installed, NpgsqlDbType.Text, ct);
                 }
                 await copy.CompleteAsync(ct);
             }
             await using (var upsert = new NpgsqlCommand("""
                 WITH up AS (
                     INSERT INTO zentriq.vuln_findings AS f (asset_id, cve_id, software_name, software_version, vendor, product, fixed_version, status, priority, risk_score,
-                                                           first_seen_at, last_seen_at, due_at)
+                                                           first_seen_at, last_seen_at, due_at, source, kb, installed_version)
                     SELECT n.asset_id, n.cve_id, n.name, n.version, n.vendor, n.product, n.fixed, 'open', n.priority, n.risk, now(), now(),
                            LEAST(now() + make_interval(days => CASE n.severity WHEN 'critical' THEN @dc WHEN 'high' THEN @dh WHEN 'medium' THEN @dm ELSE @dl END),
-                                 n.kev_due::timestamptz + interval '1 day' - interval '1 second')
+                                 n.kev_due::timestamptz + interval '1 day' - interval '1 second'),
+                           n.source, n.kb, n.installed
                       FROM vf_new n
                     ON CONFLICT (asset_id, cve_id, software_name, software_version) DO UPDATE SET
                         last_seen_at = now(), priority = EXCLUDED.priority, risk_score = EXCLUDED.risk_score, fixed_version = EXCLUDED.fixed_version,
+                        kb = EXCLUDED.kb, installed_version = EXCLUDED.installed_version, source = EXCLUDED.source,
                         status = CASE WHEN f.status = 'fixed' THEN 'open' ELSE f.status END,
+                        status_changed_at = CASE WHEN f.status = 'fixed' THEN now() ELSE f.status_changed_at END,
                         fixed_at = CASE WHEN f.status = 'fixed' THEN NULL ELSE f.fixed_at END,
                         first_seen_at = CASE WHEN f.status = 'fixed' THEN now() ELSE f.first_seen_at END,
                         due_at = CASE WHEN f.status = 'fixed' THEN EXCLUDED.due_at ELSE LEAST(f.due_at, EXCLUDED.due_at) END
-                    RETURNING (xmax = 0) AS inserted, f.first_seen_at >= @started AS fresh)
+                    RETURNING f.id, (xmax = 0) AS inserted, f.first_seen_at >= @started AS fresh),
+                ev AS (
+                    INSERT INTO zentriq.vuln_finding_events (finding_id, kind, text)
+                    SELECT id, 'system', 'Detected again after it had been fixed; reopened.' FROM up WHERE NOT inserted AND fresh)
                 SELECT count(*) FILTER (WHERE inserted), count(*) FILTER (WHERE NOT inserted AND fresh) FROM up
                 """, conn, tx))
             {
@@ -390,19 +558,26 @@ public sealed class VulnStore(NpgsqlDataSource ds)
                 if (await r.ReadAsync(ct)) { added = (int)r.GetInt64(0); reopened = (int)r.GetInt64(1); }
             }
             await using (var fix = new NpgsqlCommand("""
-                UPDATE zentriq.vuln_findings f SET status = 'fixed', fixed_at = now()
-                  FROM zentriq.assets a
-                 WHERE a.id = f.asset_id AND a.status = 'active' AND f.status IN ('open','accepted') AND f.last_seen_at < @started
+                WITH fx AS (
+                    UPDATE zentriq.vuln_findings f SET status = 'fixed', fixed_at = now(), status_changed_at = now()
+                      FROM zentriq.assets a
+                     WHERE a.id = f.asset_id AND a.status = 'active' AND f.status IN ('open','in_progress','accepted') AND f.last_seen_at < @started
+                       AND NOT (f.source = 'os' AND f.asset_id = ANY(@keep))
+                    RETURNING f.id, f.source)
+                INSERT INTO zentriq.vuln_finding_events (finding_id, kind, text)
+                SELECT id, 'system', CASE WHEN source = 'os' THEN 'Fixed: the device now has the Windows update that fixes it.'
+                                          ELSE 'Fixed: the vulnerable version is no longer installed.' END FROM fx
                 """, conn, tx))
             {
                 fix.Parameters.AddWithValue("started", started);
+                fix.Parameters.Add(new NpgsqlParameter("keep", NpgsqlDbType.Array | NpgsqlDbType.Uuid) { Value = keepOs.ToArray() });
                 fixedCount = await fix.ExecuteNonQueryAsync(ct);
             }
             await tx.CommitAsync(ct);
         }
-        await using var openCmd = ds.CreateCommand("SELECT count(*) FROM zentriq.vuln_findings WHERE status = 'open'");
+        await using var openCmd = ds.CreateCommand("SELECT count(*) FROM zentriq.vuln_findings WHERE status IN ('open','in_progress')");
         var open = Convert.ToInt32(await openCmd.ExecuteScalarAsync(ct), CultureInfo.InvariantCulture);
-        return new EvaluationResult(namesByProduct.Count, installs, open, added, fixedCount, reopened);
+        return new EvaluationResult(namesByProduct.Count, installs, open, added, fixedCount, reopened) { OsAssessed = osAssessed, OsNotAssessed = osNotAssessed };
     }
 
     private static NpgsqlParameter Txt(string n, string? v) => new(n, NpgsqlDbType.Text) { Value = (object?)v ?? DBNull.Value };

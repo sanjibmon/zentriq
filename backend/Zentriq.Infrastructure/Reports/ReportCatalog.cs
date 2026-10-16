@@ -5,7 +5,8 @@ public enum ReportColumnType { Text, Number, Date, YesNo }
 /// <summary>One selectable report column: a fixed SQL expression (never user input), a label and a type.</summary>
 public sealed record ReportColumn(string Key, string Label, ReportColumnType Type, string Expr, string? Group = null);
 
-public sealed record ReportDataset(string Key, string Name, string Description, string From, IReadOnlyList<ReportColumn> Columns)
+/// <summary>A data source. <paramref name="Permission"/>: extra permission needed to use it (besides viewing assets).</summary>
+public sealed record ReportDataset(string Key, string Name, string Description, string From, IReadOnlyList<ReportColumn> Columns, string? Permission = null)
 {
     public ReportColumn? Column(string key) => Columns.FirstOrDefault(c => c.Key == key);
 }
@@ -67,7 +68,12 @@ public static class ReportCatalog
                 new("offline_days", "Days offline", ReportColumnType.Number, $"floor(extract(epoch FROM now() - {LastContact}) / 86400)::int", "Coverage"),
                 new("last_inventory", "Last inventory", ReportColumnType.Date, "a.last_inventory_at", "Coverage"),
                 new("software_count", "Applications", ReportColumnType.Number, "(SELECT count(*) FROM zentriq.software_inventory s WHERE s.asset_id = a.id)", "Software"),
-                new("open_vulns", "Open vulnerabilities", ReportColumnType.Number, "(SELECT count(*) FROM zentriq.vuln_findings f WHERE f.asset_id = a.id AND f.status = 'open')", "Security"),
+                new("open_vulns", "Open vulnerabilities", ReportColumnType.Number, "(SELECT count(*) FROM zentriq.vuln_findings f WHERE f.asset_id = a.id AND f.status IN ('open','in_progress'))", "Security"),
+                new("critical_vulns", "Critical vulnerabilities", ReportColumnType.Number, "(SELECT count(*) FROM zentriq.vuln_findings f JOIN zentriq.vuln_cves c ON c.cve_id = f.cve_id WHERE f.asset_id = a.id AND f.status IN ('open','in_progress') AND c.severity = 'critical')", "Security"),
+                new("vuln_risk", "Vulnerability risk (sum)", ReportColumnType.Number, "(SELECT COALESCE(sum(f.risk_score), 0) FROM zentriq.vuln_findings f WHERE f.asset_id = a.id AND f.status IN ('open','in_progress'))", "Security"),
+                new("os_build", "OS build", ReportColumnType.Text, "(d.document #>> '{os,version}') || COALESCE('.' || (d.document #>> '{os,ubr}'), '')", "Device"),
+                new("feature_update", "Feature update", ReportColumnType.Text, "d.document #>> '{os,displayVersion}'", "Device"),
+                new("last_boot", "Last boot", ReportColumnType.Date, "(d.document #>> '{os,lastBoot}')::timestamptz", "Device"),
             ]),
 
         new("hardware", "Hardware", "One row per device with hardware inventory.",
@@ -153,7 +159,7 @@ public static class ReportCatalog
                 new("completed_at", "Completed", ReportColumnType.Date, "x.completed_at", "Action"),
             ]),
 
-        new("vulnerabilities", "Vulnerability findings", "One row per vulnerability found on a device.",
+        new("vulnerabilities", "Vulnerability findings", "One row per vulnerability found on a device (software and Windows).",
             """
             zentriq.vuln_findings f
             JOIN zentriq.vuln_cves c ON c.cve_id = f.cve_id
@@ -164,6 +170,10 @@ public static class ReportCatalog
             """,
             [
                 new("cve", "CVE", ReportColumnType.Text, "f.cve_id", "Vulnerability"),
+                new("title", "Title", ReportColumnType.Text, "c.title", "Vulnerability"),
+                new("source", "Found in", ReportColumnType.Text, "CASE f.source WHEN 'os' THEN 'os' ELSE 'software' END", "Vulnerability"),
+                new("exploited", "Known exploited", ReportColumnType.YesNo, "CASE WHEN c.kev OR c.ms_exploited THEN 'yes' ELSE 'no' END", "Vulnerability"),
+                new("ms_severity", "Microsoft severity", ReportColumnType.Text, "c.ms_severity", "Vulnerability"),
                 new("priority", "Priority", ReportColumnType.Text, "f.priority", "Vulnerability"),
                 new("severity", "Severity", ReportColumnType.Text, "c.severity", "Vulnerability"),
                 new("cvss", "CVSS", ReportColumnType.Number, "c.cvss_score", "Vulnerability"),
@@ -173,17 +183,81 @@ public static class ReportCatalog
                 new("risk", "Risk score", ReportColumnType.Number, "f.risk_score", "Vulnerability"),
                 new("description", "Description", ReportColumnType.Text, "left(c.description, 400)", "Vulnerability"),
                 new("software", "Software", ReportColumnType.Text, "f.software_name", "Affected"),
-                new("version", "Installed version", ReportColumnType.Text, "f.software_version", "Affected"),
+                new("version", "Installed version", ReportColumnType.Text, "COALESCE(f.installed_version, f.software_version)", "Affected"),
+                new("installed_version", "Installed build", ReportColumnType.Text, "f.installed_version", "Affected"),
                 new("fixed_version", "Fixed in", ReportColumnType.Text, "f.fixed_version", "Affected"),
+                new("kb", "Windows update (KB)", ReportColumnType.Text, "CASE WHEN f.kb IS NOT NULL THEN 'KB' || f.kb END", "Affected"),
                 .. DeviceColumns,
                 new("status", "Status", ReportColumnType.Text, "f.status", "Remediation"),
+                new("assignee", "Assigned to", ReportColumnType.Text, "(SELECT u.display_name FROM zentriq.users u WHERE u.id = f.assignee_id)", "Remediation"),
+                new("ticket", "Ticket", ReportColumnType.Text, "f.ticket", "Remediation"),
                 new("first_seen", "First seen", ReportColumnType.Date, "f.first_seen_at", "Remediation"),
+                new("age_days", "Age (days)", ReportColumnType.Number, "floor(extract(epoch FROM COALESCE(f.fixed_at, now()) - f.first_seen_at) / 86400)::int", "Remediation"),
+                new("age_bucket", "Age", ReportColumnType.Text,
+                    "CASE WHEN now() - f.first_seen_at <= interval '30 days' THEN '0–30 days' WHEN now() - f.first_seen_at <= interval '60 days' THEN '31–60 days' WHEN now() - f.first_seen_at <= interval '90 days' THEN '61–90 days' WHEN now() - f.first_seen_at <= interval '180 days' THEN '91–180 days' ELSE 'Over 180 days' END", "Remediation"),
                 new("due_at", "Due", ReportColumnType.Date, "f.due_at", "Remediation"),
-                new("overdue", "Overdue", ReportColumnType.YesNo, "CASE WHEN f.status = 'open' AND f.due_at < now() THEN 'yes' ELSE 'no' END", "Remediation"),
+                new("overdue", "Overdue", ReportColumnType.YesNo, "CASE WHEN f.status IN ('open','in_progress') AND f.due_at < now() THEN 'yes' ELSE 'no' END", "Remediation"),
                 new("fixed_at", "Fixed", ReportColumnType.Date, "f.fixed_at", "Remediation"),
                 new("exception_reason", "Exception reason", ReportColumnType.Text, "f.exception_reason", "Remediation"),
                 new("exception_until", "Exception until", ReportColumnType.Date, "f.exception_until", "Remediation"),
+            ], Permission: "vuln.view"),
+
+        new("software_titles", "Software titles", "One row per application title: publisher, devices, versions in use.",
+            """
+            (SELECT s.name, min(s.publisher) AS publisher, count(DISTINCT s.asset_id) AS devices, count(DISTINCT s.version) AS versions,
+                    (array_agg(s.version ORDER BY zentriq.version_key(s.version) DESC NULLS LAST))[1] AS latest_version,
+                    (array_agg(s.version ORDER BY zentriq.version_key(s.version) ASC NULLS LAST))[1] AS oldest_version,
+                    min(s.installed_on) AS first_installed, max(s.installed_on) AS last_installed
+               FROM zentriq.software_inventory s JOIN zentriq.assets a ON a.id = s.asset_id
+              WHERE a.status = 'active'
+              GROUP BY s.name) st
+            """,
+            [
+                new("software", "Software", ReportColumnType.Text, "st.name", "Software"),
+                new("publisher", "Publisher", ReportColumnType.Text, "st.publisher", "Software"),
+                new("devices", "Devices", ReportColumnType.Number, "st.devices", "Usage"),
+                new("versions", "Versions in use", ReportColumnType.Number, "st.versions", "Usage"),
+                new("latest_version", "Newest version", ReportColumnType.Text, "st.latest_version", "Usage"),
+                new("oldest_version", "Oldest version", ReportColumnType.Text, "st.oldest_version", "Usage"),
+                new("first_installed", "First installed", ReportColumnType.Date, "st.first_installed::timestamptz", "Usage"),
+                new("last_installed", "Last installed", ReportColumnType.Date, "st.last_installed::timestamptz", "Usage"),
+                new("open_vulns", "Open vulnerabilities", ReportColumnType.Number,
+                    "(SELECT count(*) FROM zentriq.vuln_findings f WHERE f.software_name = st.name AND f.status IN ('open','in_progress'))", "Security"),
             ]),
+
+        new("discovery", "Discovery results", "One row per address checked by a discovery scan.",
+            """
+            zentriq.scan_results r
+            JOIN zentriq.discovery_scans sc ON sc.id = r.scan_id
+            """,
+            [
+                new("scan", "Scan", ReportColumnType.Text, "sc.name", "Scan"),
+                new("scan_number", "Scan number", ReportColumnType.Number, "sc.number", "Scan"),
+                new("scan_type", "Scan type", ReportColumnType.Text, "sc.scan_type", "Scan"),
+                new("started", "Scan started", ReportColumnType.Date, "COALESCE(sc.started_at, sc.created_at)", "Scan"),
+                new("target", "Target", ReportColumnType.Text, "r.target", "Result"),
+                new("ip", "IP address", ReportColumnType.Text, "host(r.ip_address)", "Result"),
+                new("hostname", "Hostname", ReportColumnType.Text, "r.hostname", "Result"),
+                new("result", "Result", ReportColumnType.Text, "r.status", "Result"),
+                new("protocol", "Protocol", ReportColumnType.Text, "r.protocol", "Result"),
+                new("open_ports", "Open ports", ReportColumnType.Text, "array_to_string(r.open_ports, ', ')", "Result"),
+                new("detail", "Detail", ReportColumnType.Text, "r.detail", "Result"),
+                new("asset_created", "New device", ReportColumnType.YesNo, "CASE WHEN r.asset_created THEN 'yes' ELSE 'no' END", "Result"),
+                new("duration_ms", "Duration (ms)", ReportColumnType.Number, "r.duration_ms", "Result"),
+                new("recorded", "Checked at", ReportColumnType.Date, "r.recorded_at", "Result"),
+            ]),
+
+        new("audit", "Audit trail", "Administrative actions recorded in the tamper-evident audit log.",
+            "zentriq.audit_events e",
+            [
+                new("at", "Time", ReportColumnType.Date, "e.occurred_at", "Event"),
+                new("user", "User", ReportColumnType.Text, "e.actor_name", "Event"),
+                new("action", "Action", ReportColumnType.Text, "e.action", "Event"),
+                new("target", "Target", ReportColumnType.Text, "e.target", "Event"),
+                new("ip", "IP address", ReportColumnType.Text, "e.source_ip", "Event"),
+                new("result", "Result", ReportColumnType.Text, "e.outcome", "Event"),
+                new("detail", "Detail", ReportColumnType.Text, "left(e.detail::text, 500)", "Event"),
+            ], Permission: "audit.view"),
     ];
 
     public static ReportDataset? Find(string key) => Datasets.FirstOrDefault(d => d.Key == key);

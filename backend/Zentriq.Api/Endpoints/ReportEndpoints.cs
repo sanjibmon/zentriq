@@ -25,11 +25,18 @@ public static class ReportEndpoints
     {
         var g = api.MapGroup("/reports").WithTags("Reports").RequireModule(Modules.Reports).RequireAuthorization(Permissions.AssetsView);
 
-        g.MapGet("/datasets", () => Results.Ok(ReportCatalog.Datasets.Select(d => new
+        g.MapGet("/datasets", (RequestContext rc) => Results.Ok(new
         {
-            d.Key, d.Name, d.Description,
-            columns = d.Columns.Select(c => new { c.Key, c.Label, type = c.Type.ToString().ToLowerInvariant(), group = c.Group }),
-        })));
+            datasets = ReportCatalog.Datasets.Where(d => CanUse(d, rc)).Select(d => new
+            {
+                d.Key, d.Name, d.Description,
+                columns = d.Columns.Select(c => new { c.Key, c.Label, type = c.Type.ToString().ToLowerInvariant(), group = c.Group }),
+            }),
+            aggregates = ReportEngine.AggregateFunctions,
+            dateBuckets = ReportEngine.DateBuckets,
+            charts = ReportEngine.Charts,
+            formats = new[] { "xlsx", "csv", "pdf" },
+        }));
 
         g.MapGet("", async (NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
         {
@@ -46,6 +53,7 @@ public static class ReportEndpoints
             await using var r = await cmd.ExecuteReaderAsync(ct);
             while (await r.ReadAsync(ct))
             {
+                if (ReportCatalog.Find(r.GetString(3)) is not { } dsx || !CanUse(dsx, rc)) continue;
                 var schedule = r.IsDBNull(9) ? null : JsonSerializer.Deserialize<ReportSchedule>(r.GetString(9));
                 list.Add(new
                 {
@@ -71,6 +79,7 @@ public static class ReportEndpoints
             cmd.Parameters.Add(new NpgsqlParameter("me", NpgsqlDbType.Uuid) { Value = (object?)rc.UserId ?? DBNull.Value });
             await using var r = await cmd.ExecuteReaderAsync(ct);
             if (!await r.ReadAsync(ct)) return Results.NotFound();
+            if (Denied(r.GetString(2), rc) is { } denied) return denied;
             return Results.Ok(new
             {
                 id, name = r.GetString(0), description = r.IsDBNull(1) ? null : r.GetString(1), dataset = r.GetString(2),
@@ -79,8 +88,9 @@ public static class ReportEndpoints
             });
         });
 
-        g.MapPost("/run", async (RunBody body, NpgsqlDataSource ds, CancellationToken ct) =>
+        g.MapPost("/run", async (RunBody body, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
         {
+            if (Denied(body.Dataset, rc) is { } denied) return denied;
             try
             {
                 var result = await ReportEngine.RunAsync(ds, body.Dataset, body.Definition, Math.Clamp(body.Limit ?? 500, 1, 5000), ct);
@@ -91,12 +101,13 @@ public static class ReportEndpoints
 
         g.MapPost("/export", async (ExportBody body, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
         {
-            var format = body.Format == "csv" ? "csv" : "xlsx";
+            if (Denied(body.Dataset, rc) is { } denied) return denied;
+            var format = body.Format is "csv" or "pdf" ? body.Format : "xlsx";
             var name = string.IsNullOrWhiteSpace(body.Name) ? ReportCatalog.Find(body.Dataset)?.Name ?? "Report" : body.Name.Trim();
             ReportResult result;
-            try { result = await ReportEngine.RunAsync(ds, body.Dataset, body.Definition, ReportDelivery.MaxExportRows, ct); }
+            try { result = await ReportEngine.RunAsync(ds, body.Dataset, body.Definition, format == "pdf" ? PdfWriter.MaxPdfRows : ReportDelivery.MaxExportRows, ct); }
             catch (ReportValidationException ex) { return Validation.Problem("definition", ex.Message); }
-            var (content, fileName, contentType) = ReportDelivery.Render(name, format, result);
+            var (content, fileName, contentType) = ReportDelivery.Render(name, format, result, chart: body.Definition.Chart);
             await rc.AuditAsync("report.export", name, detail: new { body.Dataset, format, rows = result.Rows.Count });
             return Results.File(content, contentType, fileName);
         }).RequireAuthorization(Permissions.ReportsExport);
@@ -156,7 +167,7 @@ public static class ReportEndpoints
             cmd.Parameters.AddWithValue("id", id);
             cmd.Parameters.Add(new NpgsqlParameter("s", NpgsqlDbType.Text) { Value = body.Schedule is null ? DBNull.Value : JsonSerializer.Serialize(body.Schedule) });
             cmd.Parameters.Add(new NpgsqlParameter("r", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = recipients });
-            cmd.Parameters.AddWithValue("f", body.Format == "csv" ? "csv" : "xlsx");
+            cmd.Parameters.AddWithValue("f", body.Format is "csv" or "pdf" ? body.Format : "xlsx");
             cmd.Parameters.Add(new NpgsqlParameter("n", NpgsqlDbType.TimestampTz) { Value = (object?)next ?? DBNull.Value });
             cmd.Parameters.Add(new NpgsqlParameter("me", NpgsqlDbType.Uuid) { Value = (object?)rc.UserId ?? DBNull.Value });
             await cmd.ExecuteNonQueryAsync(ct);
@@ -166,11 +177,12 @@ public static class ReportEndpoints
 
         g.MapPost("/{id:guid}/send", async (Guid id, NpgsqlDataSource ds, JobQueue jobs, RequestContext rc, CancellationToken ct) =>
         {
-            await using (var cmd = ds.CreateCommand("SELECT 1 FROM zentriq.report_definitions WHERE id = @id AND (system OR shared OR owner_id = @me)"))
+            await using (var cmd = ds.CreateCommand("SELECT dataset FROM zentriq.report_definitions WHERE id = @id AND (system OR shared OR owner_id = @me)"))
             {
                 cmd.Parameters.AddWithValue("id", id);
                 cmd.Parameters.Add(new NpgsqlParameter("me", NpgsqlDbType.Uuid) { Value = (object?)rc.UserId ?? DBNull.Value });
-                if (await cmd.ExecuteScalarAsync(ct) is null) return Results.NotFound();
+                if (await cmd.ExecuteScalarAsync(ct) is not string dataset) return Results.NotFound();
+                if (Denied(dataset, rc) is { } denied) return denied;
             }
             var jobId = await jobs.EnqueueAsync(new EnqueueRequest(JobTypes.ReportDeliver, new { reportId = id, trigger = "manual", requestedBy = rc.UserId },
                 MaxAttempts: 1, TimeoutSeconds: 1800, CreatedBy: rc.UserId), ct: ct);
@@ -214,15 +226,16 @@ public static class ReportEndpoints
         g.MapGet("/runs/{id:guid}/file", async (Guid id, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
         {
             await using var cmd = ds.CreateCommand("""
-                SELECT x.file_name, x.format, x.content FROM zentriq.report_runs x LEFT JOIN zentriq.report_definitions d ON d.id = x.report_id
+                SELECT x.file_name, x.format, x.content, d.dataset FROM zentriq.report_runs x LEFT JOIN zentriq.report_definitions d ON d.id = x.report_id
                  WHERE x.id = @id AND x.content IS NOT NULL AND (d.id IS NULL OR d.system OR d.shared OR d.owner_id = @me)
                 """);
             cmd.Parameters.AddWithValue("id", id);
             cmd.Parameters.Add(new NpgsqlParameter("me", NpgsqlDbType.Uuid) { Value = (object?)rc.UserId ?? DBNull.Value });
             await using var r = await cmd.ExecuteReaderAsync(ct);
             if (!await r.ReadAsync(ct)) return Results.NotFound();
-            var type = r.GetString(1) == "csv" ? "text/csv" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-            return Results.File(r.GetFieldValue<byte[]>(2), type, r.GetString(0));
+            if (!r.IsDBNull(3) && Denied(r.GetString(3), rc) is { } denied) return denied;
+            await rc.AuditAsync("report.download", r.GetString(0));
+            return Results.File(r.GetFieldValue<byte[]>(2), ReportDelivery.ContentType(r.GetString(1)), r.GetString(0));
         }).RequireAuthorization(Permissions.ReportsExport);
     }
 
@@ -233,10 +246,17 @@ public static class ReportEndpoints
         if (body.Shared && !rc.Has(Permissions.DashboardsShare) && !rc.Has(Permissions.SettingsManage)) return Validation.Problem("shared", "You do not have permission to share reports.");
         var ds = ReportCatalog.Find(body.Dataset);
         if (ds is null) return Validation.Problem("dataset", "Choose a dataset.");
+        if (!CanUse(ds, rc)) return Results.Problem(statusCode: 403, title: $"You do not have permission to use the {ds.Name} data source.");
         try { ReportEngine.Validate(ds, body.Definition); }
         catch (ReportValidationException ex) { return Validation.Problem("definition", ex.Message); }
         return null;
     }
+
+    /// <summary>Data sources with their own permission (vulnerabilities, audit trail) need it, or administrator rights.</summary>
+    internal static bool CanUse(ReportDataset d, RequestContext rc) => d.Permission is null || rc.Has(d.Permission) || rc.Has(Permissions.SettingsManage);
+
+    private static IResult? Denied(string dataset, RequestContext rc) =>
+        ReportCatalog.Find(dataset) is { } d && !CanUse(d, rc) ? Results.Problem(statusCode: 403, title: $"You do not have permission to use the {d.Name} data source.") : null;
 
     private static void Fill(NpgsqlCommand cmd, ReportBody body, RequestContext rc)
     {

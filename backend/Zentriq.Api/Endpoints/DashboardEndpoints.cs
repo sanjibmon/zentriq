@@ -15,7 +15,8 @@ public static class DashboardEndpoints
     public static readonly string[] WidgetTypes =
         ["kpi.assets", "assets.byCategory", "assets.byOs", "assets.byInventory", "assets.byCriticality", "scans.recent", "jobs.active", "license.status", "license.usage",
          "kpi.tiles", "assets.category", "assets.type", "assets.coverage", "assets.trend", "assets.os", "assets.seen", "security.posture", "agents.health",
-         "software.top", "hw.vendor", "hw.cores", "hw.cpu", "hw.ram", "hw.disk", "hw.free", "scans.results", "scans.recent", "license.usage"];
+         "software.top", "hw.vendor", "hw.cores", "hw.cpu", "hw.ram", "hw.disk", "hw.free", "scans.results", "scans.recent", "license.usage",
+         "report", "vuln.severity", "vuln.aging"];
 
     public static void MapDashboardEndpoints(this RouteGroupBuilder api)
     {
@@ -81,6 +82,9 @@ public static class DashboardEndpoints
         {
             if (!WidgetTypes.Contains(w.Type)) return Validation.Problem("widgets", $"Unknown widget type '{w.Type}'.");
             if (w.Width is < 1 or > 12 || w.Height is < 1 or > 6) return Validation.Problem("widgets", "Widget size is out of range.");
+            // A pinned report stores the report id; the report itself is checked when the widget runs it.
+            if (w.Type == "report" && !(w.Settings is { ValueKind: JsonValueKind.Object } st && st.TryGetProperty("reportId", out var rid) && rid.ValueKind == JsonValueKind.String && Guid.TryParse(rid.GetString(), out _)))
+                return Validation.Problem("widgets", "A report widget needs the report to show.");
         }
         if (b.RefreshSeconds is not (0 or 60 or 300 or 900)) return Validation.Problem("refreshSeconds", "Unsupported refresh interval.");
         return null;
