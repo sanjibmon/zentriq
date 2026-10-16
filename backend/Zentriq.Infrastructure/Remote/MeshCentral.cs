@@ -79,7 +79,10 @@ public sealed class MeshControlClient : IAsyncDisposable
         // The server is on this machine (loopback); its certificate is MeshCentral's own self-signed one.
         c._ws.Options.RemoteCertificateValidationCallback = (_, _, _, errors) => errors == System.Net.Security.SslPolicyErrors.None || baseUrl.IsLoopback;
         c._ws.Options.KeepAliveInterval = TimeSpan.FromSeconds(30);
-        var url = new Uri(baseUrl, "control.ashx?auth=" + Uri.EscapeDataString(MeshCookie.ControlAuth(serviceUser, keyHex)));
+        var url = new UriBuilder(new Uri(baseUrl, "control.ashx?auth=" + Uri.EscapeDataString(MeshCookie.ControlAuth(serviceUser, keyHex))))
+        {
+            Scheme = baseUrl.Scheme == Uri.UriSchemeHttp ? "ws" : "wss",
+        }.Uri;
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeout.CancelAfter(TimeSpan.FromSeconds(15));
         await c._ws.ConnectAsync(url, timeout.Token);
