@@ -13,3 +13,4 @@ TestResults/
 answers*.json
 .vs/
 *.user
+frontend/package-lock.json

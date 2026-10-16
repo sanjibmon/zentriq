@@ -8,6 +8,9 @@ on:
     branches: ['dev/**']
   workflow_dispatch:
 
+permissions:
+  contents: write   # push the logs to the ci-quick-logs branch
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -49,12 +52,20 @@ jobs:
           set -o pipefail
           dotnet test backend/Zentriq.Tests/Zentriq.Tests.csproj -c Release --no-build --logger "console;verbosity=normal" 2>&1 | tee test.log
       - name: Web console
+        if: always()
         working-directory: frontend
         run: |
-          npm ci --no-audit --no-fund
-          npm run build
-      - name: Logs
+          set -o pipefail
+          npm install --no-audit --no-fund
+          npm run build 2>&1 | tee build.log
+      - name: Push logs to the ci-quick-logs branch
         if: always()
         run: |
-          grep -E "error [A-Z]+[0-9]+" build.log | sort -u | head -80 || true
-          grep -E "Failed |\[FAIL\]|Error Message|Assert\." test.log | head -80 || true
+          d="$RUNNER_TEMP/logs"; mkdir -p "$d"
+          cp build.log test.log "$d/" 2>/dev/null || true
+          cp frontend/build.log "$d/console.log" 2>/dev/null || true
+          if [ -d frontend/dist ]; then cp -r frontend/dist "$d/dist"; fi
+          echo "run $GITHUB_RUN_ID commit $GITHUB_SHA branch $GITHUB_REF_NAME status ${{ job.status }}" > "$d/RUN.txt"
+          cd "$d" && git init -q && git checkout -q -b ci-quick-logs && git add -A
+          git -c user.name=ci -c user.email=ci@localhost commit -q -m "ci-quick logs for run $GITHUB_RUN_ID"
+          git push -f -q "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ci-quick-logs
