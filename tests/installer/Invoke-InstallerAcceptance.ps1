@@ -119,7 +119,7 @@ Remove-Item $answer -Force   # contains the administrator password
 
 if (-not $installed) {
     foreach ($t in 'T02 PostgreSQL provisioning', 'T03 Database migration', 'T04 Administrator sign-in', 'T05 API and worker services', 'T06 Trial initialization',
-                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo') {
+                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent') {
         Record $t.Substring(0, 3) $t.Substring(4) 'BLOCKED' 'installation failed'
     }
 } else {
@@ -1018,6 +1018,75 @@ if (-not $installed) {
         $lic = Api GET '/licensing/status' -Session $s
         Assert (@($lic.usage | Where-Object workload -eq 'devices').Count -eq 1) 'licensing usage missing'
         "PNG stored and served anonymously ($($png.Length) bytes); SVG refused; removed"
+    } | Out-Null
+
+    # ---- Remote support (MeshCentral engine, Zentriq branded) --------------------------------------------------
+    $remoteExe = Join-Path $OutDir 'ZentriqRemoteSupport.exe'
+    function Remote-Wait([scriptblock] $Until, [int] $Minutes, [string] $What) {
+        $deadline = (Get-Date).AddMinutes($Minutes)
+        do { $v = & $Until; if ($v) { return $v }; Start-Sleep 10 } while ((Get-Date) -lt $deadline)
+        throw "timed out after $Minutes min waiting for $What"
+    }
+    function Remote-Me($s) {
+        Api POST '/remote/sync' @{} -Session $s | Out-Null
+        @(Api GET "/remote/devices?q=$env:COMPUTERNAME&filter=installed" -Session $s | ForEach-Object { $_ }) | Where-Object { $_.nodeId -and $_.assetId -and $_.online } | Select-Object -First 1
+    }
+
+    $remoteOk = Check 'T59' 'Remote support: branded server running, installer, remote agent connects, technician session opens signed in' {
+        $s = Login
+        Assert ((Get-Service ZentriqRemote).Status -eq 'Running') 'service ZentriqRemote is not running'
+        $h = Invoke-WebRequest 'https://localhost:8446/health.ashx' -SkipCertificateCheck -SkipHttpErrorCheck
+        Assert ($h.StatusCode -eq 200) "health.ashx returned $($h.StatusCode)"
+        $st = Api GET '/remote/status' -Session $s
+        Assert ($st.installed -and $st.running) "remote status: installed=$($st.installed) running=$($st.running) $($st.message)"
+        $login = Invoke-WebRequest 'https://localhost:8446/' -SkipCertificateCheck
+        Assert ($login.Content -match 'Zentriq') 'remote support sign-in page is not Zentriq branded'
+        $r = Invoke-WebRequest "$base/api/v1/remote/installer" -WebSession $s -OutFile $remoteExe -PassThru -SkipHttpErrorCheck
+        Assert ($r.StatusCode -eq 200) "installer download returned $($r.StatusCode)"
+        $bytes = [IO.File]::ReadAllBytes($remoteExe)
+        Assert ($bytes.Length -gt 100KB -and $bytes[0] -eq 0x4D -and $bytes[1] -eq 0x5A) "installer is not a Windows executable ($($bytes.Length) bytes)"
+        $vi = (Get-Item $remoteExe).VersionInfo
+        Assert ("$($vi.ProductName) $($vi.FileDescription) $($vi.CompanyName)" -match 'Zentriq') "installer version info not branded: '$($vi.ProductName)' / '$($vi.FileDescription)' / '$($vi.CompanyName)'"
+        $p = Start-Process $remoteExe -ArgumentList '-fullinstall' -Wait -PassThru
+        Remote-Wait { Get-Service ZentriqRemoteSupport -ErrorAction SilentlyContinue | Where-Object Status -eq 'Running' } 4 'service ZentriqRemoteSupport' | Out-Null
+        $me = Remote-Wait { Remote-Me $s } 5 "$env:COMPUTERNAME online in Remote Support"
+        $ses = Api POST '/remote/sessions' @{ assetId = $me.assetId; view = 'desktop' } -Session $s
+        Assert ($ses.url -match '[?&]login=' -and $ses.url -match 'gotonode=') "session url: $($ses.url)"
+        $page = Invoke-WebRequest $ses.url -SkipCertificateCheck
+        Assert ($page.Content -match 'MainDevDesktop') 'the session link did not open the signed-in device view'
+        $forged = Invoke-WebRequest ($ses.url -replace 'login=[^&]+', 'login=AAAA') -SkipCertificateCheck -SkipHttpErrorCheck
+        Assert ($forged.Content -notmatch 'MainDevDesktop') 'a forged sign-in link was accepted'
+        $log = Api GET "/remote/sessions?assetId=$($me.assetId)" -Session $s
+        Assert (@($log.items | Where-Object { $_.view -eq 'desktop' }).Count -ge 1) 'session not in the session history'
+        "engine healthy; branded installer $([math]::Round($bytes.Length/1MB,1)) MB ('$($vi.FileDescription)', exit $($p.ExitCode)); $($me.name) online as $($me.os); signed-in desktop link opened; forged link refused"
+    }
+
+    Check 'T60' 'Remote support via the Zentriq agent: remove and install the remote agent from the console' {
+        Assert $remoteOk 'T59 did not pass'
+        Assert (Test-Path $agentMsi) 'agent package from T26 not available'
+        $s = Login
+        $tok = Api POST '/agents/enrollment-tokens' @{ name = 'ci-remote'; validDays = 1; maxUses = 1; serverUrl = 'https://localhost:8444' } -Session $s
+        $p = Start-Process msiexec.exe -ArgumentList '/i', "`"$agentMsi`"", '/qn', "ENROLLMENTCODE=$($tok.code)", '/l*v', "`"$(Join-Path $OutDir 'agent-install-remote.log')`"" -Wait -PassThru
+        Assert ($p.ExitCode -eq 0) "agent MSI exit $($p.ExitCode)"
+        try {
+            $dev = Remote-Wait { @(Api GET "/remote/devices?q=$env:COMPUTERNAME" -Session $s | ForEach-Object { $_ }) | Where-Object { $_.assetId -and $_.canInstall } | Select-Object -First 1 } 6 'the Zentriq agent to report the remote-support capability'
+            $r = Api POST '/remote/deploy' @{ assetIds = @($dev.assetId); operation = 'uninstall' } -Session $s
+            Assert ($r.queued -eq 1) "uninstall not queued: $($r.message)"
+            Remote-Wait { -not (Get-Service ZentriqRemoteSupport -ErrorAction SilentlyContinue) } 8 'the remote agent to be removed' | Out-Null
+            $act = Remote-Wait { @((Api GET '/activity?kind=remote-support' -Session $s).items | Where-Object { $_.status -in 'succeeded', 'failed' }) | Select-Object -First 1 } 3 'the removal result'
+            Assert ($act.status -eq 'succeeded') "removal: $($act.status) $($act.detail)"
+            $r = Api POST '/remote/deploy' @{ assetIds = @($dev.assetId); operation = 'install' } -Session $s
+            Assert ($r.queued -eq 1) "install not queued: $($r.message)"
+            Remote-Wait { Get-Service ZentriqRemoteSupport -ErrorAction SilentlyContinue | Where-Object Status -eq 'Running' } 8 'the remote agent to be installed' | Out-Null
+            $me = Remote-Wait { Remote-Me $s } 5 "$env:COMPUTERNAME back online in Remote Support"
+            $done = @((Api GET '/activity?kind=remote-support' -Session $s).items | Where-Object { $_.status -eq 'succeeded' }).Count
+            "removed and reinstalled through the Zentriq agent; $($me.name) online again; $done successful remote-support action(s) in the Activity log"
+        } finally {
+            if (Test-Path $remoteExe) { Start-Process $remoteExe -ArgumentList '-fulluninstall' -Wait -ErrorAction SilentlyContinue | Out-Null }
+            @(Api GET '/agents' -Session $s | ForEach-Object { $_ }) | Where-Object { $_.status -eq 'active' } | ForEach-Object { Api POST "/agents/$($_.id)/revoke" -Session $s | Out-Null }
+            @(Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*' -ErrorAction SilentlyContinue | Where-Object { $_.PSObject.Properties['DisplayName'] -and $_.DisplayName -eq 'Zentriq Agent' }) |
+                ForEach-Object { Start-Process msiexec.exe -ArgumentList '/x', $_.PSChildName, '/qn' -Wait | Out-Null }
+        }
     } | Out-Null
 
     if ($UpgradeBundle) {
