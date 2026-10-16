@@ -15,6 +15,7 @@ import { ReportBuilder } from '../features/reports/ReportBuilder';
 import { VulnerabilitiesPage } from '../features/vulnerabilities/VulnerabilitiesPage';
 import { SecurityPage } from '../features/security/SecurityPage';
 import { IntegrationsPage } from '../features/integrations/IntegrationsPage';
+import { RemotePage } from '../features/remote/RemotePage';
 import { ActivityPage } from '../features/activity/ActivityPage';
 import { LoginPage } from '../features/login/LoginPage';
 import { ResetPasswordPage } from '../features/login/ResetPasswordPage';
@@ -48,6 +49,7 @@ function Routes() {
   if (path === '/vulnerabilities' || path === '/modules/vuln') return <VulnerabilitiesPage />;
   if (path === '/security' || path === '/modules/config') return <SecurityPage />;
   if (path === '/integrations' || path === '/modules/integrations') return <IntegrationsPage />;
+  if (path === '/remote' || path === '/modules/remote') return <RemotePage />;
   if (path.startsWith('/modules/')) return <ModulePage id={path.slice('/modules/'.length)} />;
   return <ModulePage id="" />;
 }

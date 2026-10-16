@@ -48,9 +48,12 @@ jobs:
           dotnet build agent/Zentriq.Agent/Zentriq.Agent.csproj -c Release 2>&1 | tee -a build.log
       - name: Remote support engine (MeshCentral) for the live test
         run: |
+          set -o pipefail
           v=$(node -p "require('./installer/remote/package.json').dependencies.meshcentral")
+          log="$GITHUB_WORKSPACE/mesh.log"
+          echo "MeshCentral $v" | tee "$log"
           mkdir -p "$RUNNER_TEMP/mc" && cd "$RUNNER_TEMP/mc" && npm init -y >/dev/null
-          npm install "meshcentral@$v" --omit=dev --no-audit --no-fund --ignore-scripts --loglevel=error
+          npm install "meshcentral@$v" --omit=dev --no-audit --no-fund --ignore-scripts 2>&1 | tail -40 | tee -a "$log"
           echo "ZENTRIQ_TEST_MESHCENTRAL=$RUNNER_TEMP/mc" >> "$GITHUB_ENV"
       - name: Tests (unit + PostgreSQL)
         env:
@@ -69,7 +72,7 @@ jobs:
         if: always()
         run: |
           d="$RUNNER_TEMP/logs"; mkdir -p "$d"
-          cp build.log test.log "$d/" 2>/dev/null || true
+          cp build.log test.log mesh.log "$d/" 2>/dev/null || true
           cp frontend/build.log "$d/console.log" 2>/dev/null || true
           if [ -d frontend/dist ]; then cp -r frontend/dist "$d/dist"; fi
           echo "run $GITHUB_RUN_ID commit $GITHUB_SHA branch $GITHUB_REF_NAME status ${{ job.status }}" > "$d/RUN.txt"

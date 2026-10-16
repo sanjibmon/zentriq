@@ -7,6 +7,7 @@ import { Availability, typeLabel } from '../assets/AssetsPage';
 import { ServiceActionDialog, type ControlInfo, type ServiceActionRow } from './ServiceControl';
 import { useApi } from '../../app/useApi';
 import { AssetSecurity } from '../security/AssetSecurity';
+import { AssetRemoteButtons } from '../remote/AssetRemote';
 import { ChangesView } from './Changes';
 import { DepartmentSelect, useDepartments } from '../departments/Departments';
 import { AssetVulnerabilities } from '../vulnerabilities/AssetVulnerabilities';
@@ -67,6 +68,7 @@ export function AssetDetailPage({ id }: { id: string }) {
     <>
       <PageHead title={a.hostname ?? a.ip ?? 'Asset'} desc={<>{typeLabel({ ...a, chassis: d?.device.chassis ?? a.chassis, isVirtual: d?.hardware.isVirtual ?? a.isVirtual })} · {a.osName ?? fmt.label(a.osFamily)} · <Pill tone={statusTone(a.status)}>{fmt.label(a.status)}</Pill> · <Availability a={a} long /></>}
         actions={<>
+          {can('remote.start') && <AssetRemoteButtons assetId={id} onError={(m) => setNote({ tone: 'crit', text: m })} />}
           {can('scans.run') && <button className="btn primary" onClick={() => void collectNow()}>Collect inventory now</button>}
           <Link className="btn" to="/assets">All assets</Link>
         </>} />

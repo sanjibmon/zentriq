@@ -28,7 +28,9 @@ export const NAV: [string, NavItem[]][] = [
     { id: 'vuln', label: 'Vulnerability Management', icon: 'bug', path: '/vulnerabilities', ready: true, permission: 'vuln.view' },
     { id: 'config', label: 'Security Configuration', icon: 'sliders', path: '/security', ready: true, permission: 'security.view' },
     { id: 'deploy', label: 'Software Deployment', icon: 'package', path: '/modules/deploy', ready: false },
-    { id: 'remote', label: 'Remote Support', icon: 'remote', path: '/modules/remote', ready: false },
+  ]],
+  ['Remote management', [
+    { id: 'remote', label: 'Remote Support', icon: 'remote', path: '/remote', ready: true, permission: 'remote.start' },
   ]],
   ['Infrastructure', [
     { id: 'cloud', label: 'Cloud & Infrastructure', icon: 'cloud', path: '/modules/cloud', ready: false },
