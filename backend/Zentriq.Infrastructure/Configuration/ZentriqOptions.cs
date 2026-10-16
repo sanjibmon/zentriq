@@ -7,6 +7,7 @@ public sealed class ZentriqOptions
 
     public DatabaseOptions Database { get; set; } = new();
     public HttpsOptions Https { get; set; } = new();
+    public RemoteOptions Remote { get; set; } = new();
     public string? PostgresBinDirectory { get; set; }
     public string? PostgresServiceName { get; set; }
     public string ProductVersion { get; set; } = typeof(ZentriqOptions).Assembly.GetName().Version?.ToString(3) ?? "0.0.0";
@@ -36,4 +37,17 @@ public sealed class HttpsOptions
     public string? AgentPublicUrl { get; set; }
     /// <summary>Additional plain-HTTP loopback port used only for local health probes; 0 disables.</summary>
     public int LoopbackHealthPort { get; set; } = 0;
+}
+
+/// <summary>Zentriq Remote Support (MeshCentral engine run by the ZentriqRemote service).</summary>
+public sealed class RemoteOptions
+{
+    /// <summary>Set by provisioning when the remote support engine is installed and configured.</summary>
+    public bool Enabled { get; set; }
+    /// <summary>HTTPS port of the remote support server (browsers and remote agents connect to it).</summary>
+    public int Port { get; set; } = 8446;
+    /// <summary>Name or address devices and browsers use to reach it; defaults to the console host name.</summary>
+    public string? PublicHost { get; set; }
+    /// <summary>Remote support account Zentriq manages it with (signed in by key, no password).</summary>
+    public string ServiceUser { get; set; } = "zentriq";
 }

@@ -80,7 +80,9 @@ internal static class AgentUpdater
         catch (Exception ex) { Log.Warn("Could not remove old update packages: " + ex.Message); }
     }
 
-    private static void PrepareFolder()
+    internal static void PrepareFolder() => PrepareFolder(Folder);
+
+    internal static void PrepareFolder(string folder)
     {
         // SYSTEM and Administrators only, so nobody else can swap the package between the check and the install.
         var sec = new DirectorySecurity();
@@ -89,8 +91,8 @@ internal static class AgentUpdater
             InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Allow));
         sec.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null), FileSystemRights.FullControl,
             InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Allow));
-        if (Directory.Exists(Folder)) Directory.SetAccessControl(Folder, sec);
-        else Directory.CreateDirectory(Folder, sec);
+        if (Directory.Exists(folder)) Directory.SetAccessControl(folder, sec);
+        else Directory.CreateDirectory(folder, sec);
     }
 
     private static string Safe(string v)

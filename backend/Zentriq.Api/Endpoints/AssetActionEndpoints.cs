@@ -228,7 +228,7 @@ public static class AssetActionEndpoints
                 """;
             void P(NpgsqlCommand c)
             {
-                c.Parameters.Add(new NpgsqlParameter("k", NpgsqlDbType.Text) { Value = kind is "service" or "uninstall" or "agent-update" ? kind : DBNull.Value });
+                c.Parameters.Add(new NpgsqlParameter("k", NpgsqlDbType.Text) { Value = kind is "service" or "uninstall" or "agent-update" or "remote-support" ? kind : DBNull.Value });
                 c.Parameters.Add(new NpgsqlParameter("st", NpgsqlDbType.Text) { Value = status is "succeeded" or "failed" or "pending" or "expired" ? status : DBNull.Value });
                 c.Parameters.Add(new NpgsqlParameter("a", NpgsqlDbType.Uuid) { Value = (object?)assetId ?? DBNull.Value });
                 c.Parameters.Add(new NpgsqlParameter("q", NpgsqlDbType.Text) { Value = string.IsNullOrWhiteSpace(q) ? DBNull.Value : $"%{q.Trim()}%" });

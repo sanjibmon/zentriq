@@ -203,9 +203,12 @@ internal sealed class AgentWorker
             bool ok; string? st; string msg;
             try
             {
-                (ok, st, msg) = a.Kind == "uninstall"
-                    ? SoftwareActions.Uninstall(a.Target, a.Argument, TimeSpan.FromMinutes(20))
-                    : ServiceActions.Run(a.Kind, a.Target, a.Operation, TimeSpan.FromSeconds(60));
+                (ok, st, msg) = a.Kind switch
+                {
+                    "uninstall" => SoftwareActions.Uninstall(a.Target, a.Argument, TimeSpan.FromMinutes(20)),
+                    "remote-support" => RemoteSupportActions.Run(client, a.Operation, a.Argument, ct),
+                    _ => ServiceActions.Run(a.Kind, a.Target, a.Operation, TimeSpan.FromSeconds(60)),
+                };
             }
             catch (Exception ex) { ok = false; st = null; msg = ex.Message; }
             Log.Info($"Action {a.Operation} {a.Target}: {(ok ? "OK" : "FAILED")} - {msg}");

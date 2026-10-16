@@ -142,6 +142,7 @@ public static class AgentEndpoints
             if (caps.Contains("service-control")) kinds.Add("service");
             if (caps.Contains("software-uninstall")) kinds.Add("uninstall");
             if (caps.Contains("self-update")) kinds.Add("agent-update");
+            if (caps.Contains("remote-support")) kinds.Add("remote-support");
             await CompleteUpdatesAsync(ds, agent.Id, req.AgentVersion, ct);
             if (kinds.Count > 0)
             {
@@ -186,6 +187,22 @@ public static class AgentEndpoints
             var file = env.WebRootFileProvider.GetFileInfo(PackagePath);
             if (!file.Exists || file.PhysicalPath is null) return Results.Problem(statusCode: 404, title: "No agent package is available on this server.");
             return Results.File(file.PhysicalPath, "application/x-msi", "ZentriqAgent-x64.msi");
+        }).AllowAnonymous();
+
+        // The branded remote support agent installer for this server (requested by "install remote support" actions).
+        g.MapGet("/remote-agent", async (HttpContext http, NpgsqlDataSource ds, AgentServer server, Zentriq.Infrastructure.Remote.RemoteSupportService remote, CancellationToken ct) =>
+        {
+            var (agent, error) = await AuthenticateAsync(http, ds, server, ct);
+            if (agent is null) return error!;
+            try
+            {
+                var (bytes, _) = await remote.AgentInstallerAsync(ct);
+                return Results.File(bytes, "application/octet-stream", "ZentriqRemoteSupport.exe");
+            }
+            catch (Exception ex) when (ex is Zentriq.Infrastructure.Remote.MeshException or HttpRequestException or System.Net.WebSockets.WebSocketException or TaskCanceledException)
+            {
+                return Results.Problem(statusCode: 503, title: "Remote support is not available on the server: " + ex.Message);
+            }
         }).AllowAnonymous();
 
         g.MapPost("/inventory", async (HttpContext http, NpgsqlDataSource ds, AgentServer server, InventoryStore store, LicensingService licensing, ILoggerFactory lf, CancellationToken ct) =>

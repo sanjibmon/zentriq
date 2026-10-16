@@ -5,6 +5,23 @@ using Zentriq.Worker;
 using Zentriq.Worker.Handlers;
 
 var paths = new ZentriqPaths();
+
+// "--remote-host": the ZentriqRemote service (supervises the bundled remote support server). Same executable,
+// separate service and account, nothing else runs in that process.
+if (args.Contains("--remote-host"))
+{
+    var rb = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { Args = [], ContentRootPath = AppContext.BaseDirectory });
+    rb.Services.AddWindowsService(o => o.ServiceName = "ZentriqRemote");
+    rb.Services.Configure<HostOptions>(o => o.ShutdownTimeout = TimeSpan.FromSeconds(20));
+    rb.Logging.ClearProviders();
+    rb.Logging.AddConsole();
+    rb.Logging.AddZentriqFile(paths.Logs, "remote");
+    rb.Services.AddSingleton(paths);
+    rb.Services.AddHostedService<Zentriq.Worker.Remote.RemoteHost>();
+    rb.Build().Run();
+    return;
+}
+
 var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { Args = args, ContentRootPath = AppContext.BaseDirectory });
 builder.Configuration.AddJsonFile(paths.ConfigFile, optional: true).AddEnvironmentVariables("ZENTRIQ_");
 builder.Services.AddWindowsService(o => o.ServiceName = "ZentriqWorker");
@@ -37,5 +54,6 @@ builder.Services.AddSingleton<Zentriq.Worker.Agentless.AgentlessInventory>();
 builder.Services.AddHostedService<JobRunner>();
 builder.Services.AddHostedService<Housekeeping>();
 builder.Services.AddHostedService<Zentriq.Worker.Integrations.IntegrationService>();
+builder.Services.AddHostedService<Zentriq.Worker.Remote.RemoteSupportSync>();
 
 builder.Build().Run();

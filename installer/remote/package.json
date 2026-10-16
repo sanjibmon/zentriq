@@ -1,0 +1,12 @@
+{
+  "name": "zentriq-remote-support",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Engine of Zentriq Remote Support: MeshCentral (Apache-2.0) with the modules it needs on Windows, installed at build time so the server never downloads anything.",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "meshcentral": "1.2.6",
+    "node-windows": "0.1.14",
+    "loadavg-windows": "1.1.1"
+  }
+}

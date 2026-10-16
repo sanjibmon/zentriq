@@ -17,6 +17,8 @@ public sealed class AppSecrets
     [JsonPropertyName("credentialKey")] public string? CredentialKey { get; set; }
     /// <summary>Password of Secrets\agent-ca.pfx (internal CA that issues agent client certificates).</summary>
     [JsonPropertyName("agentCaPfxPassword")] public string? AgentCaPfxPassword { get; set; }
+    /// <summary>Remote support login key (160 hex characters), shared with the ZentriqRemote server's configuration.</summary>
+    [JsonPropertyName("remoteLoginKey")] public string? RemoteLoginKey { get; set; }
 
     public byte[] InstallSecretBytes() => Convert.FromBase64String(InstallSecret);
 }

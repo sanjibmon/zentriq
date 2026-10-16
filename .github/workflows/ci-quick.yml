@@ -42,9 +42,16 @@ jobs:
       - name: Build server
         run: |
           set -o pipefail
-          for p in Zentriq.Api Zentriq.Worker Zentriq.Tests; do
+          for p in Zentriq.Api Zentriq.Worker Zentriq.Setup Zentriq.Tests; do
             dotnet build backend/$p/$p.csproj -c Release 2>&1 | tee -a build.log
           done
+          dotnet build agent/Zentriq.Agent/Zentriq.Agent.csproj -c Release 2>&1 | tee -a build.log
+      - name: Remote support engine (MeshCentral) for the live test
+        run: |
+          v=$(node -p "require('./installer/remote/package.json').dependencies.meshcentral")
+          mkdir -p "$RUNNER_TEMP/mc" && cd "$RUNNER_TEMP/mc" && npm init -y >/dev/null
+          npm install "meshcentral@$v" --omit=dev --no-audit --no-fund --ignore-scripts --loglevel=error
+          echo "ZENTRIQ_TEST_MESHCENTRAL=$RUNNER_TEMP/mc" >> "$GITHUB_ENV"
       - name: Tests (unit + PostgreSQL)
         env:
           ZENTRIQ_TEST_PG: Host=localhost;Port=5432;Username=postgres;Password=root

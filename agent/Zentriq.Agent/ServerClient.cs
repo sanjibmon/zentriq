@@ -131,7 +131,7 @@ internal sealed class ServerClient : IDisposable
         PostJsonAsync<CheckinResponse>("api/agent/v1/checkin", new Dictionary<string, object?>
         {
             ["agentVersion"] = Program.Version, ["hostname"] = hostname, ["osName"] = osName, ["lastError"] = lastError,
-            ["capabilities"] = new[] { "service-control", "software-uninstall", "self-update" },
+            ["capabilities"] = new[] { "service-control", "software-uninstall", "self-update", "remote-support" },
         }, ct);
 
     public async Task ReportActionAsync(string actionId, bool ok, string? state, string message, CancellationToken ct)
@@ -146,6 +146,16 @@ internal sealed class ServerClient : IDisposable
     public async Task DownloadPackageAsync(string file, CancellationToken ct)
     {
         using var resp = await _http.GetAsync(new Uri(_base, "api/agent/v1/package"), HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+        await EnsureAsync(resp).ConfigureAwait(false);
+        using var src = await resp.Content.ReadAsStreamAsync().ConfigureAwait(false);
+        using var dst = new FileStream(file, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+        await src.CopyToAsync(dst, 81920, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>Downloads the Zentriq Remote Support agent installer for this server (agent port, client certificate).</summary>
+    public async Task DownloadRemoteAgentAsync(string file, CancellationToken ct)
+    {
+        using var resp = await _http.GetAsync(new Uri(_base, "api/agent/v1/remote-agent"), HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
         await EnsureAsync(resp).ConfigureAwait(false);
         using var src = await resp.Content.ReadAsStreamAsync().ConfigureAwait(false);
         using var dst = new FileStream(file, FileMode.CreateNew, FileAccess.Write, FileShare.None);

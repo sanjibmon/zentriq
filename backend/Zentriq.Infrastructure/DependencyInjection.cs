@@ -55,6 +55,7 @@ public static class DependencyInjection
         services.AddSingleton<Zentriq.Infrastructure.Vulnerabilities.VulnFeedService>();
         services.AddSingleton<Zentriq.Infrastructure.Reports.ReportDelivery>();
         services.AddSingleton<Zentriq.Infrastructure.Security.SecurityStore>();
+        services.AddSingleton<Zentriq.Infrastructure.Remote.RemoteSupportService>();
         services.AddSingleton<Zentriq.Infrastructure.Integrations.IntegrationStore>();
         services.AddSingleton<Zentriq.Infrastructure.Integrations.ChannelSender>();
         services.AddScoped<Zentriq.Infrastructure.Inventory.InventoryStore>();

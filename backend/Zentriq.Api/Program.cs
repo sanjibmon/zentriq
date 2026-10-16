@@ -171,6 +171,7 @@ api.MapReportEndpoints();
 api.MapVulnerabilityEndpoints();
 api.MapSecurityEndpoints();
 api.MapIntegrationEndpoints();
+api.MapRemoteEndpoints();
 api.MapDepartmentEndpoints();
 app.MapAgentEndpoints();
 api.MapPendingModuleEndpoints();

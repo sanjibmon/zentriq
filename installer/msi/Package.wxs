@@ -97,6 +97,7 @@
         <Directory Id="WorkerFolder" Name="worker" />
         <Directory Id="ToolsFolder" Name="tools" />
         <Directory Id="DocsFolder" Name="docs" />
+        <Directory Id="RemoteFolder" Name="remote" />
       </Directory>
     </StandardDirectory>
     <StandardDirectory Id="DesktopFolder" />
@@ -109,6 +110,9 @@
       <ComponentGroupRef Id="WorkerFiles" />
       <ComponentGroupRef Id="ToolsFiles" />
       <ComponentGroupRef Id="DocsFiles" />
+      <ComponentGroupRef Id="RemoteFiles" />
+      <ComponentRef Id="FirewallRemoteAny" />
+      <ComponentRef Id="FirewallRemoteLocalSubnet" />
       <ComponentRef Id="Settings" />
       <ComponentRef Id="FirewallAny" />
       <ComponentRef Id="FirewallLocalSubnet" />
@@ -143,6 +147,12 @@
                         Type="ownProcess" Start="auto" ErrorControl="normal" Vital="yes"
                         Account="NT SERVICE\ZentriqWorker" />
         <ServiceControl Id="WorkerServiceControl" Name="ZentriqWorker" Stop="both" Remove="uninstall" Wait="yes" />
+        <!-- Zentriq Remote Support: the same executable in remote-host mode supervises the bundled MeshCentral server. -->
+        <ServiceInstall Id="RemoteServiceInstall" Name="ZentriqRemote" DisplayName="Zentriq Remote Support"
+                        Description="Zentriq Remote Support server (remote desktop, terminal and files; MeshCentral engine)."
+                        Type="ownProcess" Start="auto" ErrorControl="normal" Vital="no" Arguments="--remote-host"
+                        Account="NT SERVICE\ZentriqRemote" />
+        <ServiceControl Id="RemoteServiceControl" Name="ZentriqRemote" Stop="both" Remove="uninstall" Wait="yes" />
       </Component>
       <Files Include="$(var.StagingDir)\worker\**">
         <Exclude Files="$(var.StagingDir)\worker\Zentriq.Worker.exe" />
@@ -151,6 +161,11 @@
 
     <ComponentGroup Id="ToolsFiles" Directory="ToolsFolder">
       <Files Include="$(var.StagingDir)\tools\**" />
+    </ComponentGroup>
+
+    <!-- Remote support engine: Node.js + MeshCentral (Apache-2.0), staged by installer/scripts/Get-RemoteSupport.ps1. -->
+    <ComponentGroup Id="RemoteFiles" Directory="RemoteFolder">
+      <Files Include="$(var.StagingDir)\remote\**" />
     </ComponentGroup>
 
     <ComponentGroup Id="DocsFiles" Directory="DocsFolder">
@@ -190,6 +205,18 @@
       <fw:FirewallException Id="FwAgentSubnet" Name="Zentriq Agent gateway (HTTPS 8444, local subnet)" Description="Inbound connections from Zentriq Agents on the local subnet."
                             Port="8444" Protocol="tcp" Scope="localSubnet" Profile="all" />
       <RegistryValue Root="HKLM" Key="SOFTWARE\Zentriq\Console" Name="FirewallAgentRuleLocalSubnet" Type="string" Value="localsubnet" KeyPath="yes" />
+    </Component>
+
+    <!-- Inbound HTTPS 8446 for Zentriq Remote Support (browsers of technicians and remote support agents). -->
+    <Component Id="FirewallRemoteAny" Directory="INSTALLFOLDER" Condition='FIREWALLSCOPE = "any"'>
+      <fw:FirewallException Id="FwRemoteAny" Name="Zentriq Remote Support (HTTPS 8446)" Description="Inbound connections to Zentriq Remote Support."
+                            Port="8446" Protocol="tcp" Scope="any" Profile="all" />
+      <RegistryValue Root="HKLM" Key="SOFTWARE\Zentriq\Console" Name="FirewallRemoteRuleAny" Type="string" Value="any" KeyPath="yes" />
+    </Component>
+    <Component Id="FirewallRemoteLocalSubnet" Directory="INSTALLFOLDER" Condition='FIREWALLSCOPE = "localsubnet"'>
+      <fw:FirewallException Id="FwRemoteSubnet" Name="Zentriq Remote Support (HTTPS 8446, local subnet)" Description="Inbound connections to Zentriq Remote Support from the local subnet."
+                            Port="8446" Protocol="tcp" Scope="localSubnet" Profile="all" />
+      <RegistryValue Root="HKLM" Key="SOFTWARE\Zentriq\Console" Name="FirewallRemoteRuleLocalSubnet" Type="string" Value="localsubnet" KeyPath="yes" />
     </Component>
 
     <!-- Branded icon used by the Start menu and Desktop shortcuts (otherwise Windows shows the browser icon). -->

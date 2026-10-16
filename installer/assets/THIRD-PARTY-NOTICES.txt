@@ -29,3 +29,13 @@ WiX Toolset 5.0.2 (installer runtime components: Burn engine, internal-UI bootst
   Copyright (c) .NET Foundation and contributors.
 
 Web console third-party packages: see the licenses bundled with frontend/dist (generated at build time).
+
+Zentriq Remote Support engine (installed in C:\Program Files\Zentriq\remote, run by the ZentriqRemote service):
+  MeshCentral - Apache License 2.0. Copyright Ylian Saint-Hilaire and the MeshCentral contributors.
+    https://github.com/Ylianst/MeshCentral (license: remote\app\node_modules\meshcentral\LICENSE).
+    Zentriq configures and brands it; the MeshCentral source code is not modified. The MeshCentral agent
+    (MeshAgent) installed on devices for remote support is distributed under the same license.
+  Node.js - MIT License. Copyright Node.js contributors. https://nodejs.org (license: remote\node\LICENSE,
+    which also lists the third-party components included in Node.js).
+  npm packages used by MeshCentral (express, ws, node-forge, @seald-io/nedb and others) - each under its own
+    license (MIT, Apache-2.0, BSD or ISC), included in its folder under remote\app\node_modules.

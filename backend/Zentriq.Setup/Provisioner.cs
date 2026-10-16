@@ -46,6 +46,7 @@ public sealed class Provisioner(ProvisionInput input, ZentriqPaths paths, Report
             ("Configure HTTPS certificate", HttpsAsync),
             ("Write configuration", ConfigAsync),
             ("Configure and start Zentriq services", ServicesAsync),
+            ("Configure remote support", RemoteAsync),
             ("Verify API readiness over HTTPS", ApiReadyAsync),
             ("Verify the worker processes a test job", WorkerSelfTestAsync),
             ("Create the first administrator and start the trial", InitializeAsync),
@@ -123,7 +124,10 @@ public sealed class Provisioner(ProvisionInput input, ZentriqPaths paths, Report
         WindowsHost.SecureDirectory(paths.Config, (api, read), (worker, read));
         WindowsHost.SecureDirectory(paths.Secrets, (api, read), (worker, read));
         WindowsHost.SecureDirectory(paths.DataProtectionKeys, (api, modify));
-        WindowsHost.SecureDirectory(paths.Logs, (api, modify), (worker, modify));
+        if (WindowsHost.ServiceExists(RemoteService))
+            WindowsHost.SecureDirectory(paths.Logs, (api, modify), (worker, modify), (WindowsHost.ServiceSid(RemoteService), modify));
+        else
+            WindowsHost.SecureDirectory(paths.Logs, (api, modify), (worker, modify));
         WindowsHost.SecureDirectory(paths.Packages, (worker, read));
         WindowsHost.SecureDirectory(paths.Exports, (api, modify), (worker, modify));
         WindowsHost.SecureDirectory(paths.Backups); // SYSTEM and Administrators only
@@ -161,6 +165,7 @@ public sealed class Provisioner(ProvisionInput input, ZentriqPaths paths, Report
         if (string.IsNullOrEmpty(_app.HttpsPfxPassword)) _app.HttpsPfxPassword = SecretStore.NewPassword();
         if (string.IsNullOrEmpty(_app.CredentialKey)) _app.CredentialKey = SecretStore.NewKey();
         if (string.IsNullOrEmpty(_app.AgentCaPfxPassword)) _app.AgentCaPfxPassword = SecretStore.NewPassword();
+        if (_app.RemoteLoginKey is not { Length: 160 }) _app.RemoteLoginKey = Zentriq.Infrastructure.Remote.MeshCookie.NewKeyHex();
 
         if (_superPassword.Length > 0)
             await new PostgresProvisioner(log).EnsureDatabaseAsync(input.Postgres, _superPassword, _owner.DbOwnerPassword, _app.DbAppPassword, ct);
@@ -243,8 +248,24 @@ public sealed class Provisioner(ProvisionInput input, ZentriqPaths paths, Report
         return Task.CompletedTask;
     }
 
+    private const string RemoteService = "ZentriqRemote";
+    private string RemoteDir => Path.GetFullPath(Path.Combine(input.InstallDir, "..", "remote"));
+    private bool RemoteInstalled => File.Exists(Path.Combine(RemoteDir, "node", "node.exe")) && WindowsHost.ServiceExists(RemoteService);
+
     private Task ConfigAsync(CancellationToken ct)
     {
+        // Keep remote support settings an administrator changed in zentriq.json (port, public host name).
+        try
+        {
+            if (File.Exists(paths.ConfigFile) && JsonDocument.Parse(File.ReadAllText(paths.ConfigFile)).RootElement.TryGetProperty("Zentriq", out var z)
+                && z.TryGetProperty("Remote", out var rem))
+            {
+                var old = rem.Deserialize<RemoteOptions>();
+                if (old is not null) { _options.Remote.Port = old.Port is > 0 and < 65536 ? old.Port : 8446; _options.Remote.PublicHost = old.PublicHost; }
+            }
+        }
+        catch (JsonException) { }
+        _options.Remote.Enabled = RemoteInstalled;
         var json = JsonSerializer.Serialize(new { Zentriq = _options }, new JsonSerializerOptions { WriteIndented = true });
         File.WriteAllText(paths.ConfigFile, json);
         log.Info($"Configuration written to {paths.ConfigFile} (no secrets).");
@@ -275,6 +296,71 @@ public sealed class Provisioner(ProvisionInput input, ZentriqPaths paths, Report
         }
         log.Info($"{input.WorkerService}: {WindowsHost.ServiceStatus(input.WorkerService)}, {input.ApiService}: {WindowsHost.ServiceStatus(input.ApiService)}");
     }
+
+    /// <summary>
+    /// Configures the bundled remote support server (MeshCentral) and starts the ZentriqRemote service. Never fails
+    /// the installation: when something goes wrong it is reported and Zentriq continues without remote support.
+    /// </summary>
+    private async Task RemoteAsync(CancellationToken ct)
+    {
+        if (!_options.Remote.Enabled) { log.Info("Remote support is not part of this installation."); return; }
+        try
+        {
+            var sid = WindowsHost.ServiceSid(RemoteService);
+            var root = Path.Combine(paths.Root, "Remote");
+            var data = Path.Combine(root, "data");
+            WindowsHost.SecureDirectory(root, (sid, FileSystemRights.Modify)); // SYSTEM, Administrators, ZentriqRemote only
+            foreach (var d in new[] { data, Path.Combine(root, "files"), Path.Combine(root, "backups") }) Directory.CreateDirectory(d);
+
+            var host = string.IsNullOrWhiteSpace(_options.Remote.PublicHost) ? _options.Https.HostName : _options.Remote.PublicHost!;
+            var config = Zentriq.Infrastructure.Remote.RemoteServerConfig.Build(new(host, _options.Remote.Port, _app.RemoteLoginKey!,
+                Convert.ToHexString(RandomNumberGenerator.GetBytes(32)), data, Path.Combine(root, "files"), Path.Combine(root, "backups")));
+            File.WriteAllText(Path.Combine(data, "config.json"), config.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+            foreach (var f in new[] { Zentriq.Infrastructure.Remote.RemoteServerConfig.TitlePicture, Zentriq.Infrastructure.Remote.RemoteServerConfig.AgentImage, Zentriq.Infrastructure.Remote.RemoteServerConfig.AgentIcon })
+            {
+                var src = Path.Combine(RemoteDir, "branding", f);
+                if (File.Exists(src)) File.Copy(src, Path.Combine(data, f), overwrite: true);
+            }
+
+            WindowsHost.StopAndWait(RemoteService, TimeSpan.FromMinutes(1));
+            var node = Path.Combine(RemoteDir, "node", "node.exe");
+            var script = Path.Combine(RemoteDir, "app", "node_modules", "meshcentral", "meshcentral.js");
+            // The account Zentriq manages remote support with. It signs in by key; its random password is never used or stored.
+            string[] createArgs = [script, "--datapath", data, "--createaccount", _options.Remote.ServiceUser, "--" + "pass", SecretStore.NewPassword(), "--name", "Zentriq"];
+            var create = await WindowsHost.RunAsync(node, createArgs, TimeSpan.FromMinutes(3), ct: ct);
+            log.Info("Remote support service account: " + LastLine(create.Output));
+            var admin = await WindowsHost.RunAsync(node, [script, "--datapath", data, "--adminaccount", _options.Remote.ServiceUser], TimeSpan.FromMinutes(3), ct: ct);
+            log.Info("Remote support administrator rights: " + LastLine(admin.Output));
+
+            await WindowsHost.ConfigureRecoveryAsync(RemoteService, null, log);
+            if (input.SkipServiceStart) { log.Warn("Remote support service start skipped by request."); return; }
+            WindowsHost.StartAndWait(RemoteService, TimeSpan.FromMinutes(2));
+            using var http = new HttpClient(new HttpClientHandler { ServerCertificateCustomValidationCallback = (_, _, _, _) => true }) { Timeout = TimeSpan.FromSeconds(10) };
+            var deadline = DateTime.UtcNow.AddMinutes(4); // the first start creates the server's certificates
+            string last = "no response";
+            while (DateTime.UtcNow < deadline)
+            {
+                try
+                {
+                    using var r = await http.GetAsync($"https://127.0.0.1:{_options.Remote.Port}/health.ashx", ct);
+                    if (r.IsSuccessStatusCode) { log.Info($"Remote support is running on port {_options.Remote.Port}."); _result.Checks["remote support"] = "PASS"; return; }
+                    last = $"HTTP {(int)r.StatusCode}";
+                }
+                catch (HttpRequestException ex) { last = ex.Message; }
+                catch (TaskCanceledException) when (!ct.IsCancellationRequested) { last = "timeout"; }
+                await Task.Delay(3000, ct);
+            }
+            _result.Checks["remote support"] = "WARN";
+            log.Warn($"Remote support did not answer on port {_options.Remote.Port} yet ({last}). See {paths.Logs}\remote-*.log. Zentriq works without it.");
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _result.Checks["remote support"] = "WARN";
+            log.Warn($"Remote support could not be configured: {ex.Message}. Zentriq works without it; run Repair to try again.");
+        }
+    }
+
+    private static string LastLine(string s) => s.Trim().Split('\n').Select(l => l.Trim()).LastOrDefault(l => l.Length > 0) ?? "(no output)";
 
     private HttpClient Http()
     {

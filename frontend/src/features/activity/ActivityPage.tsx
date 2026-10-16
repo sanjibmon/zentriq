@@ -6,7 +6,7 @@ import { useApi } from '../../app/useApi';
 import { DataTable, ErrorBox, fmt, PageHead, Pager, Panel, Pill } from '../../components/ui';
 
 export interface ActivityRow {
-  id: string; assetId: string; hostname: string | null; ip: string | null; channel: 'agent' | 'agentless'; kind: 'service' | 'uninstall' | 'agent-update';
+  id: string; assetId: string; hostname: string | null; ip: string | null; channel: 'agent' | 'agentless'; kind: 'service' | 'uninstall' | 'agent-update' | 'remote-support';
   target: string; argument: string | null; operation: string; status: string; detail: string | null; resultState: string | null;
   requestedAt: string; completedAt: string | null; requestedBy: string | null;
 }
@@ -46,6 +46,7 @@ export function ActivityPage() {
           <option value="service">Service actions</option>
           <option value="uninstall">Software uninstalls</option>
           <option value="agent-update">Agent updates</option>
+          <option value="remote-support">Remote support agent</option>
         </select>
         <select className="in" value={status} onChange={(e) => { setPage(1); setStatus(e.target.value); }} aria-label="Result">
           <option value="">Any result</option>
@@ -60,7 +61,7 @@ export function ActivityPage() {
         <DataTable rows={rows} empty={data.loading ? 'Loading…' : 'No device actions yet. Start, stop or restart a service from an asset, or uninstall software from Software Inventory.'} columns={[
           { key: 't', label: 'Requested', render: (r) => <span title={fmt.date(r.requestedAt)}>{fmt.date(r.requestedAt)}</span> },
           { key: 'h', label: 'Device', render: (r) => <Link to={`/assets/${r.assetId}`}><b>{r.hostname ?? r.ip ?? '—'}</b></Link> },
-          { key: 'a', label: 'Action', render: (r) => <>{OP[r.operation] ?? fmt.label(r.operation)}<div className="faint mono" style={{ fontSize: 11.5 }}>{r.kind === 'agent-update' ? `to ${r.target}` : `${r.target}${r.argument ? ` ${r.argument}` : ''}`}</div></> },
+          { key: 'a', label: 'Action', render: (r) => <>{r.kind === 'remote-support' ? (r.operation === 'install' ? 'Install remote support' : 'Remove remote support') : OP[r.operation] ?? fmt.label(r.operation)}<div className="faint mono" style={{ fontSize: 11.5 }}>{r.kind === 'agent-update' ? `to ${r.target}` : r.kind === 'remote-support' ? 'Zentriq Remote Support agent' : `${r.target}${r.argument ? ` ${r.argument}` : ''}`}</div></> },
           { key: 'c', label: 'Via', render: (r) => r.channel === 'agent' ? 'Zentriq Agent' : 'WinRM / WMI' },
           { key: 's', label: 'Result', render: (r) => <Pill tone={STATUS[r.status]?.[0] ?? ''}>{STATUS[r.status]?.[1] ?? fmt.label(r.status)}</Pill> },
           { key: 'd', label: 'Detail', className: 'wrap', render: (r) => <span style={{ fontSize: 12.5 }}>{r.detail ?? (r.status === 'queued' ? 'Runs at the device’s next check-in.' : '')}{r.completedAt ? <span className="faint"> · {fmt.ago(r.completedAt)}</span> : null}</span> },

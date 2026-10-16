@@ -153,7 +153,7 @@ public static class ReportCatalog
                 new("requested_at", "Requested", ReportColumnType.Date, "x.requested_at", "Action"),
                 new("hostname", "Device", ReportColumnType.Text, "COALESCE(a.hostname, host(a.primary_ip))", "Action"),
                 new("action", "Action", ReportColumnType.Text,
-                    "CASE x.operation WHEN 'start' THEN 'Start service' WHEN 'stop' THEN 'Stop service' WHEN 'restart' THEN 'Restart service' WHEN 'uninstall' THEN 'Uninstall software' WHEN 'update' THEN 'Update agent' ELSE x.operation END", "Action"),
+                    "CASE x.operation WHEN 'start' THEN 'Start service' WHEN 'stop' THEN 'Stop service' WHEN 'restart' THEN 'Restart service' WHEN 'uninstall' THEN CASE WHEN x.kind = 'remote-support' THEN 'Remove remote support' ELSE 'Uninstall software' END WHEN 'update' THEN 'Update agent' WHEN 'install' THEN 'Install remote support' ELSE x.operation END", "Action"),
                 new("target", "Target", ReportColumnType.Text, "x.target", "Action"),
                 new("channel", "Via", ReportColumnType.Text, "x.channel", "Action"),
                 new("status", "Result", ReportColumnType.Text, "x.status", "Action"),

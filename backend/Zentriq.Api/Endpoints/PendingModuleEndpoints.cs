@@ -10,7 +10,6 @@ public static class PendingModuleEndpoints
     [
         ("/patch", "Patch management"),
         ("/deployment", "Software deployment"),
-        ("/remote", "Remote support"),
         ("/cloud", "Cloud & infrastructure connectors"),
     ];
 

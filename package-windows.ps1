@@ -89,6 +89,11 @@ New-Item -ItemType Directory -Force -Path $docs | Out-Null
 Copy-Item (Join-Path $root 'docs/*.md') $docs -Force
 Copy-Item (Join-Path $root 'installer/assets/THIRD-PARTY-NOTICES.txt') $docs -Force
 
+# ---- 2a. remote support engine (Node.js + MeshCentral, Apache-2.0) ------------------------------------
+Write-Section 'Remote support engine (Node.js + MeshCentral)'
+& (Join-Path $root 'installer/scripts/Get-RemoteSupport.ps1') -OutDir (Join-Path $staging 'remote') -CacheDir $prereqDir
+if (-not (Test-Path (Join-Path $staging 'remote/node/node.exe'))) { throw 'Remote support engine was not staged.' }
+
 # ---- 3. prerequisites --------------------------------------------------------------------------
 Write-Section 'Prerequisites (download + verify)'
 & (Join-Path $root 'installer/scripts/Get-Prerequisites.ps1') -OutDir $prereqDir -Offline:$OfflinePrereqs
