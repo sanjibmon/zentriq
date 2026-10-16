@@ -52,6 +52,9 @@ jobs:
           v=$(node -p "require('./installer/remote/package.json').dependencies.meshcentral")
           log="$GITHUB_WORKSPACE/mesh.log"
           echo "MeshCentral $v" | tee "$log"
+          npm view meshcentral dist-tags 2>&1 | tee -a "$log" || true
+          npm view meshcentral versions --json 2>&1 | tail -15 | tee -a "$log" || true
+          npm view meshcentral time --json 2>&1 | tail -8 | tee -a "$log" || true
           mkdir -p "$RUNNER_TEMP/mc" && cd "$RUNNER_TEMP/mc" && npm init -y >/dev/null
           npm install "meshcentral@$v" --omit=dev --no-audit --no-fund --ignore-scripts 2>&1 | tail -40 | tee -a "$log"
           echo "ZENTRIQ_TEST_MESHCENTRAL=$RUNNER_TEMP/mc" >> "$GITHUB_ENV"
