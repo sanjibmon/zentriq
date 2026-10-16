@@ -75,6 +75,13 @@ public sealed class Housekeeping(NpgsqlDataSource ds, JobQueue jobs, WorkerIdent
         var slot = DateTimeOffset.UtcNow;
         await jobs.EnqueueAsync(new EnqueueRequest(JobTypes.VulnEvaluate, new { source = "scheduled" }, $"vuln-eval:{slot:yyyy-MM-dd-HH}:{slot.Minute / 30}",
             Priority: 190, MaxAttempts: 2, TimeoutSeconds: 1800), ct: ct);
+        await using (var cmd = ds.CreateCommand("SELECT value::text FROM zentriq.system_settings WHERE key = 'security.auto_evaluate'"))
+        {
+            var v = await cmd.ExecuteScalarAsync(ct) as string;
+            if (v is null || v.Trim() == "true")
+                await jobs.EnqueueAsync(new EnqueueRequest(JobTypes.SecurityEvaluate, new { source = "scheduled" }, $"sec-eval:{slot:yyyy-MM-dd-HH}:{slot.Minute / 30}",
+                    Priority: 190, MaxAttempts: 2, TimeoutSeconds: 1800), ct: ct);
+        }
     }
 
     /// <summary>Report files are kept 30 days; uploaded feed files are dropped once processed (or after a day).</summary>
@@ -83,6 +90,9 @@ public sealed class Housekeeping(NpgsqlDataSource ds, JobQueue jobs, WorkerIdent
         await using var cmd = ds.CreateCommand("""
             UPDATE zentriq.report_runs SET content = NULL WHERE content IS NOT NULL AND started_at < now() - interval '30 days';
             DELETE FROM zentriq.report_runs WHERE started_at < now() - interval '365 days';
+            DELETE FROM zentriq.int_deliveries WHERE created_at < now() - interval '90 days';
+            DELETE FROM zentriq.int_events e WHERE e.occurred_at < now() - interval '90 days' AND NOT EXISTS (SELECT 1 FROM zentriq.int_deliveries d WHERE d.event_id = e.id);
+            DELETE FROM zentriq.sec_exceptions WHERE expires_at < now() - interval '365 days';
             UPDATE zentriq.vuln_imports SET content = NULL, status = CASE WHEN status IN ('queued','running') THEN 'failed' ELSE status END,
                    message = COALESCE(message, 'Not processed within a day.') WHERE content IS NOT NULL AND created_at < now() - interval '1 day';
             """);

@@ -9,11 +9,9 @@ public static class PendingModuleEndpoints
     private static readonly (string Path, string Name)[] Pending =
     [
         ("/patch", "Patch management"),
-        ("/configuration", "Security configuration assessment"),
         ("/deployment", "Software deployment"),
         ("/remote", "Remote support"),
         ("/cloud", "Cloud & infrastructure connectors"),
-        ("/integrations", "Integrations & automation"),
     ];
 
     public static void MapPendingModuleEndpoints(this RouteGroupBuilder api)

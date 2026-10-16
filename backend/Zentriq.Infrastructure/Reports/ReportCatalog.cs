@@ -74,6 +74,8 @@ public static class ReportCatalog
                 new("os_build", "OS build", ReportColumnType.Text, "(d.document #>> '{os,version}') || COALESCE('.' || (d.document #>> '{os,ubr}'), '')", "Device"),
                 new("feature_update", "Feature update", ReportColumnType.Text, "d.document #>> '{os,displayVersion}'", "Device"),
                 new("last_boot", "Last boot", ReportColumnType.Date, "(d.document #>> '{os,lastBoot}')::timestamptz", "Device"),
+                new("security_score", "Security score", ReportColumnType.Number, "(SELECT min(sc.score) FROM zentriq.sec_scores sc WHERE sc.asset_id = a.id)", "Security"),
+                new("security_failed", "Failed security checks", ReportColumnType.Number, "(SELECT count(*) FROM zentriq.sec_results sr WHERE sr.asset_id = a.id AND sr.status = 'fail')", "Security"),
             ]),
 
         new("hardware", "Hardware", "One row per device with hardware inventory.",
@@ -201,6 +203,34 @@ public static class ReportCatalog
                 new("exception_reason", "Exception reason", ReportColumnType.Text, "f.exception_reason", "Remediation"),
                 new("exception_until", "Exception until", ReportColumnType.Date, "f.exception_until", "Remediation"),
             ], Permission: "vuln.view"),
+
+        new("security", "Security configuration", "One row per configuration check per device and baseline (Windows).",
+            """
+            zentriq.sec_results s
+            JOIN zentriq.assets a ON a.id = s.asset_id
+            JOIN zentriq.sec_baselines b ON b.id = s.baseline_id
+            LEFT JOIN zentriq.sec_rules r ON r.id = s.rule_id
+            LEFT JOIN zentriq.asset_inventory_documents d ON d.asset_id = a.id
+            LEFT JOIN zentriq.hardware_inventory h ON h.asset_id = a.id
+            WHERE a.status = 'active'
+            """,
+            [
+                new("rule", "Check", ReportColumnType.Text, "s.rule_id", "Check"),
+                new("title", "Title", ReportColumnType.Text, "r.title", "Check"),
+                new("category", "Check category", ReportColumnType.Text, "r.category", "Check"),
+                new("severity", "Severity", ReportColumnType.Text, "s.severity", "Check"),
+                new("severity_rank", "Severity order", ReportColumnType.Number, "CASE s.severity WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END", "Check"),
+                new("reference", "Reference", ReportColumnType.Text, "r.reference", "Check"),
+                new("remediation", "Remediation", ReportColumnType.Text, "r.remediation", "Check"),
+                new("status", "Result", ReportColumnType.Text, "s.status", "Result"),
+                new("actual", "Value found", ReportColumnType.Text, "s.actual", "Result"),
+                new("first_failed", "Failing since", ReportColumnType.Date, "s.first_failed_at", "Result"),
+                new("failing_days", "Days failing", ReportColumnType.Number, "floor(extract(epoch FROM now() - s.first_failed_at) / 86400)::int", "Result"),
+                new("evaluated", "Checked at", ReportColumnType.Date, "s.evaluated_at", "Result"),
+                new("baseline", "Baseline", ReportColumnType.Text, "b.name", "Result"),
+                new("score", "Device score", ReportColumnType.Number, "(SELECT sc.score FROM zentriq.sec_scores sc WHERE sc.asset_id = s.asset_id AND sc.baseline_id = s.baseline_id)", "Result"),
+                .. DeviceColumns,
+            ], Permission: "security.view"),
 
         new("software_titles", "Software titles", "One row per application title: publisher, devices, versions in use.",
             """

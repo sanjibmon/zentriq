@@ -88,6 +88,35 @@ public static class ReportEndpoints
             });
         });
 
+        // Data of a saved report for scripts, BI tools and SIEM pulls (works with read-only API tokens).
+        g.MapGet("/{id:guid}/data", async (Guid id, string? format, int? limit, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
+        {
+            await using var cmd = ds.CreateCommand("""
+                SELECT name, dataset, definition::text FROM zentriq.report_definitions WHERE id = @id AND (system OR shared OR owner_id = @me)
+                """);
+            cmd.Parameters.AddWithValue("id", id);
+            cmd.Parameters.Add(new NpgsqlParameter("me", NpgsqlDbType.Uuid) { Value = (object?)rc.UserId ?? DBNull.Value });
+            string name, dataset, definition;
+            await using (var r = await cmd.ExecuteReaderAsync(ct))
+            {
+                if (!await r.ReadAsync(ct)) return Results.NotFound();
+                (name, dataset, definition) = (r.GetString(0), r.GetString(1), r.GetString(2));
+            }
+            if (Denied(dataset, rc) is { } denied) return denied;
+            ReportResult result;
+            try { result = await ReportEngine.RunAsync(ds, dataset, ReportSpec.Parse(definition), Math.Clamp(limit ?? ReportDelivery.MaxExportRows, 1, ReportDelivery.MaxExportRows), ct); }
+            catch (ReportValidationException ex) { return Validation.Problem("definition", ex.Message); }
+            await rc.AuditAsync("report.data", name, detail: new { format = format ?? "json", rows = result.Rows.Count });
+            if (format == "csv") return Results.File(ReportEngine.ToCsv(result), "text/csv; charset=utf-8", $"{name}.csv");
+            var rows = result.Rows.Select(row =>
+            {
+                var o = new Dictionary<string, object?>(result.Columns.Count);
+                for (var i = 0; i < result.Columns.Count; i++) o[result.Columns[i].Key] = row[i];
+                return o;
+            });
+            return Results.Ok(new { report = name, dataset, columns = result.Columns, rows, total = result.Total, truncated = result.Truncated, generatedAt = DateTimeOffset.UtcNow });
+        }).RequireAuthorization(Permissions.ReportsExport);
+
         g.MapPost("/run", async (RunBody body, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
         {
             if (Denied(body.Dataset, rc) is { } denied) return denied;

@@ -64,6 +64,8 @@ public sealed class OsInfo
     [JsonPropertyName("displayVersion")] public string? DisplayVersion { get; set; }
     /// <summary>Client, Server or Server Core.</summary>
     [JsonPropertyName("installationType")] public string? InstallationType { get; set; }
+    /// <summary>Edition, e.g. Professional, Enterprise, EnterpriseS (LTSC), ServerStandard.</summary>
+    [JsonPropertyName("editionId")] public string? EditionId { get; set; }
 }
 
 public sealed class HardwareInfo
@@ -143,6 +145,44 @@ public sealed class SecurityInfo
     [JsonPropertyName("firewallEnabled")] public bool? FirewallEnabled { get; set; }
     [JsonPropertyName("diskEncryption")] public bool? DiskEncryption { get; set; }
     [JsonPropertyName("secureBoot")] public bool? SecureBoot { get; set; }
+    /// <summary>Security settings read from the registry and WMI (read-only), assessed by Security Configuration.</summary>
+    [JsonPropertyName("hardening")] public HardeningInfo? Hardening { get; set; }
+}
+
+/// <summary>
+/// Windows security settings. Null = could not be read (older agent, access denied); the console then reports the
+/// check as "unknown" rather than passed or failed.
+/// </summary>
+public sealed class HardeningInfo
+{
+    [JsonPropertyName("firewallDomain")] public bool? FirewallDomain { get; set; }
+    [JsonPropertyName("firewallPrivate")] public bool? FirewallPrivate { get; set; }
+    [JsonPropertyName("firewallPublic")] public bool? FirewallPublic { get; set; }
+    [JsonPropertyName("uacEnabled")] public bool? UacEnabled { get; set; }
+    [JsonPropertyName("uacAdminPrompt")] public int? UacAdminPrompt { get; set; }
+    [JsonPropertyName("smb1Enabled")] public bool? Smb1Enabled { get; set; }
+    [JsonPropertyName("smbSigningRequired")] public bool? SmbSigningRequired { get; set; }
+    [JsonPropertyName("rdpEnabled")] public bool? RdpEnabled { get; set; }
+    [JsonPropertyName("rdpNla")] public bool? RdpNla { get; set; }
+    [JsonPropertyName("rdpPort")] public int? RdpPort { get; set; }
+    [JsonPropertyName("llmnrDisabled")] public bool? LlmnrDisabled { get; set; }
+    [JsonPropertyName("autorunDisabled")] public bool? AutorunDisabled { get; set; }
+    [JsonPropertyName("wdigestCleartext")] public bool? WDigestCleartext { get; set; }
+    [JsonPropertyName("lsaProtection")] public bool? LsaProtection { get; set; }
+    [JsonPropertyName("lmCompatibilityLevel")] public int? LmCompatibilityLevel { get; set; }
+    [JsonPropertyName("noLmHash")] public bool? NoLmHash { get; set; }
+    [JsonPropertyName("tls10Enabled")] public bool? Tls10Enabled { get; set; }
+    [JsonPropertyName("tls11Enabled")] public bool? Tls11Enabled { get; set; }
+    [JsonPropertyName("ssl3Enabled")] public bool? Ssl3Enabled { get; set; }
+    [JsonPropertyName("autoUpdateDisabled")] public bool? AutoUpdateDisabled { get; set; }
+    [JsonPropertyName("inactivityTimeoutSecs")] public int? InactivityTimeoutSecs { get; set; }
+    [JsonPropertyName("scriptBlockLogging")] public bool? ScriptBlockLogging { get; set; }
+    [JsonPropertyName("guestEnabled")] public bool? GuestEnabled { get; set; }
+    [JsonPropertyName("builtinAdminEnabled")] public bool? BuiltinAdminEnabled { get; set; }
+    [JsonPropertyName("defenderRealtime")] public bool? DefenderRealtime { get; set; }
+    [JsonPropertyName("defenderSignatureAgeDays")] public int? DefenderSignatureAgeDays { get; set; }
+    [JsonPropertyName("tamperProtection")] public bool? TamperProtection { get; set; }
+    [JsonPropertyName("credentialGuard")] public bool? CredentialGuard { get; set; }
 }
 
 public sealed class AntivirusProduct

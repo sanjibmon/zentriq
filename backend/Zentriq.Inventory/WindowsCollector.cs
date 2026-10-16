@@ -175,7 +175,12 @@ public static class WindowsCollector
                 doc.Os.Ubr = registry.GetDword(cv, "UBR");
                 doc.Os.DisplayVersion = registry.GetString(cv, "DisplayVersion") ?? registry.GetString(cv, "ReleaseId");
                 doc.Os.InstallationType = registry.GetString(cv, "InstallationType");
+                doc.Os.EditionId = registry.GetString(cv, "EditionID");
             }, optional: true);
+
+        // Security settings for Security Configuration (read-only; nothing is changed on the device).
+        if (registry is not null && doc.Os.Family == "windows")
+            Section(doc, "security settings", () => ReadHardening(doc, registry), optional: true);
 
         Section(doc, "patches", () =>
         {
@@ -212,6 +217,38 @@ public static class WindowsCollector
             }
         }, optional: true);
 
+        Section(doc, "local accounts", () =>
+        {
+            if (productType == 2) return; // domain controllers have no local accounts
+            var h = doc.Security.Hardening ??= new HardeningInfo();
+            foreach (var a in wmi.Query(Cimv2, "SELECT SID, Disabled FROM Win32_UserAccount WHERE LocalAccount = TRUE"))
+            {
+                var sid = Str(a, "SID") ?? "";
+                var enabled = Bool(a, "Disabled") is { } d ? !d : (bool?)null;
+                if (sid.EndsWith("-501", StringComparison.Ordinal)) h.GuestEnabled = enabled;
+                else if (sid.EndsWith("-500", StringComparison.Ordinal)) h.BuiltinAdminEnabled = enabled;
+            }
+        }, optional: true);
+
+        Section(doc, "defender", () =>
+        {
+            var d = First(wmi, @"root\Microsoft\Windows\Defender", "SELECT RealTimeProtectionEnabled, AntivirusSignatureAge, IsTamperProtected FROM MSFT_MpComputerStatus");
+            if (d is null) return;
+            var h = doc.Security.Hardening ??= new HardeningInfo();
+            h.DefenderRealtime = Bool(d, "RealTimeProtectionEnabled");
+            h.DefenderSignatureAgeDays = Int(d, "AntivirusSignatureAge");
+            h.TamperProtection = Bool(d, "IsTamperProtected");
+        }, optional: true);
+
+        Section(doc, "device guard", () =>
+        {
+            var g = First(wmi, @"root\Microsoft\Windows\DeviceGuard", "SELECT SecurityServicesRunning FROM Win32_DeviceGuard");
+            if (g is null) return;
+            var running = g.TryGetValue("SecurityServicesRunning", out var v) ? v : null;
+            var list = running is System.Collections.IEnumerable e && running is not string ? e.Cast<object?>().Select(x => Convert.ToInt64(x, CultureInfo.InvariantCulture)).ToList() : new List<long>();
+            (doc.Security.Hardening ??= new HardeningInfo()).CredentialGuard = list.Contains(1);
+        }, optional: true);
+
         Section(doc, "local administrators", () =>
         {
             if (productType == 2) return; // domain controllers have no local groups
@@ -230,6 +267,68 @@ public static class WindowsCollector
 
         Classify(doc);
         return doc;
+    }
+
+    /// <summary>Reads Windows security settings from HKLM (policy values first, then the effective setting).</summary>
+    internal static void ReadHardening(InventoryDocument doc, IRegistrySource r)
+    {
+        var h = doc.Security.Hardening ??= new HardeningInfo();
+        bool? Is(int? v, int on) => v is null ? null : v == on;
+        var build = int.TryParse(doc.Os.Build, NumberStyles.Integer, CultureInfo.InvariantCulture, out var b) ? b : 0;
+
+        const string fw = @"SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy\";
+        const string fwPol = @"SOFTWARE\Policies\Microsoft\WindowsFirewall\";
+        bool? Fw(string profile, string policyProfile) => Is(r.GetDword(fwPol + policyProfile, "EnableFirewall"), 1) ?? Is(r.GetDword(fw + profile, "EnableFirewall"), 1);
+        h.FirewallDomain = Fw("DomainProfile", "DomainProfile");
+        h.FirewallPrivate = Fw("StandardProfile", "PrivateProfile");
+        h.FirewallPublic = Fw("PublicProfile", "PublicProfile");
+
+        const string sys = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System";
+        h.UacEnabled = Is(r.GetDword(sys, "EnableLUA"), 1) ?? true;          // absent = default (on)
+        h.UacAdminPrompt = r.GetDword(sys, "ConsentPromptBehaviorAdmin");
+        h.InactivityTimeoutSecs = r.GetDword(sys, "InactivityTimeoutSecs");
+
+        // SMBv1: server parameter, or the SMB1 client driver still installed and not disabled.
+        var smb1Server = r.GetDword(@"SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters", "SMB1");
+        var smb1Driver = r.GetDword(@"SYSTEM\CurrentControlSet\Services\mrxsmb10", "Start");
+        h.Smb1Enabled = smb1Server == 1 || (smb1Driver is not null && smb1Driver != 4) || (smb1Server is null && smb1Driver is null && build > 0 && build < 16299);
+        h.SmbSigningRequired = Is(r.GetDword(@"SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters", "RequireSecuritySignature"), 1) ?? false;
+
+        const string ts = @"SYSTEM\CurrentControlSet\Control\Terminal Server";
+        var deny = r.GetDword(@"SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services", "fDenyTSConnections") ?? r.GetDword(ts, "fDenyTSConnections");
+        h.RdpEnabled = deny is null ? null : deny == 0;
+        h.RdpNla = Is(r.GetDword(@"SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services", "UserAuthentication"), 1)
+                   ?? Is(r.GetDword(ts + @"\WinStations\RDP-Tcp", "UserAuthentication"), 1);
+        h.RdpPort = r.GetDword(ts + @"\WinStations\RDP-Tcp", "PortNumber");
+
+        h.LlmnrDisabled = Is(r.GetDword(@"SOFTWARE\Policies\Microsoft\Windows NT\DNSClient", "EnableMulticast"), 0) ?? false;
+        var autorun = r.GetDword(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer", "NoDriveTypeAutoRun")
+                      ?? r.GetDword(@"SOFTWARE\Policies\Microsoft\Windows\Explorer", "NoAutoplayfornonVolume");
+        h.AutorunDisabled = autorun is null ? false : autorun == 255 || autorun == 1;
+
+        h.WDigestCleartext = Is(r.GetDword(@"SYSTEM\CurrentControlSet\Control\SecurityProviders\WDigest", "UseLogonCredential"), 1) ?? false;
+        const string lsa = @"SYSTEM\CurrentControlSet\Control\Lsa";
+        var ppl = r.GetDword(lsa, "RunAsPPL");
+        h.LsaProtection = ppl is 1 or 2;
+        h.LmCompatibilityLevel = r.GetDword(lsa, "LmCompatibilityLevel") ?? 3;   // Windows default
+        h.NoLmHash = Is(r.GetDword(lsa, "NoLMHash"), 1) ?? true;
+
+        // Server-side protocols. Absent = Windows default: TLS 1.0/1.1 are off by default from Windows 11 24H2 / Server 2025 (build 26100).
+        const string sch = @"SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\";
+        bool? Proto(string name, bool defaultOn)
+        {
+            var en = r.GetDword(sch + name + @"\Server", "Enabled");
+            var dis = r.GetDword(sch + name + @"\Server", "DisabledByDefault");
+            if (en == 0 || dis == 1) return false;
+            if (en is not null && en != 0) return true;
+            return defaultOn;
+        }
+        h.Tls10Enabled = Proto("TLS 1.0", build < 26100);
+        h.Tls11Enabled = Proto("TLS 1.1", build < 26100);
+        h.Ssl3Enabled = Proto("SSL 3.0", false);
+
+        h.AutoUpdateDisabled = Is(r.GetDword(@"SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU", "NoAutoUpdate"), 1) ?? false;
+        h.ScriptBlockLogging = Is(r.GetDword(@"SOFTWARE\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging", "EnableScriptBlockLogging"), 1) ?? false;
     }
 
     public static IEnumerable<SoftwareItem> ReadUninstallKeys(IRegistrySource registry)

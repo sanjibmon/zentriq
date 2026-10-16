@@ -99,3 +99,17 @@ public sealed class VulnImportHandler(NpgsqlDataSource ds, VulnFeedService feeds
         await cmd.ExecuteNonQueryAsync(ct);
     }
 }
+
+/// <summary>Checks every Windows device's configuration against the enabled security baselines (read-only).</summary>
+public sealed class SecurityEvaluateHandler(Zentriq.Infrastructure.Security.SecurityStore store) : IJobHandler
+{
+    public string JobType => JobTypes.SecurityEvaluate;
+
+    public async Task<object?> ExecuteAsync(JobContext context, CancellationToken ct)
+    {
+        var e = await store.EvaluateAsync(ct);
+        await context.LogAsync($"{e.Devices} Windows device(s) checked against {e.Baselines} baseline(s): {e.Checks} check result(s), {e.Failed} failed; {e.NewFailures} newly failing, {e.Resolved} resolved." +
+            (e.NoSettingsData > 0 ? $" {e.NoSettingsData} device(s) did not report security settings (update the agent or collect inventory again)." : ""), ct: ct);
+        return e;
+    }
+}

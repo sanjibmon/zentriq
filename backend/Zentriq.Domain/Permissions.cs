@@ -29,12 +29,16 @@ public static class Permissions
     public const string SoftwareUninstall = "software.uninstall";
     public const string VulnView = "vuln.view";
     public const string VulnManage = "vuln.manage";
+    public const string SecurityView = "security.view";
+    public const string SecurityManage = "security.manage";
+    public const string IntegrationsManage = "integrations.manage";
 
     public static readonly IReadOnlyList<string> All =
     [
         AssetsView, AssetsManage, ScansRun, ScansProfiles, CredentialsManage, PatchApprove, PatchDeploy,
         DeployRun, RemoteStart, RemoteUnattended, ReportsDesign, ReportsExport, DashboardsShare, VulnExcept,
-        JobsView, UsersManage, LicensingManage, BackupRun, SettingsManage, AuditView, AgentsManage, DirectoryManage, AssetsControl, SoftwareUninstall, VulnView, VulnManage
+        JobsView, UsersManage, LicensingManage, BackupRun, SettingsManage, AuditView, AgentsManage, DirectoryManage, AssetsControl, SoftwareUninstall, VulnView, VulnManage,
+        SecurityView, SecurityManage, IntegrationsManage
     ];
 }
 

@@ -72,7 +72,9 @@ var dp = builder.Services.AddDataProtection()
 if (OperatingSystem.IsWindows()) dp.ProtectKeysWithDpapi(protectToLocalMachine: true);
 
 // ---- Authentication & authorization ----------------------------------------------------
-builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+builder.Services.AddAuthentication(AuthSchemes.Smart)
+    .AddPolicyScheme(AuthSchemes.Smart, "Session or API token", o => o.ForwardDefaultSelector = AuthSchemes.Select)
+    .AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions, ApiTokenAuthenticationHandler>(ApiTokenAuthenticationHandler.Scheme, _ => { })
     .AddCookie(o =>
     {
         o.Cookie.Name = "zentriq.session";
@@ -167,6 +169,8 @@ api.MapInventoryEndpoints();
 api.MapAgentAdminEndpoints();
 api.MapReportEndpoints();
 api.MapVulnerabilityEndpoints();
+api.MapSecurityEndpoints();
+api.MapIntegrationEndpoints();
 app.MapAgentEndpoints();
 api.MapPendingModuleEndpoints();
 app.MapOpenApi("/api/openapi/{documentName}.json").RequireAuthorization(Permissions.SettingsManage);
