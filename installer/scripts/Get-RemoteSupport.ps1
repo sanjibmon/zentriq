@@ -70,10 +70,10 @@ if ($mc.version -ne $want) { throw "MeshCentral $($mc.version) installed, expect
 # The server checks its modules at start and would try to download missing ones: prove they are all present.
 & (Join-Path $OutDir 'node\node.exe') -e @"
 const need=['archiver','cbor','compression','cookie-session','express','express-handlebars','express-ws','ipcheck','minimist','multiparty','@seald-io/nedb','node-forge','ua-parser-js','ua-client-hints-js','ws','yauzl','@zip.js/zip.js','node-windows','loadavg-windows'];
-const path=require('path'); const base=path.join(process.cwd(),'node_modules');
-const missing=need.filter(m=>{try{require.resolve(path.join(base,m,'package.json'));return false}catch(e){return true}});
-if(missing.length){console.error('Missing modules: '+missing.join(', '));process.exit(1)} console.log('All MeshCentral modules present.');
-"@
+const path=require('path'); const fs=require('fs'); const base=process.argv[1];
+const missing=need.filter(m=>!fs.existsSync(path.join(base,m,'package.json')));
+if(missing.length){console.error('Missing modules: '+missing.join(', ')+' in '+base);process.exit(1)} console.log('All MeshCentral modules present.');
+"@ (Join-Path $app 'node_modules')
 if ($LASTEXITCODE -ne 0) { throw 'MeshCentral modules are incomplete.' }
 # Remove documentation and source maps (not used at run time) to keep the installer smaller.
 Get-ChildItem (Join-Path $app 'node_modules') -Recurse -File -Include '*.md', '*.map' -ErrorAction SilentlyContinue |
