@@ -1,9 +1,20 @@
 # Test report
 
-Latest: GitHub Actions run 38851850244 (commit `4b0b543`), workflow `windows-release`, on a GitHub-hosted
-**Windows Server 2022 Datacenter 10.0.20348** VM. Release: `v1.1.1-build.45` (pre-release, **unsigned**), package
-version **1.1.1.45**. Results: unit + PostgreSQL integration tests **111/111 PASS**; installer acceptance
-**42 passed, 0 failed, 0 blocked, 10 not run**; in-place updates from published builds 27→29 (half-updated), 43 and 1.0.2 PASS.
+Latest: GitHub Actions run 38890056806 (commit `eef1f69`), workflow `windows-release`, on a GitHub-hosted
+**Windows Server 2022 Datacenter 10.0.20348** VM. Release: `v1.1.1-build.46` (pre-release, **unsigned**), package
+version **1.1.1.46**. Results: unit + PostgreSQL integration tests **134/134 PASS**; installer acceptance
+**45 passed, 0 failed, 0 blocked, 10 not run**; in-place updates from published builds (half-updated, same version) and 1.0.2 → 1.1.1.46 (schema 12) PASS.
+
+New in build 46 (Security Configuration, Integrations & Automation):
+
+| ID | Test | Result | Detail |
+|---|---|---|---|
+| T53 | Security configuration: settings collected (agentless WinRM), 30 checks, score, baseline, exception, report | **PASS** | runner: score 60; 12 passed, 11 failed (SC-05, SC-09, SC-11, SC-16, SC-19, SC-21, SC-22, SC-25, SC-27, SC-28, SC-29 — a default, unhardened Azure image), 1 unknown; server-only baseline with SC-07 = 7 days; out-of-range parameter refused; exception shows as "Exception"; security report and built-in reports run |
+| T54 | Integrations: webhook + syslog channels, test messages, alert rule, failure logging | **PASS** | HMAC-SHA256 signature verified by the receiver; CEF line `<134>1 … Zentriq - test - CEF:0\|Zentriq\|Zentriq\|1.1.1\|test\|…`; rule delivered `asset.discovered` to both channels within a minute; stored channel credentials never returned by the API; http:// Slack URL refused; unreachable channel reports the connection error |
+| T55 | API tokens | **PASS** | report data as CSV and JSON with a bearer token; 403 for a permission the token lacks; POST refused (401); last use recorded; revoked token → 401; write permissions cannot be given to a token |
+| — | Unit / DB tests | **PASS** | 30-check catalogue, hardened vs. weak devices, unknown and scope rules, Windows lifecycle (Win10 22H2, Win11 23H2 Pro/Enterprise, LTSC, Server 2012 R2–2025), scoring, baselines, exceptions, registry reading (policy first, Windows defaults); webhook signature, Slack/Teams/CEF/ServiceNow/Jira formats; end-to-end evaluation on PostgreSQL; alert rule → signed webhook to a local listener, retries; every built-in report runs |
+| — | New console screens (security overview, checks, check detail, baseline editor, devices, exceptions; integrations overview, channels, channel dialog, alert rule, delivery log, API access) | checked | rendered from the built console against a mock API |
+| — | ServiceNow, Jira, Slack and Teams against the real services | **NOT RUN** | no accounts on CI; request formats covered by unit tests — use **Send test** after configuring |
 
 New in build 45 (Reports & Analytics, Vulnerability Management):
 
