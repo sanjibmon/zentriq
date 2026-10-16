@@ -1,9 +1,19 @@
 # Test report
 
-Latest: GitHub Actions run 38890056806 (commit `eef1f69`), workflow `windows-release`, on a GitHub-hosted
-**Windows Server 2022 Datacenter 10.0.20348** VM. Release: `v1.1.1-build.46` (pre-release, **unsigned**), package
-version **1.1.1.46**. Results: unit + PostgreSQL integration tests **134/134 PASS**; installer acceptance
-**45 passed, 0 failed, 0 blocked, 10 not run**; in-place updates from published builds (half-updated, same version) and 1.0.2 → 1.1.1.46 (schema 12) PASS.
+Latest: GitHub Actions run 38920606135 (commit `8943a86`), workflow `windows-release`, on a GitHub-hosted
+**Windows Server 2022 Datacenter 10.0.20348** VM. Release: `v1.1.1-build.48` (pre-release, **unsigned**), package
+version **1.1.1.48**. Results: unit + PostgreSQL integration tests **142/142 PASS**; installer acceptance
+**48 passed, 0 failed, 0 blocked, 10 not run**; in-place updates from published builds and from 1.0.2 PASS.
+
+New in build 48 (departments, change history, console options):
+
+| ID | Test | Result | Detail |
+|---|---|---|---|
+| T56 | Departments: create, assign, filter, dashboard, reports, rename, delete | **PASS** | duplicate name refused; deleting leaves devices unassigned |
+| T57 | Change history on the runner: software installed → updated → uninstalled | **PASS** | 1.0.0 → 2.0.0 → removed, all recorded; shown device-wise; change report rows |
+| T58 | Company logo | **PASS** | PNG stored and served without sign-in; SVG refused; removal |
+| — | Unit / DB tests | **PASS** | hardware/software diff (memory, disks, CPU, BIOS, replaced board, adapters, KBs, OS upgrade), false-change guards, department report columns |
+| — | Build 47 | FAIL → fixed | acceptance T53/T57 script issues (strict mode; collect-now fallback), not product defects |
 
 New in build 46 (Security Configuration, Integrations & Automation):
 
