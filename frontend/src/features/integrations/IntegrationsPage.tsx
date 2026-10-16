@@ -335,7 +335,7 @@ function Rules({ catalog }: { catalog: Catalog }) {
   );
 }
 
-const CATEGORIES = ['server', 'endpoint', 'network_device', 'printer', 'iot', 'virtual_host', 'other'];
+const CATEGORIES: [string, string][] = [['server', 'Server'], ['endpoint', 'Workstation'], ['network_device', 'Network device'], ['printer', 'Printer'], ['iot', 'IoT'], ['virtual_host', 'Virtualization host'], ['other', 'Other']];
 
 function RuleDialog({ rule, catalog, channels, onClose, onSaved }: { rule: Rule | null; catalog: Catalog; channels: Channel[]; onClose: () => void; onSaved: () => void }) {
   const [f, setF] = useState<Omit<Rule, 'id' | 'lastFiredAt' | 'sent7d'>>(rule ?? {
@@ -374,7 +374,7 @@ function RuleDialog({ rule, catalog, channels, onClose, onSaved }: { rule: Rule 
           {ev && <small className="muted" style={{ marginTop: -6 }}>{ev.description}</small>}
           {ev?.perDevice && <>
             <div><div style={{ fontSize: 13, fontWeight: 500, marginBottom: 5 }}>Only for device categories <span className="faint">(none = all)</span></div>
-              <div className="check-grid">{CATEGORIES.map((c) => <label key={c} className="check-inline"><input type="checkbox" checked={f.conditions.categories.includes(c)} onChange={() => setF({ ...f, conditions: { ...f.conditions, categories: toggle(f.conditions.categories, c) } })} /> {fmt.label(c)}</label>)}</div>
+              <div className="check-grid">{CATEGORIES.map(([c, l]) => <label key={c} className="check-inline"><input type="checkbox" checked={f.conditions.categories.includes(c)} onChange={() => setF({ ...f, conditions: { ...f.conditions, categories: toggle(f.conditions.categories, c) } })} /> {l}</label>)}</div>
             </div>
             <div><div style={{ fontSize: 13, fontWeight: 500, marginBottom: 5 }}>Only for asset criticality <span className="faint">(none = all)</span></div>
               <div className="check-grid">{['Critical', 'High', 'Medium', 'Low'].map((c) => <label key={c} className="check-inline"><input type="checkbox" checked={f.conditions.criticality.includes(c)} onChange={() => setF({ ...f, conditions: { ...f.conditions, criticality: toggle(f.conditions.criticality, c) } })} /> {c}</label>)}</div>
@@ -463,6 +463,7 @@ function ApiAccess({ catalog }: { catalog: Catalog }) {
           { key: 'x', label: '', render: (t) => !t.revokedAt ? <button className="btn sm" onClick={() => void revoke(t)}>Revoke</button> : null },
         ]} />
       </Panel>
+      <div style={{ height: 14 }} />
       <Panel title="Using the API">
         <p style={{ marginTop: 0 }}>Send the token in the <span className="mono">Authorization</span> header. Tokens can only read (GET); they carry the permissions chosen when created, limited to what the creator still has, and stop working when the creator's account is disabled.</p>
         <p style={{ margin: '10px 0 0' }}><b>Data of a saved report</b> (any report you can open in Reports &amp; Analytics — copy its id from the address bar):</p>

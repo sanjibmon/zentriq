@@ -119,7 +119,7 @@ Remove-Item $answer -Force   # contains the administrator password
 
 if (-not $installed) {
     foreach ($t in 'T02 PostgreSQL provisioning', 'T03 Database migration', 'T04 Administrator sign-in', 'T05 API and worker services', 'T06 Trial initialization',
-                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF') {
+                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens') {
         Record $t.Substring(0, 3) $t.Substring(4) 'BLOCKED' 'installation failed'
     }
 } else {
@@ -766,6 +766,162 @@ if (-not $installed) {
             -Body (@{ name = 'x'; shared = $false; filters = @{}; refreshSeconds = 60; widgets = @(@{ type = 'report'; width = 4; height = 2; settings = @{} }) } | ConvertTo-Json -Depth 6)
         Assert ($badWidget.StatusCode -eq 400) "report widget without a report accepted: $($badWidget.StatusCode)"
         "aggregates and month buckets OK; 3 new data sources; PDF $($bytes.Length) bytes; report widget saved"
+    } | Out-Null
+
+    Check 'T53' 'Security configuration: Windows settings collected, 30 checks evaluated, score, baseline, exception, report' {
+        $s = Login
+        # Collect inventory again so this server reports its security settings with this build's collector.
+        Api POST '/assets/collect' @{ all = $true } -Session $s | Out-Null
+        $deadline = (Get-Date).AddMinutes(8)
+        $evaluated = $false
+        do {
+            Start-Sleep 20
+            $o = Api GET '/security/overview' -Session $s
+            if ($o.coverage.windowsDevices -ge 1 -and $o.coverage.noSettingsData -lt $o.coverage.windowsDevices -and -not $evaluated) {
+                Api POST '/security/evaluate' -Session $s | Out-Null; $evaluated = $true; Start-Sleep 20
+                $o = Api GET '/security/overview' -Session $s
+            }
+        } while (-not ($evaluated -and $o.kpi.devices -ge 1) -and (Get-Date) -lt $deadline)
+        Assert ($o.coverage.windowsDevices -ge 1) 'no Windows device with inventory'
+        Assert ($o.coverage.noSettingsData -lt $o.coverage.windowsDevices) "no Windows device reported its security settings ($($o.coverage.noSettingsData) of $($o.coverage.windowsDevices) without)"
+        Assert ($o.kpi.devices -ge 1 -and $null -ne $o.kpi.avgScore) "not evaluated: $($o.kpi | ConvertTo-Json -Compress)"
+        $dev = (Api GET '/security/devices?sort=worst&pageSize=50' -Session $s).items | Where-Object { $null -ne $_.score } | Select-Object -First 1
+        Assert $dev 'no scored device'
+        $d = Api GET "/security/devices/$($dev.assetId)" -Session $s
+        Assert ($d.settingsReported) 'device page: settings not reported'
+        $known = @($d.results | Where-Object { $_.status -in 'pass', 'fail' })
+        Assert ($known.Count -ge 15) "only $($known.Count) checks could be decided on $($dev.hostname): unknown = $((@($d.results | Where-Object status -eq 'unknown').rule) -join ',')"
+        foreach ($must in 'SC-02', 'SC-11', 'SC-15', 'SC-20', 'SC-22') {
+            $r = $d.results | Where-Object rule -eq $must | Select-Object -First 1
+            Assert ($r -and $r.status -in 'pass', 'fail') "$must is $($r.status) ($($r.actual))"
+        }
+        $rules = (Api GET '/security/rules' -Session $s).rules
+        Assert (@($rules).Count -eq 30 -and @($rules | Where-Object enabled).Count -eq 28) "rules: $(@($rules).Count), on $(@($rules | Where-Object enabled).Count)"
+        $failing = @($d.results | Where-Object status -eq 'fail')
+        $target = if ($failing.Count) { $failing[0] } else { $known[0] }
+        $rd = Api GET "/security/rules/$($target.rule)?status=" -Session $s
+        Assert ($rd.rule.remediation.Length -gt 20 -and @($rd.devices).Count -ge 1) 'check detail lacks guidance or devices'
+        # A baseline for servers with a stricter patch window; then an exception for this device.
+        $builtIn = @(Api GET '/security/baselines' -Session $s | ForEach-Object { $_ }) | Where-Object builtIn
+        $nb = Api POST '/security/baselines' @{ name = 'CI servers'; categories = @('server'); copyFrom = $builtIn.id } -Session $s
+        $det = Api GET "/security/baselines/$($nb.id)" -Session $s
+        $body = @{ name = 'CI servers'; description = 'CI'; enabled = $true; categories = @('server'); rules = @($det.rules | ForEach-Object { @{ id = $_.id; enabled = $_.enabled; severity = $null; params = $(if ($_.id -eq 'SC-07') { @{ maxDays = 7 } } else { @{} }) } }) }
+        Api PUT "/security/baselines/$($nb.id)" $body -Session $s | Out-Null
+        Assert (((Api GET "/security/baselines/$($nb.id)" -Session $s).rules | Where-Object id -eq 'SC-07').params[0].value -eq 7) 'baseline parameter not saved'
+        $bad = Invoke-WebRequest "$base/api/v1/security/baselines/$($nb.id)" -Method Put -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } -ContentType 'application/json' -SkipHttpErrorCheck `
+            -Body (@{ name = 'CI servers'; rules = @(@{ id = 'SC-07'; enabled = $true; params = @{ maxDays = 1 } }) } | ConvertTo-Json -Depth 5)
+        Assert ($bad.StatusCode -eq 400) "out-of-range parameter accepted: $($bad.StatusCode)"
+        Api POST '/security/exceptions' @{ ruleId = $target.rule; assetIds = @($dev.assetId); reason = 'CI exception test'; expiresAt = (Get-Date).AddDays(30).ToUniversalTime().ToString('o') } -Session $s | Out-Null
+        Api POST '/security/evaluate' -Session $s | Out-Null
+        $deadline = (Get-Date).AddMinutes(3)
+        do { Start-Sleep 10; $after = Api GET "/security/devices/$($dev.assetId)" -Session $s } while ((($after.results | Where-Object { $_.rule -eq $target.rule -and $_.baselineId -eq $builtIn.id }).status -ne 'exempt' -or @($after.baselines).Count -lt 2) -and (Get-Date) -lt $deadline)
+        Assert (($after.results | Where-Object { $_.rule -eq $target.rule -and $_.baselineId -eq $builtIn.id }).status -eq 'exempt') 'exception not applied'
+        Assert (@($after.baselines).Count -ge 2) 'the server baseline was not evaluated'
+        $rep = Api POST '/reports/run' @{ dataset = 'security'; definition = @{ columns = @('hostname', 'rule', 'title', 'status', 'actual', 'baseline'); filters = @() } } -Session $s
+        Assert ($rep.total -ge 15) "security report: $($rep.total) rows"
+        $lib = @(Api GET '/reports' -Session $s | ForEach-Object { $_ }) | Where-Object { $_.system -and $_.dataset -eq 'security' }
+        Assert (@($lib).Count -ge 2) 'built-in security reports missing'
+        foreach ($x in @(Api GET '/security/exceptions' -Session $s | ForEach-Object { $_ }) | Where-Object reason -eq 'CI exception test') { Api DELETE "/security/exceptions/$($x.id)" -Session $s | Out-Null }
+        Api DELETE "/security/baselines/$($nb.id)" -Session $s | Out-Null
+        $fail = @($d.results | Where-Object status -eq 'fail' | ForEach-Object rule)
+        "$($dev.hostname): score $($dev.score); $(@($d.results | Where-Object status -eq 'pass').Count) passed, $($fail.Count) failed ($($fail -join ', ')), $(@($d.results | Where-Object status -eq 'unknown').Count) unknown; baseline + exception + report OK"
+    } | Out-Null
+
+    Check 'T54' 'Integrations: signed webhook and syslog (CEF) channels, test messages, alert rule delivers an event, failures logged' {
+        $s = Login
+        $hookFile = Join-Path $OutDir 'ci-webhook.jsonl'; $sysFile = Join-Path $OutDir 'ci-syslog.txt'
+        Remove-Item $hookFile, $sysFile -ErrorAction SilentlyContinue
+        $hook = Start-ThreadJob -ArgumentList $hookFile -ScriptBlock {
+            param($file)
+            $l = [Net.HttpListener]::new(); $l.Prefixes.Add('http://127.0.0.1:18099/hook/'); $l.Start()
+            $deadline = (Get-Date).AddMinutes(8); $t = $null
+            while ((Get-Date) -lt $deadline) {
+                if (-not $t) { $t = $l.GetContextAsync() }
+                if (-not $t.Wait(3000)) { continue }
+                $c = $t.Result; $t = $null
+                $body = [IO.StreamReader]::new($c.Request.InputStream, [Text.Encoding]::UTF8).ReadToEnd()
+                [ordered]@{ body = $body; sig = $c.Request.Headers['X-Zentriq-Signature']; ts = $c.Request.Headers['X-Zentriq-Timestamp']; ev = $c.Request.Headers['X-Zentriq-Event']; key = $c.Request.Headers['X-Api-Key'] } | ConvertTo-Json -Compress | Add-Content $file
+                $c.Response.StatusCode = 204; $c.Response.Close()
+            }
+            $l.Stop()
+        }
+        $sys = Start-ThreadJob -ArgumentList $sysFile -ScriptBlock {
+            param($file)
+            $u = [Net.Sockets.UdpClient]::new(15514); $u.Client.ReceiveTimeout = 3000
+            $ep = [Net.IPEndPoint]::new([Net.IPAddress]::Any, 0); $deadline = (Get-Date).AddMinutes(8)
+            while ((Get-Date) -lt $deadline) { try { $b = $u.Receive([ref]$ep); Add-Content $file ([Text.Encoding]::UTF8.GetString($b)) } catch { } }
+            $u.Close()
+        }
+        Start-Sleep 3
+        try {
+            $hmacKey = 'ci-' + [guid]::NewGuid().ToString('N')
+            $wh = Api POST '/integrations/channels' @{ kind = 'webhook'; name = 'CI webhook'; settings = @{ url = 'http://127.0.0.1:18099/hook/'; headerName = 'X-Api-Key' }; secrets = @{ signingSecret = $hmacKey; headerValue = 'ci-key' } } -Session $s
+            $sl = Api POST '/integrations/channels' @{ kind = 'syslog'; name = 'CI syslog'; settings = @{ host = '127.0.0.1'; port = 15514; protocol = 'udp'; format = 'cef' } } -Session $s
+            $badSlack = Invoke-WebRequest "$base/api/v1/integrations/channels" -Method Post -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } -ContentType 'application/json' -SkipHttpErrorCheck `
+                -Body (@{ kind = 'slack'; name = 'bad'; secrets = @{ url = 'http://hooks.slack.com/x' } } | ConvertTo-Json -Depth 4)
+            Assert ($badSlack.StatusCode -eq 400) "Slack channel with an http:// URL accepted: $($badSlack.StatusCode)"
+            $list = Invoke-WebRequest "$base/api/v1/integrations/channels" -WebSession $s
+            Assert (-not (Body $list).Contains($hmacKey) -and -not (Body $list).Contains('ci-key')) 'a channel secret is returned by the API'
+            $t1 = Api POST "/integrations/channels/$($wh.id)/test" -Session $s
+            Assert ($t1.ok) "webhook test failed: $($t1.error)"
+            $t2 = Api POST "/integrations/channels/$($sl.id)/test" -Session $s
+            Assert ($t2.ok) "syslog test failed: $($t2.error)"
+            $deadline = (Get-Date).AddSeconds(30)
+            while (-not ((Test-Path $hookFile) -and (Test-Path $sysFile)) -and (Get-Date) -lt $deadline) { Start-Sleep 2 }
+            $first = Get-Content $hookFile -ErrorAction SilentlyContinue | Select-Object -First 1 | ConvertFrom-Json
+            Assert ($first -and $first.ev -eq 'test' -and $first.key -eq 'ci-key') "webhook not received: $($first | ConvertTo-Json -Compress)"
+            $mac = [Security.Cryptography.HMACSHA256]::new([Text.Encoding]::UTF8.GetBytes($hmacKey))
+            $expected = 'sha256=' + ([Convert]::ToHexString($mac.ComputeHash([Text.Encoding]::UTF8.GetBytes("$($first.ts).$($first.body)")))).ToLowerInvariant()
+            Assert ($first.sig -eq $expected) "signature $($first.sig) does not match $expected"
+            $line = Get-Content $sysFile -ErrorAction SilentlyContinue | Select-Object -First 1
+            Assert ($line -match '^<134>1 \S+ \S+ Zentriq - test - CEF:0\|Zentriq\|Zentriq\|[^|]+\|test\|') "syslog line: $line"
+            # An alert rule sends a real event: a new device.
+            Api POST '/integrations/rules' @{ name = 'CI new devices'; eventType = 'asset.discovered'; minSeverity = 'info'; channelIds = @($wh.id, $sl.id); throttleMinutes = 0 } -Session $s | Out-Null
+            Start-Sleep 5
+            $asset = Api POST '/assets' @{ hostname = 'CI-INTEGRATION-DEVICE'; category = 'other'; osFamily = 'other'; criticality = 'Low' } -Session $s
+            $deadline = (Get-Date).AddMinutes(4)
+            do { Start-Sleep 10; $got = @(Get-Content $hookFile -ErrorAction SilentlyContinue | ForEach-Object { $_ | ConvertFrom-Json } | Where-Object ev -eq 'asset.discovered') } while ($got.Count -eq 0 -and (Get-Date) -lt $deadline)
+            Assert ($got.Count -ge 1) 'no asset.discovered webhook within 4 minutes'
+            $evBody = $got[0].body | ConvertFrom-Json
+            Assert ($evBody.asset.hostname -eq 'CI-INTEGRATION-DEVICE' -and $evBody.type -eq 'asset.discovered') "event body: $($got[0].body)"
+            Start-Sleep 3
+            Assert (@(Get-Content $sysFile | Where-Object { $_ -match '\|asset\.discovered\|' -and $_ -match 'CI-INTEGRATION-DEVICE' }).Count -ge 1) 'asset event not in syslog'
+            $log = Api GET '/integrations/deliveries?status=sent' -Session $s
+            Assert (@($log.items | Where-Object eventType -eq 'asset.discovered').Count -ge 2) 'delivery log lacks the sent event'
+            # A channel that cannot be reached: the test reports the error and the channel shows it.
+            $dead = Api POST '/integrations/channels' @{ kind = 'webhook'; name = 'CI unreachable'; settings = @{ url = 'http://127.0.0.1:1/none' } } -Session $s
+            $t3 = Api POST "/integrations/channels/$($dead.id)/test" -Session $s
+            Assert (-not $t3.ok -and $t3.error) 'unreachable webhook reported as sent'
+            Assert ((@(Api GET '/integrations/channels' -Session $s | ForEach-Object { $_ }) | Where-Object id -eq $dead.id).lastError) 'channel error not recorded'
+            Api POST "/assets/$($asset.id)/retire" -Session $s | Out-Null
+            "webhook HMAC verified; CEF syslog: $($line.Substring(0, [Math]::Min(90, $line.Length)))…; rule delivered asset.discovered to 2 channels; failure logged: $($t3.error)"
+        } finally {
+            Stop-Job $hook, $sys -ErrorAction SilentlyContinue; Remove-Job $hook, $sys -Force -ErrorAction SilentlyContinue
+        }
+    } | Out-Null
+
+    Check 'T55' 'API tokens: read-only bearer access to report data, permissions limited, revocation' {
+        $s = Login
+        $bad = Invoke-WebRequest "$base/api/v1/integrations/tokens" -Method Post -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } -ContentType 'application/json' -SkipHttpErrorCheck `
+            -Body (@{ name = 'bad'; permissions = @('users.manage') } | ConvertTo-Json)
+        Assert ($bad.StatusCode -eq 400) "token with a write permission accepted: $($bad.StatusCode)"
+        $tok = Api POST '/integrations/tokens' @{ name = 'CI token'; permissions = @('reports.export', 'assets.view', 'security.view'); expiresInDays = 1 } -Session $s
+        Assert ($tok.token -like 'zq_*') 'no token returned'
+        $h = @{ Authorization = "Bearer $($tok.token)" }
+        $all = @(Api GET '/reports' -Session $s | ForEach-Object { $_ }) | Where-Object { $_.system -and $_.name -eq 'All assets' }
+        $csv = Invoke-WebRequest "$base/api/v1/reports/$($all.id)/data?format=csv" -Headers $h -SkipHttpErrorCheck
+        Assert ($csv.StatusCode -eq 200 -and (Body $csv) -match 'Hostname') "CSV with token: $($csv.StatusCode)"
+        $json = Invoke-RestMethod "$base/api/v1/reports/$($all.id)/data" -Headers $h
+        Assert ($json.total -ge 1 -and $null -ne $json.rows[0].hostname) 'JSON rows missing'
+        Assert ((Invoke-WebRequest "$base/api/v1/security/overview" -Headers $h -SkipHttpErrorCheck).StatusCode -eq 200) 'security overview with token'
+        Assert ((Invoke-WebRequest "$base/api/v1/vulnerabilities/overview" -Headers $h -SkipHttpErrorCheck).StatusCode -eq 403) 'token without vuln.view could read vulnerabilities'
+        $post = Invoke-WebRequest "$base/api/v1/security/evaluate" -Method Post -Headers ($h + @{ 'X-Zentriq-Request' = '1' }) -SkipHttpErrorCheck
+        Assert ($post.StatusCode -eq 401) "POST with a token returned $($post.StatusCode)"
+        $listed = @(Api GET '/integrations/tokens' -Session $s | ForEach-Object { $_ }) | Where-Object id -eq $tok.id
+        Assert ($listed.lastUsedAt) 'last use not recorded'
+        Api DELETE "/integrations/tokens/$($tok.id)" -Session $s | Out-Null
+        Assert ((Invoke-WebRequest "$base/api/v1/reports/$($all.id)/data" -Headers $h -SkipHttpErrorCheck).StatusCode -eq 401) 'revoked token still works'
+        "CSV $((Body $csv).Length) bytes and $($json.total) JSON row(s) with the token; 403 without permission; POST refused; revoked -> 401"
     } | Out-Null
 
     if ($UpgradeBundle) {
