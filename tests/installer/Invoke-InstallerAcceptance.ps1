@@ -790,7 +790,7 @@ if (-not $installed) {
         $d = Api GET "/security/devices/$($dev.assetId)" -Session $s
         Assert ($d.settingsReported) 'device page: settings not reported'
         $known = @($d.results | Where-Object { $_.status -in 'pass', 'fail' })
-        Assert ($known.Count -ge 15) "only $($known.Count) checks could be decided on $($dev.hostname): unknown = $((@($d.results | Where-Object status -eq 'unknown').rule) -join ',')"
+        Assert ($known.Count -ge 15) "only $($known.Count) checks could be decided on $($dev.hostname): unknown = $(@($d.results | Where-Object status -eq 'unknown' | ForEach-Object rule) -join ',')"
         foreach ($must in 'SC-02', 'SC-11', 'SC-15', 'SC-20', 'SC-22') {
             $r = $d.results | Where-Object rule -eq $must | Select-Object -First 1
             Assert ($r -and $r.status -in 'pass', 'fail') "$must is $($r.status) ($($r.actual))"
@@ -955,12 +955,21 @@ if (-not $installed) {
         $me = (Api GET "/assets?q=$env:COMPUTERNAME&pageSize=10" -Session $s).items | Where-Object { $_.inventoryStatus -eq 'success' } | Select-Object -First 1
         Assert $me "no inventoried asset for $env:COMPUTERNAME"
         $key = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\ZentriqCiChangeTest'
+        $script:collectNotes = @()
         function Collect-Wait {
             $before = (Api GET "/assets/$($me.id)" -Session $s).lastInventoryAt
-            Api POST '/assets/collect' @{ assetIds = @($me.id) } -Session $s | Out-Null
-            $deadline = (Get-Date).AddMinutes(6)
-            do { Start-Sleep 15; $now = (Api GET "/assets/$($me.id)" -Session $s).lastInventoryAt } while ($now -eq $before -and (Get-Date) -lt $deadline)
-            if ($now -eq $before) { throw "inventory of $($me.hostname) was not collected again within 6 minutes" }
+            $c = Api POST '/assets/collect' @{ assetIds = @($me.id) } -Session $s
+            $deadline = (Get-Date).AddMinutes(2)
+            do { Start-Sleep 10; $now = (Api GET "/assets/$($me.id)" -Session $s).lastInventoryAt } while ($now -eq $before -and (Get-Date) -lt $deadline)
+            if ($now -ne $before) { $script:collectNotes += 'collect-now'; return }
+            # "Collect inventory now" did not reach this device (see its message); scan it directly with the T28 credential.
+            $script:collectNotes += "scan (collect-now said: $($c.message))"
+            Assert $script:ciCred 'no credential from T28'
+            $scan = Api POST '/discovery/scans' @{ name = 'ci-changes'; scanType = 'single'; targetsText = $me.ip; credentialIds = @($script:ciCred) } -Session $s
+            $deadline = (Get-Date).AddMinutes(5)
+            do { Start-Sleep 5; $d = Api GET "/discovery/scans/$($scan.id)" -Session $s } while ($d.scan.status -in 'queued', 'running' -and (Get-Date) -lt $deadline)
+            $now = (Api GET "/assets/$($me.id)" -Session $s).lastInventoryAt
+            if ($now -eq $before) { throw "inventory of $($me.hostname) was not collected again (scan $($d.scan.status); collect-now: $($c.message))" }
         }
         function Find-Change([string] $change) {
             @((Api GET "/inventory/changes?assetId=$($me.id)&kind=software&days=1&pageSize=200" -Session $s).items | Where-Object { $_.item -eq 'Zentriq CI Change Test' -and $_.change -eq $change })
@@ -990,7 +999,7 @@ if (-not $installed) {
         $run = Api POST '/reports/run' @{ dataset = 'changes'; definition = (Api GET "/reports/$($lib.id)" -Session $s).definition } -Session $s
         Assert ($run.total -ge 3) "software changes report: $($run.total) row(s)"
         $hw = @((Api GET "/inventory/changes?assetId=$($me.id)&kind=hardware&days=1" -Session $s).items)
-        "$($me.hostname): installed 1.0.0 -> updated to 2.0.0 -> uninstalled, all recorded; device-wise summary $($row[0].changes) change(s); report $($run.total) row(s); hardware changes during the test: $($hw.Count)"
+        "$($me.hostname): installed 1.0.0 -> updated to 2.0.0 -> uninstalled, all recorded; device-wise summary $($row[0].changes) change(s); report $($run.total) row(s); hardware changes during the test: $($hw.Count); collected by: $(($script:collectNotes | Select-Object -Unique) -join ' / ')"
     } | Out-Null
 
     Check 'T58' 'Company logo: upload (PNG), shown without sign-in, unsafe types refused, removal' {
