@@ -208,7 +208,7 @@ public sealed class ReportAnalyticsTests
         Assert.Contains("Devices \\(test\\)", text);                      // parentheses escaped
         Assert.Contains("Zürich", text);                             // Latin-1 kept
         // Every xref offset points at its object.
-        var xref = text.LastIndexOf("xref\n", StringComparison.Ordinal);
+        var xref = text.LastIndexOf("\nxref\n", StringComparison.Ordinal) + 1;   // not the "xref" inside "startxref"
         var lines = text[xref..].Split('\n');
         var count = int.Parse(lines[1].Split(' ')[1]);
         for (var i = 1; i < count; i++)

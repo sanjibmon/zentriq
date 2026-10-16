@@ -7,6 +7,7 @@ import { Link, useRouter } from '../../app/router';
 import { Callout, DataTable, ErrorBox, fmt, Loading, PageHead, Panel, Pill, statusTone } from '../../components/ui';
 import { useConfirm } from '../../components/Confirm';
 import { CategoryChart, CHART_KINDS, HBars, PostureBars, TrendArea, type ChartKind, type Slice } from '../../components/charts';
+import { ReportWidget } from './ReportWidget';
 
 const TYPE_LABEL: Record<string, string> = {
   laptop: 'Laptop', desktop: 'Desktop', server: 'Physical server', virtual: 'Virtual machine', other: 'Other hardware',
@@ -52,6 +53,8 @@ function Hero({ label, value, sub, to, meter, tone }: { label: string; value: st
   return to ? <Link to={to} className="hero-card">{body}</Link> : <div className="hero-card">{body}</div>;
 }
 
+interface VulnSummary { bySeverity: KC[]; aging: { bucket: string; critical: number; high: number; medium: number; low: number }[] }
+
 // ---- Widget registry ---------------------------------------------------------------------------------------
 interface WidgetDef { id: string; title: string; wide?: boolean; full?: boolean; defaultOn: boolean; description: string; chart?: ChartKind }
 const WIDGETS: WidgetDef[] = [
@@ -74,10 +77,46 @@ const WIDGETS: WidgetDef[] = [
   { id: 'scans.results', chart: 'donut', title: 'Discovery results', defaultOn: true, description: 'Outcome of scans in the last 30 days' },
   { id: 'license.usage', title: 'Licensing', defaultOn: true, description: 'Trial or license and device usage' },
   { id: 'scans.recent', title: 'Recent scans', defaultOn: false, description: 'Last five scans' },
+  { id: 'vuln.severity', chart: 'donut', title: 'Open vulnerabilities', defaultOn: false, description: 'Software and Windows findings by severity' },
+  { id: 'vuln.aging', chart: 'column', title: 'Vulnerability aging', defaultOn: false, description: 'How long open findings have been open' },
 ];
-type Layout = { id: string; wide: boolean; chart?: ChartKind }[];
+/** A widget on the dashboard. Saved reports are widgets too (id "report:<id>"). */
+type LayoutItem = { id: string; wide: boolean; chart?: ChartKind; reportId?: string; title?: string | null };
+type Layout = LayoutItem[];
 const DEFAULT_LAYOUT: Layout = WIDGETS.filter((w) => w.defaultOn).map((w) => ({ id: w.id, wide: !!w.wide, chart: w.chart }));
-interface DashboardDto { id: string; name: string; owned: boolean; widgets: { type: string; width: number; settings?: { chart?: ChartKind } | null }[] }
+interface DashboardDto {
+  id: string; name: string; owned: boolean;
+  widgets: { type: string; title?: string | null; width: number; settings?: { chart?: ChartKind; reportId?: string } | null }[];
+}
+const defFor = (it: LayoutItem): WidgetDef | undefined => it.reportId
+  ? { id: it.id, title: it.title || 'Saved report', defaultOn: false, description: 'Saved report', chart: 'bar' }
+  : WIDGETS.find((w) => w.id === it.id);
+const toBody = (layout: Layout) => layout.map((w) => ({
+  type: w.reportId ? 'report' : w.id, title: w.reportId ? (w.title ?? null) : null, width: w.wide ? 8 : 4, height: 2,
+  settings: { ...(w.chart ? { chart: w.chart } : {}), ...(w.reportId ? { reportId: w.reportId } : {}) },
+}));
+const fromDto = (d: DashboardDto | null): Layout | null => {
+  // Only a layout saved by this dashboard counts. Dashboards from earlier versions (kpi.assets, assets.byOs, …)
+  // would otherwise show just the two widget types that still exist; they get the default layout instead.
+  const ws = d?.widgets ?? [];
+  const known = ws.length > 0 && ws.every((w) => WIDGETS.some((x) => x.id === w.type) || (w.type === 'report' && !!w.settings?.reportId));
+  if (!known) return null;
+  return ws.map((w) => w.type === 'report'
+    ? { id: `report:${w.settings!.reportId}`, reportId: w.settings!.reportId, title: w.title, wide: w.width >= 8, chart: isKind(w.settings?.chart) ? w.settings!.chart : undefined }
+    : { id: w.type, wide: w.width >= 8, chart: isKind(w.settings?.chart) ? w.settings!.chart : WIDGETS.find((x) => x.id === w.type)?.chart });
+};
+
+/** Adds a saved report to the user's own dashboard (creating it from the default layout when needed). */
+export async function pinReportToDashboard(reportId: string, name: string, wide: boolean): Promise<'added' | 'present'> {
+  const list = await api.get<DashboardDto[]>('/dashboards');
+  const mine = list.find((d) => d.owned) ?? null;
+  const layout = fromDto(mine) ?? DEFAULT_LAYOUT;
+  if (layout.some((w) => w.reportId === reportId)) return 'present';
+  const next = [...layout, { id: `report:${reportId}`, reportId, title: name, wide }];
+  const body = { name: mine?.name ?? 'My dashboard', shared: false, filters: {}, refreshSeconds: 60, widgets: toBody(next) };
+  if (mine) await api.put(`/dashboards/${mine.id}`, body); else await api.post('/dashboards', body);
+  return 'added';
+}
 const isKind = (k: unknown): k is ChartKind => CHART_KINDS.some(([c]) => c === k);
 
 export function DashboardPage() {
@@ -96,14 +135,10 @@ export function DashboardPage() {
   useEffect(() => { const t = setInterval(() => setTick((x) => x + 1), 60000); return () => clearInterval(t); }, []);
 
   const mine = dashboards.data?.find((d) => d.owned) ?? null;
-  const saved: Layout | null = useMemo(() => {
-    // Only a layout saved by this dashboard counts. Dashboards from earlier versions (kpi.assets, assets.byOs, …)
-    // would otherwise show just the two widget types that still exist; they get the default layout instead.
-    const ws = mine?.widgets ?? [];
-    const own = ws.length > 0 && ws.every((w) => WIDGETS.some((d) => d.id === w.type));
-    return own ? ws.map((w) => ({ id: w.type, wide: w.width >= 8, chart: isKind(w.settings?.chart) ? w.settings!.chart : WIDGETS.find((d) => d.id === w.type)?.chart })) : null;
-  }, [mine]);
+  const saved: Layout | null = useMemo(() => fromDto(mine), [mine]);
   const layout = saved ?? DEFAULT_LAYOUT;
+  const wantsVulns = layout.some((w) => w.id.startsWith('vuln.')) && can('vuln.view');
+  const vulns = useApi(() => (wantsVulns ? api.get<VulnSummary>('/vulnerabilities/overview') : Promise.resolve(null)), [tick, wantsVulns]);
 
   const o = ov.data;
   const k = o?.kpi;
@@ -115,7 +150,7 @@ export function DashboardPage() {
     try { setMsg((await api.post<{ message: string }>('/assets/collect', { all: true })).message); } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
   }
   async function saveLayout(next: Layout) {
-    const body = { name: mine?.name ?? 'My dashboard', shared: false, filters: {}, refreshSeconds: 60, widgets: next.map((w) => ({ type: w.id, title: null, width: w.wide ? 8 : 4, height: 2, settings: w.chart ? { chart: w.chart } : {} })) };
+    const body = { name: mine?.name ?? 'My dashboard', shared: false, filters: {}, refreshSeconds: 60, widgets: toBody(next) };
     try {
       if (mine) await api.put(`/dashboards/${mine.id}`, body); else await api.post('/dashboards', body);
       dashboards.reload();
@@ -132,6 +167,21 @@ export function DashboardPage() {
     const C = (data: Slice[], onSelect?: (s: Slice) => void, opts: { centerLabel?: string; color?: string; max?: number } = {}) =>
       <CategoryChart kind={chart} data={data} onSelect={onSelect} {...opts} />;
     switch (id) {
+      case 'vuln.severity': {
+        if (!can('vuln.view')) return <div className="chart-empty">You do not have access to vulnerability data.</div>;
+        const v = vulns.data;
+        if (!v) return <div className="chart-empty">Loading…</div>;
+        const SEV: Record<string, string> = { critical: 'var(--crit)', high: '#e8590c', medium: 'var(--warn)', low: 'var(--info)', none: 'var(--line-strong)' };
+        return C(v.bySeverity.map((r) => ({ key: r.key, label: fmt.label(r.key), value: r.count, color: SEV[r.key] })),
+          (s) => navigate(`/vulnerabilities?tab=findings&severity=${encodeURIComponent(s.key)}`), { centerLabel: 'open' });
+      }
+      case 'vuln.aging': {
+        if (!can('vuln.view')) return <div className="chart-empty">You do not have access to vulnerability data.</div>;
+        const v = vulns.data;
+        if (!v) return <div className="chart-empty">Loading…</div>;
+        return C(v.aging.map((b) => ({ key: b.bucket, label: b.bucket, value: b.critical + b.high + b.medium + b.low })),
+          () => navigate('/vulnerabilities?tab=findings&sort=age'), { centerLabel: 'open' });
+      }
       case 'kpi.tiles':
         return (
           <div className="dash-hero">
@@ -231,10 +281,18 @@ export function DashboardPage() {
       {!o || !k ? <Loading /> : (
         <>
           <div className="dash-grid">
-            {layout.map(({ id, wide, chart }) => {
-              const def = WIDGETS.find((w) => w.id === id);
+            {layout.map((item) => {
+              const { id, wide, chart } = item;
+              const def = defFor(item);
               if (!def) return null;
               if (def.full) return <div key={id} className="dash-full">{render(id)}</div>;
+              if (item.reportId) return (
+                <div key={id} className={`dash-tile${wide ? ' dash-wide' : ''}`}>
+                  <Panel title={def.title} sub="Saved report" right={<Link to={`/reports/${item.reportId}`} className="btn sm">Open</Link>}>
+                    <ReportWidget reportId={item.reportId} chart={chart} tick={tick} />
+                  </Panel>
+                </div>
+              );
               return (
                 <div key={id} className={`dash-tile${wide ? ' dash-wide' : ''}`}>
                   <Panel title={def.title} sub={sub[id]} right={links[id]} flush={id === 'scans.recent'}>{render(id, chart ?? def.chart)}</Panel>
@@ -252,8 +310,8 @@ export function DashboardPage() {
 
 function CustomizeDialog({ layout, onClose, onSave }: { layout: Layout; onClose: () => void; onSave: (l: Layout) => Promise<void> }) {
   // Visible widgets in their order, then the hidden ones.
-  const [items, setItems] = useState(() => [
-    ...layout.map((l) => ({ ...l, chart: l.chart ?? WIDGETS.find((w) => w.id === l.id)?.chart, on: true })),
+  const [items, setItems] = useState<(LayoutItem & { on: boolean })[]>(() => [
+    ...layout.map((l) => ({ ...l, chart: l.chart ?? defFor(l)?.chart, on: true })),
     ...WIDGETS.filter((w) => !layout.some((l) => l.id === w.id)).map((w) => ({ id: w.id, wide: !!w.wide, chart: w.chart, on: false })),
   ]);
   const [drag, setDrag] = useState<number | null>(null);
@@ -267,6 +325,8 @@ function CustomizeDialog({ layout, onClose, onSave }: { layout: Layout; onClose:
   });
   const set = (i: number, patch: Partial<{ on: boolean; wide: boolean; chart: ChartKind }>) => setItems((xs) => xs.map((x, j) => (j === i ? { ...x, ...patch } : x)));
   const [error, setError] = useState<string | null>(null);
+  const reports = useApi(() => api.get<{ id: string; name: string; definition?: unknown }[]>('/reports'), []);
+  const addable = (reports.data ?? []).filter((r) => !items.some((x) => x.reportId === r.id));
   async function save(next: Layout) {
     setBusy(true); setError(null);
     try { await onSave(next); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(false); }
@@ -278,10 +338,10 @@ function CustomizeDialog({ layout, onClose, onSave }: { layout: Layout; onClose:
         <header><h2 id="cz-title">Customize dashboard</h2></header>
         <div className="body form-v">
           {error && <Callout tone="crit" icon="alert">The layout was not saved: {error}</Callout>}
-          <small className="muted">Tick the charts you want, choose how each is drawn (donut, pie, bar or column), drag them (or use the arrows) to change the order, and choose which ones are wide. Saved for your account.</small>
+          <small className="muted">Tick the charts you want, choose how each is drawn (donut, pie, bar or column), drag them (or use the arrows) to change the order, and choose which ones are wide. Saved reports can be added as charts too. Saved for your account.</small>
           <ul className="cz-list">
             {items.map((it, i) => {
-              const def = WIDGETS.find((w) => w.id === it.id)!;
+              const def = defFor(it)!;
               return (
                 <li key={it.id} draggable onDragStart={() => setDrag(i)} onDragOver={(e) => e.preventDefault()} onDrop={() => { if (drag != null) move(drag, i); setDrag(null); }}
                   className={it.on ? '' : 'off'}>
@@ -302,11 +362,22 @@ function CustomizeDialog({ layout, onClose, onSave }: { layout: Layout; onClose:
               );
             })}
           </ul>
+          {addable.length > 0 && (
+            <label className="stack-label">Add a saved report
+              <select className="in" value="" onChange={(e) => {
+                const r = addable.find((x) => x.id === e.target.value);
+                if (r) setItems((xs) => [...xs, { id: `report:${r.id}`, reportId: r.id, title: r.name, wide: false, chart: 'bar' as ChartKind, on: true }]);
+              }}>
+                <option value="">Choose a report…</option>
+                {addable.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+              </select>
+            </label>
+          )}
         </div>
         <footer>
           <button type="button" className="btn" style={{ marginRight: 'auto' }} disabled={busy} onClick={() => void save(DEFAULT_LAYOUT)}>Reset to default</button>
           <button type="button" className="btn" onClick={onClose} disabled={busy}>Cancel</button>
-          <button type="button" className="btn primary" disabled={busy || !items.some((x) => x.on)} onClick={() => void save(items.filter((x) => x.on).map(({ id, wide, chart }) => ({ id, wide, chart })))}>{busy ? 'Saving…' : 'Save'}</button>
+          <button type="button" className="btn primary" disabled={busy || !items.some((x) => x.on)} onClick={() => void save(items.filter((x) => x.on).map(({ id, wide, chart, reportId, title }) => ({ id, wide, chart, reportId, title })))}>{busy ? 'Saving…' : 'Save'}</button>
         </footer>
       </div>
     </div>

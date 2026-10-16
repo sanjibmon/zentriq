@@ -8,14 +8,14 @@ import { useConfirm } from '../../components/Confirm';
 import { Icon } from '../../components/Icon';
 import { Callout, DataTable, ErrorBox, fmt, PageHead, Pager, Panel, Pill } from '../../components/ui';
 import { ScheduleDialog } from './ScheduleDialog';
-import { errorText, type Dataset, type ReportListItem, type ReportRun } from './types';
+import { errorText, type DatasetCatalog, type ReportListItem, type ReportRun } from './types';
 
 export function ReportsPage() {
   const { query, navigate } = useRouter();
   const tab = query.get('tab') === 'history' ? 'history' : 'library';
   return (
     <>
-      <PageHead title="Reports & Analytics" desc="Build, schedule and export reports on any inventory data."
+      <PageHead title="Reports & Analytics" desc="Turn every inventory and security record into a report."
         actions={<Link className="btn primary" to="/reports/new"><Icon name="plus" size={14} /> New report</Link>} />
       <div className="tabs" role="tablist">
         <button role="tab" aria-selected={tab === 'library'} className={tab === 'library' ? 'on' : ''} onClick={() => navigate('/reports', true)}>Reports</button>
@@ -28,7 +28,8 @@ export function ReportsPage() {
 
 function Library() {
   const list = useApi(() => api.get<ReportListItem[]>('/reports'), []);
-  const datasets = useApi(() => api.get<Dataset[]>('/reports/datasets'), []);
+  const catalog = useApi(() => api.get<DatasetCatalog>('/reports/datasets'), []);
+  const datasets = { data: catalog.data?.datasets };
   const { can } = useAuth();
   const confirm = useConfirm();
   const [q, setQ] = useState('');

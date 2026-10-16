@@ -4,22 +4,38 @@ export type ColumnType = 'text' | 'number' | 'date' | 'yesno';
 
 export interface DatasetColumn { key: string; label: string; type: ColumnType; group: string | null }
 export interface Dataset { key: string; name: string; description: string; columns: DatasetColumn[] }
+export interface DatasetCatalog { datasets: Dataset[]; aggregates: string[]; dateBuckets: string[]; charts: string[]; formats: ReportFormat[] }
+export type ReportFormat = 'xlsx' | 'csv' | 'pdf';
 
 export interface ReportFilter { column: string; op: string; value?: string | null }
 export interface ReportSort { column: string; dir: 'asc' | 'desc' }
-export interface ReportSpec { columns: string[]; filters: ReportFilter[]; groupBy?: string[] | null; sort?: ReportSort[] | null }
+export interface ReportAggregate { fn: 'count_distinct' | 'sum' | 'avg' | 'min' | 'max'; column: string }
+export interface ReportSpec {
+  columns: string[]; filters: ReportFilter[]; groupBy?: string[] | null; sort?: ReportSort[] | null;
+  aggregates?: ReportAggregate[] | null; dateBucket?: string | null; chart?: string | null;
+}
+
+export const AGGREGATES: { fn: ReportAggregate['fn']; label: string; types: ColumnType[] }[] = [
+  { fn: 'count_distinct', label: 'Distinct count of', types: ['text', 'number', 'date', 'yesno'] },
+  { fn: 'sum', label: 'Total of', types: ['number'] },
+  { fn: 'avg', label: 'Average of', types: ['number'] },
+  { fn: 'min', label: 'Lowest', types: ['number', 'date'] },
+  { fn: 'max', label: 'Highest', types: ['number', 'date'] },
+];
+export const DATE_BUCKETS: [string, string][] = [['day', 'Day'], ['week', 'Week'], ['month', 'Month'], ['quarter', 'Quarter'], ['year', 'Year']];
+export const aggKey = (a: ReportAggregate) => `agg_${a.fn}_${a.column}`;
 
 export interface ReportSchedule { enabled: boolean; frequency: 'daily' | 'weekly' | 'monthly'; hour: number; weekday: number; day: number }
 
 export interface ReportListItem {
   id: string; name: string; description: string | null; dataset: string; shared: boolean; system: boolean; owned: boolean; owner: string | null;
-  updatedAt: string; schedule: ReportSchedule | null; scheduleText: string | null; recipients: string[]; format: 'xlsx' | 'csv';
+  updatedAt: string; schedule: ReportSchedule | null; scheduleText: string | null; recipients: string[]; format: ReportFormat;
   nextRunAt: string | null; lastRunAt: string | null; lastStatus: string | null;
 }
 
 export interface ReportDetail {
   id: string; name: string; description: string | null; dataset: string; definition: ReportSpec; shared: boolean; system: boolean; owned: boolean;
-  schedule: ReportSchedule | null; recipients: string[]; format: 'xlsx' | 'csv';
+  schedule: ReportSchedule | null; recipients: string[]; format: ReportFormat;
 }
 
 export interface RunResult { columns: { key: string; label: string; type: ColumnType }[]; rows: (string | number | boolean | null)[][]; total: number; truncated: boolean }

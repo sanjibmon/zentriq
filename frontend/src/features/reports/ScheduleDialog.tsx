@@ -1,9 +1,9 @@
 import { useState, type FormEvent } from 'react';
 import { api } from '../../api/client';
 import { Callout } from '../../components/ui';
-import { errorText, WEEKDAYS, type ReportSchedule } from './types';
+import { errorText, WEEKDAYS, type ReportFormat, type ReportSchedule } from './types';
 
-interface Target { id: string; name: string; schedule: ReportSchedule | null; recipients: string[]; format: 'xlsx' | 'csv' }
+interface Target { id: string; name: string; schedule: ReportSchedule | null; recipients: string[]; format: ReportFormat }
 
 /** Schedule a saved report for e-mail delivery (daily / weekly / monthly, server time zone). */
 export function ScheduleDialog({ report, onClose, onSaved }: { report: Target; onClose: () => void; onSaved: () => void }) {
@@ -54,7 +54,7 @@ export function ScheduleDialog({ report, onClose, onSaved }: { report: Target; o
               <select className="in" value={hour} onChange={(e) => setHour(+e.target.value)} disabled={!enabled}>{Array.from({ length: 24 }, (_, i) => <option key={i} value={i}>{String(i).padStart(2, '0')}:00</option>)}</select>
             </label>
             <label>Format
-              <select className="in" value={format} onChange={(e) => setFormat(e.target.value as 'xlsx' | 'csv')}><option value="xlsx">Excel (.xlsx)</option><option value="csv">CSV</option></select>
+              <select className="in" value={format} onChange={(e) => setFormat(e.target.value as ReportFormat)}><option value="xlsx">Excel (.xlsx)</option><option value="pdf">PDF</option><option value="csv">CSV</option></select>
             </label>
           </div>
           <label>Recipients

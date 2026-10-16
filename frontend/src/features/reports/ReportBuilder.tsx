@@ -6,8 +6,9 @@ import { useApi } from '../../app/useApi';
 import { CategoryChart, CHART_KINDS, type ChartKind } from '../../components/charts';
 import { Icon } from '../../components/Icon';
 import { Callout, ErrorBox, PageHead, Panel, Pill } from '../../components/ui';
+import { pinReportToDashboard } from '../dashboard/DashboardPage';
 import { ScheduleDialog } from './ScheduleDialog';
-import { cellText, errorText, OPERATORS, type Dataset, type DatasetColumn, type ReportDetail, type ReportFilter, type ReportSpec, type RunResult } from './types';
+import { AGGREGATES, aggKey, cellText, DATE_BUCKETS, errorText, OPERATORS, type DatasetCatalog, type DatasetColumn, type ReportAggregate, type ReportDetail, type ReportFilter, type ReportFormat, type ReportSpec, type RunResult } from './types';
 
 const EMPTY: ReportSpec = { columns: [], filters: [], groupBy: null, sort: null };
 
@@ -15,7 +16,8 @@ const EMPTY: ReportSpec = { columns: [], filters: [], groupBy: null, sort: null 
 export function ReportBuilder({ id }: { id: string | null }) {
   const { navigate, query } = useRouter();
   const { can } = useAuth();
-  const datasets = useApi(() => api.get<Dataset[]>('/reports/datasets'), []);
+  const catalog = useApi(() => api.get<DatasetCatalog>('/reports/datasets'), []);
+  const datasets = { data: catalog.data?.datasets, error: catalog.error };
   const saved = useApi(() => (id ? api.get<ReportDetail>(`/reports/${id}`) : Promise.resolve(null)), [id]);
 
   const [name, setName] = useState('');
@@ -28,8 +30,9 @@ export function ReportBuilder({ id }: { id: string | null }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ tone: 'ok' | 'crit' | 'info'; text: string } | null>(null);
   const [colFilter, setColFilter] = useState('');
-  const [chart, setChart] = useState<ChartKind>('bar');
   const [scheduling, setScheduling] = useState(false);
+  const chart: ChartKind = CHART_KINDS.some(([k]) => k === spec.chart) ? spec.chart as ChartKind : 'bar';
+  const setChart = (k: ChartKind) => setSpec((s) => ({ ...s, chart: k }));
 
   const ds = datasets.data?.find((d) => d.key === dataset) ?? null;
   const grouped = (spec.groupBy?.length ?? 0) > 0;
@@ -82,8 +85,16 @@ export function ReportBuilder({ id }: { id: string | null }) {
     const g = [...(s.groupBy ?? [])];
     if (k) g[i] = k; else g.splice(i);
     const groupBy = g.filter(Boolean);
-    return { ...s, groupBy: groupBy.length ? groupBy : null, sort: null };
+    return { ...s, groupBy: groupBy.length ? groupBy : null, sort: null, aggregates: groupBy.length ? s.aggregates : null };
   });
+  const aggregates = spec.aggregates ?? [];
+  const setAgg = (i: number, a: Partial<ReportAggregate>) => setSpec((s) => ({ ...s, aggregates: (s.aggregates ?? []).map((x, n) => (n === i ? { ...x, ...a } : x)), sort: null }));
+  const addAgg = () => ds && setSpec((s) => {
+    const num = ds.columns.find((c) => c.type === 'number');
+    const first: ReportAggregate = num ? { fn: 'avg', column: num.key } : { fn: 'count_distinct', column: ds.columns[0]!.key };
+    return { ...s, aggregates: [...(s.aggregates ?? []), first] };
+  });
+  const groupedByDate = (spec.groupBy ?? []).some((k) => col(k)?.type === 'date');
 
   async function run(dsKey = dataset, sp = spec) {
     setRunning(true); setMsg(null);
@@ -105,15 +116,31 @@ export function ReportBuilder({ id }: { id: string | null }) {
     } catch (e) { setMsg({ tone: 'crit', text: errorText(e) }); } finally { setBusy(false); }
   }
 
-  async function exportAs(format: 'xlsx' | 'csv') {
+  async function pin() {
+    if (!id || !saved.data) return;
+    setBusy(true); setMsg(null);
+    try {
+      const r = await pinReportToDashboard(id, saved.data.name, !grouped);
+      setMsg({ tone: 'ok', text: r === 'added' ? 'Added to your dashboard. Change its place or chart type with Dashboard › Customize.' : 'This report is already on your dashboard.' });
+    } catch (e) { setMsg({ tone: 'crit', text: errorText(e) }); } finally { setBusy(false); }
+  }
+
+  async function exportAs(format: ReportFormat) {
     setBusy(true); setMsg(null);
     try { await api.downloadJson('/reports/export', { dataset, definition: spec, format, name: name.trim() || ds?.name }, `report.${format}`); }
     catch (e) { setMsg({ tone: 'crit', text: errorText(e) }); } finally { setBusy(false); }
   }
 
   const sort = spec.sort?.[0] ?? null;
-  const sortOptions = grouped ? [...(spec.groupBy ?? []).map((k) => ({ key: k, label: col(k)?.label ?? k })), { key: 'count', label: 'Count' }] : (ds?.columns ?? []).map((c) => ({ key: c.key, label: c.label }));
-  const chartData = grouped && result ? result.rows.slice(0, 25).map((r, i) => ({ key: `${i}`, label: r.slice(0, -1).map((v, j) => cellText(v, result.columns[j]!.type)).join(' · '), value: Number(r[r.length - 1] ?? 0) })) : [];
+  const aggLabel = (a: ReportAggregate) => `${AGGREGATES.find((x) => x.fn === a.fn)?.label ?? a.fn} ${col(a.column)?.label ?? a.column}`;
+  const sortOptions = grouped
+    ? [...(spec.groupBy ?? []).map((k) => ({ key: k, label: col(k)?.label ?? k })), { key: 'count', label: 'Count' }, ...aggregates.map((a) => ({ key: aggKey(a), label: aggLabel(a) }))]
+    : (ds?.columns ?? []).map((c) => ({ key: c.key, label: c.label }));
+  // Chart: count per group (the columns before "count" are the group labels).
+  const countAt = result ? result.columns.findIndex((c) => c.key === 'count') : -1;
+  const chartData = grouped && result && countAt > 0
+    ? result.rows.slice(0, 25).map((r, i) => ({ key: `${i}`, label: r.slice(0, countAt).map((v, j) => cellText(v, result.columns[j]!.type)).join(' · '), value: Number(r[countAt] ?? 0) }))
+    : [];
 
   if (id && saved.error) return <><PageHead title="Report" /><ErrorBox error={saved.error} /><Link to="/reports">Back to reports</Link></>;
 
@@ -123,7 +150,9 @@ export function ReportBuilder({ id }: { id: string | null }) {
         actions={<>
           <Link className="btn" to="/reports">All reports</Link>
           {can('reports.export') && <><button className="btn" disabled={busy} onClick={() => void exportAs('xlsx')}><Icon name="down" size={14} /> Excel</button>
+            <button className="btn" disabled={busy} onClick={() => void exportAs('pdf')}><Icon name="down" size={14} /> PDF</button>
             <button className="btn" disabled={busy} onClick={() => void exportAs('csv')}><Icon name="down" size={14} /> CSV</button></>}
+          {id && saved.data && <button className="btn" disabled={busy} onClick={() => void pin()} title="Show this report on your dashboard"><Icon name="plus" size={14} /> Add to dashboard</button>}
           {editable && <button className="btn" onClick={() => setScheduling(true)}><Icon name="clock" size={14} /> Schedule</button>}
           {can('reports.design') && id && <button className="btn" disabled={busy} onClick={() => void save(true)}>Save as…</button>}
           {can('reports.design') && (!id || editable) && <button className="btn primary" disabled={busy} onClick={() => void save(false)}>{busy ? 'Saving…' : 'Save'}</button>}
@@ -150,7 +179,7 @@ export function ReportBuilder({ id }: { id: string | null }) {
           <Panel title="Layout">
             <div className="seg" role="radiogroup" aria-label="Report layout" style={{ marginBottom: 10 }}>
               <button type="button" className={!grouped ? 'on' : ''} onClick={() => setSpec((s) => ({ ...s, groupBy: null, sort: null }))}>Detail list</button>
-              <button type="button" className={grouped ? 'on' : ''} onClick={() => !grouped && ds && setGroup(0, spec.columns[0] ?? ds.columns[0]!.key)}>Summary (count)</button>
+              <button type="button" className={grouped ? 'on' : ''} onClick={() => !grouped && ds && setGroup(0, spec.columns[0] ?? ds.columns[0]!.key)}>Summary</button>
             </div>
             {grouped && <div className="form-v">
               {[0, 1, 2].filter((i) => i <= (spec.groupBy?.length ?? 0)).map((i) => (
@@ -161,6 +190,34 @@ export function ReportBuilder({ id }: { id: string | null }) {
                   </select>
                 </label>
               ))}
+              {groupedByDate && <label>Dates by
+                <select className="in" value={spec.dateBucket ?? ''} onChange={(e) => setSpec((s) => ({ ...s, dateBucket: e.target.value || null }))}>
+                  <option value="">Exact date and time</option>
+                  {DATE_BUCKETS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+                </select>
+              </label>}
+              <div className="agg-list">
+                <div className="col-group" style={{ margin: '4px 0' }}>Calculations per group</div>
+                <p className="faint" style={{ margin: '0 0 6px', fontSize: 12 }}>Every group shows its count. Add totals, averages or highest values, e.g. average memory per model.</p>
+                {aggregates.map((a, i) => {
+                  const types = AGGREGATES.find((x) => x.fn === a.fn)?.types ?? [];
+                  return <div key={i} className="filter-row">
+                    <select className="in" aria-label="Calculation" value={a.fn} onChange={(e) => {
+                      const fn = e.target.value as ReportAggregate['fn'];
+                      const ok = AGGREGATES.find((x) => x.fn === fn)!.types;
+                      const c = col(a.column);
+                      setAgg(i, { fn, column: c && ok.includes(c.type) ? a.column : (ds?.columns.find((x) => ok.includes(x.type))?.key ?? a.column) });
+                    }}>
+                      {AGGREGATES.filter((x) => ds?.columns.some((c) => x.types.includes(c.type))).map((x) => <option key={x.fn} value={x.fn}>{x.label}</option>)}
+                    </select>
+                    <select className="in" aria-label="Column" value={a.column} onChange={(e) => setAgg(i, { column: e.target.value })}>
+                      {(ds?.columns ?? []).filter((c) => types.includes(c.type)).map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+                    </select>
+                    <button type="button" className="icon-btn" aria-label="Remove calculation" onClick={() => setSpec((s) => ({ ...s, aggregates: (s.aggregates ?? []).filter((_, n) => n !== i), sort: null }))}><Icon name="x" size={12} /></button>
+                  </div>;
+                })}
+                <button type="button" className="btn sm" disabled={!ds || aggregates.length >= 6} onClick={addAgg}><Icon name="plus" size={12} /> Add calculation</button>
+              </div>
             </div>}
             <div className="form-grid" style={{ marginTop: 10 }}>
               <label className="stack-label">Sort by
@@ -225,7 +282,7 @@ export function ReportBuilder({ id }: { id: string | null }) {
           <Panel title="Preview" sub={result ? `${result.total.toLocaleString()} ${grouped ? 'group(s)' : 'row(s)'}${result.truncated ? ' · first 500 shown — export for all rows' : ''}` : 'Run the report to see the result'}
             right={<button className="btn primary sm" disabled={running || !ds} onClick={() => void run()}><Icon name="play" size={12} /> {running ? 'Running…' : 'Run'}</button>} flush>
             {grouped && result && result.rows.length > 0 && <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--line)' }}>
-              <div className="seg" style={{ marginBottom: 8 }}>{CHART_KINDS.map(([k, l]) => <button key={k} type="button" className={chart === k ? 'on' : ''} onClick={() => setChart(k)}>{l}</button>)}</div>
+              <div className="seg" style={{ marginBottom: 8 }} aria-label="Chart type (saved with the report)">{CHART_KINDS.map(([k, l]) => <button key={k} type="button" className={chart === k ? 'on' : ''} onClick={() => setChart(k)}>{l}</button>)}</div>
               <CategoryChart kind={chart} data={chartData} centerLabel="records" />
             </div>}
             <div className="tbl-wrap report-table">
