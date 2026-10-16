@@ -16,7 +16,8 @@ public static class AssetEndpoints
         string InventoryStatus, DateTimeOffset FirstSeenAt, DateTimeOffset LastSeenAt, DateTimeOffset? LastInventoryAt, int RowVersion,
         IReadOnlyList<string>? Ipv4 = null, IReadOnlyList<string>? Ipv6 = null, string? LoggedOnUser = null, string? Chassis = null,
         bool? IsVirtual = null, Guid? AgentId = null, string? AgentHealth = null, string? InventorySource = null,
-        DateTimeOffset? AgentLastCheckinAt = null, DateTimeOffset? LastContactAt = null, int? OfflineDays = null, bool? Online = null);
+        DateTimeOffset? AgentLastCheckinAt = null, DateTimeOffset? LastContactAt = null, int? OfflineDays = null, bool? Online = null,
+        Guid? DepartmentId = null, string? Department = null);
 
     public sealed record AssetBody(string? Hostname, string? Ip, string? SerialNumber, string Category, string? OsFamily,
         string? OsName, string? Criticality, string? OwnerName, int? RowVersion);
@@ -26,13 +27,13 @@ public static class AssetEndpoints
 
     public static AssetDto ToDto(Asset a) => new(a.Id, a.Hostname, a.Fqdn, Display(a.PrimaryIp), a.SerialNumber, a.Category,
         Workloads.FromAssetCategory(a.Category), a.OsFamily, a.OsName, a.Status, a.Criticality, a.OwnerName, a.Source,
-        a.InventoryStatus, a.FirstSeenAt, a.LastSeenAt, a.LastInventoryAt, a.RowVersion);
+        a.InventoryStatus, a.FirstSeenAt, a.LastSeenAt, a.LastInventoryAt, a.RowVersion, DepartmentId: a.DepartmentId);
 
     public static void MapAssetEndpoints(this RouteGroupBuilder api)
     {
         var g = api.MapGroup("/assets").WithTags("Assets").RequireModule(Modules.Inventory);
 
-        g.MapGet("", async (ZentriqDbContext db, NpgsqlDataSource ds, string? q, string? category, string? status, string? agent, string? inventory, string? facet, string? value, int? offlineDays, string? sort, string? dir, int? page, int? pageSize, CancellationToken ct) =>
+        g.MapGet("", async (ZentriqDbContext db, NpgsqlDataSource ds, string? q, string? category, string? department, string? status, string? agent, string? inventory, string? facet, string? value, int? offlineDays, string? sort, string? dir, int? page, int? pageSize, CancellationToken ct) =>
         {
             var (p, ps) = Paging.Normalize(page, pageSize);
             var query = db.Assets.AsNoTracking().AsQueryable();
@@ -60,7 +61,7 @@ public static class AssetEndpoints
             if (!string.IsNullOrEmpty(facet) && AssetFacets.Expr.TryGetValue(facet, out var fexpr) && value is not null)
             {
                 // Same expression as the dashboard chart that was clicked; "Other" is the remainder of a top-N chart.
-                var sql = value == "Other" && facet is "os" or "vendor" or "cpu"
+                var sql = value == "Other" && facet is "os" or "vendor" or "cpu" or "department"
                     ? $"SELECT a.id AS \"Value\" {AssetFacets.From} WHERE {fexpr} IS NOT NULL AND {fexpr} NOT IN (SELECT k FROM (SELECT {fexpr} AS k, count(*) AS n {AssetFacets.From} WHERE a.status = 'active' AND {fexpr} IS NOT NULL GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 7) t)"
                     : $"SELECT a.id AS \"Value\" {AssetFacets.From} WHERE {fexpr} = @v";
                 var facetIds = await IdsAsync(ds, sql, ct, new NpgsqlParameter("v", value));
@@ -74,6 +75,8 @@ public static class AssetEndpoints
             if (inventory is "success" or "not_collected" or "failed" or "unavailable") query = query.Where(a => a.InventoryStatus == inventory);
             if (inventory == "missing") query = query.Where(a => a.InventoryStatus != "success");
             if (!string.IsNullOrEmpty(category)) query = query.Where(a => a.Category == category);
+            if (department == "none") query = query.Where(a => a.DepartmentId == null);
+            else if (Guid.TryParse(department, out var depId)) query = query.Where(a => a.DepartmentId == depId);
             query = string.IsNullOrEmpty(status) ? query.Where(a => a.Status == "active") : status == "all" ? query : query.Where(a => a.Status == status);
             var desc = dir == "desc";
             query = sort switch
@@ -82,6 +85,7 @@ public static class AssetEndpoints
                 "category" => desc ? query.OrderByDescending(a => a.Category) : query.OrderBy(a => a.Category),
                 "offline" => desc ? query.OrderBy(a => a.LastSeenAt) : query.OrderByDescending(a => a.LastSeenAt),
                 "criticality" => desc ? query.OrderByDescending(a => a.Criticality) : query.OrderBy(a => a.Criticality),
+                "department" => desc ? query.OrderByDescending(a => a.DepartmentId) : query.OrderBy(a => a.DepartmentId),
                 _ => desc ? query.OrderByDescending(a => a.Hostname) : query.OrderBy(a => a.Hostname),
             };
             var total = await query.CountAsync(ct);
@@ -200,7 +204,8 @@ public static class AssetEndpoints
         var showV6 = ((await setting.ExecuteScalarAsync(ct)) as string)?.Trim() == "true";
         await using var cmd = ds.CreateCommand("""
             SELECT x.id, d.document #>> '{users,loggedOn}', d.document -> 'network', COALESCE(d.document #>> '{device,chassis}', h.chassis),
-                   (d.document #>> '{hardware,isVirtual}')::boolean, d.source, ag.id, ag.last_checkin_at
+                   (d.document #>> '{hardware,isVirtual}')::boolean, d.source, ag.id, ag.last_checkin_at,
+                   (SELECT dp.name FROM zentriq.assets aa JOIN zentriq.departments dp ON dp.id = aa.department_id WHERE aa.id = x.id)
               FROM unnest(@ids) AS x(id)
               LEFT JOIN zentriq.asset_inventory_documents d ON d.asset_id = x.id
               LEFT JOIN zentriq.hardware_inventory h ON h.asset_id = x.id
@@ -239,6 +244,7 @@ public static class AssetEndpoints
                     LastContactAt = Max(lastCheckin, a.LastSeenAt),
                     OfflineDays = (int)Math.Floor((DateTimeOffset.UtcNow - Max(lastCheckin, a.LastSeenAt)).TotalDays),
                     Online = lastCheckin is { } lc && lc > DateTimeOffset.UtcNow.AddMinutes(-30) ? true : r.IsDBNull(6) ? null : false,
+                    Department = r.IsDBNull(8) ? null : r.GetString(8),
                 };
             }
         return items.Select(i => extra.TryGetValue(i.Id, out var e) ? e : i).ToList();

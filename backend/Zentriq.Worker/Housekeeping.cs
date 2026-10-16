@@ -90,6 +90,7 @@ public sealed class Housekeeping(NpgsqlDataSource ds, JobQueue jobs, WorkerIdent
         await using var cmd = ds.CreateCommand("""
             UPDATE zentriq.report_runs SET content = NULL WHERE content IS NOT NULL AND started_at < now() - interval '30 days';
             DELETE FROM zentriq.report_runs WHERE started_at < now() - interval '365 days';
+            DELETE FROM zentriq.asset_changes WHERE detected_at < now() - interval '365 days';
             DELETE FROM zentriq.int_deliveries WHERE created_at < now() - interval '90 days';
             DELETE FROM zentriq.int_events e WHERE e.occurred_at < now() - interval '90 days' AND NOT EXISTS (SELECT 1 FROM zentriq.int_deliveries d WHERE d.event_id = e.id);
             DELETE FROM zentriq.sec_exceptions WHERE expires_at < now() - interval '365 days';

@@ -97,6 +97,19 @@ public sealed class IntegrationStore(NpgsqlDataSource ds, CredentialProtector pr
              WHERE s.status = 'fail' AND s.first_failed_at > @from AND s.first_failed_at <= @to AND a.status = 'active'
              GROUP BY s.asset_id, a.hostname, a.primary_ip
             """),
+        new("inventory.changed", """
+            SELECT c.kind || '.changed',
+                   CASE WHEN c.kind = 'hardware' THEN 'medium' WHEN bool_or(c.change = 'uninstalled') OR bool_or(c.change = 'installed' AND c.component = 'Application') THEN 'low' ELSE 'info' END,
+                   c.kind || '.changed:' || c.asset_id || ':' || extract(epoch FROM @to)::bigint,
+                   count(*) || ' ' || c.kind || ' change' || CASE WHEN count(*) = 1 THEN '' ELSE 's' END || ' on ' || COALESCE(a.hostname, host(a.primary_ip)),
+                   string_agg(initcap(c.change) || ' ' || c.component || ': ' || c.item || COALESCE(' (' || c.old_value || ' → ' || c.new_value || ')', COALESCE(' (' || c.new_value || ')', '')), E'\n' ORDER BY c.id),
+                   c.asset_id,
+                   jsonb_build_object('count', count(*), 'changes', jsonb_agg(jsonb_build_object('change', c.change, 'component', c.component, 'item', c.item, 'before', c.old_value, 'after', c.new_value) ORDER BY c.id)),
+                   '/assets/' || c.asset_id || '?tab=changes'
+              FROM zentriq.asset_changes c JOIN zentriq.assets a ON a.id = c.asset_id
+             WHERE c.detected_at > @from AND c.detected_at <= @to AND a.status = 'active'
+             GROUP BY c.kind, c.asset_id, a.hostname, a.primary_ip
+            """),
         new("asset.discovered", """
             SELECT 'asset.discovered', 'info', 'asset.discovered:' || a.id,
                    'New device: ' || COALESCE(a.hostname, host(a.primary_ip), a.id::text),

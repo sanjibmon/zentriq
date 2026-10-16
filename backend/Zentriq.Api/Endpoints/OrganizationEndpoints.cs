@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Zentriq.Api.Infrastructure;
 using Zentriq.Application.Licensing;
 using Zentriq.Domain;
@@ -18,12 +19,50 @@ public static class OrganizationEndpoints
     {
         var g = api.MapGroup("/organization").WithTags("Company profile");
 
-        g.MapGet("", async (ZentriqDbContext db, LicenseVerifier verifier, CancellationToken ct) =>
+        g.MapGet("", async (ZentriqDbContext db, LicenseVerifier verifier, NpgsqlDataSource ds, CancellationToken ct) =>
         {
             var org = await db.Organizations.AsNoTracking().OrderBy(o => o.CreatedAt).FirstOrDefaultAsync(ct);
             var licensee = await ActiveLicenseeAsync(db, verifier, ct);
-            return Results.Ok(new { profile = org is null ? null : ToDto(org), licensee });
+            var logo = await LogoAsync(ds, ct);
+            return Results.Ok(new { profile = org is null ? null : ToDto(org), licensee, logoUpdatedAt = logo?.UpdatedAt });
         }).RequireAuthorization();
+
+        // Company logo: shown in the console header and on the sign-in page (PNG, JPEG or WebP, up to 1 MB).
+        g.MapGet("/logo", async (NpgsqlDataSource ds, HttpContext http, CancellationToken ct) =>
+        {
+            var logo = await LogoAsync(ds, ct);
+            if (logo is null) return Results.NotFound();
+            http.Response.Headers.CacheControl = "private, max-age=300";
+            return Results.File(Convert.FromBase64String(logo.Data), logo.ContentType);
+        }).AllowAnonymous();
+
+        g.MapPut("/logo", async (HttpContext http, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
+        {
+            using var ms = new MemoryStream();
+            await http.Request.Body.CopyToAsync(ms, ct);
+            if (ms.Length is 0 or > MaxLogoBytes) return Validation.Problem("file", "Choose an image of up to 1 MB.");
+            var bytes = ms.ToArray();
+            var type = ImageType(bytes);
+            if (type is null) return Validation.Problem("file", "Use a PNG, JPEG or WebP image.");
+            var json = System.Text.Json.JsonSerializer.Serialize(new LogoValue(type, Convert.ToBase64String(bytes), DateTimeOffset.UtcNow));
+            await using var cmd = ds.CreateCommand("""
+                INSERT INTO zentriq.system_settings (key, value, updated_by) VALUES ('organization.logo', @v::jsonb, @u)
+                ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now(), updated_by = EXCLUDED.updated_by
+                """);
+            cmd.Parameters.AddWithValue("v", json);
+            cmd.Parameters.Add(new NpgsqlParameter("u", NpgsqlTypes.NpgsqlDbType.Uuid) { Value = (object?)rc.UserId ?? DBNull.Value });
+            await cmd.ExecuteNonQueryAsync(ct);
+            await rc.AuditAsync("organization.logo", type, detail: new { bytes = bytes.Length });
+            return Results.NoContent();
+        }).RequireAuthorization(Permissions.SettingsManage);
+
+        g.MapDelete("/logo", async (NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
+        {
+            await using var cmd = ds.CreateCommand("DELETE FROM zentriq.system_settings WHERE key = 'organization.logo'");
+            await cmd.ExecuteNonQueryAsync(ct);
+            await rc.AuditAsync("organization.logo.remove", null);
+            return Results.NoContent();
+        }).RequireAuthorization(Permissions.SettingsManage);
 
         g.MapPut("", async (OrganizationBody body, ZentriqDbContext db, RequestContext rc, CancellationToken ct) =>
         {
@@ -41,6 +80,23 @@ public static class OrganizationEndpoints
             return Results.Ok(ToDto(org));
         }).RequireAuthorization(Permissions.SettingsManage);
     }
+
+    public const int MaxLogoBytes = 1024 * 1024;
+    public sealed record LogoValue(string ContentType, string Data, DateTimeOffset UpdatedAt);
+
+    public static async Task<LogoValue?> LogoAsync(NpgsqlDataSource ds, CancellationToken ct)
+    {
+        await using var cmd = ds.CreateCommand("SELECT value::text FROM zentriq.system_settings WHERE key = 'organization.logo'");
+        if (await cmd.ExecuteScalarAsync(ct) is not string json) return null;
+        try { return System.Text.Json.JsonSerializer.Deserialize<LogoValue>(json); } catch (System.Text.Json.JsonException) { return null; }
+    }
+
+    /// <summary>The image type from the file signature (SVG is not accepted: it can carry scripts).</summary>
+    public static string? ImageType(byte[] b) =>
+        b.Length > 8 && b[0] == 0x89 && b[1] == 0x50 && b[2] == 0x4E && b[3] == 0x47 ? "image/png"
+        : b.Length > 3 && b[0] == 0xFF && b[1] == 0xD8 && b[2] == 0xFF ? "image/jpeg"
+        : b.Length > 12 && b[0] == (byte)'R' && b[1] == (byte)'I' && b[2] == (byte)'F' && b[3] == (byte)'F' && b[8] == (byte)'W' && b[9] == (byte)'E' && b[10] == (byte)'B' && b[11] == (byte)'P' ? "image/webp"
+        : null;
 
     public static async Task<Licensee?> ActiveLicenseeAsync(ZentriqDbContext db, LicenseVerifier verifier, CancellationToken ct)
     {

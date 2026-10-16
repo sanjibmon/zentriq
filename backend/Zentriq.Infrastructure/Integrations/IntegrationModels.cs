@@ -13,6 +13,8 @@ public static class EventTypes
         new("vulnerability.new", "New vulnerabilities", "New vulnerability findings on a device (one message per device per evaluation; severity = the worst finding, known exploited = critical).", true),
         new("vulnerability.overdue", "Vulnerabilities past their due date", "Open findings that passed their SLA due date.", true),
         new("security.failed", "Security checks failing", "Configuration checks that started failing on a device.", true),
+        new("hardware.changed", "Hardware changed", "Hardware added, removed or replaced on a device (memory, disks, processor, serial number, network adapters…).", true),
+        new("software.changed", "Software changed", "Software installed, uninstalled or updated on a device, Windows updates and operating system upgrades.", true),
         new("asset.discovered", "New device discovered", "A device seen for the first time (discovery, Active Directory or agent enrolment).", true),
         new("asset.offline", "Device not seen", "A device has not been seen (agent, scan or inventory) for the configured number of hours.", true),
         new("agent.offline", "Agent not checking in", "An agent has not checked in for the configured number of hours.", true),

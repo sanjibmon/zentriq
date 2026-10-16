@@ -68,7 +68,7 @@ public static class OverviewEndpoints
 
             var facets = new Dictionary<string, List<KeyCount>>();
             foreach (var (f, top) in new[] { ("category", 0), ("os", 7), ("inventory", 0), ("type", 0), ("vendor", 7), ("coverage", 0), ("health", 0), ("seen", 0),
-                                             ("ram", 0), ("cores", 0), ("cpu", 0), ("disk", 0), ("free", 0), ("criticality", 0) })
+                                             ("ram", 0), ("cores", 0), ("cpu", 0), ("disk", 0), ("free", 0), ("criticality", 0), ("department", 12) })
                 facets[f] = await Facet(f, top);
             var byCategory = facets["category"];
             var byOs = facets["os"];
@@ -110,7 +110,7 @@ public static class OverviewEndpoints
             return Results.Ok(new
             {
                 kpi, byCategory, byOs, byInventory, byCriticality, byType, byManufacturer, coverage, agentHealth, ram, topSoftware, scanResults, posture, trend,
-                seen = facets["seen"], cores = facets["cores"], cpu = facets["cpu"], disk = facets["disk"], free = facets["free"],
+                seen = facets["seen"], byDepartment = facets["department"], cores = facets["cores"], cpu = facets["cpu"], disk = facets["disk"], free = facets["free"],
                 generatedAt = DateTimeOffset.UtcNow,
             });
         }).WithTags("Dashboards").RequireModule(Modules.Dashboards).RequireAuthorization(Permissions.AssetsView);

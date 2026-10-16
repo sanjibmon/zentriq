@@ -55,13 +55,55 @@ public sealed class InventoryStore(LicensingService licensing)
             created = true;
         }
 
+        // The previous inventory, to record what changed (hardware replaced, software installed / removed / updated).
+        var (prevDoc, prevSoftware) = created ? (null, null) : await PreviousAsync(conn, tx, assetId.Value, ct);
+
         await UpdateAssetAsync(conn, tx, assetId.Value, doc, hints, ct);
         await UpsertHardwareAsync(conn, tx, assetId.Value, doc, ct);
         await ReplaceSoftwareAsync(conn, tx, assetId.Value, doc, ct);
         await UpsertDocumentAsync(conn, tx, assetId.Value, doc, ct);
         await AddIdentifiersAsync(conn, tx, assetId.Value, doc, hints, ct);
+        await RecordChangesAsync(conn, tx, assetId.Value, InventoryChanges.Compare(prevDoc, prevSoftware, doc), doc.Source, ct);
         await tx.CommitAsync(ct);
         return new(assetId, created, null);
+    }
+
+    private static async Task<(InventoryDocument? Doc, List<InstalledSoftware>? Software)> PreviousAsync(NpgsqlConnection conn, NpgsqlTransaction tx, Guid id, CancellationToken ct)
+    {
+        InventoryDocument? doc = null;
+        await using (var cmd = new NpgsqlCommand("SELECT document::text FROM zentriq.asset_inventory_documents WHERE asset_id = @id", conn, tx))
+        {
+            cmd.Parameters.AddWithValue("id", id);
+            if (await cmd.ExecuteScalarAsync(ct) is string json)
+                try { doc = JsonSerializer.Deserialize<InventoryDocument>(json, Json); } catch (JsonException) { doc = null; }
+        }
+        if (doc is null) return (null, null);
+        var sw = new List<InstalledSoftware>();
+        await using (var cmd = new NpgsqlCommand("SELECT name, version, publisher FROM zentriq.software_inventory WHERE asset_id = @id", conn, tx))
+        {
+            cmd.Parameters.AddWithValue("id", id);
+            await using var r = await cmd.ExecuteReaderAsync(ct);
+            while (await r.ReadAsync(ct)) sw.Add(new InstalledSoftware(r.GetString(0), r.IsDBNull(1) ? null : r.GetString(1), r.IsDBNull(2) ? null : r.GetString(2)));
+        }
+        return (doc, sw);
+    }
+
+    private static async Task RecordChangesAsync(NpgsqlConnection conn, NpgsqlTransaction tx, Guid id, List<InventoryChange> changes, string source, CancellationToken ct)
+    {
+        if (changes.Count == 0) return;
+        await using var cmd = new NpgsqlCommand("""
+            INSERT INTO zentriq.asset_changes (asset_id, kind, change, component, item, old_value, new_value, source)
+            SELECT @id, k, c, comp, i, o, n, @s FROM unnest(@k, @c, @comp, @i, @o, @n) AS t(k, c, comp, i, o, n)
+            """, conn, tx);
+        cmd.Parameters.AddWithValue("id", id);
+        cmd.Parameters.AddWithValue("s", source);
+        cmd.Parameters.Add(new NpgsqlParameter("k", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = changes.Select(c => c.Kind).ToArray() });
+        cmd.Parameters.Add(new NpgsqlParameter("c", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = changes.Select(c => c.Change).ToArray() });
+        cmd.Parameters.Add(new NpgsqlParameter("comp", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = changes.Select(c => c.Component).ToArray() });
+        cmd.Parameters.Add(new NpgsqlParameter("i", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = changes.Select(c => Trunc(c.Item, 400)!).ToArray() });
+        cmd.Parameters.Add(new NpgsqlParameter("o", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = changes.Select(c => Trunc(c.OldValue, 400)).ToArray() });
+        cmd.Parameters.Add(new NpgsqlParameter("n", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = changes.Select(c => Trunc(c.NewValue, 400)).ToArray() });
+        await cmd.ExecuteNonQueryAsync(ct);
     }
 
     private static async Task<Guid?> MatchAsync(NpgsqlConnection conn, NpgsqlTransaction tx, InventoryDocument doc, MatchHints hints, CancellationToken ct)

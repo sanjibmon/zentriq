@@ -42,6 +42,7 @@ public static class ReportCatalog
         new("logged_on_user", "Logged-on user", ReportColumnType.Text, "d.document #>> '{users,loggedOn}'", "Device"),
         new("criticality", "Criticality", ReportColumnType.Text, "a.criticality", "Device"),
         new("owner", "Owner", ReportColumnType.Text, "a.owner_name", "Device"),
+        new("department", "Department / unit", ReportColumnType.Text, "(SELECT dp.name FROM zentriq.departments dp WHERE dp.id = a.department_id)", "Device"),
     ];
 
     public static readonly IReadOnlyList<ReportDataset> Datasets =
@@ -231,6 +232,26 @@ public static class ReportCatalog
                 new("score", "Device score", ReportColumnType.Number, "(SELECT sc.score FROM zentriq.sec_scores sc WHERE sc.asset_id = s.asset_id AND sc.baseline_id = s.baseline_id)", "Result"),
                 .. DeviceColumns,
             ], Permission: "security.view"),
+
+        new("changes", "Hardware & software changes", "One row per change found between two inventories of a device (kept 365 days).",
+            """
+            zentriq.asset_changes c
+            JOIN zentriq.assets a ON a.id = c.asset_id
+            LEFT JOIN zentriq.asset_inventory_documents d ON d.asset_id = a.id
+            LEFT JOIN zentriq.hardware_inventory h ON h.asset_id = a.id
+            WHERE a.status = 'active'
+            """,
+            [
+                new("detected", "Detected", ReportColumnType.Date, "c.detected_at", "Change"),
+                new("kind", "Hardware / software", ReportColumnType.Text, "c.kind", "Change"),
+                new("change", "Change", ReportColumnType.Text, "c.change", "Change"),
+                new("component", "Component", ReportColumnType.Text, "c.component", "Change"),
+                new("item", "Item", ReportColumnType.Text, "c.item", "Change"),
+                new("old_value", "Before", ReportColumnType.Text, "c.old_value", "Change"),
+                new("new_value", "After", ReportColumnType.Text, "c.new_value", "Change"),
+                new("change_source", "Detected by", ReportColumnType.Text, "c.source", "Change"),
+                .. DeviceColumns,
+            ]),
 
         new("software_titles", "Software titles", "One row per application title: publisher, devices, versions in use.",
             """

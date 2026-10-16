@@ -170,6 +170,96 @@ public static class InventoryEndpoints
             }
             return Results.Ok(new { items, total, page = p, pageSize = size });
         }).RequireAuthorization(Permissions.AssetsView);
+
+        // ---- change history (hardware replaced, software installed / uninstalled / updated) -----------------
+
+        g.MapGet("/changes", async (NpgsqlDataSource ds, string? kind, string? change, Guid? assetId, int? days, string? q, Guid? departmentId, int? page, int? pageSize, CancellationToken ct) =>
+        {
+            var (p, size) = Paging.Normalize(page, pageSize);
+            await using var cmd = ds.CreateCommand("""
+                SELECT c.id, c.asset_id, COALESCE(a.hostname, host(a.primary_ip)), a.os_name, dp.name, c.detected_at, c.kind, c.change, c.component, c.item,
+                       c.old_value, c.new_value, c.source, count(*) OVER ()
+                  FROM zentriq.asset_changes c JOIN zentriq.assets a ON a.id = c.asset_id
+                  LEFT JOIN zentriq.departments dp ON dp.id = a.department_id
+                 WHERE (@k::text IS NULL OR c.kind = @k) AND (@ch::text IS NULL OR c.change = @ch) AND (@a::uuid IS NULL OR c.asset_id = @a)
+                   AND (@dep::uuid IS NULL OR a.department_id = @dep)
+                   AND c.detected_at > now() - make_interval(days => @days)
+                   AND (@q::text IS NULL OR a.hostname ILIKE @q OR c.item ILIKE @q OR c.component ILIKE @q)
+                 ORDER BY c.detected_at DESC, c.id DESC LIMIT @l OFFSET @o
+                """);
+            cmd.Parameters.Add(new NpgsqlParameter("k", NpgsqlDbType.Text) { Value = kind is "hardware" or "software" ? kind : DBNull.Value });
+            cmd.Parameters.Add(new NpgsqlParameter("ch", NpgsqlDbType.Text) { Value = change is "added" or "removed" or "changed" or "installed" or "uninstalled" or "updated" ? change : DBNull.Value });
+            cmd.Parameters.Add(new NpgsqlParameter("a", NpgsqlDbType.Uuid) { Value = (object?)assetId ?? DBNull.Value });
+            cmd.Parameters.Add(new NpgsqlParameter("dep", NpgsqlDbType.Uuid) { Value = (object?)departmentId ?? DBNull.Value });
+            cmd.Parameters.AddWithValue("days", Math.Clamp(days ?? 30, 1, 366));
+            cmd.Parameters.Add(new NpgsqlParameter("q", NpgsqlDbType.Text) { Value = string.IsNullOrWhiteSpace(q) ? DBNull.Value : "%" + Escape(q.Trim()) + "%" });
+            cmd.Parameters.AddWithValue("l", size);
+            cmd.Parameters.AddWithValue("o", (p - 1) * size);
+            var items = new List<object>();
+            long total = 0;
+            await using var r = await cmd.ExecuteReaderAsync(ct);
+            while (await r.ReadAsync(ct))
+            {
+                string? S(int i) => r.IsDBNull(i) ? null : r.GetString(i);
+                items.Add(new
+                {
+                    id = r.GetInt64(0), assetId = r.GetGuid(1), hostname = S(2), os = S(3), department = S(4), detectedAt = r.GetFieldValue<DateTimeOffset>(5),
+                    kind = r.GetString(6), change = r.GetString(7), component = r.GetString(8), item = r.GetString(9), oldValue = S(10), newValue = S(11), source = S(12),
+                });
+                total = r.GetInt64(13);
+            }
+            return Results.Ok(new { items, total, page = p, pageSize = size });
+        }).RequireAuthorization(Permissions.AssetsView);
+
+        // Device-wise summary for the dashboard and the inventory pages.
+        g.MapGet("/changes/summary", async (NpgsqlDataSource ds, int? days, CancellationToken ct) =>
+        {
+            var d = Math.Clamp(days ?? 30, 1, 366);
+            await using var conn = await ds.OpenConnectionAsync(ct);
+            async Task<List<T>> Rows<T>(string sql, Func<NpgsqlDataReader, T> map)
+            {
+                var list = new List<T>();
+                await using var c = new NpgsqlCommand(sql, conn);
+                c.Parameters.AddWithValue("days", d);
+                await using var r = await c.ExecuteReaderAsync(ct);
+                while (await r.ReadAsync(ct)) list.Add(map(r));
+                return list;
+            }
+            const string Window = "FROM zentriq.asset_changes c JOIN zentriq.assets a ON a.id = c.asset_id WHERE a.status = 'active' AND c.detected_at > now() - make_interval(days => @days)";
+            var kpi = (await Rows($"""
+                SELECT count(*) FILTER (WHERE c.kind = 'hardware'), count(DISTINCT c.asset_id) FILTER (WHERE c.kind = 'hardware'),
+                       count(*) FILTER (WHERE c.kind = 'software'), count(DISTINCT c.asset_id) FILTER (WHERE c.kind = 'software'),
+                       count(*) FILTER (WHERE c.change = 'installed' AND c.component = 'Application'), count(*) FILTER (WHERE c.change = 'uninstalled'),
+                       count(*) FILTER (WHERE c.change = 'updated'), count(*) FILTER (WHERE c.component = 'Windows update')
+                {Window}
+                """, r => new
+            {
+                hardware = r.GetInt64(0), hardwareDevices = r.GetInt64(1), software = r.GetInt64(2), softwareDevices = r.GetInt64(3),
+                installed = r.GetInt64(4), uninstalled = r.GetInt64(5), updated = r.GetInt64(6), windowsUpdates = r.GetInt64(7),
+            }))[0];
+            object Device(NpgsqlDataReader r) => new
+            {
+                assetId = r.GetGuid(0), hostname = r.IsDBNull(1) ? null : r.GetString(1), department = r.IsDBNull(2) ? null : r.GetString(2),
+                changes = r.GetInt64(3), last = r.GetFieldValue<DateTimeOffset>(4), summary = r.IsDBNull(5) ? null : r.GetString(5),
+            };
+            string ByDevice(string kind) => $"""
+                SELECT c.asset_id, COALESCE(a.hostname, host(a.primary_ip)), (SELECT dp.name FROM zentriq.departments dp WHERE dp.id = a.department_id),
+                       count(*), max(c.detected_at),
+                       string_agg(c.change || ' ' || c.component || ': ' || c.item || COALESCE(' (' || c.old_value || ' → ' || c.new_value || ')', ''), '; ' ORDER BY c.detected_at DESC, c.id DESC)
+                {Window} AND c.kind = '{kind}' GROUP BY c.asset_id, a.hostname, a.primary_ip, a.department_id ORDER BY max(c.detected_at) DESC LIMIT 15
+                """;
+            var hardwareDevices = await Rows(ByDevice("hardware"), Device);
+            var softwareDevices = await Rows(ByDevice("software"), Device);
+            var byComponent = await Rows($"SELECT c.kind, c.component, c.change, count(*) {Window} GROUP BY 1, 2, 3 ORDER BY 4 DESC LIMIT 30",
+                r => new { kind = r.GetString(0), component = r.GetString(1), change = r.GetString(2), count = r.GetInt64(3) });
+            var trend = await Rows("""
+                SELECT g::date, count(c.id) FILTER (WHERE c.kind = 'hardware'), count(c.id) FILTER (WHERE c.kind = 'software')
+                  FROM generate_series(current_date - least(@days, 90) + 1, current_date, interval '1 day') g
+                  LEFT JOIN zentriq.asset_changes c ON c.detected_at::date = g::date
+                 GROUP BY 1 ORDER BY 1
+                """, r => new { day = DateOnly.FromDateTime(r.GetDateTime(0)), hardware = r.GetInt64(1), software = r.GetInt64(2) });
+            return Results.Ok(new { days = d, kpi, hardwareDevices, softwareDevices, byComponent, trend });
+        }).RequireAuthorization(Permissions.AssetsView);
     }
 
     private static string Escape(string s) => s.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");

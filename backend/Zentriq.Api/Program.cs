@@ -171,6 +171,7 @@ api.MapReportEndpoints();
 api.MapVulnerabilityEndpoints();
 api.MapSecurityEndpoints();
 api.MapIntegrationEndpoints();
+api.MapDepartmentEndpoints();
 app.MapAgentEndpoints();
 api.MapPendingModuleEndpoints();
 app.MapOpenApi("/api/openapi/{documentName}.json").RequireAuthorization(Permissions.SettingsManage);
