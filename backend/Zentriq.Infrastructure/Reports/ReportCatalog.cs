@@ -217,7 +217,7 @@ public static class ReportCatalog
             [
                 new("rule", "Check", ReportColumnType.Text, "s.rule_id", "Check"),
                 new("title", "Title", ReportColumnType.Text, "r.title", "Check"),
-                new("category", "Check category", ReportColumnType.Text, "r.category", "Check"),
+                new("check_category", "Check area", ReportColumnType.Text, "r.category", "Check"),
                 new("severity", "Severity", ReportColumnType.Text, "s.severity", "Check"),
                 new("severity_rank", "Severity order", ReportColumnType.Number, "CASE s.severity WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END", "Check"),
                 new("reference", "Reference", ReportColumnType.Text, "r.reference", "Check"),

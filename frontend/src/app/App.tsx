@@ -13,6 +13,8 @@ import { ModulePage } from '../features/placeholder/ModulePage';
 import { ReportsPage } from '../features/reports/ReportsPage';
 import { ReportBuilder } from '../features/reports/ReportBuilder';
 import { VulnerabilitiesPage } from '../features/vulnerabilities/VulnerabilitiesPage';
+import { SecurityPage } from '../features/security/SecurityPage';
+import { IntegrationsPage } from '../features/integrations/IntegrationsPage';
 import { ActivityPage } from '../features/activity/ActivityPage';
 import { LoginPage } from '../features/login/LoginPage';
 import { ResetPasswordPage } from '../features/login/ResetPasswordPage';
@@ -44,6 +46,8 @@ function Routes() {
   const reportMatch = /^\/reports\/([0-9a-f-]{36})$/i.exec(path);
   if (reportMatch) return <ReportBuilder key={reportMatch[1]} id={reportMatch[1]!} />;
   if (path === '/vulnerabilities' || path === '/modules/vuln') return <VulnerabilitiesPage />;
+  if (path === '/security' || path === '/modules/config') return <SecurityPage />;
+  if (path === '/integrations' || path === '/modules/integrations') return <IntegrationsPage />;
   if (path.startsWith('/modules/')) return <ModulePage id={path.slice('/modules/'.length)} />;
   return <ModulePage id="" />;
 }

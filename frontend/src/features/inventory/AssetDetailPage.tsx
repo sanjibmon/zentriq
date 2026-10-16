@@ -1,11 +1,12 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { api } from '../../api/client';
 import type { Asset, AssetInventory } from '../../api/types';
-import { Link } from '../../app/router';
+import { Link, useRouter } from '../../app/router';
 import { useAuth } from '../../app/auth';
 import { Availability, typeLabel } from '../assets/AssetsPage';
 import { ServiceActionDialog, type ControlInfo, type ServiceActionRow } from './ServiceControl';
 import { useApi } from '../../app/useApi';
+import { AssetSecurity } from '../security/AssetSecurity';
 import { AssetVulnerabilities } from '../vulnerabilities/AssetVulnerabilities';
 import { Callout, DataTable, ErrorBox, fmt, Loading, PageHead, Panel, Pill, statusTone } from '../../components/ui';
 
@@ -26,7 +27,8 @@ type Tab = 'overview' | 'hardware' | 'software' | 'network' | 'updates' | 'secur
 export function AssetDetailPage({ id }: { id: string }) {
   const asset = useApi(() => api.get<Asset>(`/assets/${id}`), [id]);
   const inv = useApi(() => api.get<AssetInventory>(`/assets/${id}/inventory`), [id]);
-  const [tab, setTab] = useState<Tab>('overview');
+  const { query } = useRouter();
+  const [tab, setTab] = useState<Tab>((['overview', 'hardware', 'software', 'network', 'updates', 'security', 'services', 'vulnerabilities'] as Tab[]).find((t) => t === query.get('tab')) ?? 'overview');
   const [filter, setFilter] = useState('');
   const { can } = useAuth();
   const control = useApi(() => (can('assets.control') ? api.get<ControlInfo>(`/assets/${id}/control`) : Promise.resolve(null)), [id]);
@@ -177,6 +179,7 @@ export function AssetDetailPage({ id }: { id: string }) {
         </Panel>
       )}
 
+      {tab === 'security' && can('security.view') && <AssetSecurity assetId={id} />}
       {tab === 'security' && (
         <div className="grid-2">
           <Panel title="Protection">

@@ -26,7 +26,7 @@ export const NAV: [string, NavItem[]][] = [
   ['Secure & remediate', [
     { id: 'patch', label: 'Patch Management', icon: 'patch', path: '/modules/patch', ready: false },
     { id: 'vuln', label: 'Vulnerability Management', icon: 'bug', path: '/vulnerabilities', ready: true, permission: 'vuln.view' },
-    { id: 'config', label: 'Security Configuration', icon: 'sliders', path: '/modules/config', ready: false },
+    { id: 'config', label: 'Security Configuration', icon: 'sliders', path: '/security', ready: true, permission: 'security.view' },
     { id: 'deploy', label: 'Software Deployment', icon: 'package', path: '/modules/deploy', ready: false },
     { id: 'remote', label: 'Remote Support', icon: 'remote', path: '/modules/remote', ready: false },
   ]],
@@ -36,7 +36,7 @@ export const NAV: [string, NavItem[]][] = [
   ]],
   ['Insight & admin', [
     { id: 'reports', label: 'Reports & Analytics', icon: 'report', path: '/reports', ready: true, permission: 'assets.view' },
-    { id: 'integrations', label: 'Integrations & Automation', icon: 'plug', path: '/modules/integrations', ready: false },
+    { id: 'integrations', label: 'Integrations & Automation', icon: 'plug', path: '/integrations', ready: true, permission: 'integrations.manage' },
     { id: 'licensing', label: 'Licensing', icon: 'key', path: '/licensing', ready: true },
     { id: 'audit', label: 'Audit Logs', icon: 'log', path: '/audit', ready: true, permission: 'audit.view' },
     { id: 'users', label: 'Users, Roles & Sites', icon: 'users', path: '/users', ready: true, permission: 'users.manage' },

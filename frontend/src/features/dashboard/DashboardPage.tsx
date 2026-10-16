@@ -53,6 +53,7 @@ function Hero({ label, value, sub, to, meter, tone }: { label: string; value: st
   return to ? <Link to={to} className="hero-card">{body}</Link> : <div className="hero-card">{body}</div>;
 }
 
+interface SecuritySummary { distribution: { bucket: string; count: number }[]; topFailing: { rule: string; title: string; failing: number }[]; kpi: { avgScore: number | null } }
 interface VulnSummary { bySeverity: KC[]; aging: { bucket: string; critical: number; high: number; medium: number; low: number }[] }
 
 // ---- Widget registry ---------------------------------------------------------------------------------------
@@ -79,6 +80,8 @@ const WIDGETS: WidgetDef[] = [
   { id: 'scans.recent', title: 'Recent scans', defaultOn: false, description: 'Last five scans' },
   { id: 'vuln.severity', chart: 'donut', title: 'Open vulnerabilities', defaultOn: false, description: 'Software and Windows findings by severity' },
   { id: 'vuln.aging', chart: 'column', title: 'Vulnerability aging', defaultOn: false, description: 'How long open findings have been open' },
+  { id: 'security.score', chart: 'column', title: 'Security configuration score', defaultOn: false, description: 'Windows devices per compliance score band' },
+  { id: 'security.failing', chart: 'bar', title: 'Most failed security checks', defaultOn: false, description: 'Configuration checks failing on the most devices' },
 ];
 /** A widget on the dashboard. Saved reports are widgets too (id "report:<id>"). */
 type LayoutItem = { id: string; wide: boolean; chart?: ChartKind; reportId?: string; title?: string | null };
@@ -139,6 +142,8 @@ export function DashboardPage() {
   const layout = saved ?? DEFAULT_LAYOUT;
   const wantsVulns = layout.some((w) => w.id.startsWith('vuln.')) && can('vuln.view');
   const vulns = useApi(() => (wantsVulns ? api.get<VulnSummary>('/vulnerabilities/overview') : Promise.resolve(null)), [tick, wantsVulns]);
+  const wantsSecurity = layout.some((w) => w.id.startsWith('security.') && w.id !== 'security.posture') && can('security.view');
+  const sec = useApi(() => (wantsSecurity ? api.get<SecuritySummary>('/security/overview') : Promise.resolve(null)), [tick, wantsSecurity]);
 
   const o = ov.data;
   const k = o?.kpi;
@@ -181,6 +186,22 @@ export function DashboardPage() {
         if (!v) return <div className="chart-empty">Loading…</div>;
         return C(v.aging.map((b) => ({ key: b.bucket, label: b.bucket, value: b.critical + b.high + b.medium + b.low })),
           () => navigate('/vulnerabilities?tab=findings&sort=age'), { centerLabel: 'open' });
+      }
+      case 'security.score':
+      case 'security.failing': {
+        if (!can('security.view')) return <div className="chart-empty">You do not have access to security configuration data.</div>;
+        const v = sec.data;
+        if (!v) return <div className="chart-empty">Loading…</div>;
+        if (id === 'security.score') {
+          const BAND: Record<string, string> = { '0–49': 'var(--crit)', '50–69': '#e8590c', '70–89': 'var(--warn)', '90–100': 'var(--ok)' };
+          const rows = v.distribution;
+          if (rows.length === 0) return <div className="chart-empty">No devices assessed yet.</div>;
+          return C(rows.map((b) => ({ key: b.bucket, label: b.bucket, value: b.count, color: BAND[b.bucket] })), () => navigate('/security?tab=devices'),
+            { centerLabel: v.kpi.avgScore != null ? `avg ${v.kpi.avgScore}` : 'devices' });
+        }
+        if (v.topFailing.length === 0) return <div className="chart-empty">No failing checks.</div>;
+        return C(v.topFailing.map((r) => ({ key: r.rule, label: `${r.rule} ${r.title}`, value: r.failing })), (s) => navigate(`/security?tab=checks&rule=${encodeURIComponent(s.key)}`),
+          { centerLabel: 'devices' });
       }
       case 'kpi.tiles':
         return (

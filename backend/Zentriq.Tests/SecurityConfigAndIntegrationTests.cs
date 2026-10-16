@@ -409,6 +409,18 @@ public sealed class SecurityAndIntegrationDatabaseTests : IAsyncLifetime
         Assert.True(all.Total >= 50);
         var assets = await ReportEngine.RunAsync(ds, "assets", new ReportSpec { Columns = ["hostname", "security_score", "security_failed"], Sort = [new() { Column = "hostname" }] }, 10, default);
         Assert.Equal(100m, Convert.ToDecimal(assets.Rows[0][1]));
+
+        // Every built-in report (including the new security ones) is valid and runs.
+        var builtIn = new List<(string Name, string Dataset, string Def)>();
+        await using (var c = ds.CreateCommand("SELECT name, dataset, definition::text FROM zentriq.report_definitions WHERE system"))
+        await using (var r = await c.ExecuteReaderAsync())
+            while (await r.ReadAsync()) builtIn.Add((r.GetString(0), r.GetString(1), r.GetString(2)));
+        Assert.Contains(builtIn, b => b.Name == "Failed security checks");
+        foreach (var (name, dataset, def) in builtIn)
+        {
+            var ex = await Record.ExceptionAsync(() => ReportEngine.RunAsync(ds, dataset, ReportSpec.Parse(def), 10, default));
+            Assert.True(ex is null, $"{name}: {ex?.Message}");
+        }
     }
 
     [DbFact]

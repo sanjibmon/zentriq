@@ -209,7 +209,7 @@ ON CONFLICT DO NOTHING;
 
 INSERT INTO report_definitions (name, dataset, shared, system, description, definition) VALUES
  ('Failed security checks', 'security', true, true, 'Every failed configuration check per device, with severity and the value found.',
-  '{"columns":["hostname","rule","title","category","severity","actual","failing_days","baseline"],"filters":[{"column":"status","op":"eq","value":"fail"}],"sort":[{"column":"severity_rank","dir":"asc"}]}'),
+  '{"columns":["hostname","rule","title","check_category","severity","actual","failing_days","baseline"],"filters":[{"column":"status","op":"eq","value":"fail"}],"sort":[{"column":"severity_rank","dir":"asc"}]}'),
  ('Security compliance by check', 'security', true, true, 'Number of devices failing each check.',
   '{"columns":["rule","title"],"groupBy":["rule","title"],"aggregates":[{"fn":"count_distinct","column":"hostname"}],"filters":[{"column":"status","op":"eq","value":"fail"}],"sort":[{"column":"count","dir":"desc"}],"chart":"bar"}'),
  ('Security score per device', 'assets', true, true, 'Configuration compliance score of every Windows device.',
