@@ -266,7 +266,7 @@ function Findings({ onCve }: { onCve: (c: string) => void }) {
           { key: 'e', label: 'EPSS', render: (f) => pct(f.epss) },
           { key: 'h', label: 'Device', render: (f) => <><Link to={`/assets/${f.assetId}`}>{f.hostname ?? f.assetId}</Link><div className="faint" style={{ fontSize: 11.5 }}>{f.os ?? ''}</div></> },
           { key: 'sw', label: 'Software / Windows', className: 'wrap', render: (f) => f.source === 'os'
-            ? <>{f.software} <span className="mono faint">{f.version}</span>{f.kb && <div style={{ fontSize: 11.5 }}>Fixed by <b>KB{f.kb}</b> (build {f.fixedVersion})</div>}</>
+            ? <>{f.kb ? <><b>KB{f.kb}</b> missing</> : 'Windows update missing'}<div className="faint mono" style={{ fontSize: 11.5 }}>build {f.version} → {f.fixedVersion}</div></>
             : <>{f.software} <span className="mono faint">{f.version}</span>{f.fixedVersion && <div style={{ fontSize: 11.5 }}>Fixed in <b>{f.fixedVersion}</b></div>}</> },
           { key: 'd', label: status === 'fixed' ? 'Fixed' : 'Due', render: (f) => f.status === 'fixed' ? fmt.day(f.fixedAt)
             : f.status === 'open' || f.status === 'in_progress' ? <span style={{ color: f.dueAt && new Date(f.dueAt).getTime() < now ? 'var(--crit)' : undefined, fontWeight: f.dueAt && new Date(f.dueAt).getTime() < now ? 600 : undefined }}>{fmt.day(f.dueAt)}</span>

@@ -64,13 +64,14 @@ public static class ReportEngine
     public const int MaxFilters = 25;
     public const int MaxAggregates = 6;
 
+    /// <summary>"Memory (GB) · average": the column name first, so labels such as "Lowest free space (%)" stay readable.</summary>
     public static string AggregateLabel(ReportAggregate a, ReportColumn c) => a.Fn switch
     {
-        "count_distinct" => $"Distinct {c.Label}",
-        "sum" => $"Total {c.Label}",
-        "avg" => $"Average {c.Label}",
-        "min" => $"Lowest {c.Label}",
-        "max" => $"Highest {c.Label}",
+        "count_distinct" => $"{c.Label} · distinct",
+        "sum" => $"{c.Label} · total",
+        "avg" => $"{c.Label} · average",
+        "min" => $"{c.Label} · minimum",
+        "max" => $"{c.Label} · maximum",
         _ => c.Label,
     };
 

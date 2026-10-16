@@ -201,7 +201,7 @@ export function ReportBuilder({ id }: { id: string | null }) {
                 <p className="faint" style={{ margin: '0 0 6px', fontSize: 12 }}>Every group shows its count. Add totals, averages or highest values, e.g. average memory per model.</p>
                 {aggregates.map((a, i) => {
                   const types = AGGREGATES.find((x) => x.fn === a.fn)?.types ?? [];
-                  return <div key={i} className="filter-row">
+                  return <div key={i} className="agg-row">
                     <select className="in" aria-label="Calculation" value={a.fn} onChange={(e) => {
                       const fn = e.target.value as ReportAggregate['fn'];
                       const ok = AGGREGATES.find((x) => x.fn === fn)!.types;

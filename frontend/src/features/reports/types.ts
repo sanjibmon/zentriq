@@ -19,8 +19,8 @@ export const AGGREGATES: { fn: ReportAggregate['fn']; label: string; types: Colu
   { fn: 'count_distinct', label: 'Distinct count of', types: ['text', 'number', 'date', 'yesno'] },
   { fn: 'sum', label: 'Total of', types: ['number'] },
   { fn: 'avg', label: 'Average of', types: ['number'] },
-  { fn: 'min', label: 'Lowest', types: ['number', 'date'] },
-  { fn: 'max', label: 'Highest', types: ['number', 'date'] },
+  { fn: 'min', label: 'Minimum of', types: ['number', 'date'] },
+  { fn: 'max', label: 'Maximum of', types: ['number', 'date'] },
 ];
 export const DATE_BUCKETS: [string, string][] = [['day', 'Day'], ['week', 'Week'], ['month', 'Month'], ['quarter', 'Quarter'], ['year', 'Year']];
 export const aggKey = (a: ReportAggregate) => `agg_${a.fn}_${a.column}`;

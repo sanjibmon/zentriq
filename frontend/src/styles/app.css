@@ -270,3 +270,4 @@ button.link:hover { text-decoration: underline; }
 .legend-row i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
 /* Report designer: calculations */
 .agg-list { border-top: 1px solid var(--line); margin-top: 6px; padding-top: 8px; display: grid; gap: 6px; }
+.agg-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) auto; gap: 6px; align-items: center; }

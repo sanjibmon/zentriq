@@ -47,6 +47,8 @@ function Check([string] $Id, [string] $Name, [scriptblock] $Body) {
         Record $Id $Name 'PASS' ([string]($detail | Select-Object -Last 1))
         return $true
     } catch {
+        # A test that cannot run for an outside reason (e.g. no internet on the runner) throws "BLOCKED: …".
+        if ($_.Exception.Message -like 'BLOCKED:*') { Record $Id $Name 'BLOCKED' $_.Exception.Message.Substring(8).Trim(); return $false }
         Record $Id $Name 'FAIL' $_.Exception.Message
         return $false
     }
@@ -117,7 +119,7 @@ Remove-Item $answer -Force   # contains the administrator password
 
 if (-not $installed) {
     foreach ($t in 'T02 PostgreSQL provisioning', 'T03 Database migration', 'T04 Administrator sign-in', 'T05 API and worker services', 'T06 Trial initialization',
-                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management') {
+                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF') {
         Record $t.Substring(0, 3) $t.Substring(4) 'BLOCKED' 'installation failed'
     }
 } else {
@@ -575,8 +577,10 @@ if (-not $installed) {
 
     Check 'T48' 'Reports: run, group, export (XLSX/CSV), injection-safe filters, save, schedule and deliver' {
         $s = Login
-        $sets = @(Api GET '/reports/datasets' -Session $s | ForEach-Object { $_ })
-        Assert ($sets.Count -ge 6) "only $($sets.Count) dataset(s)"
+        $cat = Api GET '/reports/datasets' -Session $s
+        $sets = @($cat.datasets | ForEach-Object { $_ })
+        Assert ($sets.Count -ge 9) "only $($sets.Count) dataset(s)"
+        Assert ($cat.formats -contains 'pdf') 'PDF is not offered'
         $lib = @(Api GET '/reports' -Session $s | ForEach-Object { $_ })
         Assert (@($lib | Where-Object system).Count -ge 10) "built-in reports: $(@($lib | Where-Object system).Count)"
         $r = Api POST '/reports/run' @{ dataset = 'assets'; definition = @{ columns = @('hostname', 'ip', 'os', 'agent', 'last_contact'); filters = @(@{ column = 'hostname'; op = 'not_empty' }) } } -Session $s
@@ -645,6 +649,123 @@ if (-not $installed) {
         Assert ($o.kpi.cveCatalogue -ge 1) 'overview does not count the CVE'
         foreach ($m in $pick) { Api PUT "/vulnerabilities/products/$($m.id)" @{ status = 'auto' } -Session $s | Out-Null }
         $detail
+    } | Out-Null
+
+    Check 'T50' 'Windows vulnerabilities: Microsoft file import, build matching, KB, workflow (in progress, ticket, note, history), remediation plan' {
+        $s = Login
+        $o = Api GET '/vulnerabilities/overview' -Session $s
+        Assert ($o.kpi.windowsDevices -ge 1) 'no Windows device with an inventory document (T28 agentless inventory of this server)'
+        Assert ($o.kpi.windowsNoBuild -lt $o.kpi.windowsDevices) "no Windows device reports a full build (UBR): $($o.kpi.windowsNoBuild) of $($o.kpi.windowsDevices) without"
+        # Synthetic monthly document: one exploited CVE fixed in a build far above this server's (Windows Server 2022, 10.0.20348).
+        $cvrf = @{
+            DocumentTitle = @{ Value = 'Zentriq CI Security Updates' }
+            DocumentTracking = @{ Identification = @{ ID = @{ Value = '2099-Dec' } }; CurrentReleaseDate = '2099-12-08T08:00:00Z' }
+            ProductTree = @{ FullProductName = @(@{ ProductID = '90001'; Value = 'Windows Server 2022' }, @{ ProductID = '90002'; Value = 'Windows Server 2022 (Server Core installation)' }) }
+            Vulnerability = @(@{
+                Title = @{ Value = 'Zentriq CI Windows Kernel Elevation of Privilege Vulnerability' }
+                CVE = 'CVE-2099-5050'
+                Notes = @(@{ Title = 'Description'; Type = 2; Value = '<p>CI test vulnerability.</p>' })
+                Threats = @(@{ Type = 3; Description = @{ Value = 'Important' }; ProductID = @('90001') }, @{ Type = 1; Description = @{ Value = 'Publicly Disclosed:No;Exploited:Yes;Latest Software Release:Exploitation Detected' } })
+                CVSSScoreSets = @(@{ BaseScore = 7.8; Vector = 'CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:H'; ProductID = @('90001') })
+                Remediations = @(@{ Description = @{ Value = '5999999' }; URL = 'https://catalog.update.microsoft.com/v7/site/Search.aspx?q=KB5999999'; ProductID = @('90001', '90002'); Type = 2; SubType = 'Security Update'; FixedBuild = '10.0.20348.99999'; RestartRequired = @{ Value = 'Yes' } })
+                RevisionHistory = @(@{ Number = '1.0'; Date = '2099-12-08T08:00:00' })
+            })
+        } | ConvertTo-Json -Depth 12
+        $up = Invoke-RestMethod "$base/api/v1/vulnerabilities/import?source=msrc&name=ci-msrc.json" -Method Post -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } -ContentType 'application/octet-stream' -Body ([Text.Encoding]::UTF8.GetBytes($cvrf))
+        $deadline = (Get-Date).AddMinutes(4)
+        do { Start-Sleep 5; $imp = @(Api GET '/vulnerabilities/imports' -Session $s | ForEach-Object { $_ }) | Where-Object id -eq $up.id } while ($imp.status -in 'queued', 'running' -and (Get-Date) -lt $deadline)
+        Assert ($imp.status -eq 'done') "import $($imp.status): $($imp.message)"
+        $deadline = (Get-Date).AddMinutes(2)
+        do { Start-Sleep 5; $f = Api GET '/vulnerabilities/findings?cve=CVE-2099-5050&status=all' -Session $s } while ($f.total -eq 0 -and (Get-Date) -lt $deadline)
+        $o = Api GET '/vulnerabilities/overview' -Session $s
+        Assert ($f.total -ge 1) "no Windows finding (Windows devices $($o.kpi.windowsDevices), without build $($o.kpi.windowsNoBuild); evaluation: $(($o.feeds | Where-Object source -eq 'evaluate').message))"
+        $x = $f.items[0]
+        Assert ($x.source -eq 'os' -and $x.kb -eq '5999999' -and $x.fixedVersion -eq '10.0.20348.99999') "finding: source $($x.source), KB $($x.kb), fixed $($x.fixedVersion)"
+        Assert ($x.priority -eq 'P1' -and $x.exploited) "priority $($x.priority) (Microsoft 'exploited' must give P1)"
+        $cve = Api GET '/vulnerabilities/cves/CVE-2099-5050' -Session $s
+        Assert ($cve.cve.msExploited -and $cve.cve.msSeverity -eq 'Important' -and @($cve.windows).Count -eq 2) 'CVE detail lacks the Microsoft data'
+        # Workflow: start (assigns to me), ticket, note; history keeps all three.
+        Assert ((Api POST '/vulnerabilities/findings/workflow' @{ ids = @($x.id); action = 'start' } -Session $s).updated -eq 1) 'start remediation failed'
+        Api POST '/vulnerabilities/findings/workflow' @{ ids = @($x.id); action = 'ticket'; ticket = 'CHG-CI-1' } -Session $s | Out-Null
+        Api POST '/vulnerabilities/findings/workflow' @{ ids = @($x.id); action = 'note'; note = 'Patch window Saturday' } -Session $s | Out-Null
+        $d = Api GET "/vulnerabilities/findings/$($x.id)" -Session $s
+        Assert ($d.finding.status -eq 'in_progress' -and $d.finding.assignee -and $d.finding.ticket -eq 'CHG-CI-1') "after workflow: $($d.finding.status), $($d.finding.assignee), $($d.finding.ticket)"
+        Assert (@($d.events).Count -ge 3) "history has $(@($d.events).Count) entries"
+        Assert ($d.finding.remediation -match 'KB5999999') "remediation text: $($d.finding.remediation)"
+        $mine = Api GET '/vulnerabilities/findings?assignee=me&status=in_progress' -Session $s
+        Assert ($mine.total -ge 1) 'not listed under assigned to me'
+        # Re-evaluation keeps the workflow state.
+        Api POST '/vulnerabilities/evaluate' -Session $s | Out-Null
+        Start-Sleep 20
+        Assert ((Api GET "/vulnerabilities/findings/$($x.id)" -Session $s).finding.status -eq 'in_progress') 're-evaluation reset the status'
+        $plan = Api GET '/vulnerabilities/remediations?source=os' -Session $s
+        $line = @($plan.items) | Where-Object { $_.product -eq 'Windows Server 2022' } | Select-Object -First 1
+        Assert ($line -and $line.kb -eq '5999999' -and $line.action -match 'KB5999999') "remediation plan: $(@($plan.items).Count) line(s)"
+        $o = Api GET '/vulnerabilities/overview' -Session $s
+        Assert ($o.kpi.osOpen -ge 1 -and $o.kpi.inProgress -ge 1 -and @($o.aging).Count -ge 1) 'overview lacks OS / workflow / aging figures'
+        "$($f.total) Windows finding(s) on $($x.hostname) ($($x.version)); P1 risk $($x.risk); workflow + history ($(@($d.events).Count) entries); plan: $($line.action)"
+    } | Out-Null
+
+    Check 'T51' "Live Microsoft data: 'Update now' loads Windows fixed builds from api.msrc.microsoft.com and evaluates this server" {
+        $s = Login
+        Api PUT '/vulnerabilities/settings' @{ msrcMonths = 3 } -Session $s | Out-Null
+        $before = (Api GET '/vulnerabilities/overview' -Session $s).feeds | Where-Object source -eq 'msrc'
+        Api POST '/vulnerabilities/sync' -Session $s | Out-Null
+        $deadline = (Get-Date).AddMinutes(25)
+        do {
+            Start-Sleep 20
+            $o = Api GET '/vulnerabilities/overview' -Session $s
+            $m = $o.feeds | Where-Object source -eq 'msrc'
+            $e = $o.feeds | Where-Object source -eq 'evaluate'
+        } while (($m.lastRunAt -eq $before.lastRunAt -or -not $e.lastRunAt -or [datetime]$e.lastRunAt -lt [datetime]$m.lastRunAt) -and (Get-Date) -lt $deadline)
+        if ($m.lastRunAt -eq $before.lastRunAt) { throw 'the update did not reach the Microsoft stage in 25 minutes' }
+        if (-not $m.lastOkAt -or $m.lastOkAt -ne $m.lastRunAt) {
+            if ($m.message -match 'Could not reach|answered 5\d\d') { throw "BLOCKED: api.msrc.microsoft.com not reachable from the runner: $($m.message)" }
+            throw "Microsoft feed failed: $($m.message)"
+        }
+        Assert ($o.kpi.windowsCves -ge 50) "only $($o.kpi.windowsCves) Windows CVE(s) parsed from 3 months of Microsoft data: $($m.message)"
+        $os = Api GET '/vulnerabilities/findings?source=os&status=active&pageSize=5' -Session $s
+        $real = @($os.items | Where-Object { $_.cve -ne 'CVE-2099-5050' })
+        "$($m.message) This runner: $($os.total) open Windows finding(s)$(if ($real.Count) { "; e.g. $($real[0].cve) fixed by KB$($real[0].kb) (build $($real[0].fixedVersion), runner $($real[0].version))" } else { ' (fully patched)' })."
+    } | Out-Null
+
+    Check 'T52' 'Report analytics: calculations, date grouping, new data sources, PDF, saved report on the dashboard' {
+        $s = Login
+        $agg = Api POST '/reports/run' @{ dataset = 'vulnerabilities'; definition = @{ columns = @('severity'); groupBy = @('severity'); filters = @();
+            aggregates = @(@{ fn = 'count_distinct'; column = 'hostname' }, @{ fn = 'avg'; column = 'cvss' }, @{ fn = 'max'; column = 'risk' }); sort = @(@{ column = 'agg_max_risk'; dir = 'desc' }) } } -Session $s
+        Assert (($agg.columns | ForEach-Object key) -join ',' -eq 'severity,count,agg_count_distinct_hostname,agg_avg_cvss,agg_max_risk') "columns: $(($agg.columns | ForEach-Object key) -join ',')"
+        $month = Api POST '/reports/run' @{ dataset = 'assets'; definition = @{ columns = @('first_seen'); groupBy = @('first_seen'); dateBucket = 'month'; filters = @() } } -Session $s
+        Assert (@($month.rows).Count -ge 1 -and $month.rows[0][0] -match '^\d{4}-\d{2}$') "month bucket: $($month.rows[0][0])"
+        foreach ($d in 'software_titles', 'discovery', 'audit') {
+            $r = Api POST '/reports/run' @{ dataset = $d; definition = @{ columns = @(((Api GET '/reports/datasets' -Session $s).datasets | Where-Object key -eq $d).columns | Select-Object -First 4 | ForEach-Object key); filters = @() } } -Session $s
+            Assert ($null -ne $r.total) "$d did not run"
+        }
+        $titles = Api POST '/reports/run' @{ dataset = 'software_titles'; definition = @{ columns = @('software', 'devices', 'latest_version'); filters = @(); sort = @(@{ column = 'devices'; dir = 'desc' }) } } -Session $s
+        Assert ($titles.total -ge 1) 'no software titles'
+        $lib = @(Api GET '/reports' -Session $s | ForEach-Object { $_ })
+        $win = $lib | Where-Object { $_.system -and $_.name -eq 'Windows updates missing' }
+        $def = Api GET "/reports/$($win.id)" -Session $s
+        $pdf = Invoke-WebRequest "$base/api/v1/reports/export" -Method Post -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } -ContentType 'application/json' `
+            -Body (@{ dataset = $def.dataset; definition = $def.definition; format = 'pdf'; name = $def.name } | ConvertTo-Json -Depth 8)
+        $bytes = $pdf.RawContentStream.ToArray()
+        Assert ([Text.Encoding]::ASCII.GetString($bytes, 0, 5) -eq '%PDF-' -and $pdf.Headers['Content-Type'] -match 'pdf') 'export is not a PDF'
+        $pdfFile = Join-Path $OutDir 'ci-windows-updates.pdf'; [IO.File]::WriteAllBytes($pdfFile, $bytes)
+        $sum = $lib | Where-Object { $_.system -and $_.name -eq 'Vulnerability summary by severity' }
+        $sumPdf = Invoke-WebRequest "$base/api/v1/reports/export" -Method Post -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } -ContentType 'application/json' `
+            -Body (@{ dataset = 'vulnerabilities'; definition = (Api GET "/reports/$($sum.id)" -Session $s).definition; format = 'pdf'; name = $sum.name } | ConvertTo-Json -Depth 8)
+        [IO.File]::WriteAllBytes((Join-Path $OutDir 'ci-vuln-summary.pdf'), $sumPdf.RawContentStream.ToArray())
+        # A saved report on the dashboard.
+        $dash = @(Api GET '/dashboards' -Session $s | ForEach-Object { $_ }) | Where-Object owned | Select-Object -First 1
+        $widgets = @(@{ type = 'kpi.tiles'; title = $null; width = 12; height = 2; settings = @{} }, @{ type = 'report'; title = $sum.name; width = 4; height = 2; settings = @{ reportId = $sum.id; chart = 'donut' } })
+        $body = @{ name = 'My dashboard'; shared = $false; filters = @{}; refreshSeconds = 60; widgets = $widgets }
+        if ($dash) { Api PUT "/dashboards/$($dash.id)" $body -Session $s | Out-Null } else { Api POST '/dashboards' $body -Session $s | Out-Null }
+        $saved = @(Api GET '/dashboards' -Session $s | ForEach-Object { $_ }) | Where-Object owned | Select-Object -First 1
+        $w = @($saved.widgets) | Where-Object type -eq 'report'
+        Assert ($w -and $w.settings.reportId -eq $sum.id) 'report widget not saved'
+        $badWidget = Invoke-WebRequest "$base/api/v1/dashboards/$($saved.id)" -Method Put -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } -ContentType 'application/json' -SkipHttpErrorCheck `
+            -Body (@{ name = 'x'; shared = $false; filters = @{}; refreshSeconds = 60; widgets = @(@{ type = 'report'; width = 4; height = 2; settings = @{} }) } | ConvertTo-Json -Depth 6)
+        Assert ($badWidget.StatusCode -eq 400) "report widget without a report accepted: $($badWidget.StatusCode)"
+        "aggregates and month buckets OK; 3 new data sources; PDF $($bytes.Length) bytes; report widget saved"
     } | Out-Null
 
     if ($UpgradeBundle) {

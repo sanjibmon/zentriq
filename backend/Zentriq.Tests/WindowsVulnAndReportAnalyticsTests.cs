@@ -163,7 +163,7 @@ public sealed class ReportAnalyticsTests
         Assert.Contains("count(DISTINCT t.\"model\") AS \"agg_count_distinct_model\"", sql);
         Assert.Contains("ORDER BY \"agg_avg_ram_gb\" DESC", sql);
         Assert.Equal(["manufacturer", "count", "agg_avg_ram_gb", "agg_max_disk_gb", "agg_count_distinct_model"], cols.Select(c => c.Key));
-        Assert.Equal("Average Memory (GB)", cols[2].Label);
+        Assert.Equal("Memory (GB) · average", cols[2].Label);
     }
 
     [Fact]
