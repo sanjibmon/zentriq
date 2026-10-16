@@ -202,12 +202,13 @@ export function useChartKind(key: string, fallback: ChartKind): [ChartKind, (k: 
   return [kind, set];
 }
 
-/** Small segmented control to switch a tile between donut, pie, bar and column. */
+/** Compact chart-type selector for a tile (donut, pie, bar, column; optionally one extra view such as "Stacked"). */
 export function ChartKindPicker({ value, onChange, extra }: { value: string; onChange: (k: ChartKind) => void; extra?: [string, string, () => void] }) {
   return (
-    <div className="seg seg-xs" role="group" aria-label="Chart type">
-      {extra && <button type="button" className={value === extra[0] ? 'on' : ''} onClick={extra[2]} title={extra[1]}>{extra[1]}</button>}
-      {CHART_KINDS.map(([k, l]) => <button key={k} type="button" className={value === k ? 'on' : ''} onClick={() => onChange(k)} title={`Show as ${l.toLowerCase()} chart`}>{l}</button>)}
-    </div>
+    <select className="in sm chart-pick" value={value} aria-label="Chart type" title="Chart type"
+      onChange={(e) => { const v = e.target.value; if (extra && v === extra[0]) extra[2](); else onChange(v as ChartKind); }}>
+      {extra && <option value={extra[0]}>{extra[1]}</option>}
+      {CHART_KINDS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+    </select>
   );
 }

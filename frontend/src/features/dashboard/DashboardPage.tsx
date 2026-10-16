@@ -92,7 +92,7 @@ type LayoutItem = { id: string; wide: boolean; chart?: ChartKind; reportId?: str
 type Layout = LayoutItem[];
 const DEFAULT_LAYOUT: Layout = WIDGETS.filter((w) => w.defaultOn).map((w) => ({ id: w.id, wide: !!w.wide, chart: w.chart }));
 interface DashboardDto {
-  id: string; name: string; owned: boolean;
+  id: string; name: string; owned: boolean; filters?: { seenWidgets?: string[] } | null;
   widgets: { type: string; title?: string | null; width: number; settings?: { chart?: ChartKind; reportId?: string } | null }[];
 }
 const defFor = (it: LayoutItem): WidgetDef | undefined => it.reportId
@@ -102,6 +102,13 @@ const toBody = (layout: Layout) => layout.map((w) => ({
   type: w.reportId ? 'report' : w.id, title: w.reportId ? (w.title ?? null) : null, width: w.wide ? 8 : 4, height: 2,
   settings: { ...(w.chart ? { chart: w.chart } : {}), ...(w.reportId ? { reportId: w.reportId } : {}) },
 }));
+/** Widgets added in later releases: shown once on a saved dashboard until the user saves their layout. */
+const NEW_WIDGETS = ['assets.department', 'changes.hardware', 'changes.software'];
+const withNew = (layout: Layout, d: DashboardDto | null): Layout => {
+  const seen = d?.filters?.seenWidgets ?? [];
+  const add = NEW_WIDGETS.filter((id) => !seen.includes(id) && !layout.some((w) => w.id === id));
+  return add.length === 0 ? layout : [...layout, ...add.map((id) => { const w = WIDGETS.find((x) => x.id === id)!; return { id, wide: !!w.wide, chart: w.chart }; })];
+};
 const fromDto = (d: DashboardDto | null): Layout | null => {
   // Only a layout saved by this dashboard counts. Dashboards from earlier versions (kpi.assets, assets.byOs, …)
   // would otherwise show just the two widget types that still exist; they get the default layout instead.
@@ -117,10 +124,10 @@ const fromDto = (d: DashboardDto | null): Layout | null => {
 export async function pinReportToDashboard(reportId: string, name: string, wide: boolean): Promise<'added' | 'present'> {
   const list = await api.get<DashboardDto[]>('/dashboards');
   const mine = list.find((d) => d.owned) ?? null;
-  const layout = fromDto(mine) ?? DEFAULT_LAYOUT;
+  const layout = (() => { const l = fromDto(mine); return l ? withNew(l, mine) : DEFAULT_LAYOUT; })();
   if (layout.some((w) => w.reportId === reportId)) return 'present';
   const next = [...layout, { id: `report:${reportId}`, reportId, title: name, wide }];
-  const body = { name: mine?.name ?? 'My dashboard', shared: false, filters: {}, refreshSeconds: 60, widgets: toBody(next) };
+  const body = { name: mine?.name ?? 'My dashboard', shared: false, filters: { seenWidgets: NEW_WIDGETS }, refreshSeconds: 60, widgets: toBody(next) };
   if (mine) await api.put(`/dashboards/${mine.id}`, body); else await api.post('/dashboards', body);
   return 'added';
 }
@@ -142,7 +149,7 @@ export function DashboardPage() {
   useEffect(() => { const t = setInterval(() => setTick((x) => x + 1), 60000); return () => clearInterval(t); }, []);
 
   const mine = dashboards.data?.find((d) => d.owned) ?? null;
-  const saved: Layout | null = useMemo(() => fromDto(mine), [mine]);
+  const saved: Layout | null = useMemo(() => { const l = fromDto(mine); return l ? withNew(l, mine) : null; }, [mine]);
   const layout = saved ?? DEFAULT_LAYOUT;
   const wantsVulns = layout.some((w) => w.id.startsWith('vuln.')) && can('vuln.view');
   const vulns = useApi(() => (wantsVulns ? api.get<VulnSummary>('/vulnerabilities/overview') : Promise.resolve(null)), [tick, wantsVulns]);
@@ -161,7 +168,7 @@ export function DashboardPage() {
     try { setMsg((await api.post<{ message: string }>('/assets/collect', { all: true })).message); } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
   }
   async function saveLayout(next: Layout) {
-    const body = { name: mine?.name ?? 'My dashboard', shared: false, filters: {}, refreshSeconds: 60, widgets: toBody(next) };
+    const body = { name: mine?.name ?? 'My dashboard', shared: false, filters: { seenWidgets: NEW_WIDGETS }, refreshSeconds: 60, widgets: toBody(next) };
     try {
       if (mine) await api.put(`/dashboards/${mine.id}`, body); else await api.post('/dashboards', body);
       dashboards.reload();
