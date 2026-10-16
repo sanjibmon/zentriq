@@ -1,9 +1,20 @@
 # Test report
 
-Latest: GitHub Actions run 38920606135 (commit `8943a86`), workflow `windows-release`, on a GitHub-hosted
-**Windows Server 2022 Datacenter 10.0.20348** VM. Release: `v1.1.1-build.48` (pre-release, **unsigned**), package
-version **1.1.1.48**. Results: unit + PostgreSQL integration tests **142/142 PASS**; installer acceptance
-**48 passed, 0 failed, 0 blocked, 10 not run**; in-place updates from published builds and from 1.0.2 PASS.
+Latest: GitHub Actions run 38939906842 (commit `5264740`), workflow `windows-release`, on a GitHub-hosted
+**Windows Server 2022 Datacenter 10.0.20348** VM. Release: `v1.1.1-build.51` (pre-release, **unsigned**), package
+version **1.1.1.51**. Results: unit + PostgreSQL integration tests **148/148 PASS**; installer acceptance
+**50 passed, 0 failed, 0 blocked, 10 not run**; in-place updates from published builds and from 1.0.2 PASS.
+
+New in build 51 (Remote Management › Remote Support, MeshCentral 1.2.5 engine with Zentriq branding):
+
+| ID | Test | Result | Detail |
+|---|---|---|---|
+| T59 | Remote support: engine running, branded installer, remote agent connects, signed-in session | **PASS** | ZentriqRemote service and health.ashx OK; installer 3.5 MB, version info "Zentriq Remote Support Agent"; the runner came online in Remote Support; the desktop session link opened the signed-in device view; a forged link was refused; session in history |
+| T60 | Remote agent removed and reinstalled through the Zentriq Agent from the console | **PASS** | both actions succeeded and appear in the Activity log; device online again |
+| — | Live test against a real MeshCentral (ci-quick) | **PASS** | control channel; group, user and consent management; sign-in link; agent installer; agent settings point to `wss://host:port/agent.ashx` (WAN mode, also for dotless host names); sync |
+| — | Unit / DB tests | **PASS** | sign-in cookie format, server config, rights/consent flags, certificate name; NUL characters removed from inventory |
+| — | Builds 49–50 | FAIL → fixed | MeshCentral 1.2.6 not on npm (pinned 1.2.5); packaging module check path; engine ran in LAN-only mode for a dotless host name (agents could not find it); the remote agent's uninstall entry contains a NUL character, which broke inventory upload (now stripped) |
+| — | New console screens (Remote Support devices, session history, deployment & settings; device page buttons; navigation) | checked | rendered from the built console against a mock API |
 
 New in build 48 (departments, change history, console options):
 

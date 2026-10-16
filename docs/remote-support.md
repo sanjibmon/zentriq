@@ -49,7 +49,7 @@ All three permissions are given to the Administrator role.
 
 ## Installing the remote agent on devices
 
-- **Devices with the Zentriq Agent (1.1.1 build 49 or later):**
+- **Devices with the Zentriq Agent (1.1.1 build 51 or later):**
   1. Open Remote Support › Devices.
   2. Select the devices and click **Install**.
   3. The agent downloads the installer from the server over mTLS, checks its SHA-256 and runs `-fullinstall`.
