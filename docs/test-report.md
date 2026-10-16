@@ -1,11 +1,24 @@
 # Test report
 
-Latest: GitHub Actions run 38443777104 (commit `2f42d69`), workflow `windows-release`, on a GitHub-hosted
-**Windows Server 2022 Datacenter 10.0.20348** VM. Release: `v1.1.1-build.37` (pre-release, **unsigned**), package
-version **1.1.1.37**. Results: unit + PostgreSQL integration tests 53/53 PASS; installer acceptance
-**37 passed, 0 failed, 0 blocked, 10 not run**.
+Latest: GitHub Actions run 38851850244 (commit `4b0b543`), workflow `windows-release`, on a GitHub-hosted
+**Windows Server 2022 Datacenter 10.0.20348** VM. Release: `v1.1.1-build.45` (pre-release, **unsigned**), package
+version **1.1.1.45**. Results: unit + PostgreSQL integration tests **111/111 PASS**; installer acceptance
+**42 passed, 0 failed, 0 blocked, 10 not run**; in-place updates from published builds 27→29 (half-updated), 43 and 1.0.2 PASS.
 
-New in build 37:
+New in build 45 (Reports & Analytics, Vulnerability Management):
+
+| ID | Test | Result | Detail |
+|---|---|---|---|
+| T48 | Reports: run, group, export (XLSX/CSV), injection-safe filters, save, schedule and deliver | **PASS** | 9 data sources, 22 built-in reports; delivery recorded as failed only because SMTP is not configured on the runner (file kept) |
+| T49 | Vulnerabilities: NVD file import, CPE mapping, evaluation, risk acceptance | **PASS** | 3 findings; P2, risk 69; acceptance and re-open |
+| T50 | Windows vulnerabilities from a Microsoft (CVRF) file, workflow, remediation plan | **PASS** | matched against the runner's real build 10.0.20348.5622; KB and fixed build; Microsoft "exploited" → P1; start / ticket / note with history; survives re-evaluation; plan line "Install the latest cumulative update for Windows Server 2022 (KB… or later)" |
+| T51 | Live Microsoft data from api.msrc.microsoft.com | **PASS** | 3 months loaded online: 2,063 Windows CVEs with fixed builds; the (not fully patched) runner shows 978 real open Windows findings, e.g. fixed by KB5126655 (build 10.0.20348.5761 vs. runner 5622) |
+| T52 | Report analytics | **PASS** | distinct count / average / maximum per group, month buckets, software titles / discovery / audit data sources, PDF (32 pages, header on every page, page numbers; checked by rendering), saved report on the dashboard, invalid report widget refused |
+| T47 | Agent update from the console | **PASS** | 1.1.1.45 → 1.1.2.45 in place |
+| — | New console screens (vulnerability overview, findings, finding history, remediation plan, CVE detail with Windows updates, report designer with calculations, dashboard with report and vulnerability widgets) | checked | rendered from the built console against a mock API |
+| — | Windows vulnerability matching on Windows 10/11 clients, Server 2016/2019 and Server Core | **NOT RUN** | product mapping covered by unit tests; only Server 2022 runs in CI |
+
+Build 37:
 
 | ID | Test | Result | Detail |
 |---|---|---|---|
