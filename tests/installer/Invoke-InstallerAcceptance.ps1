@@ -1040,6 +1040,16 @@ if (-not $installed) {
         $st = Api GET '/remote/status' -Session $s
         Assert ($st.installed -and $st.running) "remote status: installed=$($st.installed) running=$($st.running) $($st.message)"
         $login = Invoke-WebRequest 'https://localhost:8446/' -SkipCertificateCheck
+        function Served-Cert([int] $port) {
+            $tcp = [Net.Sockets.TcpClient]::new('localhost', $port)
+            try {
+                $ssl = [Net.Security.SslStream]::new($tcp.GetStream(), $false, { $true })
+                $ssl.AuthenticateAsClient('localhost')
+                [Security.Cryptography.X509Certificates.X509Certificate2]::new($ssl.RemoteCertificate).Thumbprint
+            } finally { $tcp.Dispose() }
+        }
+        $consoleThumb = Served-Cert $HttpsPort; $remoteThumb = Served-Cert 8446
+        Assert ($consoleThumb -eq $remoteThumb) "remote support serves certificate $remoteThumb, the console $consoleThumb"
         Assert ($login.Content -match 'Zentriq') 'remote support sign-in page is not Zentriq branded'
         $r = Invoke-WebRequest "$base/api/v1/remote/installer" -WebSession $s -OutFile $remoteExe -PassThru -SkipHttpErrorCheck
         Assert ($r.StatusCode -eq 200) "installer download returned $($r.StatusCode)"
@@ -1058,7 +1068,7 @@ if (-not $installed) {
         Assert ($forged.Content -notmatch 'MainDevDesktop') 'a forged sign-in link was accepted'
         $log = Api GET "/remote/sessions?assetId=$($me.assetId)" -Session $s
         Assert (@($log.items | Where-Object { $_.view -eq 'desktop' }).Count -ge 1) 'session not in the session history'
-        "engine healthy; branded installer $([math]::Round($bytes.Length/1MB,1)) MB ('$($vi.FileDescription)', exit $($p.ExitCode)); $($me.name) online as $($me.os); signed-in desktop link opened; forged link refused"
+        "engine healthy, same certificate as the console ($($consoleThumb.Substring(0,8))...); branded installer $([math]::Round($bytes.Length/1MB,1)) MB ('$($vi.FileDescription)', exit $($p.ExitCode)); $($me.name) online as $($me.os); signed-in desktop link opened; forged link refused"
     }
 
     Check 'T60' 'Remote support via the Zentriq agent: remove and install the remote agent from the console' {

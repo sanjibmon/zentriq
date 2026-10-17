@@ -15,7 +15,7 @@ Zentriq does not build its own remote-control stack. It bundles **MeshCentral 1.
 | Windows service | `ZentriqRemote` (`Zentriq.Worker.exe --remote-host`), account `NT SERVICE\ZentriqRemote`, restarts automatically |
 | Program files | `<install>\remote\node`, `<install>\remote\app` |
 | Data | `<data>\Remote\data` (config, database, certificates), `files`, `backups`; only SYSTEM, Administrators and the service can access it |
-| Port | **8446/TCP**, HTTPS with the engine's own certificate. Setup adds the firewall rule. Devices connect outbound to it. |
+| Port | **8446/TCP**, HTTPS with the **same certificate as the console** (Setup copies it to the engine at install, repair and upgrade; if the console certificate's key cannot be exported, the engine uses its own). Setup adds the firewall rule. Devices connect outbound to it. |
 | Logs | `<data>\Logs\remote-*.log` |
 
 ### Branding
@@ -70,9 +70,13 @@ These settings apply to all devices immediately. All are on by default:
 
 ## Remote access from outside the network
 
-Devices connect to `https://<server host>:8446/`. To use a different public name, set `Remote.PublicHost` in `zentriq.json` and run Repair. To support devices outside the LAN, publish port 8446. The first time a technician opens a session, the browser asks them to trust the engine's certificate.
+Devices connect to `https://<server host>:8446/`. Technicians are sent to port 8446 on the same address they used to open the console (for example `https://192.168.1.8:8446/`), unless `Remote.PublicHost` is set in `zentriq.json` (then run Repair). To support devices outside the LAN, publish port 8446.
+
+The console's self-signed certificate covers the server's names and its IPv4 addresses. Once a technician's PC trusts it (import it into *Trusted Root Certification Authorities*, or replace it with a CA-issued certificate), both the console and remote sessions open without warnings.
 
 ## Troubleshooting
+
+- **The session tab shows a certificate error without a way to continue:** the browser has HSTS for the server name (it trusted the console under that name) but did not trust the remote support certificate. Builds before 52 used a separate certificate on port 8446; upgrading fixes it. With build 52 or later, trust the console certificate on the technician PC or open the console by the address the certificate covers.
 
 - **Status "Not running":** check service `ZentriqRemote` and `<data>\Logs\remote-*.log`. Running Repair from Setup reconfigures it.
 - **"Install" not offered:** the Zentriq Agent on the device is older than this release. Update the agent first (Agents › Update).
