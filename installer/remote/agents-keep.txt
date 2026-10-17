@@ -5,6 +5,8 @@
 MeshService.exe
 MeshService64.exe
 MeshServiceARM64.exe
+# Required: the engine reads it at start (not offered for download in Zentriq).
+MeshCentralAssistant.exe
 agent-translations.json
 agentrecoverycore.js
 codesign.cer
