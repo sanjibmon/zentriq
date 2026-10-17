@@ -60,7 +60,7 @@ public static class ServerCertificates
         req.CertificateExtensions.Add(new X509BasicConstraintsExtension(true, true, 0, true));
         req.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.KeyCertSign | X509KeyUsageFlags.CrlSign, true));
         req.CertificateExtensions.Add(new X509SubjectKeyIdentifierExtension(req.PublicKey, false));
-        return req.CreateSelfSigned(DateTimeOffset.UtcNow.AddMinutes(-5), DateTimeOffset.UtcNow.AddYears(20));
+        return req.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddYears(20));
     }
 
     public static bool IsLocalCa(X509Certificate2 cert) =>
@@ -84,6 +84,7 @@ public static class ServerCertificates
         var serial = RandomNumberGenerator.GetBytes(16);
         serial[0] &= 0x7F;
         var notBefore = DateTimeOffset.UtcNow.AddMinutes(-10);
+        if (notBefore < ca.NotBefore.ToUniversalTime()) notBefore = ca.NotBefore.ToUniversalTime(); // a CA created moments ago
         var notAfter = notBefore + LeafLifetime;
         if (notAfter > ca.NotAfter) notAfter = ca.NotAfter.AddMinutes(-1);
         using var issued = req.Create(ca, notBefore, notAfter, serial);
