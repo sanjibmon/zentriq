@@ -1124,12 +1124,13 @@ if (-not $installed) {
 
     Check 'T61' 'Server certificate follows the server: local CA, all IP addresses, automatic re-issue with the same key, remote support follows' {
         function Served([int] $port) {
-            $tcp = [Net.Sockets.TcpClient]::new('127.0.0.1', $port)
+            # The remote support engine restarts when the certificate changes: a refused connection means "not yet".
+            try { $tcp = [Net.Sockets.TcpClient]::new('127.0.0.1', $port) } catch { return [pscustomobject]@{ Thumbprint = '(not answering)' } }
             try {
                 $ssl = [Net.Security.SslStream]::new($tcp.GetStream(), $false, { $true })
                 $ssl.AuthenticateAsClient('localhost')
                 [Security.Cryptography.X509Certificates.X509Certificate2]::new($ssl.RemoteCertificate)
-            } finally { $tcp.Dispose() }
+            } catch { [pscustomobject]@{ Thumbprint = '(not answering)' } } finally { $tcp.Dispose() }
         }
         function Sans($c) { ($c.Extensions | Where-Object { $_.Oid.Value -eq '2.5.29.17' }).Format($false) }
         $caResp = Invoke-WebRequest "$base/api/v1/trust/ca.cer"   # no sign-in needed
@@ -1225,7 +1226,7 @@ if (-not $installed) {
         Assert ($t.deviceType -eq 'scanner' -and $t.deviceTypeManual -and $t.category -eq 'printer') "manual type: $($t.deviceType)"
         $t = Api PUT "/assets/$($kept.id)/device-type" @{ deviceType = $null } -Session $s
         Assert (-not $t.deviceTypeManual) 'automatic type not restored'
-        $types = @(Api GET '/assets/device-types' -Session $s)
+        $types = @(Api GET '/assets/device-types' -Session $s | ForEach-Object { $_ })
         Assert ($types.Count -ge 20 -and ($types | Where-Object key -eq 'firewall').category -eq 'network_device') "device types: $($types.Count)"
 
         # Automatic clean-up setting and deletion.
