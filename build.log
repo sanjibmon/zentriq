@@ -1,0 +1,82 @@
+  Determining projects to restore...
+  Restored /home/runner/work/zentriq/zentriq/backend/Zentriq.Domain/Zentriq.Domain.csproj (in 114 ms).
+  Restored /home/runner/work/zentriq/zentriq/backend/Zentriq.Application/Zentriq.Application.csproj (in 119 ms).
+  Restored /home/runner/work/zentriq/zentriq/backend/Zentriq.Infrastructure/Zentriq.Infrastructure.csproj (in 1.01 sec).
+  Restored /home/runner/work/zentriq/zentriq/backend/Zentriq.Api/Zentriq.Api.csproj (in 1.15 sec).
+  Restored /home/runner/work/zentriq/zentriq/backend/Zentriq.Inventory/Zentriq.Inventory.csproj (in 1.26 sec).
+  Zentriq.Inventory -> /home/runner/work/zentriq/zentriq/backend/Zentriq.Inventory/bin/Release/netstandard2.0/Zentriq.Inventory.dll
+  Zentriq.Domain -> /home/runner/work/zentriq/zentriq/backend/Zentriq.Domain/bin/Release/net10.0/Zentriq.Domain.dll
+  Zentriq.Application -> /home/runner/work/zentriq/zentriq/backend/Zentriq.Application/bin/Release/net10.0/Zentriq.Application.dll
+  Zentriq.Infrastructure -> /home/runner/work/zentriq/zentriq/backend/Zentriq.Infrastructure/bin/Release/net10.0/Zentriq.Infrastructure.dll
+/home/runner/work/zentriq/zentriq/backend/Zentriq.Api/Infrastructure/ApiTokenAuthentication.cs(19,25): warning CS0108: 'ApiTokenAuthenticationHandler.Scheme' hides inherited member 'AuthenticationHandler<AuthenticationSchemeOptions>.Scheme'. Use the new keyword if hiding was intended. [/home/runner/work/zentriq/zentriq/backend/Zentriq.Api/Zentriq.Api.csproj]
+  Zentriq.Api -> /home/runner/work/zentriq/zentriq/backend/Zentriq.Api/bin/Release/net10.0/Zentriq.Api.dll
+
+Build succeeded.
+
+/home/runner/work/zentriq/zentriq/backend/Zentriq.Api/Infrastructure/ApiTokenAuthentication.cs(19,25): warning CS0108: 'ApiTokenAuthenticationHandler.Scheme' hides inherited member 'AuthenticationHandler<AuthenticationSchemeOptions>.Scheme'. Use the new keyword if hiding was intended. [/home/runner/work/zentriq/zentriq/backend/Zentriq.Api/Zentriq.Api.csproj]
+    1 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:17.69
+  Determining projects to restore...
+  Restored /home/runner/work/zentriq/zentriq/backend/Zentriq.Worker/Zentriq.Worker.csproj (in 1.47 sec).
+  4 of 5 projects are up-to-date for restore.
+  Zentriq.Inventory -> /home/runner/work/zentriq/zentriq/backend/Zentriq.Inventory/bin/Release/netstandard2.0/Zentriq.Inventory.dll
+  Zentriq.Domain -> /home/runner/work/zentriq/zentriq/backend/Zentriq.Domain/bin/Release/net10.0/Zentriq.Domain.dll
+  Zentriq.Application -> /home/runner/work/zentriq/zentriq/backend/Zentriq.Application/bin/Release/net10.0/Zentriq.Application.dll
+  Zentriq.Infrastructure -> /home/runner/work/zentriq/zentriq/backend/Zentriq.Infrastructure/bin/Release/net10.0/Zentriq.Infrastructure.dll
+/home/runner/work/zentriq/zentriq/backend/Zentriq.Worker/Agentless/SnmpCollector.cs(71,26): warning CS0618: 'MD5AuthenticationProvider' is obsolete: 'MD5 is no longer secure. Please use a more secure provider.' [/home/runner/work/zentriq/zentriq/backend/Zentriq.Worker/Zentriq.Worker.csproj]
+/home/runner/work/zentriq/zentriq/backend/Zentriq.Worker/Agentless/SnmpCollector.cs(73,22): warning CS0618: 'SHA1AuthenticationProvider' is obsolete: 'SHA-1 is no longer secure. Please use a more secure provider.' [/home/runner/work/zentriq/zentriq/backend/Zentriq.Worker/Zentriq.Worker.csproj]
+  Zentriq.Worker -> /home/runner/work/zentriq/zentriq/backend/Zentriq.Worker/bin/Release/net10.0/Zentriq.Worker.dll
+
+Build succeeded.
+
+/home/runner/work/zentriq/zentriq/backend/Zentriq.Worker/Agentless/SnmpCollector.cs(71,26): warning CS0618: 'MD5AuthenticationProvider' is obsolete: 'MD5 is no longer secure. Please use a more secure provider.' [/home/runner/work/zentriq/zentriq/backend/Zentriq.Worker/Zentriq.Worker.csproj]
+/home/runner/work/zentriq/zentriq/backend/Zentriq.Worker/Agentless/SnmpCollector.cs(73,22): warning CS0618: 'SHA1AuthenticationProvider' is obsolete: 'SHA-1 is no longer secure. Please use a more secure provider.' [/home/runner/work/zentriq/zentriq/backend/Zentriq.Worker/Zentriq.Worker.csproj]
+    2 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:05.16
+  Determining projects to restore...
+  Restored /home/runner/work/zentriq/zentriq/backend/Zentriq.Setup/Zentriq.Setup.csproj (in 855 ms).
+  4 of 5 projects are up-to-date for restore.
+  Zentriq.Inventory -> /home/runner/work/zentriq/zentriq/backend/Zentriq.Inventory/bin/Release/netstandard2.0/Zentriq.Inventory.dll
+  Zentriq.Domain -> /home/runner/work/zentriq/zentriq/backend/Zentriq.Domain/bin/Release/net10.0/Zentriq.Domain.dll
+  Zentriq.Application -> /home/runner/work/zentriq/zentriq/backend/Zentriq.Application/bin/Release/net10.0/Zentriq.Application.dll
+  Zentriq.Infrastructure -> /home/runner/work/zentriq/zentriq/backend/Zentriq.Infrastructure/bin/Release/net10.0/Zentriq.Infrastructure.dll
+  Zentriq.Setup -> /home/runner/work/zentriq/zentriq/backend/Zentriq.Setup/bin/Release/net10.0-windows/zentriqctl.dll
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:04.00
+  Determining projects to restore...
+  Restored /home/runner/work/zentriq/zentriq/backend/Zentriq.Tests/Zentriq.Tests.csproj (in 1.22 sec).
+  5 of 6 projects are up-to-date for restore.
+  Zentriq.Domain -> /home/runner/work/zentriq/zentriq/backend/Zentriq.Domain/bin/Release/net10.0/Zentriq.Domain.dll
+  Zentriq.Inventory -> /home/runner/work/zentriq/zentriq/backend/Zentriq.Inventory/bin/Release/netstandard2.0/Zentriq.Inventory.dll
+  Zentriq.Application -> /home/runner/work/zentriq/zentriq/backend/Zentriq.Application/bin/Release/net10.0/Zentriq.Application.dll
+  Zentriq.Infrastructure -> /home/runner/work/zentriq/zentriq/backend/Zentriq.Infrastructure/bin/Release/net10.0/Zentriq.Infrastructure.dll
+  Zentriq.Worker -> /home/runner/work/zentriq/zentriq/backend/Zentriq.Worker/bin/Release/net10.0/Zentriq.Worker.dll
+/home/runner/work/zentriq/zentriq/backend/Zentriq.Tests/DepartmentsAndChangesTests.cs(106,9): warning xUnit2029: Do not use Assert.Empty to check if a value does not exist in a collection. Use Assert.DoesNotContain instead. (https://xunit.net/xunit.analyzers/rules/xUnit2029) [/home/runner/work/zentriq/zentriq/backend/Zentriq.Tests/Zentriq.Tests.csproj]
+  Zentriq.Tests -> /home/runner/work/zentriq/zentriq/backend/Zentriq.Tests/bin/Release/net10.0/Zentriq.Tests.dll
+
+Build succeeded.
+
+/home/runner/work/zentriq/zentriq/backend/Zentriq.Tests/DepartmentsAndChangesTests.cs(106,9): warning xUnit2029: Do not use Assert.Empty to check if a value does not exist in a collection. Use Assert.DoesNotContain instead. (https://xunit.net/xunit.analyzers/rules/xUnit2029) [/home/runner/work/zentriq/zentriq/backend/Zentriq.Tests/Zentriq.Tests.csproj]
+    1 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:05.78
+  Determining projects to restore...
+  Restored /home/runner/work/zentriq/zentriq/agent/Zentriq.Agent/Zentriq.Agent.csproj (in 1.71 sec).
+  1 of 2 projects are up-to-date for restore.
+  Zentriq.Inventory -> /home/runner/work/zentriq/zentriq/backend/Zentriq.Inventory/bin/Release/netstandard2.0/Zentriq.Inventory.dll
+  Zentriq.Agent -> /home/runner/work/zentriq/zentriq/agent/Zentriq.Agent/bin/Release/net48/ZentriqAgent.exe
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:03.14
