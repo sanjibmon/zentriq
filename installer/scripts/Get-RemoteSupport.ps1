@@ -75,6 +75,13 @@ const missing=need.filter(m=>!fs.existsSync(path.join(base,m,'package.json')));
 if(missing.length){console.error('Missing modules: '+missing.join(', ')+' in '+base);process.exit(1)} console.log('All MeshCentral modules present.');
 "@ (Join-Path $app 'node_modules')
 if ($LASTEXITCODE -ne 0) { throw 'MeshCentral modules are incomplete.' }
+# Keep only the agent files Zentriq uses (Windows agents and their core scripts); see installer/remote/agents-keep.txt.
+$agentsDir = Join-Path $app 'node_modules\meshcentral\agents'
+$keep = Get-Content (Join-Path $remoteSrc 'agents-keep.txt') | Where-Object { $_ -and -not $_.StartsWith('#') } | ForEach-Object { $_.Trim().TrimEnd('/') }
+$removed = 0
+Get-ChildItem $agentsDir -Force | Where-Object { $keep -notcontains $_.Name } | ForEach-Object { Remove-Item $_.FullName -Recurse -Force; $removed++ }
+foreach ($k in 'MeshService64.exe', 'MeshService.exe', 'meshcore.js', 'modules_meshcore') { if (-not (Test-Path (Join-Path $agentsDir $k))) { throw "MeshCentral agent file missing after trimming: $k" } }
+Write-Host "MeshCentral agents: kept $($keep.Count), removed $removed unused item(s)."
 # Remove documentation and source maps (not used at run time) to keep the installer smaller.
 Get-ChildItem (Join-Path $app 'node_modules') -Recurse -File -Include '*.md', '*.map' -ErrorAction SilentlyContinue |
     Where-Object { $_.Name -notmatch '^(LICENSE|LICENCE|NOTICE)' } | Remove-Item -Force

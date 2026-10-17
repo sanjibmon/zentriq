@@ -12,6 +12,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Zentriq.Application\Zentriq.Application.csproj" />
     <ProjectReference Include="..\Zentriq.Infrastructure\Zentriq.Infrastructure.csproj" />
+    <ProjectReference Include="..\Zentriq.Worker\Zentriq.Worker.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />

@@ -12,8 +12,53 @@ public static class RemoteServerConfig
 {
     /// <param name="KeepCertificate">true when the web certificate files in DataPath were written by Zentriq (the console's
     /// certificate): MeshCentral then keeps them instead of issuing its own.</param>
+    /// <param name="AllowedOrigins">Host names and addresses technicians' browsers may open sessions from (the engine
+    /// refuses other origins; by default it accepts only its certificate name). See <see cref="Origins"/>.</param>
     public sealed record Input(string HostName, int Port, string LoginKeyHex, string SessionKey, string DataPath, string FilesPath, string BackupPath,
-        bool KeepCertificate = false);
+        bool KeepCertificate = false, IReadOnlyList<string>? AllowedOrigins = null);
+
+    /// <summary>Extra host names (DNS aliases) technicians used for the console; written by the API, read by ZentriqRemote.</summary>
+    public const string OriginsFile = "origins.txt";
+    /// <summary>The origins the running engine accepts; written by ZentriqRemote after it (re)started.</summary>
+    public const string AppliedOriginsFile = "origins-applied.txt";
+
+    /// <summary>
+    /// The browser origins the engine accepts: every name and IPv4 address of this server (the same set the console
+    /// certificate covers), the configured host, and aliases technicians used (<paramref name="extra"/>).
+    /// </summary>
+    public static string[] Origins(string host, IEnumerable<string>? extra = null)
+    {
+        var all = new List<string>();
+        void Add(string? h) { if (NormalizeHost(h) is { } n && !all.Contains(n)) all.Add(n); }
+        Add(host);
+        foreach (var n in Certificates.ServerCertificates.Names(host)) Add(n);
+        foreach (var a in Certificates.ServerCertificates.Addresses(host)) Add(a.ToString());
+        foreach (var e in extra ?? []) Add(e);
+        all.Sort(StringComparer.Ordinal);
+        return all.ToArray();
+    }
+
+    /// <summary>A browser host name or IPv4 address in the form the engine compares (lower case), or null.</summary>
+    public static string? NormalizeHost(string? h)
+    {
+        h = h?.Trim().TrimEnd('.').ToLowerInvariant();
+        return !string.IsNullOrEmpty(h) && h.Length <= 253 && Uri.CheckHostName(h) is UriHostNameType.Dns or UriHostNameType.IPv4 ? h : null;
+    }
+
+    /// <summary>Records a host name a technician used so the engine accepts it. Returns true when it was new.</summary>
+    public static bool RememberOrigin(string dir, string host)
+    {
+        if (NormalizeHost(host) is not { } h || !Directory.Exists(dir)) return false;
+        var file = Path.Combine(dir, OriginsFile);
+        var lines = File.Exists(file) ? File.ReadAllLines(file).Select(l => l.Trim()).Where(l => l.Length > 0).ToList() : [];
+        if (lines.Contains(h) || lines.Count >= 50) return false;
+        lines.Add(h);
+        File.WriteAllLines(file, lines);
+        return true;
+    }
+
+    public static IReadOnlyList<string> ReadLines(string file) =>
+        File.Exists(file) ? File.ReadAllLines(file).Select(l => l.Trim()).Where(l => l.Length > 0).ToArray() : [];
 
     public const string WebCertificateFile = "webserver-cert-public.crt";
     public const string WebKeyFile = "webserver-cert-private.key";
@@ -61,6 +106,7 @@ public static class RemoteServerConfig
             [""] = new JsonObject
             {
                 ["title"] = "Zentriq",
+                ["allowedOrigin"] = i.AllowedOrigins is { Count: > 0 } o ? new JsonArray(o.Select(x => (JsonNode)JsonValue.Create(x)!).ToArray()) : null,
                 ["title2"] = "Remote Support",
                 ["titlePicture"] = TitlePicture,
                 ["welcomeText"] = "Zentriq Remote Support. Open remote sessions from the Zentriq console (Remote Management).",

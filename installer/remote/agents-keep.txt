@@ -1,0 +1,16 @@
+# Files of node_modules/meshcentral/agents that Zentriq ships (everything else there is removed when the
+# installer is built). Zentriq deploys only the Windows agent, so the Linux/macOS/Android agents, MeshCmd,
+# MeshCentral Router/Assistant/Satellite and helper scripts are left out; they are not used and some
+# antivirus products flag remote-access tools by name.
+MeshService.exe
+MeshService64.exe
+MeshServiceARM64.exe
+agent-translations.json
+agentrecoverycore.js
+codesign.cer
+hashagents.json
+meshcore.js
+meshcore_diagnostic.js
+recoverycore.js
+tinycore.js
+modules_meshcore/

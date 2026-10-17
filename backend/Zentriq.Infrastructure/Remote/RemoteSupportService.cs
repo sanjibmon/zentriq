@@ -209,6 +209,30 @@ public sealed class RemoteSupportService(NpgsqlDataSource ds, ZentriqOptions opt
         return url;
     }
 
+    /// <summary>
+    /// Makes sure the engine accepts sessions opened from <paramref name="browserHost"/> (it refuses browser origins it does
+    /// not know). Server names and addresses are accepted already; a new host name (for example a DNS alias) is recorded
+    /// and this waits until the remote support service has restarted with it (up to 90 seconds).
+    /// </summary>
+    public async Task EnsureOriginAsync(string sharedDir, string? browserHost, CancellationToken ct)
+    {
+        if (RemoteServerConfig.NormalizeHost(browserHost) is not { } h || !Directory.Exists(sharedDir)) return;
+        var applied = Path.Combine(sharedDir, RemoteServerConfig.AppliedOriginsFile);
+        bool Accepted() => RemoteServerConfig.ReadLines(applied).Contains(h, StringComparer.Ordinal);
+        try
+        {
+            if (Accepted()) return;
+            RemoteServerConfig.RememberOrigin(sharedDir, h);
+            logger.LogInformation("Remote support: adding {Host} to the host names the engine accepts.", h);
+            var deadline = DateTime.UtcNow.AddSeconds(90);
+            while (DateTime.UtcNow < deadline && !Accepted()) await Task.Delay(2000, ct);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            logger.LogWarning("Remote support: could not record host name {Host}: {Message}", h, ex.Message);
+        }
+    }
+
     // ---- agent installer ----------------------------------------------------------------------------
 
     private (byte[] Bytes, string Sha256, DateTimeOffset At)? _installer;

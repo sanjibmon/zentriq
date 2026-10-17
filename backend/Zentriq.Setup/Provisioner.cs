@@ -315,15 +315,18 @@ public sealed class Provisioner(ProvisionInput input, ZentriqPaths paths, Report
             var data = Path.Combine(root, "data");
             WindowsHost.SecureDirectory(root, (sid, FileSystemRights.Modify)); // SYSTEM, Administrators, ZentriqRemote only
             foreach (var d in new[] { data, Path.Combine(root, "files"), Path.Combine(root, "backups") }) Directory.CreateDirectory(d);
-            // The API writes the current console certificate here; the remote support service picks it up.
-            WindowsHost.SecureDirectory(paths.RemoteCertificateDir, (WindowsHost.ServiceSid(input.ApiService), FileSystemRights.Modify), (sid, FileSystemRights.ReadAndExecute));
+            // Shared with the API: it writes the console certificate and host names technicians use; the remote support
+            // service picks them up and reports which host names it accepts.
+            WindowsHost.SecureDirectory(paths.RemoteCertificateDir, (WindowsHost.ServiceSid(input.ApiService), FileSystemRights.Modify), (sid, FileSystemRights.Modify));
 
             var host = string.IsNullOrWhiteSpace(_options.Remote.PublicHost) ? _options.Https.HostName : _options.Remote.PublicHost!;
             var sessionKey = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
             void WriteConfig(bool keepCertificate)
             {
                 var config = Zentriq.Infrastructure.Remote.RemoteServerConfig.Build(new(host, _options.Remote.Port, _app.RemoteLoginKey!, sessionKey,
-                    data, Path.Combine(root, "files"), Path.Combine(root, "backups"), keepCertificate));
+                    data, Path.Combine(root, "files"), Path.Combine(root, "backups"), keepCertificate,
+                    Zentriq.Infrastructure.Remote.RemoteServerConfig.Origins(host,
+                        Zentriq.Infrastructure.Remote.RemoteServerConfig.ReadLines(Path.Combine(paths.RemoteCertificateDir, Zentriq.Infrastructure.Remote.RemoteServerConfig.OriginsFile)))));
                 File.WriteAllText(Path.Combine(data, "config.json"), config.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
             }
             foreach (var f in new[] { Zentriq.Infrastructure.Remote.RemoteServerConfig.TitlePicture, Zentriq.Infrastructure.Remote.RemoteServerConfig.AgentImage, Zentriq.Infrastructure.Remote.RemoteServerConfig.AgentIcon })

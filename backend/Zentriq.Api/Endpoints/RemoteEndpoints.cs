@@ -1,3 +1,4 @@
+using Zentriq.Infrastructure.Configuration;
 using System.Net.WebSockets;
 using Npgsql;
 using NpgsqlTypes;
@@ -96,7 +97,7 @@ public static class RemoteEndpoints
         });
 
         // A short-lived sign-in link that opens the device in the remote support console.
-        g.MapPost("/sessions", async (SessionBody body, NpgsqlDataSource ds, RemoteSupportService remote, RequestContext rc, HttpContext http, CancellationToken ct) =>
+        g.MapPost("/sessions", async (SessionBody body, NpgsqlDataSource ds, RemoteSupportService remote, RequestContext rc, HttpContext http, ZentriqPaths paths, CancellationToken ct) =>
         {
             if (body.View is not ("desktop" or "terminal" or "files" or "device" or "console")) return Validation.Problem("view", "Choose desktop, terminal, files, device or console.");
             if (rc.UserId is not { } uid) return Results.Unauthorized();
@@ -119,7 +120,11 @@ public static class RemoteEndpoints
 
             var name = rc.Principal.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value ?? rc.UserName;
             string url;
-            try { url = await remote.SessionUrlAsync(uid, name, rc.Has(Permissions.RemoteUnattended), viewOnly: false, nodeId, body.View, ct, http.Request.Host.Host); }
+            try
+            {
+                await remote.EnsureOriginAsync(paths.RemoteCertificateDir, http.Request.Host.Host, ct);
+                url = await remote.SessionUrlAsync(uid, name, rc.Has(Permissions.RemoteUnattended), viewOnly: false, nodeId, body.View, ct, http.Request.Host.Host);
+            }
             catch (Exception ex) when (ex is MeshException or WebSocketException or HttpRequestException or TaskCanceledException)
             {
                 return Results.Problem(statusCode: 503, title: "Remote support is not available: " + ex.Message);

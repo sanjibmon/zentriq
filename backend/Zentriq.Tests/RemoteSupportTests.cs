@@ -118,7 +118,7 @@ public sealed class RemoteSupportLiveTests : IAsyncLifetime
         var data = Path.Combine(_dir, "data");
         Directory.CreateDirectory(data);
         var key = MeshCookie.NewKeyHex();
-        var cfg = RemoteServerConfig.Build(new("localhost", Port, key, Convert.ToHexString(Guid.NewGuid().ToByteArray()), data, Path.Combine(_dir, "files"), Path.Combine(_dir, "backups")));
+        var cfg = RemoteServerConfig.Build(new("localhost", Port, key, Convert.ToHexString(Guid.NewGuid().ToByteArray()), data, Path.Combine(_dir, "files"), Path.Combine(_dir, "backups"), AllowedOrigins: RemoteServerConfig.Origins("localhost")));
         File.WriteAllText(Path.Combine(data, "config.json"), cfg.ToJsonString());
 
         var created = await Run(script, "--datapath", data, "--createaccount", "zentriq", "--" + "pass", "Zq-" + Guid.NewGuid().ToString("N"), "--name", "Zentriq");
@@ -216,7 +216,7 @@ public sealed class RemoteSupportLiveTests : IAsyncLifetime
         using var consoleCert = req.CreateSelfSigned(DateTimeOffset.UtcNow.AddMinutes(-5), DateTimeOffset.UtcNow.AddYears(1));
         Assert.True(RemoteServerConfig.WriteWebCertificate(consoleCert, data, out var why), why);
         File.WriteAllText(Path.Combine(data, "config.json"), RemoteServerConfig.Build(new("localhost", Port, key, Convert.ToHexString(Guid.NewGuid().ToByteArray()),
-            data, Path.Combine(_dir, "files"), Path.Combine(_dir, "backups"), KeepCertificate: true)).ToJsonString());
+            data, Path.Combine(_dir, "files"), Path.Combine(_dir, "backups"), KeepCertificate: true, AllowedOrigins: RemoteServerConfig.Origins("localhost"))).ToJsonString());
         var psi2 = new ProcessStartInfo("node") { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, WorkingDirectory = Path.GetDirectoryName(script)! };
         psi2.ArgumentList.Add(script); psi2.ArgumentList.Add("--datapath"); psi2.ArgumentList.Add(data);
         _server = Process.Start(psi2)!;
@@ -238,5 +238,29 @@ public sealed class RemoteSupportLiveTests : IAsyncLifetime
         var msh2 = await (await http2.GetAsync($"https://127.0.0.1:{Port}/meshsettings?id={Uri.EscapeDataString(meshId[(meshId.LastIndexOf('/') + 1)..])}")).Content.ReadAsStringAsync();
         Assert.Contains($"MeshServer=wss://localhost:{Port}/agent.ashx", msh2);
         Assert.Contains("id=MainDevDesktop", await (await http2.GetAsync((await remote.SessionUrlAsync(uid, "Priya Rao", false, false, null, "console", default)).Replace("https://localhost:", "https://127.0.0.1:"))).Content.ReadAsStringAsync());
+
+        // What the browser does next: open the control channel with its session cookie. The engine checks the page's
+        // origin; sessions opened by IP address (https://127.0.0.1:port) must work, other sites must not.
+        var jar = new CookieContainer();
+        using (var browser = new HttpClient(new HttpClientHandler { ServerCertificateCustomValidationCallback = (_, _, _, _) => true, CookieContainer = jar }))
+        {
+            var link = (await remote.SessionUrlAsync(uid, "Priya Rao", false, false, null, "console", default)).Replace("https://localhost:", "https://127.0.0.1:");
+            Assert.Contains("id=MainDevDesktop", await (await browser.GetAsync(link)).Content.ReadAsStringAsync());
+        }
+        Assert.DoesNotContain("invalidorigin", await FirstControlMessage(jar, $"https://127.0.0.1:{Port}"));
+        Assert.Contains("invalidorigin", await FirstControlMessage(jar, "https://evil.example"));
+    }
+
+    private static async Task<string> FirstControlMessage(CookieContainer jar, string origin)
+    {
+        using var ws = new System.Net.WebSockets.ClientWebSocket();
+        ws.Options.Cookies = jar;
+        ws.Options.SetRequestHeader("Origin", origin);
+        ws.Options.RemoteCertificateValidationCallback = (_, _, _, _) => true;
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        await ws.ConnectAsync(new Uri($"wss://127.0.0.1:{Port}/control.ashx"), cts.Token);
+        var buf = new byte[65536];
+        var r = await ws.ReceiveAsync(buf, cts.Token);
+        return System.Text.Encoding.UTF8.GetString(buf, 0, r.Count);
     }
 }

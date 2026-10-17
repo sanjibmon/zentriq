@@ -1064,11 +1064,32 @@ if (-not $installed) {
         Assert ($ses.url -match '[?&]login=' -and $ses.url -match 'gotonode=') "session url: $($ses.url)"
         $page = Invoke-WebRequest $ses.url -SkipCertificateCheck
         Assert ($page.Content -match 'MainDevDesktop') 'the session link did not open the signed-in device view'
+        # The browser then opens the control channel from the page's origin. Opened by IP address, it must be accepted
+        # (builds before 54: "Invalid origin in HTTP request").
+        $ip = @(Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -ne '127.0.0.1' -and $_.IPAddress -notlike '169.254.*' -and $_.AddressState -eq 'Preferred' } | ForEach-Object IPAddress)[0]
+        $ses2 = Api POST '/remote/sessions' @{ assetId = $me.assetId; view = 'desktop' } -Session $s
+        $byIp = $ses2.url -replace '//[^/:]+:', "//${ip}:"
+        $null = Invoke-WebRequest $byIp -SkipCertificateCheck -SessionVariable rs
+        function First-ControlMessage([string] $origin) {
+            $ws = [Net.WebSockets.ClientWebSocket]::new()
+            $ws.Options.Cookies = $rs.Cookies
+            $ws.Options.SetRequestHeader('Origin', $origin)
+            $ws.Options.RemoteCertificateValidationCallback = { $true }
+            $ws.ConnectAsync([Uri]"wss://${ip}:8446/control.ashx", [Threading.CancellationToken]::None).Wait(20000) | Out-Null
+            $buf = [byte[]]::new(65536)
+            $seg = [ArraySegment[byte]]::new($buf)
+            $t = $ws.ReceiveAsync($seg, [Threading.CancellationToken]::None)
+            if (-not $t.Wait(20000)) { return '(no message)' }
+            [Text.Encoding]::UTF8.GetString($buf, 0, $t.Result.Count)
+        }
+        $okMsg = First-ControlMessage "https://${ip}:8446"
+        Assert ($okMsg -notmatch 'invalidorigin' -and $okMsg -ne '(no message)') "control channel opened by IP ${ip}: $okMsg"
+        Assert ((First-ControlMessage 'https://evil.example') -match 'invalidorigin') 'a foreign origin was accepted'
         $forged = Invoke-WebRequest ($ses.url -replace 'login=[^&]+', 'login=AAAA') -SkipCertificateCheck -SkipHttpErrorCheck
         Assert ($forged.Content -notmatch 'MainDevDesktop') 'a forged sign-in link was accepted'
         $log = Api GET "/remote/sessions?assetId=$($me.assetId)" -Session $s
         Assert (@($log.items | Where-Object { $_.view -eq 'desktop' }).Count -ge 1) 'session not in the session history'
-        "engine healthy, same certificate as the console ($($consoleThumb.Substring(0,8))...); branded installer $([math]::Round($bytes.Length/1MB,1)) MB ('$($vi.FileDescription)', exit $($p.ExitCode)); $($me.name) online as $($me.os); signed-in desktop link opened; forged link refused"
+        "engine healthy, same certificate as the console ($($consoleThumb.Substring(0,8))...); branded installer $([math]::Round($bytes.Length/1MB,1)) MB ('$($vi.FileDescription)', exit $($p.ExitCode)); $($me.name) online as $($me.os); signed-in desktop link opened; control channel by IP $ip accepted, foreign origin refused; forged link refused"
     }
 
     Check 'T60' 'Remote support via the Zentriq agent: remove and install the remote agent from the console' {

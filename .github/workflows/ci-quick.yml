@@ -55,6 +55,13 @@ jobs:
           npm view meshcentral dist-tags 2>&1 | tee -a "$log" || true
           mkdir -p "$RUNNER_TEMP/mc" && cd "$RUNNER_TEMP/mc" && npm init -y >/dev/null
           npm install "meshcentral@$v" --omit=dev --no-audit --no-fund --ignore-scripts 2>&1 | tail -40 | tee -a "$log"
+          # Same trimmed agent set as the Windows installer (installer/remote/agents-keep.txt).
+          keep=$(grep -v '^#' "$GITHUB_WORKSPACE/installer/remote/agents-keep.txt" | sed 's:/$::' | grep -v '^$')
+          for f in node_modules/meshcentral/agents/* node_modules/meshcentral/agents/.[!.]*; do
+            [ -e "$f" ] || continue
+            echo "$keep" | grep -qxF "$(basename "$f")" || rm -rf "$f"
+          done
+          ls node_modules/meshcentral/agents | tee -a "$log"
           echo "ZENTRIQ_TEST_MESHCENTRAL=$RUNNER_TEMP/mc" >> "$GITHUB_ENV"
       - name: Tests (unit + PostgreSQL)
         env:
