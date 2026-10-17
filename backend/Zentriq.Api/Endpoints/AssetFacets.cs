@@ -27,7 +27,7 @@ public static class AssetFacets
         ["criticality"] = "a.criticality",
         ["department"] = "COALESCE((SELECT dp.name FROM zentriq.departments dp WHERE dp.id = a.department_id), 'Unassigned')",
         ["inventory"] = "a.inventory_status",
-        ["type"] = "COALESCE(d.document #>> '{device,chassis}', h.chassis, CASE WHEN a.category IN ('network_device','printer','iot') THEN a.category ELSE 'not inventoried' END)",
+        ["type"] = "COALESCE(a.device_type, d.document #>> '{device,chassis}', h.chassis, CASE WHEN a.category IN ('network_device','printer','iot') THEN a.category ELSE 'not inventoried' END)",
         ["coverage"] = "CASE WHEN ag.id IS NOT NULL THEN 'agent' WHEN a.inventory_status = 'success' THEN 'agentless' ELSE 'discovered only' END",
         ["health"] = "CASE WHEN ag.id IS NULL THEN NULL WHEN ag.last_checkin_at IS NULL THEN 'never' WHEN ag.last_checkin_at > now() - interval '45 minutes' THEN 'online' WHEN ag.last_checkin_at > now() - interval '7 days' THEN 'stale' ELSE 'offline' END",
         ["seen"] = $"CASE WHEN ag.id IS NOT NULL AND ag.last_checkin_at > now() - interval '30 minutes' THEN 'Online now' WHEN {LastContact} > now() - interval '1 day' THEN 'Last 24 hours' WHEN {LastContact} > now() - interval '7 days' THEN '1–7 days' WHEN {LastContact} > now() - interval '30 days' THEN '7–30 days' ELSE 'Over 30 days' END",

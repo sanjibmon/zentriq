@@ -8,12 +8,16 @@ import { Callout, DataTable, ErrorBox, fmt, PageHead, Pager, Panel, Pill, status
 import { useConfirm } from '../../components/Confirm';
 import { DeployAgentDialog } from './DeployAgentDialog';
 import { AssignDepartmentDialog, ManageDepartmentsDialog, useDepartments } from '../departments/Departments';
+import { AddDeviceDialog, DeviceTypeSelect, DuplicatesDialog, useDeleteDevices, useDuplicates } from './DeviceManagement';
+import { deviceTypeLabel } from './deviceTypes';
 
 const CATEGORIES = ['endpoint', 'server', 'virtual_host', 'network_device', 'printer', 'iot', 'other'];
 const AGENT: Record<string, [string, Tone]> = { online: ['Online', 'ok'], stale: ['Not seen recently', 'warn'], offline: ['Offline', 'crit'], never: ['Never checked in', ''] };
 
-export function typeLabel(a: { chassis?: string | null; category: string; isVirtual?: boolean | null }) {
+export function typeLabel(a: { chassis?: string | null; category: string; isVirtual?: boolean | null; deviceType?: string | null; deviceTypeManual?: boolean }) {
+  if (a.deviceTypeManual && deviceTypeLabel(a.deviceType)) return deviceTypeLabel(a.deviceType)!;
   if (a.isVirtual || a.chassis === 'virtual') return 'Virtual machine';
+  if (deviceTypeLabel(a.deviceType)) return deviceTypeLabel(a.deviceType)!;
   if (a.chassis === 'server') return 'Physical server';
   return a.chassis ? fmt.label(a.chassis) : fmt.label(a.category);
 }
@@ -46,6 +50,11 @@ export function AssetsPage() {
   const [q, setQ] = useState(query.get('q') ?? '');
   const [search, setSearch] = useState(query.get('q') ?? '');
   const [category, setCategory] = useState(query.get('category') ?? '');
+  const [deviceType, setDeviceType] = useState(query.get('deviceType') ?? '');
+  const [adding, setAdding] = useState(false);
+  const [showDups, setShowDups] = useState(false);
+  const dups = useDuplicates();
+  const deleteDevices = useDeleteDevices();
   const [department, setDepartment] = useState(query.get('department') ?? '');
   const [assign, setAssign] = useState(false);
   const [manageDeps, setManageDeps] = useState(false);
@@ -62,7 +71,7 @@ export function AssetsPage() {
   const [deploy, setDeploy] = useState(false);
   const [busy, setBusy] = useState(false);
   const pageSize = 50;
-  const data = useApi(() => api.get<Paged<Asset>>('/assets', { q: search, category, department, status, agent, inventory, facet: facet?.facet, value: facet?.value, offlineDays: offline, page, pageSize, sort: offline ? 'offline' : 'hostname' }), [search, category, department, status, agent, inventory, facet, offline, page]);
+  const data = useApi(() => api.get<Paged<Asset>>('/assets', { q: search, category, deviceType, department, status, agent, inventory, facet: facet?.facet, value: facet?.value, offlineDays: offline, page, pageSize, sort: offline ? 'offline' : 'hostname' }), [search, category, deviceType, department, status, agent, inventory, facet, offline, page]);
   const settings = useApi(() => (can('settings.manage') ? api.get<Record<string, unknown>>('/system/settings') : Promise.resolve(null)), []);
   const rows = data.data?.items ?? [];
   const showV6 = rows.some((r) => r.ipv6 != null) || settings.data?.['display.show_ipv6'] === true;
@@ -83,13 +92,22 @@ export function AssetsPage() {
     settings.reload(); data.reload();
   }
   const reset = () => { setPage(1); setPicked([]); };
+  async function remove() {
+    try {
+      const m = await deleteDevices(picked, rows.find((r) => r.id === picked[0])?.hostname ?? undefined);
+      if (m) { setMsg({ tone: 'info', text: m }); setPicked([]); data.reload(); dups.reload(); }
+    } catch (e) { setMsg({ tone: 'crit', text: e instanceof Error ? e.message : String(e) }); }
+  }
 
   return (
     <>
-      <PageHead title="Asset Inventory" desc="Every device, in one place."
+      <PageHead title="IT Asset Inventory" desc="Every device, in one place."
         actions={<>
+          {can('assets.manage') && <button className="btn" onClick={() => setAdding(true)}>Add device</button>}
+          <button className="btn" onClick={() => setShowDups(true)}>Duplicates{dups.data ? ` (${dups.data.devices})` : ''}</button>
           <button className="btn" onClick={() => setManageDeps(true)}>Departments</button>
           {can('assets.manage') && picked.length > 0 && <button className="btn" onClick={() => setAssign(true)}>Assign department ({picked.length})</button>}
+          {can('assets.manage') && picked.length > 0 && <button className="btn danger" onClick={() => void remove()}>Delete ({picked.length})</button>}
           {can('agents.manage') && <button className="btn" onClick={() => setDeploy(true)}>Deploy agent</button>}
           {can('scans.run') && (picked.length > 0
             ? <button className="btn primary" disabled={busy} onClick={() => void collect(false)}>Collect inventory now ({picked.length})</button>
@@ -102,6 +120,7 @@ export function AssetsPage() {
           <option value="">All categories</option>
           {CATEGORIES.map((c) => <option key={c} value={c}>{fmt.label(c)}</option>)}
         </select>
+        <DeviceTypeSelect value={deviceType} onChange={(v) => { reset(); setDeviceType(v); }} ariaLabel="Device type filter" emptyLabel="All device types" />
         <select className="in" value={department} onChange={(e) => { reset(); setDepartment(e.target.value); }} aria-label="Department">
           <option value="">All departments</option>
           <option value="none">Not assigned</option>
@@ -163,6 +182,8 @@ export function AssetsPage() {
       </Panel>
       {deploy && <DeployAgentDialog onClose={() => setDeploy(false)} />}
       {assign && <AssignDepartmentDialog assetIds={picked} onClose={() => setAssign(false)} onDone={(m) => { setAssign(false); setPicked([]); setMsg({ tone: 'info', text: m }); data.reload(); deps.reload(); }} />}
+      {adding && <AddDeviceDialog onClose={() => setAdding(false)} onDone={(a) => { setAdding(false); setMsg({ tone: 'info', text: `Added ${a.hostname ?? a.ip}.` }); data.reload(); }} />}
+      {showDups && <DuplicatesDialog canEdit={can('assets.manage')} canSettings={can('settings.manage')} onClose={() => { setShowDups(false); dups.reload(); }} onChanged={() => { data.reload(); dups.reload(); }} />}
       {manageDeps && <ManageDepartmentsDialog canEdit={can('assets.manage')} onClose={() => { setManageDeps(false); deps.reload(); data.reload(); }} />}
     </>
   );

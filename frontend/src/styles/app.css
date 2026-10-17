@@ -295,3 +295,9 @@ button.link:hover { text-decoration: underline; }
 .btn-group .btn { border-radius: 0; margin-left: -1px; }
 .btn-group .btn:first-child { border-radius: 6px 0 0 6px; margin-left: 0; }
 .btn-group .btn:last-child { border-radius: 0 6px 6px 0; }
+.modal-card.wide { width: min(920px, 100%); }
+.grid-2.tight { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px 14px; margin: 0; }
+.supply { display: grid; grid-template-columns: minmax(120px, 1fr) 140px 44px; gap: 8px; align-items: center; font-size: 13px; padding: 3px 0; }
+.supply .bar { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; }
+.supply .bar > span { display: block; height: 100%; background: var(--brand, #0e7490); }
+.supply .bar > span.low { background: var(--crit, #b42318); }

@@ -33,8 +33,19 @@ public sealed class DiscoveryScanHandler(NpgsqlDataSource ds, IHostPinger pinger
     private static readonly int[] ManagementPorts = [22, 135, 445, 5985, 5986];
     private sealed record DirectorySource(string? Server, string? BaseDn, bool Ldaps, Guid? CredentialId, int? InactiveDays, Guid? ConnectionId = null);
     private sealed record Config(string ScanType, string TargetsText, string ExcludeText, int Concurrency, int TimeoutMs, int[] Ports, List<string> ApprovedScopes, int MaxTargets,
-        Guid[]? CredentialIds = null, DirectorySource? Directory = null);
+        Guid[]? CredentialIds = null, DirectorySource? Directory = null, bool? SnmpPublic = null);
     private List<ScanCredential> _creds = [];
+    private bool _snmpPublic = true;
+
+    /// <summary>
+    /// Ports that identify devices which cannot run an agent: printing (9100, 515, 631), Telnet, web management (8080, 8443,
+    /// 4443, 10443), video (554), SIP phones (5060), MikroTik (8291), VMware hosts (902), iSCSI storage (3260). Always probed.
+    /// </summary>
+    internal static readonly int[] IdentificationPorts = [9100, 515, 631, 23, 8080, 8443, 4443, 10443, 554, 5060, 8291, 902, 3260];
+
+    /// <summary>Read-only SNMP v2c with the factory community "public": most printers and many switches answer it.</summary>
+    internal static readonly ScanCredential PublicSnmp = new(Guid.Empty, "SNMP community 'public' (read-only)", "snmp_v2c", null,
+        new Zentriq.Infrastructure.Secrets.CredentialSecret { Community = "public" }, default, []);
     private Dictionary<string, DirectoryComputer> _adObjects = new(StringComparer.OrdinalIgnoreCase);
 
     public async Task<object?> ExecuteAsync(JobContext context, CancellationToken ct)
@@ -45,6 +56,8 @@ public sealed class DiscoveryScanHandler(NpgsqlDataSource ds, IHostPinger pinger
 
         var cfg = JsonSerializer.Deserialize<Config>(configJson, new JsonSerializerOptions(JsonSerializerDefaults.Web))
                   ?? throw new PermanentJobException("Scan configuration is unreadable.");
+        _snmpPublic = cfg.SnmpPublic != false;
+        cfg = cfg with { Ports = cfg.Ports.Concat(IdentificationPorts).Distinct().Take(48).ToArray() };
         try { _creds = await ScanCredential.LoadAsync(ds, protector, cfg.CredentialIds ?? [], ct); }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -172,9 +185,10 @@ public sealed class DiscoveryScanHandler(NpgsqlDataSource ds, IHostPinger pinger
         if (!probe.Alive)
         {
             // Network devices often answer only SNMP (UDP), which the TCP probe cannot see.
-            if (_creds.Any(c => c.IsSnmp))
+            var snmpCreds = SnmpCredentials();
+            if (snmpCreds.Count > 0)
             {
-                var snmp = await agentless.TryCollectAsync(ip, hostname, [], false, _creds.Where(c => c.IsSnmp).ToList(), timeout, ct);
+                var snmp = await agentless.TryCollectAsync(ip, hostname, [], false, snmpCreds, timeout, ct);
                 if (snmp.Outcome == CollectionAttempt.Success) return await StoreInventoryAsync(scanId, target, ip, snmp, probe, adObject, license, ct);
             }
             await RecordAsync(scanId, target, ip, hostname, ScanResultStatus.Unreachable, [], "No response on any probed port (host down, filtered or not routed)." + adNote, probe.DurationMs, false, null, ct);
@@ -188,6 +202,16 @@ public sealed class DiscoveryScanHandler(NpgsqlDataSource ds, IHostPinger pinger
             attempt = await agentless.TryCollectAsync(ip, hostname, probe.OpenPorts, true, _creds, TimeSpan.FromSeconds(Math.Max(15, cfg.TimeoutMs / 1000.0 * 10)), ct);
             if (attempt.Outcome == CollectionAttempt.Success) return await StoreInventoryAsync(scanId, target, ip, attempt, probe, adObject, license, ct);
         }
+        // Printers, switches, routers, firewalls, UPS: not Windows computers, so try the factory SNMP community too.
+        var windowsPorts = probe.OpenPorts.Intersect(new[] { 135, 139, 445, 3389, 5985, 5986 }).Any();
+        if (_snmpPublic && !windowsPorts && !_creds.Any(c => c.Kind == "snmp_v2c" && c.Secret.Community == "public"))
+        {
+            var pub = await agentless.TryCollectAsync(ip, hostname, probe.OpenPorts, true, [PublicSnmp], timeout, ct);
+            if (pub.Outcome == CollectionAttempt.Success) return await StoreInventoryAsync(scanId, target, ip, pub, probe, adObject, license, ct);
+        }
+        // No inventory protocol: recognise the device from its web interface and open ports.
+        var web = await WebFingerprinter.ProbeAsync(ip, probe.OpenPorts, TimeSpan.FromMilliseconds(Math.Max(1500, cfg.TimeoutMs * 2)), ct);
+        var fingerprint = Zentriq.Inventory.DeviceFingerprint.Combine(WebFingerprinter.Recognise(web), Zentriq.Inventory.DeviceFingerprint.FromPorts(probe.OpenPorts));
         var mgmt = probe.OpenPorts.Intersect(ManagementPorts).ToArray();
         string status, detail;
         if (attempt is { Outcome: CollectionAttempt.AuthFailed })
@@ -213,7 +237,9 @@ public sealed class DiscoveryScanHandler(NpgsqlDataSource ds, IHostPinger pinger
                 : probe.Note ?? "Host is up but exposes no probed ports.";
         }
 
-        var (assetId, created, updated, assetNote) = await ReconcileAssetAsync(ip, hostname, probe.OpenPorts, license, ct);
+        if (fingerprint.DeviceType is { } recognised)
+            detail += $" Recognised as {Zentriq.Inventory.DeviceTypes.Get(recognised)?.Label ?? recognised}{(fingerprint.Manufacturer is { } mk ? $" ({mk}{(fingerprint.Model is { } md ? " " + md : "")})" : "")}: {string.Join("; ", fingerprint.Evidence)}.";
+        var (assetId, created, updated, assetNote) = await ReconcileAssetAsync(ip, hostname, probe.OpenPorts, fingerprint, license, ct);
         if (assetId is { } macAsset && probe.Mac is { } mac)
         {
             await using (var m = ds.CreateCommand("UPDATE zentriq.assets SET mac_address = COALESCE(mac_address, @m::macaddr) WHERE id = @id"))
@@ -337,7 +363,7 @@ public sealed class DiscoveryScanHandler(NpgsqlDataSource ds, IHostPinger pinger
     /// Matches by IP then hostname among active assets; creates a new asset when nothing matches,
     /// enforcing the workload limit transactionally.
     /// </summary>
-    private async Task<(Guid? Id, bool Created, bool Updated, string? Note)> ReconcileAssetAsync(IPAddress ip, string? hostname, int[] openPorts, Application.Licensing.LicenseStatus license, CancellationToken ct)
+    private async Task<(Guid? Id, bool Created, bool Updated, string? Note)> ReconcileAssetAsync(IPAddress ip, string? hostname, int[] openPorts, Zentriq.Inventory.Fingerprint fp, Application.Licensing.LicenseStatus license, CancellationToken ct)
     {
         await using var conn = await ds.OpenConnectionAsync(ct);
         await using var tx = await conn.BeginTransactionAsync(ct);
@@ -355,13 +381,19 @@ public sealed class DiscoveryScanHandler(NpgsqlDataSource ds, IHostPinger pinger
 
         if (existing is { } id)
         {
+            // What was recognised without credentials only fills in what credentialed inventory has not established.
             await using var upd = new NpgsqlCommand("""
                 UPDATE zentriq.assets SET last_seen_at = now(), primary_ip = @ip,
                        fqdn = COALESCE(@h, fqdn), hostname = COALESCE(hostname, split_part(@h, '.', 1)),
+                       device_type = CASE WHEN device_type_manual OR inventory_status = 'success' THEN device_type ELSE COALESCE(@dt, device_type) END,
+                       category = CASE WHEN device_type_manual OR source = 'manual' OR inventory_status = 'success' OR @dc::text IS NULL THEN category ELSE @dc END,
+                       manufacturer = COALESCE(manufacturer, @mf), model = COALESCE(model, @md),
+                       identified_by = CASE WHEN inventory_status = 'success' AND identified_by IS NOT NULL THEN identified_by ELSE COALESCE(@ib::jsonb, identified_by) END,
                        updated_at = now(), row_version = row_version + 1
                  WHERE id = @id
                 """, conn, tx);
             upd.Parameters.AddWithValue("id", id);
+            AddFingerprint(upd, fp);
             upd.Parameters.Add(new NpgsqlParameter("ip", NpgsqlDbType.Inet) { Value = ip });
             upd.Parameters.Add(new NpgsqlParameter("h", NpgsqlDbType.Text) { Value = (object?)hostname ?? DBNull.Value });
             await upd.ExecuteNonQueryAsync(ct);
@@ -370,6 +402,11 @@ public sealed class DiscoveryScanHandler(NpgsqlDataSource ds, IHostPinger pinger
         }
 
         var (category, osFamily) = Classify(openPorts);
+        if (Zentriq.Inventory.DeviceTypes.CategoryFor(fp.DeviceType) is { } fc)
+        {
+            category = fc;
+            osFamily = fc == "network_device" ? "network" : fc is "printer" or "iot" ? "other" : osFamily;
+        }
         try
         {
             await licensing.EnsureCapacityAsync(conn, tx, Workloads.FromAssetCategory(category), 1, license, ct);
@@ -380,10 +417,12 @@ public sealed class DiscoveryScanHandler(NpgsqlDataSource ds, IHostPinger pinger
             return (null, false, false, "Asset not added: " + ex.Message);
         }
         await using (var ins = new NpgsqlCommand("""
-            INSERT INTO zentriq.assets (id, hostname, fqdn, primary_ip, category, os_family, source, inventory_status, first_seen_at, last_seen_at)
-            VALUES (@id, split_part(@h, '.', 1), @h, @ip, @c, @os, 'discovery', 'not_collected', now(), now())
+            INSERT INTO zentriq.assets (id, hostname, fqdn, primary_ip, category, os_family, source, inventory_status, first_seen_at, last_seen_at,
+                                        device_type, manufacturer, model, identified_by)
+            VALUES (@id, split_part(@h, '.', 1), @h, @ip, @c, @os, 'discovery', 'not_collected', now(), now(), @dt, @mf, @md, @ib::jsonb)
             """, conn, tx))
         {
+            AddFingerprint(ins, fp);
             var newId = Guid.NewGuid();
             ins.Parameters.AddWithValue("id", newId);
             ins.Parameters.Add(new NpgsqlParameter("h", NpgsqlDbType.Text) { Value = (object?)hostname ?? DBNull.Value });
@@ -394,6 +433,22 @@ public sealed class DiscoveryScanHandler(NpgsqlDataSource ds, IHostPinger pinger
             await tx.CommitAsync(ct);
             return (newId, true, false, null);
         }
+    }
+
+    private static void AddFingerprint(NpgsqlCommand cmd, Zentriq.Inventory.Fingerprint fp)
+    {
+        cmd.Parameters.Add(new NpgsqlParameter("dt", NpgsqlDbType.Text) { Value = (object?)fp.DeviceType ?? DBNull.Value });
+        cmd.Parameters.Add(new NpgsqlParameter("dc", NpgsqlDbType.Text) { Value = (object?)Zentriq.Inventory.DeviceTypes.CategoryFor(fp.DeviceType) ?? DBNull.Value });
+        cmd.Parameters.Add(new NpgsqlParameter("mf", NpgsqlDbType.Text) { Value = (object?)fp.Manufacturer ?? DBNull.Value });
+        cmd.Parameters.Add(new NpgsqlParameter("md", NpgsqlDbType.Text) { Value = (object?)fp.Model ?? DBNull.Value });
+        cmd.Parameters.Add(new NpgsqlParameter("ib", NpgsqlDbType.Text) { Value = fp.Evidence.Count > 0 ? JsonSerializer.Serialize(fp.Evidence) : DBNull.Value });
+    }
+
+    private List<ScanCredential> SnmpCredentials()
+    {
+        var list = _creds.Where(c => c.IsSnmp).ToList();
+        if (_snmpPublic && !list.Any(c => c.Kind == "snmp_v2c" && c.Secret.Community == "public")) list.Add(PublicSnmp);
+        return list;
     }
 
     /// <summary>Port-based first guess; refined later by credentialed inventory.</summary>

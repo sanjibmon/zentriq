@@ -8,6 +8,7 @@ import { Callout, DataTable, ErrorBox, fmt, Loading, PageHead, Panel, Pill, stat
 import { useConfirm } from '../../components/Confirm';
 import { CategoryChart, CHART_KINDS, HBars, PostureBars, TrendArea, type ChartKind, type Slice } from '../../components/charts';
 import { ReportWidget } from './ReportWidget';
+import { deviceTypeLabel } from '../assets/deviceTypes';
 import { ChangedDevices, type ChangeSummary } from '../inventory/Changes';
 
 const TYPE_LABEL: Record<string, string> = {
@@ -203,7 +204,7 @@ export function DashboardPage() {
       case 'assets.department': {
         const rows = o.byDepartment ?? [];
         if (rows.length === 0 || (rows.length === 1 && rows[0]!.key === 'Unassigned'))
-          return <div className="chart-empty">No departments assigned yet. Select assets in Asset Inventory and choose <b>Assign department</b>.</div>;
+          return <div className="chart-empty">No departments assigned yet. Select assets in IT Asset Inventory and choose <b>Assign department</b>.</div>;
         return C(slices(rows, (k) => k), (s) => go('department', s.key, `Department: ${s.label}`), { centerLabel: 'assets' });
       }
       case 'changes.hardware':
@@ -253,7 +254,7 @@ export function DashboardPage() {
       case 'assets.category':
         return C(slices(o.byCategory), (s) => navigate(`/assets?category=${encodeURIComponent(s.key)}`), { centerLabel: 'assets' });
       case 'assets.type':
-        return C(slices(o.byType, (t) => TYPE_LABEL[t] ?? fmt.label(t)), (s) => go('type', s.key, `Type: ${s.label}`), { centerLabel: 'devices' });
+        return C(slices(o.byType, (t) => TYPE_LABEL[t] ?? deviceTypeLabel(t) ?? fmt.label(t)), (s) => go('type', s.key, `Type: ${s.label}`), { centerLabel: 'devices' });
       case 'assets.coverage':
         return C(slices(o.coverage, (c) => COVERAGE[c]?.[0] ?? c, (c) => COVERAGE[c]?.[1]), (s) => go('coverage', s.key, `Inventoried by: ${s.label}`), { centerLabel: 'assets' });
       case 'assets.trend':

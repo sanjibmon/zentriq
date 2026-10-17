@@ -170,6 +170,7 @@ function NewScanDialog({ adConnection, onClose, onStarted }: { adConnection: str
   const [targets, setTargets] = useState('');
   const [exclude, setExclude] = useState('');
   const [credIds, setCredIds] = useState<string[]>([]);
+  const [snmpPublic, setSnmpPublic] = useState(true);
   const [connId, setConnId] = useState(adConnection ?? '');
   const [inactive, setInactive] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
@@ -192,7 +193,7 @@ function NewScanDialog({ adConnection, onClose, onStarted }: { adConnection: str
     setError(null);
     try {
       await api.post('/discovery/scans', {
-        name: name.trim() || null, scanType: type, targetsText: type === 'list' ? targets : null, excludeText: exclude, credentialIds: credIds,
+        name: name.trim() || null, scanType: type, targetsText: type === 'list' ? targets : null, excludeText: exclude, credentialIds: credIds, snmpPublic,
         directory: type === 'ad' ? { connectionId: connId, ldaps: conn?.ldaps ?? true, inactiveDays: inactive ?? conn?.inactiveDays ?? null } : null,
       });
       onStarted();
@@ -255,10 +256,14 @@ function NewScanDialog({ adConnection, onClose, onStarted }: { adConnection: str
                 ))}
               </div>
             )}
+            <label className="row-check" style={{ marginTop: 8 }}>
+              <input type="checkbox" checked={snmpPublic} onChange={(e) => setSnmpPublic(e.target.checked)} />
+              <span>Identify printers, switches, routers, firewalls and other devices without an agent: try the read-only SNMP community <span className="mono">public</span> and read their web interface (title only, no sign-in)</span>
+            </label>
             {credIds.length === 0 && (
               <Callout tone="warn" icon="alert">
-                {confirmNoCreds ? <><b>No credential selected.</b> This scan will only find which devices respond (addresses, names, open ports). It will not collect hardware, software or network details. Click <b>Start discovery only</b> to continue, or select a credential.</>
-                  : <>Without a credential the scan only finds devices — it cannot collect hardware, software or network details.</>}
+                {confirmNoCreds ? <><b>No credential selected.</b> This scan finds devices and recognises their type{snmpPublic ? ' (and full details of devices that answer SNMP "public")' : ''}, but does not collect hardware, software or network details of computers. Click <b>Start discovery only</b> to continue, or select a credential.</>
+                  : <>Without a credential the scan finds devices and their type, but cannot collect hardware, software or network details of computers.</>}
               </Callout>
             )}
           </div>

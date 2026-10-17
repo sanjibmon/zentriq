@@ -17,23 +17,31 @@ public static class AssetEndpoints
         IReadOnlyList<string>? Ipv4 = null, IReadOnlyList<string>? Ipv6 = null, string? LoggedOnUser = null, string? Chassis = null,
         bool? IsVirtual = null, Guid? AgentId = null, string? AgentHealth = null, string? InventorySource = null,
         DateTimeOffset? AgentLastCheckinAt = null, DateTimeOffset? LastContactAt = null, int? OfflineDays = null, bool? Online = null,
-        Guid? DepartmentId = null, string? Department = null);
+        Guid? DepartmentId = null, string? Department = null, string? DeviceType = null, bool DeviceTypeManual = false,
+        string? Manufacturer = null, string? Model = null, IReadOnlyList<string>? IdentifiedBy = null);
 
-    public sealed record AssetBody(string? Hostname, string? Ip, string? SerialNumber, string Category, string? OsFamily,
-        string? OsName, string? Criticality, string? OwnerName, int? RowVersion);
+    public sealed record AssetBody(string? Hostname, string? Ip, string? SerialNumber, string? Category, string? OsFamily,
+        string? OsName, string? Criticality, string? OwnerName, int? RowVersion, string? DeviceType = null, string? MacAddress = null,
+        string? Manufacturer = null, string? Model = null, Guid? DepartmentId = null);
+    public sealed record DeviceTypeBody(string? DeviceType);
+    public sealed record IdsBody(Guid[]? Ids);
+    public sealed record MergeDuplicatesBody(Guid[]? KeepIds);
+    public sealed record DuplicateSettingsBody(bool Auto);
 
     private static readonly string[] Criticalities = ["Critical", "High", "Medium", "Low"];
     private static readonly string[] OsFamilies = ["windows", "linux", "macos", "network", "other"];
 
     public static AssetDto ToDto(Asset a) => new(a.Id, a.Hostname, a.Fqdn, Display(a.PrimaryIp), a.SerialNumber, a.Category,
         Workloads.FromAssetCategory(a.Category), a.OsFamily, a.OsName, a.Status, a.Criticality, a.OwnerName, a.Source,
-        a.InventoryStatus, a.FirstSeenAt, a.LastSeenAt, a.LastInventoryAt, a.RowVersion, DepartmentId: a.DepartmentId);
+        a.InventoryStatus, a.FirstSeenAt, a.LastSeenAt, a.LastInventoryAt, a.RowVersion, DepartmentId: a.DepartmentId,
+        DeviceType: a.DeviceType, DeviceTypeManual: a.DeviceTypeManual, Manufacturer: a.Manufacturer, Model: a.Model,
+        IdentifiedBy: a.IdentifiedBy is { } ib ? System.Text.Json.JsonSerializer.Deserialize<List<string>>(ib) : null);
 
     public static void MapAssetEndpoints(this RouteGroupBuilder api)
     {
         var g = api.MapGroup("/assets").WithTags("Assets").RequireModule(Modules.Inventory);
 
-        g.MapGet("", async (ZentriqDbContext db, NpgsqlDataSource ds, string? q, string? category, string? department, string? status, string? agent, string? inventory, string? facet, string? value, int? offlineDays, string? sort, string? dir, int? page, int? pageSize, CancellationToken ct) =>
+        g.MapGet("", async (ZentriqDbContext db, NpgsqlDataSource ds, string? q, string? category, string? deviceType, string? department, string? status, string? agent, string? inventory, string? facet, string? value, int? offlineDays, string? sort, string? dir, int? page, int? pageSize, CancellationToken ct) =>
         {
             var (p, ps) = Paging.Normalize(page, pageSize);
             var query = db.Assets.AsNoTracking().AsQueryable();
@@ -49,6 +57,8 @@ public static class AssetEndpoints
                     """).ToListAsync(ct);
                 query = query.Where(a => (a.Hostname != null && a.Hostname.ToLower().Contains(term)) ||
                                          (a.SerialNumber != null && a.SerialNumber.ToLower().Contains(term)) ||
+                                         (a.Manufacturer != null && a.Manufacturer.ToLower().Contains(term)) ||
+                                         (a.Model != null && a.Model.ToLower().Contains(term)) ||
                                          (a.OsName != null && a.OsName.ToLower().Contains(term)) ||
                                          (a.OwnerName != null && a.OwnerName.ToLower().Contains(term)) ||
                                          extraIds.Contains(a.Id));
@@ -75,6 +85,7 @@ public static class AssetEndpoints
             if (inventory is "success" or "not_collected" or "failed" or "unavailable") query = query.Where(a => a.InventoryStatus == inventory);
             if (inventory == "missing") query = query.Where(a => a.InventoryStatus != "success");
             if (!string.IsNullOrEmpty(category)) query = query.Where(a => a.Category == category);
+            if (!string.IsNullOrEmpty(deviceType)) query = deviceType == "unknown" ? query.Where(a => a.DeviceType == null) : query.Where(a => a.DeviceType == deviceType);
             if (department == "none") query = query.Where(a => a.DepartmentId == null);
             else if (Guid.TryParse(department, out var depId)) query = query.Where(a => a.DepartmentId == depId);
             query = string.IsNullOrEmpty(status) ? query.Where(a => a.Status == "active") : status == "all" ? query : query.Where(a => a.Status == status);
@@ -105,8 +116,10 @@ public static class AssetEndpoints
             var asset = new Asset
             {
                 Id = Guid.NewGuid(), Hostname = body.Hostname?.Trim(), PrimaryIp = ip, SerialNumber = body.SerialNumber?.Trim(),
-                Category = body.Category, OsFamily = body.OsFamily, OsName = body.OsName?.Trim(), Criticality = body.Criticality ?? "Medium",
+                Category = CategoryOf(body), OsFamily = body.OsFamily, OsName = body.OsName?.Trim(), Criticality = body.Criticality ?? "Medium",
                 OwnerName = body.OwnerName?.Trim(), Source = "manual", FirstSeenAt = now, LastSeenAt = now, CreatedAt = now, UpdatedAt = now,
+                DeviceType = body.DeviceType, DeviceTypeManual = body.DeviceType is not null, Manufacturer = Clean(body.Manufacturer), Model = Clean(body.Model),
+                DepartmentId = body.DepartmentId,
             };
 
             // Licensing: count + insert under one transaction and advisory lock (concurrent enrolment safe).
@@ -116,6 +129,8 @@ public static class AssetEndpoints
                 Workloads.FromAssetCategory(asset.Category), 1, status, ct);
             db.Assets.Add(asset);
             await db.SaveChangesAsync(ct);
+            if (Mac(body.MacAddress) is { } mac)
+                await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE zentriq.assets SET mac_address = {mac}::macaddr WHERE id = {asset.Id}", ct);
             await tx.CommitAsync(ct);
             await rc.AuditAsync("asset.create", asset.Hostname ?? asset.PrimaryIp?.ToString(), detail: new { asset.Id, asset.Category });
             return Results.Created($"/api/v1/assets/{asset.Id}", ToDto(asset));
@@ -130,10 +145,14 @@ public static class AssetEndpoints
             if (a is null) return Results.NotFound();
             if (body.RowVersion is { } rv && rv != a.RowVersion) return Results.Problem(statusCode: 409, title: "The asset was changed by someone else. Reload and try again.");
             var oldWorkload = Workloads.FromAssetCategory(a.Category);
-            var newWorkload = Workloads.FromAssetCategory(body.Category);
+            var newCategory = CategoryOf(body, a.Category);
+            var newWorkload = Workloads.FromAssetCategory(newCategory);
             if (a.Status == "active" && oldWorkload != newWorkload)
                 await licensing.EnsureCapacityAsync((NpgsqlConnection)db.Database.GetDbConnection(), (NpgsqlTransaction)tx.GetDbTransaction(), newWorkload, 1, await rc.LicenseAsync(ct), ct);
-            a.Hostname = body.Hostname?.Trim(); a.PrimaryIp = ip; a.SerialNumber = body.SerialNumber?.Trim(); a.Category = body.Category;
+            a.Hostname = body.Hostname?.Trim(); a.PrimaryIp = ip; a.SerialNumber = body.SerialNumber?.Trim(); a.Category = newCategory;
+            if (body.DeviceType is not null) { a.DeviceType = body.DeviceType; a.DeviceTypeManual = true; }
+            if (body.Manufacturer is not null) a.Manufacturer = Clean(body.Manufacturer);
+            if (body.Model is not null) a.Model = Clean(body.Model);
             a.OsFamily = body.OsFamily; a.OsName = body.OsName?.Trim(); a.Criticality = body.Criticality ?? a.Criticality; a.OwnerName = body.OwnerName?.Trim();
             a.UpdatedAt = DateTimeOffset.UtcNow; a.RowVersion++;
             await db.SaveChangesAsync(ct);
@@ -153,19 +172,94 @@ public static class AssetEndpoints
             return Results.Ok(ToDto(a));
         }).RequireAuthorization(Permissions.AssetsManage);
 
-        g.MapPost("/{id:guid}/merge-into/{survivorId:guid}", async (Guid id, Guid survivorId, ZentriqDbContext db, RequestContext rc, CancellationToken ct) =>
+        g.MapPost("/{id:guid}/merge-into/{survivorId:guid}", async (Guid id, Guid survivorId, ZentriqDbContext db, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
         {
             if (id == survivorId) return Results.Problem(statusCode: 400, title: "An asset cannot be merged into itself.");
             var dup = await db.Assets.FirstOrDefaultAsync(x => x.Id == id, ct);
             var survivor = await db.Assets.FirstOrDefaultAsync(x => x.Id == survivorId, ct);
             if (dup is null || survivor is null) return Results.NotFound();
             if (survivor.Status != "active") return Results.Problem(statusCode: 400, title: "The surviving asset must be active.");
-            dup.Status = "duplicate"; dup.MergedInto = survivor.Id; dup.UpdatedAt = DateTimeOffset.UtcNow; dup.RowVersion++;
-            if (dup.LastSeenAt > survivor.LastSeenAt) survivor.LastSeenAt = dup.LastSeenAt;
-            await db.SaveChangesAsync(ct);
+            await using (var conn = await ds.OpenConnectionAsync(ct))
+                await Zentriq.Infrastructure.Inventory.DuplicateAssets.MergeAsync(conn, survivor.Id, [dup.Id], ct);
+            await db.Entry(survivor).ReloadAsync(ct);
             await rc.AuditAsync("asset.merge", dup.Hostname, detail: new { duplicate = dup.Id, survivor = survivor.Id });
             return Results.Ok(ToDto(survivor));
         }).RequireAuthorization(Permissions.AssetsManage);
+
+        // Device type chosen by an administrator (never overwritten by discovery), or null to go back to automatic detection.
+        g.MapPut("/{id:guid}/device-type", async (Guid id, DeviceTypeBody body, ZentriqDbContext db, NpgsqlDataSource ds, LicensingService licensing, RequestContext rc, CancellationToken ct) =>
+        {
+            if (body.DeviceType is not null && !Zentriq.Inventory.DeviceTypes.IsKnown(body.DeviceType)) return Validation.Problem("deviceType", "Unknown device type.");
+            await using var tx = await db.Database.BeginTransactionAsync(ct);
+            var a = await db.Assets.FirstOrDefaultAsync(x => x.Id == id, ct);
+            if (a is null) return Results.NotFound();
+            if (body.DeviceType is null)
+            {
+                a.DeviceTypeManual = false;
+                // Back to automatic: the type from the latest inventory, if any (the next scan refines it otherwise).
+                await using var cmd = ds.CreateCommand("SELECT document::text FROM zentriq.asset_inventory_documents WHERE asset_id = @id");
+                cmd.Parameters.AddWithValue("id", id);
+                if (await cmd.ExecuteScalarAsync(ct) is string json && System.Text.Json.JsonSerializer.Deserialize<Zentriq.Inventory.InventoryDocument>(json, Zentriq.Infrastructure.Inventory.InventoryStore.Json) is { } doc)
+                    a.DeviceType = Zentriq.Infrastructure.Inventory.InventoryStore.DeviceTypeOf(doc) ?? a.DeviceType;
+            }
+            else
+            {
+                var category = Zentriq.Inventory.DeviceTypes.CategoryFor(body.DeviceType) ?? a.Category;
+                if (a.Status == "active" && Workloads.FromAssetCategory(category) != Workloads.FromAssetCategory(a.Category))
+                    await licensing.EnsureCapacityAsync((NpgsqlConnection)db.Database.GetDbConnection(), (NpgsqlTransaction)tx.GetDbTransaction(), Workloads.FromAssetCategory(category), 1, await rc.LicenseAsync(ct), ct);
+                a.DeviceType = body.DeviceType; a.DeviceTypeManual = true; a.Category = category;
+                if (category == "network_device") a.OsFamily ??= "network";
+            }
+            a.UpdatedAt = DateTimeOffset.UtcNow; a.RowVersion++;
+            await db.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+            await rc.AuditAsync("asset.device_type", a.Hostname ?? Display(a.PrimaryIp), detail: new { a.Id, body.DeviceType });
+            return Results.Ok((await EnrichAsync(ds, [ToDto(a)], ct))[0]);
+        }).RequireAuthorization(Permissions.AssetsManage);
+
+        g.MapGet("/device-types", () => Results.Ok(Zentriq.Inventory.DeviceTypes.All.Select(t => new { key = t.Key, label = t.Label, category = t.Category, group = t.Group })))
+            .RequireAuthorization(Permissions.AssetsView);
+
+        // Permanent deletion (the device is added again if a scan or an agent reports it later).
+        g.MapDelete("/{id:guid}", async (Guid id, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
+            await DeleteAsync([id], ds, rc, ct)).RequireAuthorization(Permissions.AssetsManage);
+        g.MapPost("/delete", async (IdsBody body, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
+            body.Ids is not { Length: > 0 } ids ? Validation.Problem("ids", "Select devices.") : await DeleteAsync(ids.Take(5000).ToArray(), ds, rc, ct))
+            .RequireAuthorization(Permissions.AssetsManage);
+
+        // Duplicate devices: groups, merge (newest information kept), automatic clean-up setting.
+        g.MapGet("/duplicates", async (NpgsqlDataSource ds, CancellationToken ct) =>
+        {
+            await using var conn = await ds.OpenConnectionAsync(ct);
+            var groups = await Zentriq.Infrastructure.Inventory.DuplicateAssets.FindAsync(conn, ct);
+            return Results.Ok(new { auto = await DuplicatesAutoAsync(ds, ct), devices = groups.Sum(x => x.Merge.Count), groups });
+        }).RequireAuthorization(Permissions.AssetsView);
+
+        g.MapPost("/duplicates/merge", async (MergeDuplicatesBody body, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
+        {
+            await using var conn = await ds.OpenConnectionAsync(ct);
+            var groups = await Zentriq.Infrastructure.Inventory.DuplicateAssets.FindAsync(conn, ct);
+            if (body.KeepIds is { Length: > 0 } keep) groups = groups.Where(x => keep.Contains(x.Keep.Id)).ToList();
+            var merged = 0;
+            foreach (var grp in groups)
+            {
+                merged += await Zentriq.Infrastructure.Inventory.DuplicateAssets.MergeAsync(conn, grp.Keep.Id, grp.Merge.Select(m => m.Id).ToList(), ct);
+                await rc.AuditAsync("asset.merge", grp.Keep.Hostname ?? grp.Keep.Ip, detail: new { kept = grp.Keep.Id, merged = grp.Merge.Select(m => m.Id), reasons = grp.Reasons });
+            }
+            return Results.Ok(new { groups = groups.Count, merged, message = merged == 0 ? "No duplicates to merge." : $"Merged {merged} duplicate record(s) into {groups.Count} device(s)." });
+        }).RequireAuthorization(Permissions.AssetsManage);
+
+        g.MapPut("/duplicates/settings", async (DuplicateSettingsBody body, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
+        {
+            await using var cmd = ds.CreateCommand("""
+                INSERT INTO zentriq.system_settings (key, value) VALUES ('inventory.duplicates', @v::jsonb)
+                ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+                """);
+            cmd.Parameters.AddWithValue("v", System.Text.Json.JsonSerializer.Serialize(new { auto = body.Auto }));
+            await cmd.ExecuteNonQueryAsync(ct);
+            await rc.AuditAsync("settings.duplicates", body.Auto ? "automatic" : "manual");
+            return Results.Ok(new { auto = body.Auto });
+        }).RequireAuthorization(Permissions.SettingsManage);
 
         // Inventory summary used by dashboards.
         g.MapGet("/summary", async (ZentriqDbContext db, CancellationToken ct) =>
@@ -238,7 +332,7 @@ public static class AssetEndpoints
                 {
                     Ip = a.Ip is { } ip && ip.Contains(':') && v4.Count > 0 ? v4[0] : a.Ip,
                     Ipv4 = v4.Distinct().ToList(), Ipv6 = showV6 ? v6.Distinct().ToList() : null,
-                    LoggedOnUser = r.IsDBNull(1) ? null : r.GetString(1), Chassis = r.IsDBNull(3) ? null : r.GetString(3),
+                    LoggedOnUser = r.IsDBNull(1) ? null : r.GetString(1), Chassis = a.DeviceType ?? (r.IsDBNull(3) ? null : r.GetString(3)),
                     IsVirtual = r.IsDBNull(4) ? null : r.GetBoolean(4), InventorySource = r.IsDBNull(5) ? null : r.GetString(5),
                     AgentId = r.IsDBNull(6) ? null : r.GetGuid(6), AgentHealth = health, AgentLastCheckinAt = lastCheckin,
                     LastContactAt = Max(lastCheckin, a.LastSeenAt),
@@ -250,6 +344,41 @@ public static class AssetEndpoints
         return items.Select(i => extra.TryGetValue(i.Id, out var e) ? e : i).ToList();
     }
 
+    private static string CategoryOf(AssetBody b, string? current = null) =>
+        Zentriq.Inventory.DeviceTypes.CategoryFor(b.DeviceType) ?? b.Category ?? current ?? "other";
+
+    private static string? Clean(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim()[..Math.Min(200, s.Trim().Length)];
+
+    private static string? Mac(string? s)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return null;
+        var hex = new string(s.Where(Uri.IsHexDigit).ToArray());
+        return hex.Length == 12 ? string.Join(":", Enumerable.Range(0, 6).Select(i => hex.Substring(i * 2, 2))).ToLowerInvariant() : null;
+    }
+
+    private static async Task<bool> DuplicatesAutoAsync(NpgsqlDataSource ds, CancellationToken ct)
+    {
+        await using var cmd = ds.CreateCommand("SELECT value::text FROM zentriq.system_settings WHERE key = 'inventory.duplicates'");
+        return await cmd.ExecuteScalarAsync(ct) is not string json
+            || !System.Text.Json.JsonDocument.Parse(json).RootElement.TryGetProperty("auto", out var a) || a.ValueKind != System.Text.Json.JsonValueKind.False;
+    }
+
+    private static async Task<IResult> DeleteAsync(Guid[] ids, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct)
+    {
+        var names = new List<string>();
+        await using (var q = ds.CreateCommand("SELECT COALESCE(hostname, host(primary_ip), id::text) FROM zentriq.assets WHERE id = ANY(@ids)"))
+        {
+            q.Parameters.AddWithValue("ids", ids);
+            await using var r = await q.ExecuteReaderAsync(ct);
+            while (await r.ReadAsync(ct)) names.Add(r.GetString(0));
+        }
+        if (names.Count == 0) return Results.NotFound();
+        await using var conn = await ds.OpenConnectionAsync(ct);
+        var n = await Zentriq.Infrastructure.Inventory.DuplicateAssets.DeleteAsync(conn, ids, ct);
+        await rc.AuditAsync("asset.delete", names.Count == 1 ? names[0] : $"{names.Count} devices", detail: new { ids, names = names.Take(50) });
+        return Results.Ok(new { deleted = n, message = $"Deleted {names.Count} device(s)." });
+    }
+
     private static IResult? Validate(AssetBody b, out IPAddress? ip)
     {
         ip = null;
@@ -257,7 +386,10 @@ public static class AssetEndpoints
             return Validation.Problem("hostname", "Enter a hostname or an IP address.");
         if (b.Hostname is { Length: > 255 }) return Validation.Problem("hostname", "Hostname is too long.");
         if (!string.IsNullOrWhiteSpace(b.Ip) && !IPAddress.TryParse(b.Ip.Trim(), out ip)) return Validation.Problem("ip", "Enter a valid IP address.");
-        if (!AssetCategories.All.Contains(b.Category)) return Validation.Problem("category", "Unknown category.");
+        if (b.DeviceType is not null && !Zentriq.Inventory.DeviceTypes.IsKnown(b.DeviceType)) return Validation.Problem("deviceType", "Unknown device type.");
+        if (b.DeviceType is null && (b.Category is null || !AssetCategories.All.Contains(b.Category))) return Validation.Problem("category", "Choose a device type.");
+        if (b.Category is not null && !AssetCategories.All.Contains(b.Category)) return Validation.Problem("category", "Unknown category.");
+        if (!string.IsNullOrWhiteSpace(b.MacAddress) && Mac(b.MacAddress) is null) return Validation.Problem("macAddress", "Enter a MAC address like 00:1A:2B:3C:4D:5E.");
         if (b.Criticality is not null && !Criticalities.Contains(b.Criticality)) return Validation.Problem("criticality", "Unknown criticality.");
         if (b.OsFamily is not null && !OsFamilies.Contains(b.OsFamily)) return Validation.Problem("osFamily", "Unknown OS family.");
         return null;

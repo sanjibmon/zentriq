@@ -11,6 +11,7 @@ import { AssetRemoteButtons } from '../remote/AssetRemote';
 import { ChangesView } from './Changes';
 import { DepartmentSelect, useDepartments } from '../departments/Departments';
 import { AssetVulnerabilities } from '../vulnerabilities/AssetVulnerabilities';
+import { DeviceTypeField, useDeleteDevices } from '../assets/DeviceManagement';
 import { Callout, DataTable, ErrorBox, fmt, Loading, PageHead, Panel, Pill, statusTone } from '../../components/ui';
 
 const yesNo = (b: boolean | null | undefined) => (b == null ? '—' : b ? 'Yes' : 'No');
@@ -30,7 +31,8 @@ type Tab = 'overview' | 'hardware' | 'software' | 'network' | 'updates' | 'secur
 export function AssetDetailPage({ id }: { id: string }) {
   const asset = useApi(() => api.get<Asset>(`/assets/${id}`), [id]);
   const inv = useApi(() => api.get<AssetInventory>(`/assets/${id}/inventory`), [id]);
-  const { query } = useRouter();
+  const { query, navigate } = useRouter();
+  const deleteDevices = useDeleteDevices();
   const [tab, setTab] = useState<Tab>((['overview', 'hardware', 'software', 'network', 'updates', 'security', 'services', 'vulnerabilities', 'changes'] as Tab[]).find((t) => t === query.get('tab')) ?? 'overview');
   const [filter, setFilter] = useState('');
   const { can } = useAuth();
@@ -70,6 +72,10 @@ export function AssetDetailPage({ id }: { id: string }) {
         actions={<>
           {can('remote.start') && <AssetRemoteButtons assetId={id} onError={(m) => setNote({ tone: 'crit', text: m })} />}
           {can('scans.run') && <button className="btn primary" onClick={() => void collectNow()}>Collect inventory now</button>}
+          {can('assets.manage') && <button className="btn danger" onClick={() => void (async () => {
+            try { if (await deleteDevices([id], a.hostname ?? a.ip ?? undefined)) navigate('/assets'); }
+            catch (e) { setNote({ tone: 'crit', text: e instanceof Error ? e.message : String(e) }); }
+          })()}>Delete</button>}
           <Link className="btn" to="/assets">All assets</Link>
         </>} />
       {note && <Callout tone={note.tone} icon={note.tone === 'crit' ? 'alert' : 'info'}>{note.text}</Callout>}
@@ -89,8 +95,11 @@ export function AssetDetailPage({ id }: { id: string }) {
             <KV items={[
               ['Hostname', a.hostname], ['FQDN', d?.device.fqdn ?? a.fqdn], ['Domain / workgroup', d?.device.domain], ['IPv4 address', <span className="mono">{(a.ipv4 && a.ipv4.length ? a.ipv4 : a.ip ? [a.ip] : []).join(', ') || '—'}</span>],
               ...(a.ipv6 ? [['IPv6 address', <span className="mono">{a.ipv6.join(', ') || '—'}</span>] as [string, ReactNode]] : []),
-              ['Manufacturer', d?.device.manufacturer ?? inv.data?.hardware?.vendor], ['Model', d?.device.model ?? inv.data?.hardware?.model],
-              ['Serial number', <span className="mono">{d?.device.serialNumber ?? a.serialNumber ?? '—'}</span>], ['Type', typeLabel({ ...a, chassis: d?.device.chassis ?? a.chassis, isVirtual: d?.hardware.isVirtual ?? a.isVirtual })],
+              ['Manufacturer', d?.device.manufacturer ?? inv.data?.hardware?.vendor ?? a.manufacturer], ['Model', d?.device.model ?? inv.data?.hardware?.model ?? a.model],
+              ['Serial number', <span className="mono">{d?.device.serialNumber ?? a.serialNumber ?? '—'}</span>],
+              ['Device type', <DeviceTypeField asset={a} canEdit={can('assets.manage')} onSaved={asset.reload} />],
+              ...(a.identifiedBy && a.identifiedBy.length > 0 ? [['Recognised by', <span className="faint" style={{ fontSize: 12.5 }}>{a.identifiedBy.join('; ')}</span>] as [string, ReactNode]] : []),
+              ...(d?.device.location || d?.device.contact ? [['Location / contact', [d?.device.location, d?.device.contact].filter(Boolean).join(' · ')] as [string, ReactNode]] : []),
               ['Department / unit', <DepartmentField asset={a} onSaved={asset.reload} />],
               ['Logged-on user', d?.users.loggedOn], ['Owner', a.ownerName], ['Criticality', a.criticality],
             ]} />
@@ -105,6 +114,31 @@ export function AssetDetailPage({ id }: { id: string }) {
             ]} />
             {d && d.errors.length > 0 && <Callout tone="warn" icon="alert">Some sections could not be collected: {d.errors.join('; ')}</Callout>}
           </Panel>
+          {d?.printer && (
+            <Panel title="Printer" sub="From the printer (Printer-MIB)">
+              <KV items={[
+                ['Status', d.printer.status ? fmt.label(d.printer.status) : null],
+                ['Pages printed', d.printer.pageCount != null ? d.printer.pageCount.toLocaleString() : null],
+              ]} />
+              {d.printer.supplies.length > 0 && <div style={{ marginTop: 8 }}>
+                {d.printer.supplies.map((x, i) => (
+                  <div key={i} className="supply">
+                    <span>{x.name}</span>
+                    <span className="bar">{x.levelPercent != null && <span className={x.levelPercent <= 15 ? 'low' : ''} style={{ width: `${x.levelPercent}%` }} />}</span>
+                    <span className="mono">{x.levelPercent != null ? `${x.levelPercent}%` : '—'}</span>
+                  </div>
+                ))}
+              </div>}
+            </Panel>
+          )}
+          {d?.ports && (
+            <Panel title="Ports" sub="Ethernet interfaces (SNMP)">
+              <KV items={[
+                ['Physical ports', d.ports.physical], ['Connected (up)', d.ports.up], ['Not connected', d.ports.physical - d.ports.up],
+                ['Switching', yesNo(d.ports.switching)], ['IP routing', yesNo(d.ports.routing)],
+              ]} />
+            </Panel>
+          )}
           {inv.data && inv.data.identifiers.length > 0 && (
             <Panel title="Identifiers" sub="Used to merge records from agents and scans" flush>
               <DataTable rows={inv.data.identifiers.map((x, i) => ({ ...x, id: i }))} columns={[

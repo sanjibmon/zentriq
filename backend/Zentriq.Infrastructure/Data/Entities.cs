@@ -133,6 +133,13 @@ public sealed class Asset
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
     public int RowVersion { get; set; } = 1;
+    /// <summary>Zentriq.Inventory.DeviceTypes key; <see cref="DeviceTypeManual"/> when an administrator chose it.</summary>
+    public string? DeviceType { get; set; }
+    public bool DeviceTypeManual { get; set; }
+    public string? Manufacturer { get; set; }
+    public string? Model { get; set; }
+    /// <summary>JSON array of evidence strings (how the device was recognised without credentials).</summary>
+    public string? IdentifiedBy { get; set; }
 }
 
 public sealed class AuditEvent

@@ -27,6 +27,10 @@ public sealed class InventoryDocument
     [JsonPropertyName("users")] public UserInfo Users { get; set; } = new();
     /// <summary>Sections that could not be collected, with the reason (no secrets).</summary>
     [JsonPropertyName("errors")] public List<string> Errors { get; set; } = new();
+    /// <summary>Printers and multifunction devices (Printer-MIB): page count, supplies, status.</summary>
+    [JsonPropertyName("printer")] public PrinterInfo? Printer { get; set; }
+    /// <summary>Switches, routers, firewalls: interface counts and roles (SNMP).</summary>
+    [JsonPropertyName("ports")] public PortSummary? Ports { get; set; }
 }
 
 public sealed class DeviceInfo
@@ -45,6 +49,8 @@ public sealed class DeviceInfo
     [JsonPropertyName("description")] public string? Description { get; set; }
     [JsonPropertyName("location")] public string? Location { get; set; }
     [JsonPropertyName("contact")] public string? Contact { get; set; }
+    /// <summary>How the device type was recognised (SNMP, web interface, open ports).</summary>
+    [JsonPropertyName("identifiedBy")] public List<string>? IdentifiedBy { get; set; }
 }
 
 public sealed class OsInfo
@@ -111,6 +117,34 @@ public sealed class NetworkAdapter
     [JsonPropertyName("gateway")] public string? Gateway { get; set; }
     [JsonPropertyName("dhcp")] public bool? Dhcp { get; set; }
     [JsonPropertyName("speedMbps")] public long? SpeedMbps { get; set; }
+    /// <summary>Interface description set by the administrator (SNMP ifAlias).</summary>
+    [JsonPropertyName("alias")] public string? Alias { get; set; }
+    /// <summary>up | down | other (SNMP ifOperStatus).</summary>
+    [JsonPropertyName("status")] public string? Status { get; set; }
+}
+
+public sealed class PrinterInfo
+{
+    [JsonPropertyName("pageCount")] public long? PageCount { get; set; }
+    /// <summary>idle | printing | warmup | other | unknown (HOST-RESOURCES hrPrinterStatus).</summary>
+    [JsonPropertyName("status")] public string? Status { get; set; }
+    [JsonPropertyName("supplies")] public List<PrinterSupply> Supplies { get; set; } = new();
+}
+
+public sealed class PrinterSupply
+{
+    [JsonPropertyName("name")] public string Name { get; set; } = "";
+    /// <summary>0-100, or null when the device reports no level.</summary>
+    [JsonPropertyName("levelPercent")] public int? LevelPercent { get; set; }
+}
+
+public sealed class PortSummary
+{
+    /// <summary>Physical (Ethernet) interfaces.</summary>
+    [JsonPropertyName("physical")] public int Physical { get; set; }
+    [JsonPropertyName("up")] public int Up { get; set; }
+    [JsonPropertyName("routing")] public bool? Routing { get; set; }
+    [JsonPropertyName("switching")] public bool? Switching { get; set; }
 }
 
 public sealed class SoftwareItem

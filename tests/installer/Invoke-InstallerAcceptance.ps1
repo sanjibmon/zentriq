@@ -119,7 +119,7 @@ Remove-Item $answer -Force   # contains the administrator password
 
 if (-not $installed) {
     foreach ($t in 'T02 PostgreSQL provisioning', 'T03 Database migration', 'T04 Administrator sign-in', 'T05 API and worker services', 'T06 Trial initialization',
-                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server') {
+                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent') {
         Record $t.Substring(0, 3) $t.Substring(4) 'BLOCKED' 'installation failed'
     }
 } else {
@@ -1175,6 +1175,68 @@ if (-not $installed) {
             Restart-Service ZentriqApi -Force
             Wait-Ready | Out-Null
         }
+    } | Out-Null
+
+    Check 'T62' 'Devices without an agent: recognised from their web interface; add, device type, duplicates merged (newest kept), delete' {
+        $s = Login
+        $ip = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -match '^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)' -and $_.PrefixOrigin -ne 'WellKnown' } | Select-Object -First 1).IPAddress
+        # A printer's web page on port 8080 (what a network printer shows before sign-in).
+        $web = Start-Job {
+            $l = [Net.HttpListener]::new(); $l.Prefixes.Add('http://+:8080/'); $l.Start()
+            $deadline = (Get-Date).AddMinutes(8)
+            while ((Get-Date) -lt $deadline) {
+                $t = $l.GetContextAsync()
+                while (-not $t.Wait(1000)) { if ((Get-Date) -ge $deadline) { break } }
+                if (-not $t.IsCompleted) { break }
+                $b = [Text.Encoding]::UTF8.GetBytes('<html><head><title>HP LaserJet Pro M404dn</title></head><body>HP Embedded Web Server</body></html>')
+                $t.Result.Response.ContentType = 'text/html'; $t.Result.Response.OutputStream.Write($b, 0, $b.Length); $t.Result.Response.Close()
+            }
+            $l.Stop()
+        }
+        try {
+            Start-Sleep 3
+            $scan = Api POST '/discovery/scans' @{ name = 'ci-recognise'; scanType = 'single'; targetsText = $ip; snmpPublic = $true } -Session $s
+            $deadline = (Get-Date).AddMinutes(4)
+            do { Start-Sleep 4; $d = Api GET "/discovery/scans/$($scan.id)" -Session $s } while ($d.scan.status -in 'queued', 'running' -and (Get-Date) -lt $deadline)
+            $res = (Api GET "/discovery/scans/$($scan.id)/results" -Session $s).items | Select-Object -First 1
+            Assert ($res.detail -match 'Recognised as Printer \(HP HP LaserJet Pro M404dn\)|Recognised as Printer \(HP') "scan result: $($res.status) $($res.detail)"
+            Assert (@($res.openPorts) -contains 8080) "port 8080 not probed: $(@($res.openPorts) -join ',')"
+            $me = Api GET "/assets/$($res.assetId)" -Session $s
+            Assert ($me.deviceType -ne 'printer') "an inventoried computer was re-typed by a web page: $($me.deviceType)"
+        } finally { Stop-Job $web -ErrorAction SilentlyContinue; Remove-Job $web -Force -ErrorAction SilentlyContinue }
+
+        # Manual add with a device type, then a second record of the same device.
+        $a = Api POST '/assets' @{ hostname = 'CI-PRINTER-1'; ip = '10.250.0.9'; deviceType = 'mfp'; macAddress = '00-1B-2C-3D-4E-5F'; manufacturer = 'Canon'; model = 'iR-ADV C3826'; criticality = 'Low' } -Session $s
+        Assert ($a.deviceType -eq 'mfp' -and $a.deviceTypeManual -and $a.category -eq 'printer') "added: $($a.deviceType) manual=$($a.deviceTypeManual) category=$($a.category)"
+        Start-Sleep 2
+        $b = Api POST '/assets' @{ hostname = 'ci-printer-1'; ip = '10.250.0.10'; deviceType = 'printer' } -Session $s
+        $dups = Api GET '/assets/duplicates' -Session $s
+        $g = @($dups.groups | Where-Object { @($_.keep.id) + @($_.merge | ForEach-Object id) -contains $a.id })
+        Assert ($g.Count -eq 1 -and (@($g[0].merge).Count -eq 1)) "duplicate group not found: $($dups | ConvertTo-Json -Depth 5 -Compress)"
+        $m = Api POST '/assets/duplicates/merge' @{ keepIds = @($g[0].keep.id) } -Session $s
+        Assert ($m.merged -eq 1) "merge: $($m.message)"
+        $kept = Api GET "/assets/$($g[0].keep.id)" -Session $s
+        $gone = Api GET "/assets/$($g[0].merge[0].id)" -Session $s
+        Assert ($kept.status -eq 'active' -and $gone.status -eq 'duplicate') "after merge: kept $($kept.status), other $($gone.status)"
+        Assert ($kept.ip -eq '10.250.0.10') "kept record does not have the newest address: $($kept.ip)"
+
+        # Device type: manual, then automatic again.
+        $t = Api PUT "/assets/$($kept.id)/device-type" @{ deviceType = 'scanner' } -Session $s
+        Assert ($t.deviceType -eq 'scanner' -and $t.deviceTypeManual -and $t.category -eq 'printer') "manual type: $($t.deviceType)"
+        $t = Api PUT "/assets/$($kept.id)/device-type" @{ deviceType = $null } -Session $s
+        Assert (-not $t.deviceTypeManual) 'automatic type not restored'
+        $types = @(Api GET '/assets/device-types' -Session $s)
+        Assert ($types.Count -ge 20 -and ($types | Where-Object key -eq 'firewall').category -eq 'network_device') "device types: $($types.Count)"
+
+        # Automatic clean-up setting and deletion.
+        Api PUT '/assets/duplicates/settings' @{ auto = $false } -Session $s | Out-Null
+        Assert (-not (Api GET '/assets/duplicates' -Session $s).auto) 'automatic merge not switched off'
+        Api PUT '/assets/duplicates/settings' @{ auto = $true } -Session $s | Out-Null
+        $del = Api POST '/assets/delete' @{ ids = @($kept.id) } -Session $s
+        Assert ($del.deleted -eq 2) "deleted $($del.deleted) record(s) (kept + merged)"
+        $r = Invoke-WebRequest "$base/api/v1/assets/$($kept.id)" -WebSession $s -SkipHttpErrorCheck
+        Assert ($r.StatusCode -eq 404) "deleted device still readable ($($r.StatusCode))"
+        "web page on 8080 recognised ($($res.detail -replace '.*(Recognised as [^:]+).*', '$1')); inventoried computer kept its type ($($me.deviceType)); added mfp, duplicate merged keeping $($kept.ip); type manual -> automatic; deleted 2 record(s)"
     } | Out-Null
 
     if ($UpgradeBundle) {

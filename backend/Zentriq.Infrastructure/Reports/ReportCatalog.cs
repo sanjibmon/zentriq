@@ -25,7 +25,7 @@ public static class ReportCatalog
     private const string DiskGb = "(SELECT round(sum((x ->> 'sizeBytes')::numeric) / 1073741824) FROM jsonb_array_elements(CASE WHEN jsonb_typeof(d.document #> '{hardware,disks}') = 'array' THEN d.document #> '{hardware,disks}' ELSE '[]' END) x)";
     private const string FreePct = "(SELECT round(min((v ->> 'freeBytes')::numeric * 100 / NULLIF((v ->> 'sizeBytes')::numeric, 0)), 1) FROM jsonb_array_elements(CASE WHEN jsonb_typeof(d.document #> '{hardware,volumes}') = 'array' THEN d.document #> '{hardware,volumes}' ELSE '[]' END) v WHERE (v ->> 'sizeBytes')::numeric > 0 AND v ->> 'freeBytes' IS NOT NULL)";
     private static string YesNo(string path) => $"CASE WHEN d.document #>> '{path}' = 'true' THEN 'yes' WHEN d.document #>> '{path}' = 'false' THEN 'no' END";
-    private const string TypeExpr = "COALESCE(d.document #>> '{device,chassis}', h.chassis, a.category)";
+    private const string TypeExpr = "COALESCE(a.device_type, d.document #>> '{device,chassis}', h.chassis, a.category)";
     private const string OsExpr = "COALESCE(a.os_name, initcap(a.os_family))";
 
     private static readonly ReportColumn[] DeviceColumns =

@@ -62,6 +62,7 @@ public sealed class ZentriqDbContext(DbContextOptions<ZentriqDbContext> options)
         {
             e.ToTable("assets");
             e.Property(x => x.RowVersion).IsConcurrencyToken();
+            e.Property(x => x.IdentifiedBy).HasColumnType("jsonb");
         });
         b.Entity<AuditEvent>(e => { e.ToTable("audit_events"); e.Property(x => x.Detail).HasColumnType("jsonb"); });
         b.Entity<Job>(e =>

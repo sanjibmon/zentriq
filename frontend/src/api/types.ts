@@ -96,6 +96,13 @@ export interface Asset {
   lastContactAt?: string | null;
   offlineDays?: number | null;
   online?: boolean | null;
+  /** Device type key (see features/assets/deviceTypes.ts); deviceTypeManual when an administrator chose it. */
+  deviceType?: string | null;
+  deviceTypeManual?: boolean;
+  manufacturer?: string | null;
+  model?: string | null;
+  /** How the device was recognised without credentials (web interface, SNMP, ports). */
+  identifiedBy?: string[] | null;
 }
 
 export interface KeyCount {
@@ -374,7 +381,9 @@ export interface InventoryDocument {
     disks: { model: string | null; serial: string | null; sizeBytes: number | null; mediaType: string | null; interface: string | null }[];
     volumes: { name: string | null; fileSystem: string | null; sizeBytes: number | null; freeBytes: number | null; encrypted: boolean | null }[];
   };
-  network: { name: string | null; mac: string | null; ipv4: string[]; ipv6: string[]; gateway: string | null; dhcp: boolean | null; speedMbps: number | null }[];
+  network: { name: string | null; mac: string | null; ipv4: string[]; ipv6: string[]; gateway: string | null; dhcp: boolean | null; speedMbps: number | null; alias?: string | null; status?: string | null }[];
+  printer?: { pageCount: number | null; status: string | null; supplies: { name: string; levelPercent: number | null }[] } | null;
+  ports?: { physical: number; up: number; routing: boolean | null; switching: boolean | null } | null;
   patches: { id: string; description: string | null; installedOn: string | null }[];
   services: { name: string; displayName: string | null; state: string | null; startMode: string | null }[];
   security: { antivirus: { name: string; enabled: boolean | null; upToDate: boolean | null }[]; firewallEnabled: boolean | null; diskEncryption: boolean | null; secureBoot: boolean | null };

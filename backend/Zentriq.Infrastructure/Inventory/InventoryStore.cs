@@ -165,7 +165,10 @@ public sealed class InventoryStore(LicensingService licensing)
                 hostname = COALESCE(@h, hostname), fqdn = COALESCE(@f, fqdn), primary_ip = COALESCE(@ip, primary_ip),
                 mac_address = COALESCE(@mac::macaddr, mac_address), serial_number = COALESCE(@sn, serial_number),
                 os_family = COALESCE(@of, os_family), os_name = COALESCE(@on, os_name),
-                category = CASE WHEN source <> 'manual' AND @c::text IS NOT NULL THEN @c ELSE category END,
+                category = CASE WHEN source <> 'manual' AND NOT device_type_manual AND @c::text IS NOT NULL THEN @c ELSE category END,
+                device_type = CASE WHEN device_type_manual THEN device_type ELSE COALESCE(@dt, device_type) END,
+                manufacturer = COALESCE(@mf, manufacturer), model = COALESCE(@md, model),
+                identified_by = COALESCE(@ib::jsonb, identified_by),
                 inventory_status = 'success', inventory_source = @src, last_inventory_at = now(), last_seen_at = now(),
                 updated_at = now(), row_version = row_version + 1
              WHERE id = @id
@@ -180,7 +183,27 @@ public sealed class InventoryStore(LicensingService licensing)
         cmd.Parameters.Add(Text("on", Trunc(doc.Os.Name, 200)));
         cmd.Parameters.Add(Text("c", doc.Device.Category is null ? null : NormalizeCategory(doc.Device.Category)));
         cmd.Parameters.AddWithValue("src", doc.Source);
+        cmd.Parameters.Add(Text("dt", DeviceTypeOf(doc)));
+        cmd.Parameters.Add(Text("mf", Trunc(doc.Device.Manufacturer, 200)));
+        cmd.Parameters.Add(Text("md", Trunc(doc.Device.Model, 200)));
+        cmd.Parameters.Add(Text("ib", doc.Device.IdentifiedBy is { Count: > 0 } ib ? JsonSerializer.Serialize(ib) : null));
         await cmd.ExecuteNonQueryAsync(ct);
+    }
+
+    /// <summary>The device type an inventory shows: its chassis (laptop, virtual, switch, printer…), else from the category.</summary>
+    public static string? DeviceTypeOf(InventoryDocument doc)
+    {
+        if (doc.Hardware.IsVirtual == true) return "virtual";
+        if (DeviceTypes.IsKnown(doc.Device.Chassis)) return doc.Device.Chassis;
+        return doc.Device.Category switch
+        {
+            "server" => "server",
+            "endpoint" => "desktop",
+            "printer" => "printer",
+            "network_device" => "network",
+            "virtual_host" => "hypervisor",
+            _ => null,
+        };
     }
 
     private static async Task UpsertHardwareAsync(NpgsqlConnection conn, NpgsqlTransaction tx, Guid id, InventoryDocument doc, CancellationToken ct)
