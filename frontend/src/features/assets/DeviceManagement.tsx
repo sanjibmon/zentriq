@@ -155,7 +155,7 @@ export function DuplicatesDialog({ onClose, onChanged, canEdit, canSettings }: {
             <input type="checkbox" checked={d?.auto ?? true} disabled={!canSettings || !d} onChange={(e) => void setAuto(e.target.checked)} />
             Merge duplicates automatically (every 30 minutes)
           </label>
-          {!d ? <p className="muted">Loading…</p> : d.groups.length === 0 ? <Callout tone="ok" icon="check">No duplicate devices.</Callout> : (
+          {!d ? <p className="muted">Loading…</p> : d.groups.length === 0 ? <Callout tone="ok" icon="info">No duplicate devices.</Callout> : (
             <div className="tbl-wrap" style={{ maxHeight: 420, overflow: 'auto' }}>
               <table className="t">
                 <thead><tr><th /><th>Device</th><th>IP</th><th>Serial / MAC</th><th>Source</th><th>Last seen</th></tr></thead>
