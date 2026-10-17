@@ -43,6 +43,21 @@ public sealed class RemoteSupportService(NpgsqlDataSource ds, ZentriqOptions opt
     public string PublicHost => string.IsNullOrWhiteSpace(options.Remote.PublicHost) ? options.Https.HostName : options.Remote.PublicHost.Trim();
     public string PublicUrl => $"https://{PublicHost}:{options.Remote.Port}/";
 
+    /// <summary>
+    /// The address technicians open: the configured public host if any, otherwise the host name (or IP address) the
+    /// technician's browser used to reach the console. The server's own name may not resolve on the technician's PC.
+    /// </summary>
+    public string UrlFor(string? browserHost)
+    {
+        if (string.IsNullOrWhiteSpace(options.Remote.PublicHost) && !string.IsNullOrWhiteSpace(browserHost)
+            && Uri.CheckHostName(browserHost) is UriHostNameType.Dns or UriHostNameType.IPv4 or UriHostNameType.IPv6)
+        {
+            var h = Uri.CheckHostName(browserHost) == UriHostNameType.IPv6 && !browserHost.StartsWith('[') ? $"[{browserHost}]" : browserHost;
+            return $"https://{h}:{options.Remote.Port}/";
+        }
+        return PublicUrl;
+    }
+
     private static readonly HttpClient Loopback = new(new SocketsHttpHandler
     {
         // The remote support server runs on this machine; its certificate is its own self-signed one.
@@ -177,7 +192,7 @@ public sealed class RemoteSupportService(NpgsqlDataSource ds, ZentriqOptions opt
     /// A sign-in link for one technician that opens the device (or the full remote console when nodeId is null).
     /// The technician's remote support account is created or updated first; the link is valid for 2 minutes.
     /// </summary>
-    public async Task<string> SessionUrlAsync(Guid userId, string displayName, bool fullRights, bool viewOnly, string? nodeId, string view, CancellationToken ct)
+    public async Task<string> SessionUrlAsync(Guid userId, string displayName, bool fullRights, bool viewOnly, string? nodeId, string view, CancellationToken ct, string? browserHost = null)
     {
         await using var c = await ConnectAsync(ct);
         var mesh = await EnsureGroupAsync(c, null, ct);
@@ -185,7 +200,7 @@ public sealed class RemoteSupportService(NpgsqlDataSource ds, ZentriqOptions opt
         var meshUser = "user//" + name;
         await c.EnsureUserAsync(name, displayName, null, ct);
         await c.GrantGroupAsync(mesh, meshUser, fullRights ? MeshRights.Full : MeshRights.RemoteControl | (viewOnly ? MeshRights.ViewOnly : 0), ct);
-        var url = PublicUrl + "?login=" + Uri.EscapeDataString(MeshCookie.Login(meshUser, Key!));
+        var url = UrlFor(browserHost) + "?login=" + Uri.EscapeDataString(MeshCookie.Login(meshUser, Key!));
         if (nodeId is not null)
         {
             var tail = nodeId.StartsWith("node//", StringComparison.Ordinal) ? nodeId["node//".Length..] : nodeId;

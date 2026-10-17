@@ -118,7 +118,16 @@ public sealed class RemoteSupportLiveTests : IAsyncLifetime
         var data = Path.Combine(_dir, "data");
         Directory.CreateDirectory(data);
         var key = MeshCookie.NewKeyHex();
-        var cfg = RemoteServerConfig.Build(new("localhost", Port, key, Convert.ToHexString(Guid.NewGuid().ToByteArray()), data, Path.Combine(_dir, "files"), Path.Combine(_dir, "backups")));
+        // The engine presents the console's certificate (here: a self-signed one like Setup issues).
+        using var rsaKey = System.Security.Cryptography.RSA.Create(2048);
+        var req = new System.Security.Cryptography.X509Certificates.CertificateRequest("CN=localhost, O=Zentriq (self-signed)", rsaKey,
+            System.Security.Cryptography.HashAlgorithmName.SHA256, System.Security.Cryptography.RSASignaturePadding.Pkcs1);
+        var sanB = new System.Security.Cryptography.X509Certificates.SubjectAlternativeNameBuilder();
+        sanB.AddDnsName("localhost"); sanB.AddIpAddress(IPAddress.Loopback);
+        req.CertificateExtensions.Add(sanB.Build());
+        using var consoleCert = req.CreateSelfSigned(DateTimeOffset.UtcNow.AddMinutes(-5), DateTimeOffset.UtcNow.AddYears(1));
+        Assert.True(RemoteServerConfig.WriteWebCertificate(consoleCert, data, out var why), why);
+        var cfg = RemoteServerConfig.Build(new("localhost", Port, key, Convert.ToHexString(Guid.NewGuid().ToByteArray()), data, Path.Combine(_dir, "files"), Path.Combine(_dir, "backups"), KeepCertificate: true));
         File.WriteAllText(Path.Combine(data, "config.json"), cfg.ToJsonString());
 
         var created = await Run(script, "--datapath", data, "--createaccount", "zentriq", "--" + "pass", "Zq-" + Guid.NewGuid().ToString("N"), "--name", "Zentriq");
@@ -134,7 +143,8 @@ public sealed class RemoteSupportLiveTests : IAsyncLifetime
         _server.ErrorDataReceived += (_, e) => { lock (log) log.AppendLine(e.Data); };
         _server.BeginOutputReadLine(); _server.BeginErrorReadLine();
 
-        using var http = new HttpClient(new HttpClientHandler { ServerCertificateCustomValidationCallback = (_, _, _, _) => true, UseCookies = true, CookieContainer = new CookieContainer() });
+        string? served = null;
+        using var http = new HttpClient(new HttpClientHandler { ServerCertificateCustomValidationCallback = (_, c, _, _) => { served ??= c?.Thumbprint; return true; }, UseCookies = true, CookieContainer = new CookieContainer() });
         var deadline = DateTime.UtcNow.AddMinutes(6);
         var up = false;
         while (DateTime.UtcNow < deadline && !up)
@@ -196,6 +206,12 @@ public sealed class RemoteSupportLiveTests : IAsyncLifetime
             meshId = await remote.EnsureGroupAsync(mc, null, default);
         var msh = await (await http.GetAsync($"https://127.0.0.1:{Port}/meshsettings?id={Uri.EscapeDataString(meshId[(meshId.LastIndexOf('/') + 1)..])}")).Content.ReadAsStringAsync();
         Assert.Contains($"MeshServer=wss://localhost:{Port}/agent.ashx", msh);
+        Assert.Equal(consoleCert.Thumbprint, served);       // same certificate as the console, not one the engine issued
+        Assert.Equal(consoleCert.Thumbprint, (await File.ReadAllTextAsync(Path.Combine(data, "zentriq-web-cert.txt"))).Trim());
+        Assert.Contains(consoleCert.ExportCertificatePem(), await File.ReadAllTextAsync(Path.Combine(data, RemoteServerConfig.WebCertificateFile)));
+        Assert.True(RemoteServerConfig.WriteWebCertificate(consoleCert, data, out _)); // a repair rewrites the same files
+        Assert.Equal($"https://192.168.1.8:{Port}/", remote.UrlFor("192.168.1.8"));
+        Assert.Equal($"https://localhost:{Port}/", remote.UrlFor("bad host/x"));
         var sync = await remote.SyncAsync(default);
         Assert.Equal(0, sync.Nodes);
         await remote.SaveSettingsAsync(new RemoteSettings { Prompt = false, Notify = true, PrivacyBar = true }, default);

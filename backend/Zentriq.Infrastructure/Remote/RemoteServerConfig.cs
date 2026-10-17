@@ -9,7 +9,13 @@ namespace Zentriq.Infrastructure.Remote;
 /// </summary>
 public static class RemoteServerConfig
 {
-    public sealed record Input(string HostName, int Port, string LoginKeyHex, string SessionKey, string DataPath, string FilesPath, string BackupPath);
+    /// <param name="KeepCertificate">true when the web certificate files in DataPath were written by Zentriq (the console's
+    /// certificate): MeshCentral then keeps them instead of issuing its own.</param>
+    public sealed record Input(string HostName, int Port, string LoginKeyHex, string SessionKey, string DataPath, string FilesPath, string BackupPath,
+        bool KeepCertificate = false);
+
+    public const string WebCertificateFile = "webserver-cert-public.crt";
+    public const string WebKeyFile = "webserver-cert-private.key";
 
     public const string TitlePicture = "remote-title.png";
     public const string AgentImage = "remote-agent.png";
@@ -25,6 +31,9 @@ public static class RemoteServerConfig
             // no dot. Devices connect to agentAliasDNS (the real host name), so a trailing dot keeps WAN mode for names such as
             // "localhost" or a NetBIOS server name.
             ["cert"] = CertificateName(i.HostName),
+            ["keepCerts"] = i.KeepCertificate,
+            // The console already sends HSTS for its own host name; the engine must not add a second, longer policy.
+            ["StrictTransportSecurity"] = false,
             ["port"] = i.Port,
             ["redirPort"] = 0,
             ["mpsPort"] = 0,
@@ -101,4 +110,59 @@ public static class RemoteServerConfig
     /// <summary>The certificate name for MeshCentral: the host name, with a trailing dot when it has no dot.</summary>
     public static string CertificateName(string host) =>
         host.Contains('.') || System.Net.IPAddress.TryParse(host, out _) ? host : host + ".";
+
+    /// <summary>
+    /// Writes the console's HTTPS certificate (and its chain) for the engine, so the browser sees the same certificate on
+    /// port 8446 as on the console: when the console certificate is trusted, remote sessions open without a warning, and
+    /// a browser that received HSTS for the console host can still open them. Only RSA keys that can be exported are
+    /// supported; otherwise the files are removed and the engine uses its own certificate.
+    /// </summary>
+    /// <returns>true when the files were written.</returns>
+    public static bool WriteWebCertificate(System.Security.Cryptography.X509Certificates.X509Certificate2? cert, string dataPath, out string? reason)
+    {
+        var crt = Path.Combine(dataPath, WebCertificateFile);
+        var key = Path.Combine(dataPath, WebKeyFile);
+        var marker = Path.Combine(dataPath, "zentriq-web-cert.txt");
+        reason = null;
+        try
+        {
+            if (cert is null) { reason = "no certificate"; }
+            else if (cert.GetRSAPrivateKey() is not { } rsa) { reason = "the certificate has no RSA private key"; }
+            else
+            {
+                string pem;
+                using (rsa)
+                {
+                    try { pem = rsa.ExportRSAPrivateKeyPem(); }
+                    catch (System.Security.Cryptography.CryptographicException)
+                    {
+                        reason = "the private key cannot be exported";
+                        pem = "";
+                    }
+                }
+                if (pem.Length > 0)
+                {
+                    var chain = new System.Text.StringBuilder(cert.ExportCertificatePem()).Append('\n');
+                    using (var ch = new System.Security.Cryptography.X509Certificates.X509Chain())
+                    {
+                        ch.ChainPolicy.RevocationMode = System.Security.Cryptography.X509Certificates.X509RevocationMode.NoCheck;
+                        ch.Build(cert);
+                        foreach (var e in ch.ChainElements.Skip(1))
+                            if (e.Certificate.SubjectName.RawData.AsSpan().SequenceEqual(e.Certificate.IssuerName.RawData) is false) // skip the root
+                                chain.Append(e.Certificate.ExportCertificatePem()).Append('\n');
+                    }
+                    File.WriteAllText(crt, chain.ToString());
+                    File.WriteAllText(key, pem);
+                    File.WriteAllText(marker, cert.Thumbprint);
+                    return true;
+                }
+            }
+        }
+        catch (Exception ex) when (ex is System.Security.Cryptography.CryptographicException or IOException) { reason = ex.Message; }
+        // Fall back to the engine's own certificate: remove the files only if Zentriq wrote them (the engine then issues its
+        // own once and keeps it).
+        if (File.Exists(marker))
+            try { File.Delete(crt); File.Delete(key); File.Delete(marker); } catch (IOException) { }
+        return false;
+    }
 }

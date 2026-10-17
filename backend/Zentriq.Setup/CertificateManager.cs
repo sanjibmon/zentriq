@@ -19,13 +19,17 @@ public sealed class CertificateManager(Reporter log)
     public CertificateInfo EnsureSelfSigned(ZentriqPaths paths, string hostName, string pfxPassword, bool forceNew)
     {
         var names = SubjectNames(hostName);
+        // Technicians often open the console by IP address (https://192.168.1.8); include this server's addresses too.
+        var ips = ServerAddresses();
         if (!forceNew && File.Exists(paths.HttpsCertificateFile))
         {
             try
             {
                 using var existing = X509CertificateLoader.LoadPkcs12FromFile(paths.HttpsCertificateFile, pfxPassword, X509KeyStorageFlags.EphemeralKeySet);
-                var san = existing.Extensions.OfType<X509SubjectAlternativeNameExtension>().FirstOrDefault()?.EnumerateDnsNames().ToHashSet(StringComparer.OrdinalIgnoreCase) ?? [];
-                if (existing.NotAfter > DateTime.Now.AddDays(30) && names.All(san.Contains))
+                var sanExt = existing.Extensions.OfType<X509SubjectAlternativeNameExtension>().FirstOrDefault();
+                var san = sanExt?.EnumerateDnsNames().ToHashSet(StringComparer.OrdinalIgnoreCase) ?? [];
+                var sanIps = sanExt?.EnumerateIPAddresses().ToHashSet() ?? [];
+                if (existing.NotAfter > DateTime.Now.AddDays(30) && names.All(san.Contains) && ips.All(sanIps.Contains))
                 {
                     log.Info($"Keeping existing HTTPS certificate {existing.Thumbprint} (expires {existing.NotAfter:yyyy-MM-dd}).");
                     Trust(existing);
@@ -41,6 +45,7 @@ public sealed class CertificateManager(Reporter log)
         var sanBuilder = new SubjectAlternativeNameBuilder();
         foreach (var n in names) sanBuilder.AddDnsName(n);
         sanBuilder.AddIpAddress(IPAddress.Loopback);
+        foreach (var ip in ips) sanBuilder.AddIpAddress(ip);
         req.CertificateExtensions.Add(sanBuilder.Build());
         req.CertificateExtensions.Add(new X509BasicConstraintsExtension(false, false, 0, true));
         req.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.DigitalSignature | X509KeyUsageFlags.KeyEncipherment, true));
@@ -49,7 +54,7 @@ public sealed class CertificateManager(Reporter log)
         using var cert = req.CreateSelfSigned(DateTimeOffset.UtcNow.AddMinutes(-5), DateTimeOffset.UtcNow.AddYears(2));
         File.WriteAllBytes(paths.HttpsCertificateFile, cert.Export(X509ContentType.Pfx, pfxPassword));
         Trust(cert);
-        log.Info($"Issued self-signed HTTPS certificate {cert.Thumbprint} for {string.Join(", ", names)}.");
+        log.Info($"Issued self-signed HTTPS certificate {cert.Thumbprint} for {string.Join(", ", names.Concat(ips.Select(i => i.ToString())))}.");
         return new(cert.Thumbprint, cert.NotAfter, true, cert.Subject);
     }
 
@@ -116,6 +121,22 @@ public sealed class CertificateManager(Reporter log)
             }
         }
         catch (Exception ex) { log.Warn($"Could not add the certificate to the trusted root store: {ex.Message}"); }
+    }
+
+    /// <summary>The IPv4 addresses of this server's active network adapters (no loopback or link-local).</summary>
+    public static IPAddress[] ServerAddresses()
+    {
+        try
+        {
+            return System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces()
+                .Where(n => n.OperationalStatus == System.Net.NetworkInformation.OperationalStatus.Up
+                            && n.NetworkInterfaceType != System.Net.NetworkInformation.NetworkInterfaceType.Loopback)
+                .SelectMany(n => n.GetIPProperties().UnicastAddresses.Select(u => u.Address))
+                .Where(a => a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork && !IPAddress.IsLoopback(a)
+                            && !a.ToString().StartsWith("169.254.", StringComparison.Ordinal))
+                .Distinct().OrderBy(a => a.ToString(), StringComparer.Ordinal).ToArray();
+        }
+        catch (System.Net.NetworkInformation.NetworkInformationException) { return []; }
     }
 
     public static string[] SubjectNames(string? configured)

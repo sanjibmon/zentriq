@@ -22,7 +22,7 @@ public static class RemoteEndpoints
     {
         var g = api.MapGroup("/remote").WithTags("Remote support").RequireModule(Modules.Remote).RequireAuthorization(Permissions.RemoteStart);
 
-        g.MapGet("/status", async (RemoteSupportService remote, NpgsqlDataSource ds, CancellationToken ct) =>
+        g.MapGet("/status", async (RemoteSupportService remote, NpgsqlDataSource ds, HttpContext http, CancellationToken ct) =>
         {
             var st = await remote.StatusAsync(ct);
             await using var cmd = ds.CreateCommand("""
@@ -37,7 +37,7 @@ public static class RemoteEndpoints
             await r.ReadAsync(ct);
             return Results.Ok(new
             {
-                st.Installed, st.Running, st.Message, st.PublicUrl, st.Port,
+                st.Installed, st.Running, st.Message, PublicUrl = st.Installed ? remote.UrlFor(http.Request.Host.Host) : null, st.Port,
                 devices = r.GetInt64(0), online = r.GetInt64(1), unmapped = r.GetInt64(2), sessions24h = r.GetInt64(3),
                 lastSync = r.IsDBNull(4) ? (DateTimeOffset?)null : r.GetFieldValue<DateTimeOffset>(4), readyToInstall = r.GetInt64(5),
             });
@@ -119,7 +119,7 @@ public static class RemoteEndpoints
 
             var name = rc.Principal.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value ?? rc.UserName;
             string url;
-            try { url = await remote.SessionUrlAsync(uid, name, rc.Has(Permissions.RemoteUnattended), viewOnly: false, nodeId, body.View, ct); }
+            try { url = await remote.SessionUrlAsync(uid, name, rc.Has(Permissions.RemoteUnattended), viewOnly: false, nodeId, body.View, ct, http.Request.Host.Host); }
             catch (Exception ex) when (ex is MeshException or WebSocketException or HttpRequestException or TaskCanceledException)
             {
                 return Results.Problem(statusCode: 503, title: "Remote support is not available: " + ex.Message);

@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Net.Http.Json;
 using System.Security.AccessControl;
 using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -313,8 +314,15 @@ public sealed class Provisioner(ProvisionInput input, ZentriqPaths paths, Report
             foreach (var d in new[] { data, Path.Combine(root, "files"), Path.Combine(root, "backups") }) Directory.CreateDirectory(d);
 
             var host = string.IsNullOrWhiteSpace(_options.Remote.PublicHost) ? _options.Https.HostName : _options.Remote.PublicHost!;
+            // The engine presents the console's certificate, so a browser that trusts the console trusts remote sessions too.
+            bool ownCert;
+            string? certReason;
+            using (var consoleCert = ConsoleCertificate())
+                ownCert = Zentriq.Infrastructure.Remote.RemoteServerConfig.WriteWebCertificate(consoleCert, data, out certReason);
+            if (ownCert) log.Info("Remote support uses the console's HTTPS certificate.");
+            else log.Warn($"Remote support uses its own certificate ({certReason}); browsers will ask to trust it once.");
             var config = Zentriq.Infrastructure.Remote.RemoteServerConfig.Build(new(host, _options.Remote.Port, _app.RemoteLoginKey!,
-                Convert.ToHexString(RandomNumberGenerator.GetBytes(32)), data, Path.Combine(root, "files"), Path.Combine(root, "backups")));
+                Convert.ToHexString(RandomNumberGenerator.GetBytes(32)), data, Path.Combine(root, "files"), Path.Combine(root, "backups"), ownCert));
             File.WriteAllText(Path.Combine(data, "config.json"), config.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
             foreach (var f in new[] { Zentriq.Infrastructure.Remote.RemoteServerConfig.TitlePicture, Zentriq.Infrastructure.Remote.RemoteServerConfig.AgentImage, Zentriq.Infrastructure.Remote.RemoteServerConfig.AgentIcon })
             {
@@ -358,6 +366,24 @@ public sealed class Provisioner(ProvisionInput input, ZentriqPaths paths, Report
             _result.Checks["remote support"] = "WARN";
             log.Warn($"Remote support could not be configured: {ex.Message}. Zentriq works without it; run Repair to try again.");
         }
+    }
+
+    /// <summary>The console's HTTPS certificate with an exportable private key, or null.</summary>
+    private X509Certificate2? ConsoleCertificate()
+    {
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(_options.Https.CertificateThumbprint))
+            {
+                using var store = new X509Store(StoreName.My, StoreLocation.LocalMachine);
+                store.Open(OpenFlags.ReadOnly);
+                return store.Certificates.Find(X509FindType.FindByThumbprint, _options.Https.CertificateThumbprint!, validOnly: false).OfType<X509Certificate2>().FirstOrDefault();
+            }
+            if (File.Exists(paths.HttpsCertificateFile))
+                return X509CertificateLoader.LoadPkcs12FromFile(paths.HttpsCertificateFile, _app.HttpsPfxPassword, X509KeyStorageFlags.Exportable | X509KeyStorageFlags.EphemeralKeySet);
+        }
+        catch (CryptographicException ex) { log.Warn("Could not open the console certificate for remote support: " + ex.Message); }
+        return null;
     }
 
     private static string LastLine(string s) => s.Trim().Split('\n').Select(l => l.Trim()).LastOrDefault(l => l.Length > 0) ?? "(no output)";
