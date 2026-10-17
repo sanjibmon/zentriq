@@ -76,10 +76,17 @@ These settings apply to all devices immediately. All are on by default:
 - **Technician PCs trust the CA once** (Remote Support › Deployment & settings › *Trust this server*: download, or `Import-Certificate -FilePath .\Zentriq-Local-CA.cer -CertStoreLocation Cert:\LocalMachine\Root`, or Group Policy). After that the console and remote sessions open without warnings at any address the server gets.
 - A customer certificate (thumbprint in Setup) is used as is and not re-issued; remote support uses it too when its key can be exported.
 
+- **Browser origins:** the engine only accepts sessions from pages it knows (protection against other websites using a technician's session). It accepts every name and IPv4 address of the server, kept current by the ZentriqRemote service; a host name the server does not know (a DNS alias) is added the first time a technician uses it (that session waits up to a minute while the engine restarts).
+
 To support devices outside the LAN, publish port 8446 (and 8444 for the Zentriq Agent).
+
+## Antivirus
+
+The installer ships only the MeshCentral files Zentriq uses: the Windows agents and their core scripts (`installer/remote/agents-keep.txt`). Linux/macOS/Android agents, MeshCmd, MeshCentral Router and Satellite are left out. The installer is not code-signed yet; if Microsoft Defender or another product still blocks it, note the threat name and file from *Protection history* (`Get-MpThreatDetection`) — sign the build or submit the file as a false positive.
 
 ## Troubleshooting
 
+- **"Invalid origin in HTTP request" in the session tab:** builds 51–54 accepted sessions only from the engine's certificate name. Fixed in build 55.
 - **The session tab shows a certificate error without a way to continue:** the browser has HSTS for the server name (it trusted the console under that name) but did not trust the remote support certificate. Builds before 52 used a separate certificate on port 8446; upgrading fixes it. From build 53, install the Zentriq Local CA once on the technician PC.
 
 - **Status "Not running":** check service `ZentriqRemote` and `<data>\Logs\remote-*.log`. Running Repair from Setup reconfigures it.

@@ -1,9 +1,19 @@
 # Test report
 
-Latest: GitHub Actions run 39012398399 (commit `fbeb474`), workflow `windows-release`, on a GitHub-hosted
-**Windows Server 2022 Datacenter 10.0.20348** VM. Release: `v1.1.1-build.53` (pre-release, **unsigned**), package
-version **1.1.1.53**. Results: unit + PostgreSQL integration tests **152/152 PASS**; installer acceptance
-**51 passed, 0 failed, 0 blocked, 10 not run**; in-place updates from published builds and from 1.0.2 PASS.
+Latest: GitHub Actions run 39044411894, workflow `windows-release`, on a GitHub-hosted
+**Windows Server 2022 Datacenter 10.0.20348** VM. Release: `v1.1.1-build.55` (pre-release, **unsigned**), package
+version **1.1.1.55**. Results: unit + PostgreSQL integration tests **154 PASS, 1 skipped** (the live MeshCentral test
+runs in ci-quick: PASS); installer acceptance **51 passed, 0 failed, 0 blocked, 10 not run**; in-place updates PASS.
+
+New in build 55 (remote session "Invalid origin", antivirus):
+
+| ID | Test | Result | Detail |
+|---|---|---|---|
+| T59 (extended) | Control channel opened from the page by IP address | **PASS** | origin https://10.1.0.13:8446 accepted; a foreign origin refused |
+| — | Live MeshCentral test (ci-quick) | **PASS** | control channel with the browser's session cookie: by IP accepted, foreign origin refused (reproduced the reported error before the fix) |
+| — | Unit tests | **PASS** | accepted origins cover server names, addresses and aliases; remote service adds new ones and stays quiet otherwise |
+| — | Installer contents | changed | MeshCentral agents folder: kept 13 files (Windows agents and their core scripts), removed 58 unused items (Linux/macOS agents, MeshCmd, Router, Satellite, Android) |
+| — | Build 54 | FAIL → fixed | acceptance script used a PowerShell certificate callback on a background thread (test defect, not product) |
 
 New in build 53 (nothing tied to a fixed server address):
 
