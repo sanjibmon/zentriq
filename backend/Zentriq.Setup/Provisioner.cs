@@ -314,16 +314,13 @@ public sealed class Provisioner(ProvisionInput input, ZentriqPaths paths, Report
             foreach (var d in new[] { data, Path.Combine(root, "files"), Path.Combine(root, "backups") }) Directory.CreateDirectory(d);
 
             var host = string.IsNullOrWhiteSpace(_options.Remote.PublicHost) ? _options.Https.HostName : _options.Remote.PublicHost!;
-            // The engine presents the console's certificate, so a browser that trusts the console trusts remote sessions too.
-            bool ownCert;
-            string? certReason;
-            using (var consoleCert = ConsoleCertificate())
-                ownCert = Zentriq.Infrastructure.Remote.RemoteServerConfig.WriteWebCertificate(consoleCert, data, out certReason);
-            if (ownCert) log.Info("Remote support uses the console's HTTPS certificate.");
-            else log.Warn($"Remote support uses its own certificate ({certReason}); browsers will ask to trust it once.");
-            var config = Zentriq.Infrastructure.Remote.RemoteServerConfig.Build(new(host, _options.Remote.Port, _app.RemoteLoginKey!,
-                Convert.ToHexString(RandomNumberGenerator.GetBytes(32)), data, Path.Combine(root, "files"), Path.Combine(root, "backups"), ownCert));
-            File.WriteAllText(Path.Combine(data, "config.json"), config.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+            var sessionKey = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+            void WriteConfig(bool keepCertificate)
+            {
+                var config = Zentriq.Infrastructure.Remote.RemoteServerConfig.Build(new(host, _options.Remote.Port, _app.RemoteLoginKey!, sessionKey,
+                    data, Path.Combine(root, "files"), Path.Combine(root, "backups"), keepCertificate));
+                File.WriteAllText(Path.Combine(data, "config.json"), config.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+            }
             foreach (var f in new[] { Zentriq.Infrastructure.Remote.RemoteServerConfig.TitlePicture, Zentriq.Infrastructure.Remote.RemoteServerConfig.AgentImage, Zentriq.Infrastructure.Remote.RemoteServerConfig.AgentIcon })
             {
                 var src = Path.Combine(RemoteDir, "branding", f);
@@ -331,6 +328,11 @@ public sealed class Provisioner(ProvisionInput input, ZentriqPaths paths, Report
             }
 
             WindowsHost.StopAndWait(RemoteService, TimeSpan.FromMinutes(1));
+            // The engine creates its own certificates (agent identity, code signing) at its first start, named after the
+            // server so that it runs in WAN mode. Only after that is its web certificate replaced with the console's.
+            var firstStart = !File.Exists(Path.Combine(data, "root-cert-public.crt"));
+            WriteConfig(keepCertificate: !firstStart && File.Exists(Path.Combine(data, "zentriq-web-cert.txt")));
+
             var node = Path.Combine(RemoteDir, "node", "node.exe");
             var script = Path.Combine(RemoteDir, "app", "node_modules", "meshcentral", "meshcentral.js");
             // The account Zentriq manages remote support with. It signs in by key; its random password is never used or stored.
@@ -342,30 +344,61 @@ public sealed class Provisioner(ProvisionInput input, ZentriqPaths paths, Report
 
             await WindowsHost.ConfigureRecoveryAsync(RemoteService, null, log);
             if (input.SkipServiceStart) { log.Warn("Remote support service start skipped by request."); return; }
-            WindowsHost.StartAndWait(RemoteService, TimeSpan.FromMinutes(2));
-            using var http = new HttpClient(new HttpClientHandler { ServerCertificateCustomValidationCallback = (_, _, _, _) => true }) { Timeout = TimeSpan.FromSeconds(10) };
-            var deadline = DateTime.UtcNow.AddMinutes(4); // the first start creates the server's certificates
-            string last = "no response";
-            while (DateTime.UtcNow < deadline)
+
+            if (firstStart)
             {
-                try
-                {
-                    using var r = await http.GetAsync($"https://127.0.0.1:{_options.Remote.Port}/health.ashx", ct);
-                    if (r.IsSuccessStatusCode) { log.Info($"Remote support is running on port {_options.Remote.Port}."); _result.Checks["remote support"] = "PASS"; return; }
-                    last = $"HTTP {(int)r.StatusCode}";
-                }
-                catch (HttpRequestException ex) { last = ex.Message; }
-                catch (TaskCanceledException) when (!ct.IsCancellationRequested) { last = "timeout"; }
-                await Task.Delay(3000, ct);
+                WindowsHost.StartAndWait(RemoteService, TimeSpan.FromMinutes(2));
+                var (ok, why) = await RemoteHealthyAsync(TimeSpan.FromMinutes(4), ct); // the first start creates the certificates
+                if (!ok) { RemoteWarn(why); return; }
+                WindowsHost.StopAndWait(RemoteService, TimeSpan.FromMinutes(1));
             }
-            _result.Checks["remote support"] = "WARN";
-            log.Warn($"Remote support did not answer on port {_options.Remote.Port} yet ({last}). See {paths.Logs}\remote-*.log. Zentriq works without it.");
+
+            // The engine presents the console's certificate, so a browser that trusts the console trusts remote sessions too.
+            bool ownCert;
+            string? certReason;
+            using (var consoleCert = ConsoleCertificate())
+                ownCert = Zentriq.Infrastructure.Remote.RemoteServerConfig.WriteWebCertificate(consoleCert, data, out certReason);
+            if (ownCert) log.Info("Remote support uses the console's HTTPS certificate.");
+            else log.Warn($"Remote support uses its own certificate ({certReason}); browsers will ask to trust it once.");
+            WriteConfig(keepCertificate: ownCert);
+
+            WindowsHost.StartAndWait(RemoteService, TimeSpan.FromMinutes(2));
+            var (running, last) = await RemoteHealthyAsync(TimeSpan.FromMinutes(4), ct);
+            if (!running) { RemoteWarn(last); return; }
+            log.Info($"Remote support is running on port {_options.Remote.Port}.");
+            _result.Checks["remote support"] = "PASS";
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _result.Checks["remote support"] = "WARN";
             log.Warn($"Remote support could not be configured: {ex.Message}. Zentriq works without it; run Repair to try again.");
         }
+    }
+
+    private void RemoteWarn(string why)
+    {
+        _result.Checks["remote support"] = "WARN";
+        log.Warn($"Remote support did not answer on port {_options.Remote.Port} yet ({why}). See {paths.Logs}\\remote-*.log. Zentriq works without it.");
+    }
+
+    private async Task<(bool Ok, string Last)> RemoteHealthyAsync(TimeSpan wait, CancellationToken ct)
+    {
+        using var http = new HttpClient(new HttpClientHandler { ServerCertificateCustomValidationCallback = (_, _, _, _) => true }) { Timeout = TimeSpan.FromSeconds(10) };
+        var deadline = DateTime.UtcNow.Add(wait);
+        var last = "no response";
+        while (DateTime.UtcNow < deadline)
+        {
+            try
+            {
+                using var r = await http.GetAsync($"https://127.0.0.1:{_options.Remote.Port}/health.ashx", ct);
+                if (r.IsSuccessStatusCode) return (true, "OK");
+                last = $"HTTP {(int)r.StatusCode}";
+            }
+            catch (HttpRequestException ex) { last = ex.Message; }
+            catch (TaskCanceledException) when (!ct.IsCancellationRequested) { last = "timeout"; }
+            await Task.Delay(3000, ct);
+        }
+        return (false, last);
     }
 
     /// <summary>The console's HTTPS certificate with an exportable private key, or null.</summary>
