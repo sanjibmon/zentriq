@@ -130,7 +130,11 @@ public static class AssetEndpoints
             db.Assets.Add(asset);
             await db.SaveChangesAsync(ct);
             if (Mac(body.MacAddress) is { } mac)
+            {
+                // The adapter also identifies the device when an agent or a credentialed scan reports it later.
                 await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE zentriq.assets SET mac_address = {mac}::macaddr WHERE id = {asset.Id}", ct);
+                await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO zentriq.asset_identifiers (asset_id, kind, value) VALUES ({asset.Id}, 'mac', {mac.ToUpperInvariant()}) ON CONFLICT (kind, value) DO NOTHING", ct);
+            }
             await tx.CommitAsync(ct);
             await rc.AuditAsync("asset.create", asset.Hostname ?? asset.PrimaryIp?.ToString(), detail: new { asset.Id, asset.Category });
             return Results.Created($"/api/v1/assets/{asset.Id}", ToDto(asset));
