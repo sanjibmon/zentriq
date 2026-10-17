@@ -41,8 +41,9 @@ export function DeployAgentDialog({ onClose }: { onClose: () => void }) {
   async function createCode() {
     setError(null);
     try {
-      const port = 8444;
-      const t = await api.post<NewEnrollmentToken>('/agents/enrollment-tokens', { name: `Rollout ${new Date().toLocaleDateString()}`, validDays: 30, maxUses: null, serverUrl: `https://${window.location.hostname}:${port}` });
+      // No address: the server uses its name (not the IP this browser happens to use), so devices keep finding it when
+      // its IP address changes.
+      const t = await api.post<NewEnrollmentToken>('/agents/enrollment-tokens', { name: `Rollout ${new Date().toLocaleDateString()}`, validDays: 30, maxUses: null, serverUrl: null });
       tokens.reload();
       setTokenId(t.id);
     } catch (e) { setError(errorText(e)); }

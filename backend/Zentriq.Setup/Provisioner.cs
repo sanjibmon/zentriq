@@ -166,6 +166,7 @@ public sealed class Provisioner(ProvisionInput input, ZentriqPaths paths, Report
         if (string.IsNullOrEmpty(_app.HttpsPfxPassword)) _app.HttpsPfxPassword = SecretStore.NewPassword();
         if (string.IsNullOrEmpty(_app.CredentialKey)) _app.CredentialKey = SecretStore.NewKey();
         if (string.IsNullOrEmpty(_app.AgentCaPfxPassword)) _app.AgentCaPfxPassword = SecretStore.NewPassword();
+        if (string.IsNullOrEmpty(_app.HttpsCaPfxPassword)) _app.HttpsCaPfxPassword = SecretStore.NewPassword();
         if (_app.RemoteLoginKey is not { Length: 160 }) _app.RemoteLoginKey = Zentriq.Infrastructure.Remote.MeshCookie.NewKeyHex();
 
         if (_superPassword.Length > 0)
@@ -234,7 +235,7 @@ public sealed class Provisioner(ProvisionInput input, ZentriqPaths paths, Report
     {
         var cm = new CertificateManager(log);
         var info = string.IsNullOrWhiteSpace(input.Https.CertificateThumbprint)
-            ? cm.EnsureSelfSigned(paths, _options.Https.HostName, _app.HttpsPfxPassword!, forceNew: false)
+            ? cm.EnsureSelfSigned(paths, _options.Https.HostName, _app.HttpsPfxPassword!, _app.HttpsCaPfxPassword!, forceNew: false)
             : cm.UseExisting(input.Https.CertificateThumbprint!, input.ApiService);
         _thumbprint = info.Thumbprint;
         // Agent CA (issues agent client certificates for mutual TLS); readable only by the API service.
@@ -244,7 +245,9 @@ public sealed class Provisioner(ProvisionInput input, ZentriqPaths paths, Report
         if (string.IsNullOrWhiteSpace(input.Https.CertificateThumbprint))
         {
             _options.Https.CertificatePath = paths.HttpsCertificateFile;
-            WindowsHost.SecureFile(paths.HttpsCertificateFile, (WindowsHost.ServiceSid(input.ApiService), FileSystemRights.Read));
+            // The API re-issues the certificate when the server's names or addresses change: it reads the CA and rewrites the PFX.
+            WindowsHost.SecureFile(paths.HttpsCertificateFile, (WindowsHost.ServiceSid(input.ApiService), FileSystemRights.Read | FileSystemRights.Write));
+            WindowsHost.SecureFile(paths.HttpsCaFile, (WindowsHost.ServiceSid(input.ApiService), FileSystemRights.Read));
         }
         return Task.CompletedTask;
     }
@@ -312,6 +315,8 @@ public sealed class Provisioner(ProvisionInput input, ZentriqPaths paths, Report
             var data = Path.Combine(root, "data");
             WindowsHost.SecureDirectory(root, (sid, FileSystemRights.Modify)); // SYSTEM, Administrators, ZentriqRemote only
             foreach (var d in new[] { data, Path.Combine(root, "files"), Path.Combine(root, "backups") }) Directory.CreateDirectory(d);
+            // The API writes the current console certificate here; the remote support service picks it up.
+            WindowsHost.SecureDirectory(paths.RemoteCertificateDir, (WindowsHost.ServiceSid(input.ApiService), FileSystemRights.Modify), (sid, FileSystemRights.ReadAndExecute));
 
             var host = string.IsNullOrWhiteSpace(_options.Remote.PublicHost) ? _options.Https.HostName : _options.Remote.PublicHost!;
             var sessionKey = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
@@ -357,7 +362,11 @@ public sealed class Provisioner(ProvisionInput input, ZentriqPaths paths, Report
             bool ownCert;
             string? certReason;
             using (var consoleCert = ConsoleCertificate())
+            {
                 ownCert = Zentriq.Infrastructure.Remote.RemoteServerConfig.WriteWebCertificate(consoleCert, data, out certReason);
+                if (ownCert && string.IsNullOrWhiteSpace(_options.Https.CertificateThumbprint))
+                    Zentriq.Infrastructure.Remote.RemoteServerConfig.WriteWebCertificate(consoleCert, paths.RemoteCertificateDir, out _);
+            }
             if (ownCert) log.Info("Remote support uses the console's HTTPS certificate.");
             else log.Warn($"Remote support uses its own certificate ({certReason}); browsers will ask to trust it once.");
             WriteConfig(keepCertificate: ownCert);

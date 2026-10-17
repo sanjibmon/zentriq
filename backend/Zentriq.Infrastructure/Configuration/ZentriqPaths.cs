@@ -50,5 +50,9 @@ public sealed class ZentriqPaths
     public string OwnerSecretsFile => Path.Combine(Secrets, "owner.secrets");
     public string HttpsCertificateFile => Path.Combine(Secrets, "https.pfx");
     public string AgentCaFile => Path.Combine(Secrets, "agent-ca.pfx");
+    /// <summary>Local CA that issues the console certificate (when no customer certificate is configured).</summary>
+    public string HttpsCaFile => Path.Combine(Secrets, "https-ca.pfx");
+    /// <summary>The console certificate in PEM for the remote support engine (written by the API, read by ZentriqRemote).</summary>
+    public string RemoteCertificateDir => Path.Combine(Root, "Remote", "cert");
     public string InstallResultFile => Path.Combine(Logs, "install-result.json");
 }

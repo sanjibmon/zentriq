@@ -37,6 +37,14 @@ builder.Services.AddZentriqInfrastructure(options, paths, "Zentriq.Api");
 builder.Services.AddSingleton<AgentServer>();
 
 // ---- Kestrel / HTTPS -------------------------------------------------------------------
+// The certificate can be replaced while running (ConsoleCertificateRenewer: new server name or IP address).
+var consoleCertificate = httpOnly ? null : new ConsoleCertificate(HttpsCertificate.Load(options, paths));
+if (consoleCertificate is not null)
+{
+    builder.Services.AddSingleton(consoleCertificate);
+    builder.Services.AddSingleton<ConsoleCertificateRenewer>();
+    builder.Services.AddHostedService(sp => sp.GetRequiredService<ConsoleCertificateRenewer>());
+}
 builder.WebHost.ConfigureKestrel((ctx, k) =>
 {
     k.AddServerHeader = false;
@@ -47,15 +55,18 @@ builder.WebHost.ConfigureKestrel((ctx, k) =>
         k.ListenLocalhost(port);
         return;
     }
-    var cert = HttpsCertificate.Load(options, paths);
-    k.ListenAnyIP(options.Https.Port, l => l.UseHttps(cert));
+    var holder = consoleCertificate!;
+    k.ListenAnyIP(options.Https.Port, l => l.UseHttps(new Microsoft.AspNetCore.Server.Kestrel.Https.HttpsConnectionAdapterOptions
+    {
+        ServerCertificateSelector = (_, _) => holder.Current,
+    }));
     if (options.Https.AgentPort > 0)
     {
         // Agents: mutual TLS. Any client certificate is accepted at the TLS layer; AgentEndpoints validates
         // it against the installation's agent CA and the agent registry (enrollment itself has no certificate).
         k.ListenAnyIP(options.Https.AgentPort, l => l.UseHttps(new Microsoft.AspNetCore.Server.Kestrel.Https.HttpsConnectionAdapterOptions
         {
-            ServerCertificate = cert,
+            ServerCertificateSelector = (_, _) => holder.Current,
             ClientCertificateMode = Microsoft.AspNetCore.Server.Kestrel.Https.ClientCertificateMode.AllowCertificate,
             ClientCertificateValidation = (_, _, _) => true,
             CheckCertificateRevocation = false,
@@ -172,6 +183,7 @@ api.MapVulnerabilityEndpoints();
 api.MapSecurityEndpoints();
 api.MapIntegrationEndpoints();
 api.MapRemoteEndpoints();
+api.MapTrustEndpoints();
 api.MapDepartmentEndpoints();
 app.MapAgentEndpoints();
 api.MapPendingModuleEndpoints();

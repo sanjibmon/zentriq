@@ -8,6 +8,7 @@ import { useConfirm } from '../../components/Confirm';
 import { CopyBox } from '../../components/CopyBox';
 import { Icon } from '../../components/Icon';
 import { Callout, DataTable, ErrorBox, fmt, Kpis, PageHead, Pager, Panel, Pill } from '../../components/ui';
+import { TrustPanel } from './TrustPanel';
 import { openRemote, VIEW_LABEL, type RemoteDevice, type RemoteSession, type RemoteSettings, type RemoteStatus, type RemoteView } from './remote';
 
 type Tab = 'devices' | 'sessions' | 'setup';
@@ -195,6 +196,7 @@ function Setup({ status, onChanged }: { status: RemoteStatus; onChanged: () => v
         </dl>
         <p className="faint" style={{ fontSize: 12, marginBottom: 0 }}>Technicians sign in through Zentriq with a link valid for 2 minutes; there is no separate password. Who may open sessions is controlled by the permissions <span className="mono">remote.start</span> (sessions), <span className="mono">remote.manage</span> (install, settings) and <span className="mono">remote.unattended</span> (full remote console) in Users, Roles &amp; Sites.</p>
       </Panel>
+      <TrustPanel />
     </>
   );
 }

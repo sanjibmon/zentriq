@@ -34,6 +34,8 @@ public sealed class RemoteHost(ZentriqPaths paths, ILogger<RemoteHost> logger) :
                 await Wait(TimeSpan.FromMinutes(1), stoppingToken); continue;
             }
             var started = DateTime.UtcNow;
+            if (SyncCertificate(paths, data)) logger.LogInformation("Remote support now uses the console's current HTTPS certificate.");
+            using var running = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
             try
             {
                 var psi = new ProcessStartInfo(NodeExe)
@@ -54,16 +56,66 @@ public sealed class RemoteHost(ZentriqPaths paths, ILogger<RemoteHost> logger) :
                 _process.BeginOutputReadLine();
                 _process.BeginErrorReadLine();
                 logger.LogInformation("Remote support server started (pid {Pid}).", _process.Id);
+                var proc = _process;
+                // The API re-issues the console certificate when the server's names or addresses change; restart the
+                // engine with the new certificate.
+                _ = Task.Run(async () =>
+                {
+                    while (!running.IsCancellationRequested)
+                    {
+                        await Wait(TimeSpan.FromMinutes(1), running.Token);
+                        if (running.IsCancellationRequested) return;
+                        try
+                        {
+                            if (!SyncCertificate(paths, data)) continue;
+                            logger.LogInformation("The console certificate changed; restarting the remote support server to use it.");
+                            delay = TimeSpan.FromSeconds(1);
+                            proc.Kill(entireProcessTree: true);
+                            return;
+                        }
+                        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or System.Text.Json.JsonException)
+                        {
+                            logger.LogWarning("Could not update the remote support certificate: {Message}", ex.Message);
+                        }
+                    }
+                });
                 await _process.WaitForExitAsync(stoppingToken);
                 logger.LogWarning("Remote support server exited with code {Code}.", _process.ExitCode);
             }
             catch (OperationCanceledException) { break; }
             catch (Exception ex) { logger.LogError(ex, "Remote support server could not be started"); }
-            finally { _process?.Dispose(); _process = null; }
+            finally { running.Cancel(); _process?.Dispose(); _process = null; }
             // Back off when it keeps failing quickly; reset after a run of more than 5 minutes.
-            delay = DateTime.UtcNow - started > TimeSpan.FromMinutes(5) ? TimeSpan.FromSeconds(5) : TimeSpan.FromSeconds(Math.Min(120, delay.TotalSeconds * 2));
+            delay = delay == TimeSpan.FromSeconds(1) ? TimeSpan.FromSeconds(5)
+                : DateTime.UtcNow - started > TimeSpan.FromMinutes(5) ? TimeSpan.FromSeconds(5) : TimeSpan.FromSeconds(Math.Min(120, delay.TotalSeconds * 2));
             await Wait(delay, stoppingToken);
         }
+    }
+
+    /// <summary>
+    /// Copies the console certificate written by the API (Remote\cert) into the engine's data folder when it changed.
+    /// Only after the engine's first start (its own certificates exist; see zentriqctl), and it keeps the certificate
+    /// (keepCerts) from then on. Returns true when the engine must restart.
+    /// </summary>
+    public static bool SyncCertificate(ZentriqPaths paths, string data)
+    {
+        var src = paths.RemoteCertificateDir;
+        const string marker = "zentriq-web-cert.txt";
+        if (!File.Exists(Path.Combine(src, marker)) || !File.Exists(Path.Combine(data, "root-cert-public.crt"))) return false;
+        var want = File.ReadAllText(Path.Combine(src, marker)).Trim();
+        var have = File.Exists(Path.Combine(data, marker)) ? File.ReadAllText(Path.Combine(data, marker)).Trim() : null;
+        if (string.Equals(want, have, StringComparison.OrdinalIgnoreCase)) return false;
+        foreach (var f in new[] { Infrastructure.Remote.RemoteServerConfig.WebCertificateFile, Infrastructure.Remote.RemoteServerConfig.WebKeyFile })
+            File.Copy(Path.Combine(src, f), Path.Combine(data, f), overwrite: true);
+        var cfgPath = Path.Combine(data, "config.json");
+        var cfg = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(cfgPath))!.AsObject();
+        if (cfg["settings"] is System.Text.Json.Nodes.JsonObject settings && settings["keepCerts"]?.GetValue<bool>() != true)
+        {
+            settings["keepCerts"] = true;
+            File.WriteAllText(cfgPath, cfg.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+        }
+        File.WriteAllText(Path.Combine(data, marker), want); // last: a partial copy is retried
+        return true;
     }
 
     private static async Task Wait(TimeSpan t, CancellationToken ct)

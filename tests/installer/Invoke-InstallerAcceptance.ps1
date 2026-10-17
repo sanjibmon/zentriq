@@ -119,7 +119,7 @@ Remove-Item $answer -Force   # contains the administrator password
 
 if (-not $installed) {
     foreach ($t in 'T02 PostgreSQL provisioning', 'T03 Database migration', 'T04 Administrator sign-in', 'T05 API and worker services', 'T06 Trial initialization',
-                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent') {
+                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server') {
         Record $t.Substring(0, 3) $t.Substring(4) 'BLOCKED' 'installation failed'
     }
 } else {
@@ -1096,6 +1096,61 @@ if (-not $installed) {
             @(Api GET '/agents' -Session $s | ForEach-Object { $_ }) | Where-Object { $_.status -eq 'active' } | ForEach-Object { Api POST "/agents/$($_.id)/revoke" -Session $s | Out-Null }
             @(Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*' -ErrorAction SilentlyContinue | Where-Object { $_.PSObject.Properties['DisplayName'] -and $_.DisplayName -eq 'Zentriq Agent' }) |
                 ForEach-Object { Start-Process msiexec.exe -ArgumentList '/x', $_.PSChildName, '/qn' -Wait | Out-Null }
+        }
+    } | Out-Null
+
+    Check 'T61' 'Server certificate follows the server: local CA, all IP addresses, automatic re-issue with the same key, remote support follows' {
+        function Served([int] $port) {
+            $tcp = [Net.Sockets.TcpClient]::new('127.0.0.1', $port)
+            try {
+                $ssl = [Net.Security.SslStream]::new($tcp.GetStream(), $false, { $true })
+                $ssl.AuthenticateAsClient('localhost')
+                [Security.Cryptography.X509Certificates.X509Certificate2]::new($ssl.RemoteCertificate)
+            } finally { $tcp.Dispose() }
+        }
+        function Sans($c) { ($c.Extensions | Where-Object { $_.Oid.Value -eq '2.5.29.17' }).Format($false) }
+        $caResp = Invoke-WebRequest "$base/api/v1/trust/ca.cer"   # no sign-in needed
+        $ca = [Security.Cryptography.X509Certificates.X509Certificate2]::new([byte[]]$caResp.Content)
+        Assert ($ca.Subject -like 'CN=Zentriq Local CA*') "CA subject: $($ca.Subject)"
+        Assert (Test-Path "Cert:\LocalMachine\Root\$($ca.Thumbprint)") 'local CA is not trusted on the server'
+        $before = Served $HttpsPort
+        Assert ($before.Issuer -eq $ca.Subject) "console certificate issued by $($before.Issuer)"
+        $ips = @(Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -ne '127.0.0.1' -and $_.IPAddress -notlike '169.254.*' -and $_.AddressState -eq 'Preferred' } | ForEach-Object IPAddress)
+        $san = Sans $before
+        foreach ($ip in $ips) {
+            Assert ($san -match [regex]::Escape($ip)) "certificate does not cover $ip ($san)"
+            $r = Invoke-WebRequest "https://${ip}$(if ($HttpsPort -ne 443) { ":$HttpsPort" })/" -SkipHttpErrorCheck   # no -SkipCertificateCheck: must validate by IP
+            Assert ($r.StatusCode -eq 200) "https://$ip returned $($r.StatusCode)"
+        }
+        $s = Login
+        $trust = Api GET '/trust' -Session $s
+        Assert ($trust.mode -eq 'local-ca') "trust mode $($trust.mode)"
+
+        # The server gets a new name: the API re-issues the certificate by itself (same key: agent pins stay valid) and
+        # remote support switches to it.
+        $cfgPath = Join-Path $dataDir 'Config\zentriq.json'
+        $original = Get-Content $cfgPath -Raw
+        $cfg = $original | ConvertFrom-Json
+        $cfg.Zentriq.Https.HostName = 'zq-renamed.ci.test'
+        $cfg | ConvertTo-Json -Depth 20 | Set-Content $cfgPath -Encoding UTF8
+        try {
+            Restart-Service ZentriqApi -Force
+            Wait-Ready | Out-Null
+            $deadline = (Get-Date).AddMinutes(2)
+            do { Start-Sleep 5; $after = Served $HttpsPort } while ((Sans $after) -notmatch 'zq-renamed\.ci\.test' -and (Get-Date) -lt $deadline)
+            Assert ((Sans $after) -match 'zq-renamed\.ci\.test') "not re-issued for the new name: $(Sans $after)"
+            Assert ($after.Thumbprint -ne $before.Thumbprint -and $after.Issuer -eq $ca.Subject) 'new certificate not from the local CA'
+            Assert ([Convert]::ToBase64String($after.PublicKey.EncodedKeyValue.RawData) -eq [Convert]::ToBase64String($before.PublicKey.EncodedKeyValue.RawData)) 'the key changed (agents would reject the server)'
+            $deadline = (Get-Date).AddMinutes(4)
+            do { Start-Sleep 10; $remote = Served 8446 } while ($remote.Thumbprint -ne $after.Thumbprint -and (Get-Date) -lt $deadline)
+            Assert ($remote.Thumbprint -eq $after.Thumbprint) "remote support still serves $($remote.Thumbprint)"
+            $agentOk = Invoke-WebRequest "https://localhost:8444/api/agent/v1/checkin" -Method Post -Body '{}' -ContentType 'application/json' -SkipHttpErrorCheck -SkipCertificateCheck
+            Assert ($agentOk.StatusCode -in 400, 401, 403) "agent port after re-issue: $($agentOk.StatusCode)"
+            "CA $($ca.Thumbprint.Substring(0,8))... trusted; covers $($ips -join ', ') (validated by IP); new name -> re-issued $($after.Thumbprint.Substring(0,8))... with the same key in place; remote support switched to it"
+        } finally {
+            Set-Content $cfgPath $original -Encoding UTF8 -NoNewline
+            Restart-Service ZentriqApi -Force
+            Wait-Ready | Out-Null
         }
     } | Out-Null
 
