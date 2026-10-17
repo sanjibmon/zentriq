@@ -238,7 +238,7 @@ public sealed class DiscoveryScanHandler(NpgsqlDataSource ds, IHostPinger pinger
         }
 
         if (fingerprint.DeviceType is { } recognised)
-            detail += $" Recognised as {Zentriq.Inventory.DeviceTypes.Get(recognised)?.Label ?? recognised}{(fingerprint.Manufacturer is { } mk ? $" ({mk}{(fingerprint.Model is { } md ? " " + md : "")})" : "")}: {string.Join("; ", fingerprint.Evidence)}.";
+            detail += $" Recognised as {Zentriq.Inventory.DeviceTypes.Get(recognised)?.Label ?? recognised}{(fingerprint.Manufacturer is { } mk ? $" ({(fingerprint.Model is { } md ? (md.StartsWith(mk, StringComparison.OrdinalIgnoreCase) ? md : mk + " " + md) : mk)})" : "")}: {string.Join("; ", fingerprint.Evidence)}.";
         var (assetId, created, updated, assetNote) = await ReconcileAssetAsync(ip, hostname, probe.OpenPorts, fingerprint, license, ct);
         if (assetId is { } macAsset && probe.Mac is { } mac)
         {

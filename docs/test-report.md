@@ -1,9 +1,18 @@
 # Test report
 
-Latest: GitHub Actions run 39044411894, workflow `windows-release`, on a GitHub-hosted
-**Windows Server 2022 Datacenter 10.0.20348** VM. Release: `v1.1.1-build.55` (pre-release, **unsigned**), package
-version **1.1.1.55**. Results: unit + PostgreSQL integration tests **154 PASS, 1 skipped** (the live MeshCentral test
-runs in ci-quick: PASS); installer acceptance **51 passed, 0 failed, 0 blocked, 10 not run**; in-place updates PASS.
+Latest: GitHub Actions run 39056576162, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
+10.0.20348** VM. Release: `v1.1.1-build.57` (pre-release, **unsigned**), package version **1.1.1.57**. Results: unit +
+PostgreSQL integration tests **183 PASS, 1 skipped** (live MeshCentral test runs in ci-quick: PASS); installer
+acceptance **52 passed, 0 failed, 0 blocked, 10 not run**; in-place updates PASS.
+
+New in build 57 (IT Asset Inventory: devices without an agent, device types, duplicates, navigation):
+
+| ID | Test | Result | Detail |
+|---|---|---|---|
+| T62 | Devices without an agent; add, device type, duplicates, delete | **PASS** | a printer web page on port 8080 of the runner was recognised by a scan ("Printer, HP LaserJet Pro M404dn"); the inventoried computer kept its own type (virtual); added a multifunction printer with MAC; duplicate found and merged keeping the newest address 10.250.0.10; device type manual then automatic; automatic merge switched off/on; delete removed 2 records |
+| — | Unit tests | **PASS** | 20 product families from web interface text; port guesses; evidence order; model from page title; SNMP switch / router / firewall / printer (ports, supplies, page count, model); device type → category; record kept in a duplicate group |
+| — | PostgreSQL tests | **PASS** | duplicate groups by name, serial and MAC (locally administered MACs and same-name/different-serial excluded), merge keeps newest address, delete removes merged records; manual device type survives inventory |
+| — | Build 56 | FAIL → fixed | acceptance script defects: T61 did not wait while the remote support engine restarted; T62 read the device-type list as one item |
 
 New in build 55 (remote session "Invalid origin", antivirus):
 
