@@ -120,6 +120,12 @@ public sealed class RemoteSupportLiveTests : IAsyncLifetime
         var key = MeshCookie.NewKeyHex();
         var cfg = RemoteServerConfig.Build(new("localhost", Port, key, Convert.ToHexString(Guid.NewGuid().ToByteArray()), data, Path.Combine(_dir, "files"), Path.Combine(_dir, "backups"), AllowedOrigins: RemoteServerConfig.Origins("localhost")));
         File.WriteAllText(Path.Combine(data, "config.json"), cfg.ToJsonString());
+        // Branding files next to the configuration, as zentriqctl copies them (the engine reads them at start).
+        var repo = new DirectoryInfo(AppContext.BaseDirectory);
+        while (repo is not null && !Directory.Exists(Path.Combine(repo.FullName, "installer", "remote"))) repo = repo.Parent;
+        Assert.NotNull(repo);
+        foreach (var f in new[] { RemoteServerConfig.TitlePicture, RemoteServerConfig.AgentImage, RemoteServerConfig.AgentIcon })
+            File.Copy(Path.Combine(repo!.FullName, "installer", "remote", f), Path.Combine(data, f), overwrite: true);
 
         var created = await Run(script, "--datapath", data, "--createaccount", "zentriq", "--" + "pass", "Zq-" + Guid.NewGuid().ToString("N"), "--name", "Zentriq");
         Assert.Contains("Done", created);
