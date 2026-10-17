@@ -1,0 +1,134 @@
+
+==== Packaging Zentriq 1.1.2 (package version 1.1.2.57) ====
+
+==== Publish backend/Zentriq.Api/Zentriq.Api.csproj ====
+  Determining projects to restore...
+  Restored D:\a\zentriq\zentriq\backend\Zentriq.Domain\Zentriq.Domain.csproj (in 209 ms).
+  Restored D:\a\zentriq\zentriq\backend\Zentriq.Inventory\Zentriq.Inventory.csproj (in 230 ms).
+  Restored D:\a\zentriq\zentriq\backend\Zentriq.Application\Zentriq.Application.csproj (in 5 ms).
+  Restored D:\a\zentriq\zentriq\backend\Zentriq.Infrastructure\Zentriq.Infrastructure.csproj (in 236 ms).
+  Restored D:\a\zentriq\zentriq\backend\Zentriq.Api\Zentriq.Api.csproj (in 236 ms).
+  Zentriq.Inventory -> D:\a\zentriq\zentriq\backend\Zentriq.Inventory\bin\Release\netstandard2.0\Zentriq.Inventory.dll
+  Zentriq.Domain -> D:\a\zentriq\zentriq\backend\Zentriq.Domain\bin\Release\net10.0\Zentriq.Domain.dll
+  Zentriq.Application -> D:\a\zentriq\zentriq\backend\Zentriq.Application\bin\Release\net10.0\Zentriq.Application.dll
+  Zentriq.Infrastructure -> D:\a\zentriq\zentriq\backend\Zentriq.Infrastructure\bin\Release\net10.0\Zentriq.Infrastructure.dll
+D:\a\zentriq\zentriq\backend\Zentriq.Api\Infrastructure\ApiTokenAuthentication.cs(19,25): warning CS0108: 'ApiTokenAuthenticationHandler.Scheme' hides inherited member 'AuthenticationHandler<AuthenticationSchemeOptions>.Scheme'. Use the new keyword if hiding was intended. [D:\a\zentriq\zentriq\backend\Zentriq.Api\Zentriq.Api.csproj]
+  Zentriq.Api -> D:\a\zentriq\zentriq\backend\Zentriq.Api\bin\Release\net10.0\win-x64\Zentriq.Api.dll
+  Zentriq.Api -> D:\a\zentriq\zentriq\artifacts\staging\api\
+
+==== Publish backend/Zentriq.Worker/Zentriq.Worker.csproj ====
+  Determining projects to restore...
+  Restored D:\a\zentriq\zentriq\backend\Zentriq.Worker\Zentriq.Worker.csproj (in 292 ms).
+  4 of 5 projects are up-to-date for restore.
+  Zentriq.Inventory -> D:\a\zentriq\zentriq\backend\Zentriq.Inventory\bin\Release\netstandard2.0\Zentriq.Inventory.dll
+  Zentriq.Domain -> D:\a\zentriq\zentriq\backend\Zentriq.Domain\bin\Release\net10.0\Zentriq.Domain.dll
+  Zentriq.Application -> D:\a\zentriq\zentriq\backend\Zentriq.Application\bin\Release\net10.0\Zentriq.Application.dll
+  Zentriq.Infrastructure -> D:\a\zentriq\zentriq\backend\Zentriq.Infrastructure\bin\Release\net10.0\Zentriq.Infrastructure.dll
+D:\a\zentriq\zentriq\backend\Zentriq.Worker\Agentless\SnmpCollector.cs(71,26): warning CS0618: 'MD5AuthenticationProvider' is obsolete: 'MD5 is no longer secure. Please use a more secure provider.' [D:\a\zentriq\zentriq\backend\Zentriq.Worker\Zentriq.Worker.csproj]
+D:\a\zentriq\zentriq\backend\Zentriq.Worker\Agentless\SnmpCollector.cs(73,22): warning CS0618: 'SHA1AuthenticationProvider' is obsolete: 'SHA-1 is no longer secure. Please use a more secure provider.' [D:\a\zentriq\zentriq\backend\Zentriq.Worker\Zentriq.Worker.csproj]
+  Zentriq.Worker -> D:\a\zentriq\zentriq\backend\Zentriq.Worker\bin\Release\net10.0\win-x64\Zentriq.Worker.dll
+  Zentriq.Worker -> D:\a\zentriq\zentriq\artifacts\staging\worker\
+
+==== Publish backend/Zentriq.Setup/Zentriq.Setup.csproj ====
+  Determining projects to restore...
+  Restored D:\a\zentriq\zentriq\backend\Zentriq.Setup\Zentriq.Setup.csproj (in 234 ms).
+  4 of 5 projects are up-to-date for restore.
+  Zentriq.Inventory -> D:\a\zentriq\zentriq\backend\Zentriq.Inventory\bin\Release\netstandard2.0\Zentriq.Inventory.dll
+  Zentriq.Domain -> D:\a\zentriq\zentriq\backend\Zentriq.Domain\bin\Release\net10.0\Zentriq.Domain.dll
+  Zentriq.Application -> D:\a\zentriq\zentriq\backend\Zentriq.Application\bin\Release\net10.0\Zentriq.Application.dll
+  Zentriq.Infrastructure -> D:\a\zentriq\zentriq\backend\Zentriq.Infrastructure\bin\Release\net10.0\Zentriq.Infrastructure.dll
+  Zentriq.Setup -> D:\a\zentriq\zentriq\backend\Zentriq.Setup\bin\Release\net10.0-windows\win-x64\zentriqctl.dll
+  Zentriq.Setup -> D:\a\zentriq\zentriq\artifacts\staging\tools\
+
+==== Stage web console (frontend/dist) ====
+
+==== Remote support engine (Node.js + MeshCentral) ====
+Node.js v22.23.3 verified (SHA-256 2B0FF57B049CDA1BBCEA2240EEC20467018713C1EFE1F7360C2681859B90ED71, signed by OpenJS Foundation).
+
+added 230 packages in 7s
+All MeshCentral modules present.
+MeshCentral agents: kept 13, removed 58 unused item(s).
+Remote support staged: MeshCentral 1.2.5, Node.js v22.23.3, 6060 files.
+
+==== Prerequisites (download + verify) ====
+OK  postgresql-17.11-1-windows-x64.exe  f104c552d8495a6f20738c2a03f643164bc64b9985363329e314dec24559f0b7  CN=EnterpriseDB Corporation, O=EnterpriseDB Corporation, L=Wilmington, S=Delaware, C=US
+OK  vc_redist.x64.exe  cc0ff0eb1dc3f5188ae6300faef32bf5beeba4bdd6e8e445a9184072096b713b  CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US
+Wrote D:\a\zentriq\zentriq\artifacts\prereqs\prereqs.lock.json
+PostgreSQL installer: postgresql-17.11-1-windows-x64.exe; VC++ runtime build: 35211
+Code signing: not configured (artifacts will show "Unknown publisher").
+
+==== MSI custom actions ====
+  Determining projects to restore...
+  Restored D:\a\zentriq\zentriq\installer\customactions\Zentriq.CustomActions.csproj (in 147 ms).
+  Zentriq.CustomActions -> D:\a\zentriq\zentriq\installer\customactions\bin\Release\net472\Zentriq.CustomActions.dll
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:01.12
+
+==== Zentriq Agent ====
+  Determining projects to restore...
+  Restored D:\a\zentriq\zentriq\agent\Zentriq.Agent\Zentriq.Agent.csproj (in 202 ms).
+  Restored D:\a\zentriq\zentriq\backend\Zentriq.Inventory\Zentriq.Inventory.csproj (in 202 ms).
+  Zentriq.Inventory -> D:\a\zentriq\zentriq\backend\Zentriq.Inventory\bin\Release\netstandard2.0\Zentriq.Inventory.dll
+  Zentriq.Agent -> D:\a\zentriq\zentriq\agent\Zentriq.Agent\bin\Release\net48\ZentriqAgent.exe
+  Zentriq.Agent -> D:\a\zentriq\zentriq\artifacts\staging-agent\
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+D:\a\zentriq\zentriq\installer\agent-msi\Package.wxs(57): warning WIX1149: ServiceConfig functionality is documented in the Windows Installer SDK to "not [work] as expected." Consider replacing ServiceConfig with the WixToolset.Util.wixext ServiceConfig element. [D:\a\zentriq\zentriq\installer\agent-msi\Zentriq.AgentMsi.wixproj]
+D:\a\zentriq\zentriq\installer\agent-msi\Package.wxs(22): warning WIX1076: ICE61: This product should remove only older versions of itself. The Maximum version is not less than the current product. (1.1.2.57 1.1.2.57) [D:\a\zentriq\zentriq\installer\agent-msi\Zentriq.AgentMsi.wixproj]
+  Zentriq.AgentMsi -> D:\a\zentriq\zentriq\artifacts\agent-msi\ZentriqAgent-x64.msi
+
+Build succeeded.
+
+D:\a\zentriq\zentriq\installer\agent-msi\Package.wxs(57): warning WIX1149: ServiceConfig functionality is documented in the Windows Installer SDK to "not [work] as expected." Consider replacing ServiceConfig with the WixToolset.Util.wixext ServiceConfig element. [D:\a\zentriq\zentriq\installer\agent-msi\Zentriq.AgentMsi.wixproj]
+D:\a\zentriq\zentriq\installer\agent-msi\Package.wxs(22): warning WIX1076: ICE61: This product should remove only older versions of itself. The Maximum version is not less than the current product. (1.1.2.57 1.1.2.57) [D:\a\zentriq\zentriq\installer\agent-msi\Zentriq.AgentMsi.wixproj]
+    2 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:03.17
+
+==== Zentriq.msi ====
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+D:\a\zentriq\zentriq\installer\msi\Package.wxs(168): warning WIX1076: ICE60: The file flso6Z8Q3omHmaIMpNQ1MwODTx0XRg is not a Font, and its version is not a companion file reference. It should have a language specified in the Language column. [D:\a\zentriq\zentriq\installer\msi\Zentriq.Msi.wixproj]
+D:\a\zentriq\zentriq\installer\msi\Package.wxs(26): warning WIX1076: ICE61: This product should remove only older versions of itself. The Maximum version is not less than the current product. (1.1.2.57 1.1.2.57) [D:\a\zentriq\zentriq\installer\msi\Zentriq.Msi.wixproj]
+  Zentriq.Msi -> D:\a\zentriq\zentriq\artifacts\msi\Zentriq.msi
+
+Build succeeded.
+
+D:\a\zentriq\zentriq\installer\msi\Package.wxs(168): warning WIX1076: ICE60: The file flso6Z8Q3omHmaIMpNQ1MwODTx0XRg is not a Font, and its version is not a companion file reference. It should have a language specified in the Language column. [D:\a\zentriq\zentriq\installer\msi\Zentriq.Msi.wixproj]
+D:\a\zentriq\zentriq\installer\msi\Package.wxs(26): warning WIX1076: ICE61: This product should remove only older versions of itself. The Maximum version is not less than the current product. (1.1.2.57 1.1.2.57) [D:\a\zentriq\zentriq\installer\msi\Zentriq.Msi.wixproj]
+    2 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:02:03.27
+
+==== Zentriq-Setup-x64.exe ====
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+  Zentriq.Bundle -> D:\a\zentriq\zentriq\artifacts\bundle\Zentriq-Setup-x64.exe
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:41.59
+
+==== Release artifacts ====
+
+Name                                 Length
+----                                 ------
+release-manifest.json                  3097
+SHA256SUMS.txt                          447
+Zentriq-1.1.2-docs.zip                58279
+Zentriq-1.1.2-msi-offline-kit.zip 525877893
+Zentriq-Setup-x64.exe             526472678
+Zentriq.msi                       134492763
+ZentriqAgent-x64.msi                3801088
+
+
+Artifacts are NOT code-signed (Windows shows "Unknown publisher"). See docs/code-signing.md.
+Release written to D:\a\zentriq\zentriq\artifacts\release

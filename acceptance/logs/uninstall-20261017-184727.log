@@ -1,0 +1,2 @@
+﻿2026-10-17T18:47:27.8086008Z INFO Removed Zentriq scheduled tasks.
+2026-10-17T18:47:27.8177374Z INFO Customer data was NOT removed: C:\ProgramData\Zentriq and the PostgreSQL database are preserved. See docs/administrator-guide.md for complete removal.

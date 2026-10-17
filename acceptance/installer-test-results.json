@@ -1,0 +1,445 @@
+{
+  "environment": {
+    "os": "Microsoft Windows Server 2022 Datacenter 10.0.20348",
+    "machine": "runnervmgnbhw",
+    "bundle": "Zentriq-Setup-x64.exe",
+    "upgradeBundle": "D:\\a\\zentriq\\zentriq/artifacts/release-upgrade/Zentriq-Setup-x64.exe",
+    "finishedUtc": "2026-10-17T18:48:28.9735648Z"
+  },
+  "results": [
+    {
+      "id": "T01",
+      "test": "First-time installation (silent, answer file)",
+      "outcome": "PASS",
+      "detail": "exit 0 in 1 min",
+      "atUtc": "2026-10-17T18:27:55.9626733Z"
+    },
+    {
+      "id": "T02",
+      "test": "PostgreSQL provisioned as a Windows service",
+      "outcome": "PASS",
+      "detail": "running, loopback-only",
+      "atUtc": "2026-10-17T18:27:56.4154834Z"
+    },
+    {
+      "id": "T32",
+      "test": "Leftover data folder from an earlier failed attempt is set aside, not fatal",
+      "outcome": "PASS",
+      "detail": "moved to postgresql.incomplete-20261017-182657",
+      "atUtc": "2026-10-17T18:27:56.4266691Z"
+    },
+    {
+      "id": "T05",
+      "test": "API and worker services running under virtual accounts",
+      "outcome": "PASS",
+      "detail": "ready: {\"status\":\"ready\",\"checks\":{\"database\":\"ok\",\"schemaVersion\":15,\"expectedSchemaVersion\":15,\"initialized\":true,\"worker\":\"ok\"}}",
+      "atUtc": "2026-10-17T18:27:56.6705635Z"
+    },
+    {
+      "id": "T03",
+      "test": "Database migrations applied",
+      "outcome": "PASS",
+      "detail": "schema version 15",
+      "atUtc": "2026-10-17T18:27:56.6875751Z"
+    },
+    {
+      "id": "T06",
+      "test": "Trial initialized for 14 days",
+      "outcome": "PASS",
+      "detail": "expires 10/31/2026 18:27:55",
+      "atUtc": "2026-10-17T18:27:56.7097847Z"
+    },
+    {
+      "id": "T04",
+      "test": "First administrator can sign in",
+      "outcome": "PASS",
+      "detail": "signed in as admin@ci.zentriq.test",
+      "atUtc": "2026-10-17T18:27:56.9121274Z"
+    },
+    {
+      "id": "T07",
+      "test": "HTTPS certificate is valid and trusted on the server",
+      "outcome": "PASS",
+      "detail": "TLS OK, firewall rule present",
+      "atUtc": "2026-10-17T18:27:57.7052059Z"
+    },
+    {
+      "id": "T22",
+      "test": "Start menu and Desktop shortcuts use the Zentriq icon",
+      "outcome": "PASS",
+      "detail": "Start menu + Desktop shortcuts with zentriq.ico",
+      "atUtc": "2026-10-17T18:27:57.7125961Z"
+    },
+    {
+      "id": "T23",
+      "test": "Web console sign-in page is served (not the placeholder)",
+      "outcome": "PASS",
+      "detail": "index + /assets/index-Y0fDtp7I.js (562 KB)",
+      "atUtc": "2026-10-17T18:27:57.7777593Z"
+    },
+    {
+      "id": "T08",
+      "test": "zentriqctl verify (end-to-end health)",
+      "outcome": "PASS",
+      "detail": "all checks passed",
+      "atUtc": "2026-10-17T18:27:58.1768275Z"
+    },
+    {
+      "id": "T09",
+      "test": "Service restart does not reset the trial",
+      "outcome": "PASS",
+      "detail": "trial unchanged",
+      "atUtc": "2026-10-17T18:28:00.9140933Z"
+    },
+    {
+      "id": "T10",
+      "test": "Repair keeps data and trial",
+      "outcome": "PASS",
+      "detail": "repaired; trial unchanged; sign-in works",
+      "atUtc": "2026-10-17T18:28:46.1172978Z"
+    },
+    {
+      "id": "T11",
+      "test": "Encrypted backup and deep restore validation",
+      "outcome": "PASS",
+      "detail": "zentriq-20261017-182846-ci.zbak (51 KB)",
+      "atUtc": "2026-10-17T18:28:50.3500324Z"
+    },
+    {
+      "id": "T12",
+      "test": "Tampered/unsigned license is rejected",
+      "outcome": "PASS",
+      "detail": "rejected with 422",
+      "atUtc": "2026-10-17T18:28:50.4553151Z"
+    },
+    {
+      "id": "T24",
+      "test": "Trial: every module enabled, 30 devices in total",
+      "outcome": "PASS",
+      "detail": "limits: {\"devices\":30}",
+      "atUtc": "2026-10-17T18:28:50.5390290Z"
+    },
+    {
+      "id": "T25",
+      "test": "Company profile can be edited and read back",
+      "outcome": "PASS",
+      "detail": "profile saved (Zentriq CI Private Limited)",
+      "atUtc": "2026-10-17T18:28:50.6355200Z"
+    },
+    {
+      "id": "T26",
+      "test": "Agent: enrollment code, MSI download from the console, silent install, inventory received",
+      "outcome": "PASS",
+      "detail": "runnervmgnbhw: 73 applications, 16 GB RAM, health online; MSI signature: NotSigned",
+      "atUtc": "2026-10-17T18:28:57.8877185Z"
+    },
+    {
+      "id": "T27",
+      "test": "Agent port serves only the agent API and requires a client certificate",
+      "outcome": "PASS",
+      "detail": "/ 404, /api/v1 404, no cert 401, console port 404, firewall rule present",
+      "atUtc": "2026-10-17T18:28:57.9961939Z"
+    },
+    {
+      "id": "T28",
+      "test": "Agentless WinRM inventory with a stored credential; merges with the agent record",
+      "outcome": "PASS",
+      "detail": "172.22.160.1 via WinRM: 73 applications; assets 1 -> 1; Inventoried runnervmgnbhw over WinRM with credential 'ci-local-admin' (73 software items).",
+      "atUtc": "2026-10-17T18:29:18.0575588Z"
+    },
+    {
+      "id": "T41",
+      "test": "Asset type and address: VM recorded as virtual machine, IPv4 not IPv4-mapped IPv6, logged-on user present",
+      "outcome": "PASS",
+      "detail": "ip 172.22.160.1; type virtual; user 'runnervmgnbhw\\runneradmin'; ipv6 toggle works; dashboard: 1 assets",
+      "atUtc": "2026-10-17T18:29:18.2192883Z"
+    },
+    {
+      "id": "T42",
+      "test": "Collect inventory now for all assets",
+      "outcome": "PASS",
+      "detail": "agents 1, agentless 0: 1 agent(s) will send inventory within about 2 minutes.",
+      "atUtc": "2026-10-17T18:29:18.2919235Z"
+    },
+    {
+      "id": "T43",
+      "test": "Restart a Windows service through the Zentriq Agent",
+      "outcome": "PASS",
+      "detail": "W32Time restarted by the agent (Service restarted.); protected service refused",
+      "atUtc": "2026-10-17T18:29:25.3606319Z"
+    },
+    {
+      "id": "T45",
+      "test": "Uninstall software through the Zentriq Agent (single device), recorded in the Activity log",
+      "outcome": "PASS",
+      "detail": "uninstalled via agent: 'CI Dummy App 1.0' was uninstalled.; protected software refused; removed from inventory",
+      "atUtc": "2026-10-17T18:29:33.1912936Z"
+    },
+    {
+      "id": "T46",
+      "test": "Dashboard drill-down filters and offline timeline on assets",
+      "outcome": "PASS",
+      "detail": "drill-down by type and cores matches the charts; offlineDays 0, online True",
+      "atUtc": "2026-10-17T18:29:48.3409613Z"
+    },
+    {
+      "id": "T29",
+      "test": "Agent revocation is enforced and uninstall removes the agent",
+      "outcome": "PASS",
+      "detail": "revoked agent refused; uninstalled cleanly",
+      "atUtc": "2026-10-17T18:29:49.3766110Z"
+    },
+    {
+      "id": "T44",
+      "test": "Restart a Windows service agentlessly (WinRM, stored credential) on a device without an agent",
+      "outcome": "PASS",
+      "detail": "credential prompt enforced; W32Time restarted over WinRM: Service restarted. (runnervmgnbhw via WinRM, account runnervmgnbhw\\zqscan)",
+      "atUtc": "2026-10-17T18:29:54.5200619Z"
+    },
+    {
+      "id": "T33",
+      "test": "Enrollment code can be shown again later; revoked codes cannot",
+      "outcome": "PASS",
+      "detail": "code shown again; revoked code refused (410); list does not expose codes",
+      "atUtc": "2026-10-17T18:29:54.6361318Z"
+    },
+    {
+      "id": "T34",
+      "test": "Scan history can be deleted (single and by age); assets are kept",
+      "outcome": "PASS",
+      "detail": "single delete 204, then 404; bulk delete ok (0); assets kept (1)",
+      "atUtc": "2026-10-17T18:30:06.8273788Z"
+    },
+    {
+      "id": "T35",
+      "test": "Authenticator-app MFA: QR enrollment, sign-in requires the code, disable",
+      "outcome": "PASS",
+      "detail": "QR SVG returned; sign-in refused without code, accepted with TOTP; MFA turned off again",
+      "atUtc": "2026-10-17T18:31:08.2663173Z"
+    },
+    {
+      "id": "T36",
+      "test": "Forgot password: no account disclosure; zentriqctl reset-password works",
+      "outcome": "PASS",
+      "detail": "options=false, forgot 503 without SMTP, bogus token 400, zentriqctl reset-password then sign-in OK",
+      "atUtc": "2026-10-17T18:32:10.0049871Z"
+    },
+    {
+      "id": "T37",
+      "test": "Active Directory connection: validation and a clear error when no DC answers",
+      "outcome": "PASS",
+      "detail": "invalid DN rejected; no DC: Cannot reach the domain controller at 127.0.0.1:636 (server down, wrong address, firewall, or no LDAPS certificate on the DC / certificate not trusted by this server).; password not returned",
+      "atUtc": "2026-10-17T18:32:12.1263466Z"
+    },
+    {
+      "id": "T48",
+      "test": "Reports: run, group, export (XLSX/CSV), injection-safe filters, save, schedule and deliver",
+      "outcome": "PASS",
+      "detail": "11 datasets, 29 reports; xlsx 2529 bytes; delivery 'failed': E-mail (SMTP) is not configured in System Settings › E-mail; the file is kept in the run history.",
+      "atUtc": "2026-10-17T18:32:17.3310808Z"
+    },
+    {
+      "id": "T49",
+      "test": "Vulnerability management: NVD file import, CPE mapping, evaluation, risk acceptance",
+      "outcome": "PASS",
+      "detail": "import ok; 3 product(s) mapped; 3 finding(s); P2 risk 69; acceptance and re-open OK",
+      "atUtc": "2026-10-17T18:32:32.5442261Z"
+    },
+    {
+      "id": "T50",
+      "test": "Windows vulnerabilities: Microsoft file import, build matching, KB, workflow (in progress, ticket, note, history), remediation plan",
+      "outcome": "PASS",
+      "detail": "1 Windows finding(s) on runnervmgnbhw (10.0.20348.5622); P1 risk 65; workflow + history (3 entries); plan: Install the latest cumulative update for Windows Server 2022 (KB5999999 or later): build 10.0.20348.99999 or higher",
+      "atUtc": "2026-10-17T18:33:02.7159211Z"
+    },
+    {
+      "id": "T51",
+      "test": "Live Microsoft data: 'Update now' loads Windows fixed builds from api.msrc.microsoft.com and evaluates this server",
+      "outcome": "PASS",
+      "detail": "4 monthly update(s) loaded (2 of the last 3 downloaded now): 2057 Windows CVE(s) with fixed builds. This runner: 978 open Windows finding(s); e.g. CVE-2026-96951 fixed by KB5126655 (build 10.0.20348.5761, runner 10.0.20348.5622).",
+      "atUtc": "2026-10-17T18:35:03.2773114Z"
+    },
+    {
+      "id": "T52",
+      "test": "Report analytics: calculations, date grouping, new data sources, PDF, saved report on the dashboard",
+      "outcome": "PASS",
+      "detail": "aggregates and month buckets OK; 3 new data sources; PDF 547939 bytes; report widget saved",
+      "atUtc": "2026-10-17T18:35:03.8547731Z"
+    },
+    {
+      "id": "T53",
+      "test": "Security configuration: Windows settings collected, 30 checks evaluated, score, baseline, exception, report",
+      "outcome": "PASS",
+      "detail": "runnervmgnbhw: score 60; 12 passed, 11 failed (SC-11, SC-05, SC-09, SC-16, SC-19, SC-21, SC-22, SC-25, SC-28, SC-27, SC-29), 1 unknown; baseline + exception + report OK",
+      "atUtc": "2026-10-17T18:35:54.1372982Z"
+    },
+    {
+      "id": "T54",
+      "test": "Integrations: signed webhook and syslog (CEF) channels, test messages, alert rule delivers an event, failures logged",
+      "outcome": "PASS",
+      "detail": "webhook HMAC verified; CEF syslog: <134>1 2026-10-17T18:35:57.321Z runnervmgnbhw Zentriq - test - CEF:0|Zentriq|Zentriq|1.1.1…; rule delivered asset.discovered to 2 channels; failure logged: No connection could be made because the target machine actively refused it.",
+      "atUtc": "2026-10-17T18:37:07.9358222Z"
+    },
+    {
+      "id": "T55",
+      "test": "API tokens: read-only bearer access to report data, permissions limited, revocation",
+      "outcome": "PASS",
+      "detail": "CSV 243 bytes and 1 JSON row(s) with the token; 403 without permission; POST refused; revoked -> 401",
+      "atUtc": "2026-10-17T18:37:08.0855901Z"
+    },
+    {
+      "id": "T56",
+      "test": "Departments: create, assign assets, filter, dashboard and reports, rename, delete",
+      "outcome": "PASS",
+      "detail": "1 asset(s) assigned, filtered, charted and reported; rename and delete OK; duplicate name refused",
+      "atUtc": "2026-10-17T18:37:08.2274212Z"
+    },
+    {
+      "id": "T57",
+      "test": "Change history: software installed, updated and uninstalled on this server is recorded and shown device-wise",
+      "outcome": "PASS",
+      "detail": "runnervmgnbhw: installed 1.0.0 -> updated to 2.0.0 -> uninstalled, all recorded; device-wise summary 4 change(s); report 4 row(s); hardware changes during the test: 0; collected by: collect-now",
+      "atUtc": "2026-10-17T18:37:48.4821130Z"
+    },
+    {
+      "id": "T58",
+      "test": "Company logo: upload (PNG), shown without sign-in, unsafe types refused, removal",
+      "outcome": "PASS",
+      "detail": "PNG stored and served anonymously (70 bytes); SVG refused; removed",
+      "atUtc": "2026-10-17T18:37:48.6269547Z"
+    },
+    {
+      "id": "T59",
+      "test": "Remote support: branded server running, installer, remote agent connects, technician session opens signed in",
+      "outcome": "PASS",
+      "detail": "engine healthy, same certificate as the console (23E4339F...); branded installer 3.5 MB ('Zentriq Remote Support Agent', exit 0); runnervmgnbhw online as Microsoft Windows Server 2022 Datacenter - 21H2/20348; signed-in desktop link opened; control channel by IP 172.22.160.1 accepted, foreign origin refused; forged link refused",
+      "atUtc": "2026-10-17T18:37:59.6537750Z"
+    },
+    {
+      "id": "T60",
+      "test": "Remote support via the Zentriq agent: remove and install the remote agent from the console",
+      "outcome": "PASS",
+      "detail": "removed and reinstalled through the Zentriq agent; runnervmgnbhw online again; 2 successful remote-support action(s) in the Activity log",
+      "atUtc": "2026-10-17T18:42:25.0383142Z"
+    },
+    {
+      "id": "T61",
+      "test": "Server certificate follows the server: local CA, all IP addresses, automatic re-issue with the same key, remote support follows",
+      "outcome": "PASS",
+      "detail": "CA AFE1AFDA... trusted; covers 172.22.160.1, 10.1.1.60 (validated by IP); new name -> re-issued 61BA041E... with the same key in place; remote support switched to it",
+      "atUtc": "2026-10-17T18:42:46.3015023Z"
+    },
+    {
+      "id": "T62",
+      "test": "Devices without an agent: recognised from their web interface; add, device type, duplicates merged (newest kept), delete",
+      "outcome": "PASS",
+      "detail": "web page on 8080 recognised (Recognised as Printer (HP HP LaserJet Pro M404dn)); inventoried computer kept its type (virtual); added mfp, duplicate merged keeping 10.250.0.10; type manual -> automatic; deleted 2 record(s)",
+      "atUtc": "2026-10-17T18:43:00.7300667Z"
+    },
+    {
+      "id": "T13",
+      "test": "Upgrade to the next release preserves data and trial",
+      "outcome": "PASS",
+      "detail": "now 1.1.2.57 (database reports 1.1.2); trial unchanged",
+      "atUtc": "2026-10-17T18:44:08.1247284Z"
+    },
+    {
+      "id": "T47",
+      "test": "Agent update from the console: agent downloads the package over mTLS, verifies it and updates in place",
+      "outcome": "PASS",
+      "detail": "1.1.1.57 -> 1.1.2.57 in place (same registration and certificate, one Apps entry); Activity log: Updated to 1.1.2.57.",
+      "atUtc": "2026-10-17T18:47:16.4551766Z"
+    },
+    {
+      "id": "T14",
+      "test": "Logs contain no administrator password or connection-string passwords",
+      "outcome": "PASS",
+      "detail": "64 log files scanned",
+      "atUtc": "2026-10-17T18:47:17.5440897Z"
+    },
+    {
+      "id": "T15",
+      "test": "Uninstall removes the program but keeps customer data",
+      "outcome": "PASS",
+      "detail": "program removed; data, backups and PostgreSQL kept",
+      "atUtc": "2026-10-17T18:47:42.5990575Z"
+    },
+    {
+      "id": "T16",
+      "test": "Reinstall reuses existing data without resetting the trial",
+      "outcome": "PASS",
+      "detail": "data reused; trial unchanged; sign-in works",
+      "atUtc": "2026-10-17T18:48:28.9690788Z"
+    },
+    {
+      "id": "T17",
+      "test": "Restart of Windows (trial persists across reboot)",
+      "outcome": "NOT RUN",
+      "detail": "CI runners cannot reboot mid-job; covered by T09/T10/T16 persistence checks. Run manually on a VM.",
+      "atUtc": "2026-10-17T18:48:28.9698101Z"
+    },
+    {
+      "id": "T18",
+      "test": "Trial expiry enforcement end-to-end (clock moved past 14 days)",
+      "outcome": "NOT RUN",
+      "detail": "Covered by unit tests (LicenseEvaluator); not run against an installed server.",
+      "atUtc": "2026-10-17T18:48:28.9699855Z"
+    },
+    {
+      "id": "T19",
+      "test": "Valid commercial license activation end-to-end",
+      "outcome": "NOT RUN",
+      "detail": "Requires the vendor private key; signer + verifier covered by unit tests. Run manually with docs/licensing.md.",
+      "atUtc": "2026-10-17T18:48:28.9701038Z"
+    },
+    {
+      "id": "T20",
+      "test": "AD/OU scan and directory sync (computers, users, groups, OUs) in a test domain",
+      "outcome": "NOT RUN",
+      "detail": "No Active Directory domain on CI runners. T37 covers validation and error handling only.",
+      "atUtc": "2026-10-17T18:48:28.9702262Z"
+    },
+    {
+      "id": "T38",
+      "test": "Password reset by e-mail (SMTP delivery and link)",
+      "outcome": "NOT RUN",
+      "detail": "No mail server on CI runners; T36 covers the no-SMTP path and zentriqctl reset-password.",
+      "atUtc": "2026-10-17T18:48:28.9703482Z"
+    },
+    {
+      "id": "T39",
+      "test": "Setup refuses Windows Server 2012 R2 and older",
+      "outcome": "NOT RUN",
+      "detail": "CI has only Windows Server 2022; the bundle/MSI conditions need a manual run on an old VM.",
+      "atUtc": "2026-10-17T18:48:28.9705032Z"
+    },
+    {
+      "id": "T40",
+      "test": "Installation on Windows Server 2016",
+      "outcome": "NOT RUN",
+      "detail": "CI has only Windows Server 2022. Run manually on a Server 2016 VM.",
+      "atUtc": "2026-10-17T18:48:28.9706865Z"
+    },
+    {
+      "id": "T30",
+      "test": "Agentless SSH (Linux) and SNMP collection against real devices",
+      "outcome": "NOT RUN",
+      "detail": "No Linux/SNMP targets on the Windows CI runner; parsers covered by unit tests. Run manually.",
+      "atUtc": "2026-10-17T18:48:28.9708472Z"
+    },
+    {
+      "id": "T31",
+      "test": "Agent over the internet through a firewall/reverse proxy",
+      "outcome": "NOT RUN",
+      "detail": "CI runs agent and server on one machine. Run manually with a published port 8444.",
+      "atUtc": "2026-10-17T18:48:28.9710019Z"
+    },
+    {
+      "id": "T21",
+      "test": "Interactive wizard (UI) walk-through",
+      "outcome": "NOT RUN",
+      "detail": "Silent install exercises the same provisioning; UI pages need a manual run on a VM.",
+      "atUtc": "2026-10-17T18:48:28.9711300Z"
+    }
+  ]
+}

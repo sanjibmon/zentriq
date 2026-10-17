@@ -1,0 +1,72 @@
+﻿2026-10-17T18:48:07.1290305Z INFO Existing Zentriq data found; running as repair (data is preserved).
+2026-10-17T18:48:07.1697663Z INFO Reusing configuration: PostgreSQL bundled at localhost:5432, HTTPS port 443.
+2026-10-17T18:48:07.1698952Z INFO zentriqctl 1.1.2 provisioning (mode repair), data directory C:\ProgramData\Zentriq
+2026-10-17T18:48:07.1735743Z STEP 1/15 System compatibility and prerequisite checks
+2026-10-17T18:48:07.1744272Z PROGRESS 0 System compatibility and prerequisite checks
+2026-10-17T18:48:07.4546601Z INFO Windows 10.0.20348.0, 4 CPUs, 71 GB free on C:\
+2026-10-17T18:48:07.4771962Z INFO OK  System compatibility and prerequisite checks (302 ms)
+2026-10-17T18:48:07.4772670Z STEP 2/15 Prepare data directories and permissions
+2026-10-17T18:48:07.4772821Z PROGRESS 6 Prepare data directories and permissions
+2026-10-17T18:48:07.5251204Z INFO Data root C:\ProgramData\Zentriq secured (services: ZentriqApi, ZentriqWorker).
+2026-10-17T18:48:07.5251875Z INFO OK  Prepare data directories and permissions (47 ms)
+2026-10-17T18:48:07.5251986Z STEP 3/15 Install or connect to PostgreSQL
+2026-10-17T18:48:07.5252531Z PROGRESS 13 Install or connect to PostgreSQL
+2026-10-17T18:48:07.7700538Z INFO PostgreSQL service postgresql-x64-17 already exists; reusing it.
+2026-10-17T18:48:08.5957160Z INFO Connected to PostgreSQL 17.11 at localhost:5432.
+2026-10-17T18:48:08.5994976Z INFO OK  Install or connect to PostgreSQL (1074 ms)
+2026-10-17T18:48:08.5995737Z STEP 4/15 Create database, roles and protected credentials
+2026-10-17T18:48:08.5995837Z PROGRESS 20 Create database, roles and protected credentials
+2026-10-17T18:48:08.6896919Z INFO Updated role zentriq_owner.
+2026-10-17T18:48:08.7002045Z INFO Updated role zentriq_app.
+2026-10-17T18:48:08.7067346Z INFO Database zentriq already exists; it will be preserved and migrated.
+2026-10-17T18:48:08.7903409Z INFO PostgreSQL accepts authenticated connections for the application role.
+2026-10-17T18:48:08.7914954Z INFO OK  Create database, roles and protected credentials (191 ms)
+2026-10-17T18:48:08.7915573Z STEP 5/15 Pre-upgrade backup
+2026-10-17T18:48:08.7915665Z PROGRESS 26 Pre-upgrade backup
+2026-10-17T18:48:08.8314976Z INFO Schema is current; no pre-upgrade backup needed.
+2026-10-17T18:48:08.8316219Z INFO OK  Pre-upgrade backup (40 ms)
+2026-10-17T18:48:08.8316406Z STEP 6/15 Apply database migrations
+2026-10-17T18:48:08.8316494Z PROGRESS 33 Apply database migrations
+2026-10-17T18:48:09.5097786Z INFO Database schema already current.
+2026-10-17T18:48:09.5112140Z INFO OK  Apply database migrations (679 ms)
+2026-10-17T18:48:09.5112613Z STEP 7/15 Configure HTTPS certificate
+2026-10-17T18:48:09.5112693Z PROGRESS 40 Configure HTTPS certificate
+2026-10-17T18:48:09.6422109Z INFO Keeping HTTPS certificate 61BA041ED9BF015E31256A72D3C1524B2CDDFCC6 (expires 2029-01-19).
+2026-10-17T18:48:09.6479700Z INFO OK  Configure HTTPS certificate (136 ms)
+2026-10-17T18:48:09.6480285Z STEP 8/15 Write configuration
+2026-10-17T18:48:09.6480391Z PROGRESS 46 Write configuration
+2026-10-17T18:48:09.6555521Z INFO Configuration written to C:\ProgramData\Zentriq\Config\zentriq.json (no secrets).
+2026-10-17T18:48:09.6557205Z INFO OK  Write configuration (7 ms)
+2026-10-17T18:48:09.6557279Z STEP 9/15 Configure and start Zentriq services
+2026-10-17T18:48:09.6557368Z PROGRESS 53 Configure and start Zentriq services
+2026-10-17T18:48:12.2975080Z INFO ZentriqWorker: Running, ZentriqApi: Running
+2026-10-17T18:48:12.2976604Z INFO OK  Configure and start Zentriq services (2641 ms)
+2026-10-17T18:48:12.2977046Z STEP 10/15 Configure remote support
+2026-10-17T18:48:12.2977169Z PROGRESS 60 Configure remote support
+2026-10-17T18:48:13.6517470Z INFO Remote support service account: User already exists.
+2026-10-17T18:48:13.8962350Z INFO Remote support administrator rights: Done. This command will only work if MeshCentral is stopped.
+2026-10-17T18:48:13.9879355Z INFO Remote support uses the console's HTTPS certificate.
+2026-10-17T18:48:24.6908898Z INFO Remote support is running on port 8446.
+2026-10-17T18:48:24.6910485Z INFO OK  Configure remote support (12393 ms)
+2026-10-17T18:48:24.6910600Z STEP 11/15 Verify API readiness over HTTPS
+2026-10-17T18:48:24.6910812Z PROGRESS 66 Verify API readiness over HTTPS
+2026-10-17T18:48:25.9535455Z INFO API ready: 200 {"status":"ready","checks":{"database":"ok","schemaVersion":15,"expectedSchemaVersion":15,"initialized":true,"worker":"ok"}}
+2026-10-17T18:48:25.9541644Z INFO OK  Verify API readiness over HTTPS (1263 ms)
+2026-10-17T18:48:25.9541948Z STEP 12/15 Verify the worker processes a test job
+2026-10-17T18:48:25.9542014Z PROGRESS 73 Verify the worker processes a test job
+2026-10-17T18:48:27.9872575Z INFO Worker processed self-test job c4da7c52-cf9a-4528-a02b-e65930e10dac.
+2026-10-17T18:48:27.9889365Z INFO OK  Verify the worker processes a test job (2034 ms)
+2026-10-17T18:48:27.9889734Z STEP 13/15 Create the first administrator and start the trial
+2026-10-17T18:48:27.9889835Z PROGRESS 80 Create the first administrator and start the trial
+2026-10-17T18:48:27.9980603Z INFO Installation already initialized; the trial is unchanged.
+2026-10-17T18:48:27.9981541Z INFO OK  Create the first administrator and start the trial (9 ms)
+2026-10-17T18:48:27.9981916Z STEP 14/15 Verify the web console and trial state
+2026-10-17T18:48:27.9982009Z PROGRESS 86 Verify the web console and trial state
+2026-10-17T18:48:28.1669358Z INFO Web console loads; license mode Trial; trial committed.
+2026-10-17T18:48:28.1674113Z INFO OK  Verify the web console and trial state (169 ms)
+2026-10-17T18:48:28.1674322Z STEP 15/15 Register maintenance and backup tasks
+2026-10-17T18:48:28.1674386Z PROGRESS 93 Register maintenance and backup tasks
+2026-10-17T18:48:28.3502373Z INFO Registered scheduled tasks \Zentriq\Maintenance (every 5 min) and \Zentriq\Nightly backup (01:30).
+2026-10-17T18:48:28.3503134Z INFO OK  Register maintenance and backup tasks (182 ms)
+2026-10-17T18:48:28.3503252Z PROGRESS 100 Zentriq is ready
+2026-10-17T18:48:28.3825002Z INFO Zentriq 1.1.2 is ready at https://runnervmgnbhw/
