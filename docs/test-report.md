@@ -1,9 +1,17 @@
 # Test report
 
-Latest: GitHub Actions run 38939906842 (commit `5264740`), workflow `windows-release`, on a GitHub-hosted
-**Windows Server 2022 Datacenter 10.0.20348** VM. Release: `v1.1.1-build.51` (pre-release, **unsigned**), package
-version **1.1.1.51**. Results: unit + PostgreSQL integration tests **148/148 PASS**; installer acceptance
+Latest: GitHub Actions run 39007309810, workflow `windows-release`, on a GitHub-hosted
+**Windows Server 2022 Datacenter 10.0.20348** VM. Release: `v1.1.1-build.52` (pre-release, **unsigned**), package
+version **1.1.1.52**. Results: unit + PostgreSQL integration tests **148/148 PASS**; installer acceptance
 **50 passed, 0 failed, 0 blocked, 10 not run**; in-place updates from published builds and from 1.0.2 PASS.
+
+New in build 52 (remote session opening):
+
+| ID | Test | Result | Detail |
+|---|---|---|---|
+| T59 | Remote support (extended) | **PASS** | port 8446 serves the same certificate as the console; session and installer checks as before |
+| — | Live MeshCentral test, second start | **PASS** | engine presents the console certificate, stays in WAN mode, signed-in link works; session address follows the browser's host (e.g. 192.168.1.8) |
+| — | Reported issue | fixed | session tab opened on the server's computer name with a separate certificate; browsers with HSTS for that name offered no way to continue |
 
 New in build 51 (Remote Management › Remote Support, MeshCentral 1.2.5 engine with Zentriq branding):
 
