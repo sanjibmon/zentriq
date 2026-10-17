@@ -1,9 +1,18 @@
 # Test report
 
-Latest: GitHub Actions run 39007309810, workflow `windows-release`, on a GitHub-hosted
-**Windows Server 2022 Datacenter 10.0.20348** VM. Release: `v1.1.1-build.52` (pre-release, **unsigned**), package
-version **1.1.1.52**. Results: unit + PostgreSQL integration tests **148/148 PASS**; installer acceptance
-**50 passed, 0 failed, 0 blocked, 10 not run**; in-place updates from published builds and from 1.0.2 PASS.
+Latest: GitHub Actions run 39012398399 (commit `fbeb474`), workflow `windows-release`, on a GitHub-hosted
+**Windows Server 2022 Datacenter 10.0.20348** VM. Release: `v1.1.1-build.53` (pre-release, **unsigned**), package
+version **1.1.1.53**. Results: unit + PostgreSQL integration tests **152/152 PASS**; installer acceptance
+**51 passed, 0 failed, 0 blocked, 10 not run**; in-place updates from published builds and from 1.0.2 PASS.
+
+New in build 53 (nothing tied to a fixed server address):
+
+| ID | Test | Result | Detail |
+|---|---|---|---|
+| T61 | Server certificate follows the server | **PASS** | Zentriq Local CA trusted on the server and downloadable without sign-in; certificate covers every IPv4 address (172.26.48.1, 10.1.0.157), each validated by IP without skipping checks; after a host-name change the API re-issued the certificate by itself with the same key, and remote support switched to it |
+| T59 / T60 / T47 / T13 | Remote support, agent update, upgrade | **PASS** | with the CA-issued certificate; agents kept connecting (same key) |
+| — | Unit tests | **PASS** | CA issue/chain, coverage of names and addresses, re-issue keeps the agent key pin, PFX round trip and PEM export for remote support |
+| — | Build 53 first attempt | FAIL → fixed | a certificate issued right after the CA was created started before the CA's validity |
 
 New in build 52 (remote session opening):
 
