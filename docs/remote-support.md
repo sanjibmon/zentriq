@@ -68,15 +68,19 @@ These settings apply to all devices immediately. All are on by default:
 - **Notify the user** when a session starts.
 - **Privacy bar** on the device's screen, with a disconnect button.
 
-## Remote access from outside the network
+## Server address and certificate (nothing is tied to a fixed IP)
 
-Devices connect to `https://<server host>:8446/`. Technicians are sent to port 8446 on the same address they used to open the console (for example `https://192.168.1.8:8446/`), unless `Remote.PublicHost` is set in `zentriq.json` (then run Repair). To support devices outside the LAN, publish port 8446.
+- **Technicians** are sent to port 8446 on the same address they used to open the console (for example `https://192.168.1.8:8446/` today, `https://10.0.5.20:8446/` after the server moves), unless `Remote.PublicHost` is set in `zentriq.json` (then run Repair).
+- **Devices** (Zentriq Agent and remote agent) connect to the server by **name** (`Https.HostName`, by default the server's DNS name), so they keep finding it when its IP address changes. New enrollment codes from *Deploy agent* use the name, not the address of the browser.
+- **Certificate:** Setup creates a **Zentriq Local CA** once (`Secrets\https-ca.pfx`, trusted on the server) and issues the console certificate from it for the server's names, `localhost` and all its IPv4 addresses. The API checks every 5 minutes and when the network changes; when the server has a new name or address it issues a new certificate with the **same key** (agents pin the key) and serves it at once. The remote support service switches to it within a minute.
+- **Technician PCs trust the CA once** (Remote Support › Deployment & settings › *Trust this server*: download, or `Import-Certificate -FilePath .\Zentriq-Local-CA.cer -CertStoreLocation Cert:\LocalMachine\Root`, or Group Policy). After that the console and remote sessions open without warnings at any address the server gets.
+- A customer certificate (thumbprint in Setup) is used as is and not re-issued; remote support uses it too when its key can be exported.
 
-The console's self-signed certificate covers the server's names and its IPv4 addresses. Once a technician's PC trusts it (import it into *Trusted Root Certification Authorities*, or replace it with a CA-issued certificate), both the console and remote sessions open without warnings.
+To support devices outside the LAN, publish port 8446 (and 8444 for the Zentriq Agent).
 
 ## Troubleshooting
 
-- **The session tab shows a certificate error without a way to continue:** the browser has HSTS for the server name (it trusted the console under that name) but did not trust the remote support certificate. Builds before 52 used a separate certificate on port 8446; upgrading fixes it. With build 52 or later, trust the console certificate on the technician PC or open the console by the address the certificate covers.
+- **The session tab shows a certificate error without a way to continue:** the browser has HSTS for the server name (it trusted the console under that name) but did not trust the remote support certificate. Builds before 52 used a separate certificate on port 8446; upgrading fixes it. From build 53, install the Zentriq Local CA once on the technician PC.
 
 - **Status "Not running":** check service `ZentriqRemote` and `<data>\Logs\remote-*.log`. Running Repair from Setup reconfigures it.
 - **"Install" not offered:** the Zentriq Agent on the device is older than this release. Update the agent first (Agents › Update).
