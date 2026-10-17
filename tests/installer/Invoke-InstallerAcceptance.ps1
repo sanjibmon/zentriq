@@ -1074,8 +1074,10 @@ if (-not $installed) {
             $ws = [Net.WebSockets.ClientWebSocket]::new()
             $ws.Options.Cookies = $rs.Cookies
             $ws.Options.SetRequestHeader('Origin', $origin)
-            $ws.Options.RemoteCertificateValidationCallback = { $true }
-            $ws.ConnectAsync([Uri]"wss://${ip}:8446/control.ashx", [Threading.CancellationToken]::None).Wait(20000) | Out-Null
+            # No certificate callback: a PowerShell script block cannot run on the thread pool, and none is needed — port
+            # 8446 serves the console certificate from the Zentriq Local CA, which is trusted here and covers this address.
+            try { $ws.ConnectAsync([Uri]"wss://${ip}:8446/control.ashx", [Threading.CancellationToken]::None).GetAwaiter().GetResult() }
+            catch { $e = $_.Exception; while ($e.InnerException) { $e = $e.InnerException }; return "(connect failed: $($e.Message))" }
             $buf = [byte[]]::new(65536)
             $seg = [ArraySegment[byte]]::new($buf)
             $t = $ws.ReceiveAsync($seg, [Threading.CancellationToken]::None)
@@ -1083,7 +1085,7 @@ if (-not $installed) {
             [Text.Encoding]::UTF8.GetString($buf, 0, $t.Result.Count)
         }
         $okMsg = First-ControlMessage "https://${ip}:8446"
-        Assert ($okMsg -notmatch 'invalidorigin' -and $okMsg -ne '(no message)') "control channel opened by IP ${ip}: $okMsg"
+        Assert ($okMsg -notmatch 'invalidorigin|^\(' ) "control channel opened by IP ${ip}: $okMsg"
         Assert ((First-ControlMessage 'https://evil.example') -match 'invalidorigin') 'a foreign origin was accepted'
         $forged = Invoke-WebRequest ($ses.url -replace 'login=[^&]+', 'login=AAAA') -SkipCertificateCheck -SkipHttpErrorCheck
         Assert ($forged.Content -notmatch 'MainDevDesktop') 'a forged sign-in link was accepted'
