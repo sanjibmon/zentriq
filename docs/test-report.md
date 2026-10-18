@@ -3,7 +3,7 @@
 Latest: GitHub Actions run 39118403672, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
 10.0.20348** VM. Release: `v1.1.1-build.60` (pre-release, **unsigned**), package version **1.1.1.60**. Results: unit +
 PostgreSQL integration tests **188 PASS, 2 skipped** (the live MeshCentral and live SNMP tests run in ci-quick: PASS);
-installer acceptance: see the results file of the run; in-place updates PASS.
+installer acceptance **53 passed, 0 failed, 0 blocked, 10 not run**; in-place updates PASS.
 
 New in build 60 (Network Inventory):
 
