@@ -30,6 +30,49 @@ public sealed class NetworkDeviceInfo
     /// <summary>Stack members / chassis (ENTITY-MIB class chassis).</summary>
     [JsonPropertyName("stackMembers")] public int? StackMembers { get; set; }
     [JsonPropertyName("snmpVersion")] public string? SnmpVersion { get; set; }
+    /// <summary>Memory in use (HOST-RESOURCES-MIB RAM or CISCO-MEMORY-POOL-MIB).</summary>
+    [JsonPropertyName("memoryPercent")] public int? MemoryPercent { get; set; }
+    [JsonPropertyName("memoryTotalMb")] public long? MemoryTotalMb { get; set; }
+    /// <summary>Highest temperature reported by a sensor (°C).</summary>
+    [JsonPropertyName("temperatureC")] public double? TemperatureC { get; set; }
+    /// <summary>ENTITY-SENSOR-MIB readings: temperature, voltage, current, power, fan speed, optical power (transceivers).</summary>
+    [JsonPropertyName("sensors")] public List<NetSensor> Sensors { get; set; } = new();
+    /// <summary>Fans and power supplies with their state (CISCO-ENVMON-MIB, ENTITY-STATE-MIB).</summary>
+    [JsonPropertyName("components")] public List<NetComponent> Components { get; set; } = new();
+    /// <summary>BGP and OSPF neighbours (routers, firewalls, layer-3 switches).</summary>
+    [JsonPropertyName("routingPeers")] public List<NetRoutingPeer> RoutingPeers { get; set; } = new();
+}
+
+public sealed class NetSensor
+{
+    [JsonPropertyName("name")] public string? Name { get; set; }
+    /// <summary>temperature | voltage | current | power | fan | optical | other</summary>
+    [JsonPropertyName("type")] public string Type { get; set; } = "other";
+    [JsonPropertyName("value")] public double? Value { get; set; }
+    /// <summary>°C, V, A, W, rpm, dBm</summary>
+    [JsonPropertyName("unit")] public string? Unit { get; set; }
+    /// <summary>ok | unavailable | nonoperational</summary>
+    [JsonPropertyName("status")] public string? Status { get; set; }
+}
+
+public sealed class NetComponent
+{
+    /// <summary>fan | powerSupply | temperature</summary>
+    [JsonPropertyName("kind")] public string Kind { get; set; } = "fan";
+    [JsonPropertyName("name")] public string? Name { get; set; }
+    /// <summary>normal | warning | critical | shutdown | notPresent | notFunctioning</summary>
+    [JsonPropertyName("status")] public string? Status { get; set; }
+}
+
+public sealed class NetRoutingPeer
+{
+    /// <summary>bgp | ospf</summary>
+    [JsonPropertyName("protocol")] public string Protocol { get; set; } = "bgp";
+    [JsonPropertyName("address")] public string? Address { get; set; }
+    [JsonPropertyName("remoteAs")] public long? RemoteAs { get; set; }
+    /// <summary>BGP: idle … established; OSPF: down … full.</summary>
+    [JsonPropertyName("state")] public string? State { get; set; }
+    [JsonPropertyName("up")] public bool Up { get; set; }
 }
 
 public sealed class NetInterface
@@ -59,6 +102,15 @@ public sealed class NetInterface
     [JsonPropertyName("ipv4")] public List<string> Ipv4 { get; set; } = new();
     /// <summary>Seconds since boot when the port last changed state (ifLastChange).</summary>
     [JsonPropertyName("lastChangeSec")] public long? LastChangeSeconds { get; set; }
+    /// <summary>64-bit octet counters (IF-MIB ifHCIn/OutOctets); traffic rates come from two collections.</summary>
+    [JsonPropertyName("inOctets")] public long? InOctets { get; set; }
+    [JsonPropertyName("outOctets")] public long? OutOctets { get; set; }
+    [JsonPropertyName("inDiscards")] public long? InDiscards { get; set; }
+    [JsonPropertyName("outDiscards")] public long? OutDiscards { get; set; }
+    /// <summary>Spanning tree: forwarding | blocking | listening | learning | disabled | broken.</summary>
+    [JsonPropertyName("stpState")] public string? StpState { get; set; }
+    /// <summary>The link aggregation (port-channel) this port belongs to (ifIndex).</summary>
+    [JsonPropertyName("lagIfIndex")] public int? LagIfIndex { get; set; }
 }
 
 public sealed class NetNeighbor

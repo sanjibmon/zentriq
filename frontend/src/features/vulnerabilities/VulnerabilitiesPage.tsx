@@ -67,7 +67,7 @@ function Overview({ onCve, go }: { onCve: (c: string) => void; go: (t: Tab, extr
         { label: 'Fixed (30 d)', value: k.fixed30.toLocaleString(), sub: 'detected as fixed', to: '/vulnerabilities?tab=findings&status=fixed' },
       ]} />
       <div className="grid-3">
-        <ChartTile id="vuln.severity" title="Open by severity" fallback="donut" centerLabel="open"
+        <ChartTile id="vuln.severity" title="Open by severity" fallback="share" centerLabel="open"
           data={o.data.bySeverity.map((s) => ({ key: s.key, label: cap(s.key), value: s.count, color: SEVERITY_COLOR[s.key] }))} onSelect={(s) => go('findings', `&severity=${s.key}`)} />
         <ChartTile id="vuln.priority" title="Open by priority" sub="Risk-based: CVSS + KEV + EPSS" fallback="bar" centerLabel="open"
           data={o.data.byPriority.map((p) => ({ key: p.key, label: PRIORITY_SHORT[p.key] ?? p.key, value: p.count, color: PRIORITY_COLOR[p.key] }))} onSelect={(s) => go('findings', `&priority=${s.key}`)} />
@@ -76,7 +76,7 @@ function Overview({ onCve, go }: { onCve: (c: string) => void; go: (t: Tab, extr
       </div>
       <div className="grid-2" style={{ marginBottom: 14 }}>
         <AgingTile rows={o.data.aging} onSelect={() => go('findings', '&sort=age')} />
-        <ChartTile id="vuln.source" title="Where they are" sub="Windows itself or installed applications" fallback="donut" centerLabel="open"
+        <ChartTile id="vuln.source" title="Where they are" sub="Windows itself or installed applications" fallback="share" centerLabel="open"
           data={o.data.bySource.map((s) => ({ key: s.key, label: s.key === 'os' ? 'Windows (OS)' : 'Applications', value: s.count, color: s.key === 'os' ? '#2f7dbd' : '#7a5af8' }))} onSelect={(s) => go('findings', `&source=${s.key}`)} />
       </div>
       <Panel title="Findings over the last 30 days" sub="Line: open findings · bars: newly detected">
@@ -106,7 +106,7 @@ function Overview({ onCve, go }: { onCve: (c: string) => void; go: (t: Tab, extr
   );
 }
 
-/** A chart tile whose type (donut, pie, bar, column) the viewer can switch; the choice is remembered. */
+/** A chart tile whose type (share bar, bar, column, pie) the viewer can switch; the choice is remembered. */
 function ChartTile({ id, title, sub, data, onSelect, fallback, centerLabel }: { id: string; title: string; sub?: string; data: Slice[]; onSelect?: (s: Slice) => void; fallback: ChartKind; centerLabel?: string }) {
   const [kind, setKind] = useChartKind(id, fallback);
   return (
@@ -116,7 +116,7 @@ function ChartTile({ id, title, sub, data, onSelect, fallback, centerLabel }: { 
   );
 }
 
-/** Aging: stacked by severity (default) or totals per age bucket as donut, pie, bar or column. */
+/** Aging: stacked by severity (default) or totals per age bucket as a share bar, bar, column or pie. */
 function AgingTile({ rows, onSelect }: { rows: VulnOverview['aging']; onSelect: () => void }) {
   const [kind, setKind] = useChartKind('vuln.aging', 'bar');
   const [stacked, setStacked] = useState(() => { try { return localStorage.getItem('zq.chart.vuln.aging.stacked') !== 'false'; } catch { return true; } });

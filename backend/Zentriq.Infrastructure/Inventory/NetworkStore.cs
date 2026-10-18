@@ -30,8 +30,45 @@ public static class NetworkStore
              ELSE 'none' END
         """;
 
+    /// <summary>A port above this share of its speed (average between two collections) counts as busy.</summary>
+    public const double BusyPercent = 70;
+
+    private sealed record Rate(long? InBps, long? OutBps, double? Util);
+
+    /// <summary>Average traffic since the previous collection, from the 64-bit octet counters (a counter reset gives no rate).</summary>
+    public static (long? InBps, long? OutBps, double? Util) Traffic(decimal? prevIn, decimal? prevOut, DateTime? prevAt, long? inOctets, long? outOctets, DateTime now, long? speedMbps)
+    {
+        if (prevAt is null) return (null, null, null);
+        var secs = (now - prevAt.Value).TotalSeconds;
+        if (secs < 30 || secs > 7 * 86400) return (null, null, null);
+        long? Bps(decimal? before, long? after) => before is { } b && after is { } a && a >= b ? (long)((a - b) * 8 / (decimal)secs) : null;
+        var i = Bps(prevIn, inOctets);
+        var o = Bps(prevOut, outOctets);
+        double? util = speedMbps is > 0 && (i is not null || o is not null)
+            ? Math.Min(100, Math.Round(Math.Max(i ?? 0, o ?? 0) * 100.0 / (speedMbps.Value * 1_000_000.0), 1)) : null;
+        return (i, o, util);
+    }
+
     public static async Task SaveAsync(NpgsqlConnection conn, NpgsqlTransaction tx, Guid assetId, NetworkDeviceInfo n, CancellationToken ct)
     {
+        // Counters of the previous collection, for traffic rates.
+        var previous = new Dictionary<int, (decimal? In, decimal? Out, DateTime? At)>();
+        await using (var prev = new NpgsqlCommand("SELECT if_index, in_octets, out_octets, counters_at FROM zentriq.network_interfaces WHERE asset_id = @a", conn, tx))
+        {
+            prev.Parameters.AddWithValue("a", assetId);
+            await using var r = await prev.ExecuteReaderAsync(ct);
+            while (await r.ReadAsync(ct))
+                previous[r.GetInt32(0)] = (r.IsDBNull(1) ? null : r.GetDecimal(1), r.IsDBNull(2) ? null : r.GetDecimal(2), r.IsDBNull(3) ? null : r.GetFieldValue<DateTime>(3));
+        }
+        var now = DateTime.UtcNow;
+        var rates = n.Interfaces.GroupBy(i => i.Index).ToDictionary(g => g.Key, g =>
+        {
+            var i = g.First();
+            var p = previous.TryGetValue(i.Index, out var x) ? x : default;
+            var t = Traffic(p.In, p.Out, p.At, i.InOctets, i.OutOctets, now, i.SpeedMbps);
+            return new Rate(t.InBps, t.OutBps, t.Util);
+        });
+
         foreach (var t in new[] { "network_interfaces", "network_neighbors", "network_vlans", "network_mac_table", "network_arp", "network_modules", "network_devices" })
         {
             await using var del = new NpgsqlCommand($"DELETE FROM zentriq.{t} WHERE asset_id = @a", conn, tx);
@@ -42,8 +79,10 @@ public static class NetworkStore
         var physical = n.Interfaces.Where(i => i.Type == "ethernet").ToList();
         await using (var cmd = new NpgsqlCommand("""
             INSERT INTO zentriq.network_devices (asset_id, snmp_version, ports_total, ports_up, ports_admin_down, interfaces, vlans, neighbors,
-                mac_entries, arp_entries, ip_forwarding, routes, cpu_percent, poe_budget_w, poe_used_w, stp_root, stack_members, bridge_address, collected_at)
-            VALUES (@a, @v, @pt, @pu, @pd, @i, @vl, @nb, @me, @ae, @fw, @r, @cpu, @pb, @pw, @stp, @sm, @ba, now())
+                mac_entries, arp_entries, ip_forwarding, routes, cpu_percent, poe_budget_w, poe_used_w, stp_root, stack_members, bridge_address, collected_at,
+                memory_percent, memory_total_mb, temperature_c, sensors, components, routing_peers, components_bad, peers_down, busy_ports)
+            VALUES (@a, @v, @pt, @pu, @pd, @i, @vl, @nb, @me, @ae, @fw, @r, @cpu, @pb, @pw, @stp, @sm, @ba, now(),
+                @mem, @memt, @temp, @sens, @comp, @peers, @cbad, @pdown, @busy)
             """, conn, tx))
         {
             cmd.Parameters.AddWithValue("a", assetId);
@@ -64,6 +103,16 @@ public static class NetworkStore
             cmd.Parameters.Add(Nullable("stp", NpgsqlDbType.Boolean, n.StpRoot));
             cmd.Parameters.Add(Nullable("sm", NpgsqlDbType.Integer, n.StackMembers));
             cmd.Parameters.Add(Text("ba", Mac(n.BridgeAddress)));
+            cmd.Parameters.Add(Nullable("mem", NpgsqlDbType.Integer, n.MemoryPercent));
+            cmd.Parameters.Add(Nullable("memt", NpgsqlDbType.Bigint, n.MemoryTotalMb));
+            cmd.Parameters.Add(Nullable("temp", NpgsqlDbType.Numeric, n.TemperatureC is { } tc ? (decimal?)Math.Round((decimal)tc, 1) : null));
+            cmd.Parameters.Add(Json("sens", n.Sensors.Take(256)));
+            cmd.Parameters.Add(Json("comp", n.Components.Take(128)));
+            cmd.Parameters.Add(Json("peers", n.RoutingPeers.Take(512)));
+            cmd.Parameters.AddWithValue("cbad", n.Components.Count(c => c.Status is "warning" or "critical" or "shutdown" or "notFunctioning")
+                                               + n.Sensors.Count(x => x.Status == "nonoperational"));
+            cmd.Parameters.AddWithValue("pdown", n.RoutingPeers.Count(x => !x.Up));
+            cmd.Parameters.AddWithValue("busy", rates.Values.Count(x => x.Util >= BusyPercent));
             await cmd.ExecuteNonQueryAsync(ct);
         }
 
@@ -72,11 +121,14 @@ public static class NetworkStore
         {
             await using var cmd = new NpgsqlCommand("""
                 INSERT INTO zentriq.network_interfaces (asset_id, if_index, name, description, alias, type, mac, admin, oper, speed_mbps, duplex, mtu,
-                    vlan, trunk, poe, in_errors, out_errors, ipv4, last_change_sec)
+                    vlan, trunk, poe, in_errors, out_errors, ipv4, last_change_sec,
+                    in_octets, out_octets, in_discards, out_discards, counters_at, in_bps, out_bps, util_percent, stp_state, lag_if_index)
                 SELECT @a, x.ix, x.nm, x.ds, x.al, x.ty, x.mc, x.ad, x.op, x.sp, x.dp, x.mt, x.vl, x.tr, x.pe, x.ie, x.oe,
-                       CASE WHEN x.ip IS NULL OR x.ip = '' THEN '{}'::text[] ELSE string_to_array(x.ip, ',') END, x.lc
-                FROM unnest(@ix, @nm, @ds, @al, @ty, @mc, @ad, @op, @sp, @dp, @mt, @vl, @tr, @pe, @ie, @oe, @ip, @lc)
-                     AS x(ix, nm, ds, al, ty, mc, ad, op, sp, dp, mt, vl, tr, pe, ie, oe, ip, lc)
+                       CASE WHEN x.ip IS NULL OR x.ip = '' THEN '{}'::text[] ELSE string_to_array(x.ip, ',') END, x.lc,
+                       x.io, x.oo, x.idc, x.odc, CASE WHEN x.io IS NULL AND x.oo IS NULL THEN NULL ELSE @now END, x.ib, x.ob, x.ut, x.st, x.lg
+                FROM unnest(@ix, @nm, @ds, @al, @ty, @mc, @ad, @op, @sp, @dp, @mt, @vl, @tr, @pe, @ie, @oe, @ip, @lc,
+                            @io, @oo, @idc, @odc, @ib, @ob, @ut, @st, @lg)
+                     AS x(ix, nm, ds, al, ty, mc, ad, op, sp, dp, mt, vl, tr, pe, ie, oe, ip, lc, io, oo, idc, odc, ib, ob, ut, st, lg)
                 """, conn, tx);
             cmd.Parameters.AddWithValue("a", assetId);
             cmd.Parameters.AddWithValue("ix", ifs.Select(i => i.Index).ToArray());
@@ -97,6 +149,16 @@ public static class NetworkStore
             cmd.Parameters.Add(Array("oe", NpgsqlDbType.Bigint, ifs.Select(i => i.OutErrors)));
             cmd.Parameters.Add(TextArray("ip", ifs.Select(i => i.Ipv4.Count == 0 ? null : string.Join(",", i.Ipv4.Where(Ip).Take(16)))));
             cmd.Parameters.Add(Array("lc", NpgsqlDbType.Bigint, ifs.Select(i => i.LastChangeSeconds)));
+            cmd.Parameters.Add(Array("io", NpgsqlDbType.Numeric, ifs.Select(i => i.InOctets is { } x ? (decimal?)x : null)));
+            cmd.Parameters.Add(Array("oo", NpgsqlDbType.Numeric, ifs.Select(i => i.OutOctets is { } x ? (decimal?)x : null)));
+            cmd.Parameters.Add(Array("idc", NpgsqlDbType.Bigint, ifs.Select(i => i.InDiscards)));
+            cmd.Parameters.Add(Array("odc", NpgsqlDbType.Bigint, ifs.Select(i => i.OutDiscards)));
+            cmd.Parameters.Add(Array("ib", NpgsqlDbType.Bigint, ifs.Select(i => rates[i.Index].InBps)));
+            cmd.Parameters.Add(Array("ob", NpgsqlDbType.Bigint, ifs.Select(i => rates[i.Index].OutBps)));
+            cmd.Parameters.Add(Array("ut", NpgsqlDbType.Numeric, ifs.Select(i => rates[i.Index].Util is { } u ? (decimal?)u : null)));
+            cmd.Parameters.Add(TextArray("st", ifs.Select(i => i.StpState)));
+            cmd.Parameters.Add(Array("lg", NpgsqlDbType.Integer, ifs.Select(i => i.LagIfIndex)));
+            cmd.Parameters.Add(new NpgsqlParameter("now", NpgsqlDbType.TimestampTz) { Value = now });
             await cmd.ExecuteNonQueryAsync(ct);
         }
 
@@ -280,6 +342,8 @@ public static class NetworkStore
     private static string? Trunc(string? s, int max) => s is null ? null : s.Length <= max ? s : s[..max];
     private static NpgsqlParameter Text(string name, string? value) => new(name, NpgsqlDbType.Text) { Value = (object?)value ?? DBNull.Value };
     private static NpgsqlParameter Nullable<T>(string name, NpgsqlDbType type, T? value) where T : struct => new(name, type) { Value = value.HasValue ? value.Value : DBNull.Value };
+    private static NpgsqlParameter Json<T>(string name, IEnumerable<T> value) =>
+        new(name, NpgsqlDbType.Jsonb) { Value = System.Text.Json.JsonSerializer.Serialize(value.ToList()) };
     private static NpgsqlParameter TextArray(string name, IEnumerable<string?> values) =>
         new(name, NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = values.ToArray() };
     private static NpgsqlParameter Array<T>(string name, NpgsqlDbType type, IEnumerable<T?> values) where T : struct =>
