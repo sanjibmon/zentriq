@@ -301,3 +301,18 @@ button.link:hover { text-decoration: underline; }
 .supply .bar { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; }
 .supply .bar > span { display: block; height: 100%; background: var(--brand, #0e7490); }
 .supply .bar > span.low { background: var(--crit, #b42318); }
+
+/* Network inventory */
+.mini-meter { display: inline-block; vertical-align: middle; width: 46px; height: 5px; background: var(--surface-2); border-radius: 3px; overflow: hidden; margin-left: 4px; }
+.mini-meter i { display: block; height: 100%; background: var(--accent); }
+.topo svg { width: 100%; max-height: 720px; display: block; }
+.topo .edge { stroke: var(--line-strong); stroke-width: 1.4; }
+.topo .edge.on { stroke: var(--accent); stroke-width: 2.4; }
+.topo .edge-label { font-size: 10px; fill: var(--fg); text-anchor: middle; paint-order: stroke; stroke: var(--surface); stroke-width: 3px; }
+.topo .node rect { stroke: var(--surface); stroke-width: 1.5; }
+.topo .node.link { cursor: pointer; }
+.topo .node.link:hover rect { stroke: var(--fg); }
+.topo .node-label { font-size: 10.5px; fill: var(--fg); text-anchor: middle; paint-order: stroke; stroke: var(--surface); stroke-width: 3px; }
+.topo-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; margin-top: 8px; align-items: center; }
+.topo-legend i { display: inline-block; width: 12px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+mark { background: var(--warn-soft); color: inherit; border-radius: 2px; padding: 0 2px; }

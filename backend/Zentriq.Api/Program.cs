@@ -163,6 +163,7 @@ api.MapSetupEndpoints();
 api.MapAuthEndpoints();
 api.MapAccountEndpoints(options);
 api.MapAssetEndpoints();
+api.MapNetworkEndpoints();
 api.MapAssetActionEndpoints();
 api.MapActivityAndUninstallEndpoints();
 api.MapDiscoveryEndpoints();

@@ -33,7 +33,7 @@ public sealed class DiscoveryScanHandler(NpgsqlDataSource ds, IHostPinger pinger
     private static readonly int[] ManagementPorts = [22, 135, 445, 5985, 5986];
     private sealed record DirectorySource(string? Server, string? BaseDn, bool Ldaps, Guid? CredentialId, int? InactiveDays, Guid? ConnectionId = null);
     private sealed record Config(string ScanType, string TargetsText, string ExcludeText, int Concurrency, int TimeoutMs, int[] Ports, List<string> ApprovedScopes, int MaxTargets,
-        Guid[]? CredentialIds = null, DirectorySource? Directory = null, bool? SnmpPublic = null);
+        Guid[]? CredentialIds = null, DirectorySource? Directory = null, bool? SnmpPublic = null, bool? FollowNeighbors = null);
     private List<ScanCredential> _creds = [];
     private bool _snmpPublic = true;
 
@@ -97,42 +97,54 @@ public sealed class DiscoveryScanHandler(NpgsqlDataSource ds, IHostPinger pinger
         var tasks = new List<Task>();
         try
         {
-            foreach (var target in targets)
+            var batch = targets;
+            for (var hop = 0; ; hop++)
             {
-                if (done.Contains(target)) continue;
-                await gate.WaitAsync(ct);
-                tasks.Add(Task.Run(async () =>
+                foreach (var target in batch)
                 {
-                    try
+                    if (done.Contains(target)) continue;
+                    await gate.WaitAsync(ct);
+                    tasks.Add(Task.Run(async () =>
                     {
-                        var r = await ProbeTargetAsync(scanId, target, cfg, timeout, license, ct);
-                        counts.AddOrUpdate(r.Status, 1, (_, n) => n + 1);
-                        if (r.Created) Interlocked.Increment(ref created);
-                        if (r.Updated) Interlocked.Increment(ref updated);
-                        if (r.Status is ScanResultStatus.InventoryFailed or ScanResultStatus.AuthFailed) Interlocked.Increment(ref errors);
-                    }
-                    catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
-                    catch (Exception ex)
-                    {
-                        Interlocked.Increment(ref errors);
-                        logger.LogWarning(ex, "Probe of {Target} failed", target);
-                        await RecordAsync(scanId, target, null, null, ScanResultStatus.InventoryFailed, [], "Probe error: " + ex.Message, null, false, null, CancellationToken.None);
-                    }
-                    finally
-                    {
-                        Interlocked.Increment(ref processed);
-                        gate.Release();
-                    }
-                }, CancellationToken.None));
+                        try
+                        {
+                            var r = await ProbeTargetAsync(scanId, target, cfg, timeout, license, ct);
+                            counts.AddOrUpdate(r.Status, 1, (_, n) => n + 1);
+                            if (r.Created) Interlocked.Increment(ref created);
+                            if (r.Updated) Interlocked.Increment(ref updated);
+                            if (r.Status is ScanResultStatus.InventoryFailed or ScanResultStatus.AuthFailed) Interlocked.Increment(ref errors);
+                        }
+                        catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
+                        catch (Exception ex)
+                        {
+                            Interlocked.Increment(ref errors);
+                            logger.LogWarning(ex, "Probe of {Target} failed", target);
+                            await RecordAsync(scanId, target, null, null, ScanResultStatus.InventoryFailed, [], "Probe error: " + ex.Message, null, false, null, CancellationToken.None);
+                        }
+                        finally
+                        {
+                            Interlocked.Increment(ref processed);
+                            gate.Release();
+                        }
+                    }, CancellationToken.None));
 
-                if ((DateTime.UtcNow - lastReport).TotalSeconds >= 2)
-                {
-                    lastReport = DateTime.UtcNow;
-                    await ProgressAsync(scanId, processed, created, updated, ct);
-                    await context.ProgressAsync(targets.Count == 0 ? 100 : (int)(processed * 100L / targets.Count), $"{processed}/{targets.Count} targets", ct);
+                    if ((DateTime.UtcNow - lastReport).TotalSeconds >= 2)
+                    {
+                        lastReport = DateTime.UtcNow;
+                        await ProgressAsync(scanId, processed, created, updated, ct);
+                        await context.ProgressAsync(targets.Count == 0 ? 100 : (int)(processed * 100L / targets.Count), $"{processed}/{targets.Count} targets", ct);
+                    }
                 }
+                await Task.WhenAll(tasks);
+                // Follow LLDP/CDP neighbours: network devices the found switches and routers report, that were not in the
+                // target list, are scanned too (inside the approved scopes, never excluded addresses; up to 2 hops, 256 devices).
+                if (cfg.ScanType == "ad" || cfg.FollowNeighbors == false || hop >= 2) break;
+                batch = await NeighborTargetsAsync(scanId, cfg, targets, ct);
+                if (batch.Count == 0) break;
+                await context.LogAsync($"Following LLDP/CDP neighbours: {batch.Count} more network device(s): {string.Join(", ", batch.Take(10))}{(batch.Count > 10 ? " …" : "")}", ct: ct);
+                targets.AddRange(batch);
+                await MarkRunningAsync(scanId, targets.Count, processed, ct);
             }
-            await Task.WhenAll(tasks);
         }
         catch (OperationCanceledException)
         {
@@ -149,6 +161,13 @@ public sealed class DiscoveryScanHandler(NpgsqlDataSource ds, IHostPinger pinger
         }
 
         await ProgressAsync(scanId, processed, created, updated, ct);
+        // Link devices found by this scan to the switch ports they are connected to.
+        try
+        {
+            await using var nconn = await ds.OpenConnectionAsync(ct);
+            await NetworkStore.RefreshAsync(nconn, null, ct);
+        }
+        catch (NpgsqlException ex) { logger.LogWarning("Network links could not be refreshed: {Message}", ex.Message); }
         var final = errors > 0 ? "completed_errors" : "completed";
         await FinishAsync(scanId, final, null, ct);
         var summary = string.Join(", ", counts.OrderBy(k => k.Key).Select(k => $"{k.Key}: {k.Value}"));
@@ -462,6 +481,35 @@ public sealed class DiscoveryScanHandler(NpgsqlDataSource ds, IHostPinger pinger
     }
 
     // ---- persistence helpers ----------------------------------------------------------------
+
+    /// <summary>Management addresses of LLDP/CDP neighbours of the devices found by this scan that are not yet targets.</summary>
+    private async Task<List<string>> NeighborTargetsAsync(Guid scanId, Config cfg, List<string> targets, CancellationToken ct)
+    {
+        var known = new HashSet<string>(targets, StringComparer.OrdinalIgnoreCase);
+        var found = new List<string>();
+        await using var cmd = ds.CreateCommand("""
+            SELECT DISTINCT host(nb.remote_address) FROM zentriq.network_neighbors nb
+              JOIN zentriq.scan_results r ON r.asset_id = nb.asset_id AND r.scan_id = @s
+             WHERE nb.remote_address IS NOT NULL AND family(nb.remote_address) = 4
+               AND (nb.capabilities && ARRAY['bridge','router','wlan-ap']::text[] OR cardinality(nb.capabilities) = 0)
+             LIMIT 2048
+            """);
+        cmd.Parameters.AddWithValue("s", scanId);
+        await using (var r = await cmd.ExecuteReaderAsync(ct))
+            while (await r.ReadAsync(ct)) found.Add(r.GetString(0));
+        var result = new List<string>();
+        var already = targets.Count(t => !t.Contains('/'));
+        foreach (var addr in found)
+        {
+            if (known.Contains(addr) || result.Count >= 256) continue;
+            // Same validation as the targets typed in: in the approved scopes and not excluded.
+            var parsed = TargetParser.Parse(addr, cfg.ExcludeText, new ScanSafeguards(cfg.ApprovedScopes, cfg.MaxTargets, 0));
+            if (!parsed.IsValid || !TargetParser.Expand(parsed, 1).Any()) continue;
+            if (already + result.Count >= cfg.MaxTargets) break;
+            result.Add(addr);
+        }
+        return result;
+    }
 
     private async Task<(string Status, string Config)?> LoadScanAsync(Guid id, CancellationToken ct)
     {

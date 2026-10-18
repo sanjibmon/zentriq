@@ -276,6 +276,96 @@ public static class ReportCatalog
                     "(SELECT count(*) FROM zentriq.vuln_findings f WHERE f.software_name = st.name AND f.status IN ('open','in_progress'))", "Security"),
             ]),
 
+        new("network_devices", "Network devices", "One row per switch, router, firewall, access point or other network device.",
+            """
+            zentriq.assets a
+            LEFT JOIN zentriq.network_devices nd ON nd.asset_id = a.id
+            LEFT JOIN zentriq.asset_inventory_documents d ON d.asset_id = a.id
+            LEFT JOIN zentriq.hardware_inventory h ON h.asset_id = a.id
+            WHERE a.status = 'active' AND (a.category = 'network_device' OR nd.asset_id IS NOT NULL)
+            """,
+            [
+                new("manufacturer", "Manufacturer", ReportColumnType.Text, "COALESCE(a.manufacturer, h.vendor)", "Network device"),
+                new("model", "Model", ReportColumnType.Text, "COALESCE(a.model, h.model)", "Network device"),
+                new("serial", "Serial number", ReportColumnType.Text, "COALESCE(h.serial_number, a.serial_number)", "Network device"),
+                new("firmware", "Firmware / software version", ReportColumnType.Text, "d.document #>> '{os,version}'", "Network device"),
+                new("management", "Management", ReportColumnType.Text, Inventory.NetworkStore.ManagementExpr, "Network device"),
+                new("snmp_version", "SNMP version", ReportColumnType.Text, "nd.snmp_version", "Network device"),
+                new("location", "Location", ReportColumnType.Text, "d.document #>> '{device,location}'", "Network device"),
+                new("ports_total", "Ports", ReportColumnType.Number, "COALESCE(nd.ports_total, (d.document #>> '{ports,physical}')::int)", "Ports"),
+                new("ports_up", "Ports up", ReportColumnType.Number, "COALESCE(nd.ports_up, (d.document #>> '{ports,up}')::int)", "Ports"),
+                new("ports_free", "Ports free", ReportColumnType.Number, "(SELECT count(*) FROM zentriq.network_interfaces i WHERE i.asset_id = a.id AND i.type = 'ethernet' AND i.oper <> 'up')", "Ports"),
+                new("port_use_pct", "Port use (%)", ReportColumnType.Number, "round(nd.ports_up * 100.0 / NULLIF(nd.ports_total, 0))", "Ports"),
+                new("ports_disabled", "Ports disabled", ReportColumnType.Number, "nd.ports_admin_down", "Ports"),
+                new("ports_errors", "Ports with errors", ReportColumnType.Number, "(SELECT count(*) FROM zentriq.network_interfaces i WHERE i.asset_id = a.id AND COALESCE(i.in_errors, 0) + COALESCE(i.out_errors, 0) > 0)", "Ports"),
+                new("unmanaged_ports", "Unmanaged switches behind", ReportColumnType.Number, "(SELECT count(*) FROM zentriq.network_interfaces i WHERE i.asset_id = a.id AND i.unmanaged_suspect)", "Ports"),
+                new("vlans", "VLANs", ReportColumnType.Number, "nd.vlans", "Switching"),
+                new("mac_entries", "MAC addresses learned", ReportColumnType.Number, "nd.mac_entries", "Switching"),
+                new("neighbors", "LLDP/CDP neighbours", ReportColumnType.Number, "nd.neighbors", "Switching"),
+                new("stp_root", "Spanning-tree root", ReportColumnType.YesNo, "CASE WHEN nd.stp_root THEN 'yes' WHEN nd.stp_root = false THEN 'no' END", "Switching"),
+                new("stack_members", "Stack members", ReportColumnType.Number, "nd.stack_members", "Switching"),
+                new("routing", "IP routing", ReportColumnType.YesNo, "CASE WHEN nd.ip_forwarding THEN 'yes' WHEN nd.ip_forwarding = false THEN 'no' END", "Routing"),
+                new("routes", "Routes", ReportColumnType.Number, "nd.routes", "Routing"),
+                new("arp_entries", "ARP entries", ReportColumnType.Number, "nd.arp_entries", "Routing"),
+                new("poe_budget", "PoE budget (W)", ReportColumnType.Number, "nd.poe_budget_w", "Power"),
+                new("poe_used", "PoE used (W)", ReportColumnType.Number, "nd.poe_used_w", "Power"),
+                new("cpu", "CPU (%)", ReportColumnType.Number, "nd.cpu_percent", "Health"),
+                new("last_boot", "Last boot", ReportColumnType.Date, "(d.document #>> '{os,lastBoot}')::timestamptz", "Health"),
+                new("collected", "Collected", ReportColumnType.Date, "nd.collected_at", "Health"),
+                new("last_seen", "Last seen", ReportColumnType.Date, "a.last_seen_at", "Health"),
+                .. DeviceColumns,
+            ]),
+
+        new("network_ports", "Switch ports", "One row per port of a network device, with what is connected to it.",
+            """
+            zentriq.network_interfaces i
+            JOIN zentriq.assets a ON a.id = i.asset_id
+            LEFT JOIN zentriq.asset_inventory_documents d ON d.asset_id = a.id
+            LEFT JOIN zentriq.hardware_inventory h ON h.asset_id = a.id
+            WHERE a.status = 'active' AND i.type IN ('ethernet', 'lag', 'wireless')
+            """,
+            [
+                new("port", "Port", ReportColumnType.Text, "i.name", "Port"),
+                new("port_index", "Port index", ReportColumnType.Number, "i.if_index", "Port"),
+                new("port_description", "Port description", ReportColumnType.Text, "COALESCE(NULLIF(i.alias, ''), i.description)", "Port"),
+                new("port_type", "Port type", ReportColumnType.Text, "i.type", "Port"),
+                new("admin_status", "Admin status", ReportColumnType.Text, "i.admin", "Port"),
+                new("oper_status", "Link", ReportColumnType.Text, "i.oper", "Port"),
+                new("speed", "Speed (Mbit/s)", ReportColumnType.Number, "i.speed_mbps", "Port"),
+                new("duplex", "Duplex", ReportColumnType.Text, "i.duplex", "Port"),
+                new("vlan", "VLAN", ReportColumnType.Number, "i.vlan", "Port"),
+                new("trunk", "Trunk", ReportColumnType.YesNo, "CASE WHEN i.trunk THEN 'yes' ELSE 'no' END", "Port"),
+                new("poe", "PoE delivering", ReportColumnType.YesNo, "CASE WHEN i.poe THEN 'yes' WHEN i.poe = false THEN 'no' END", "Port"),
+                new("errors", "Errors", ReportColumnType.Number, "COALESCE(i.in_errors, 0) + COALESCE(i.out_errors, 0)", "Port"),
+                new("mac_count", "Devices learned", ReportColumnType.Number, "i.mac_count", "Connected"),
+                new("connected", "Connected devices", ReportColumnType.Text, "(SELECT string_agg(COALESCE(x ->> 'name', '') || COALESCE(' (' || (x ->> 'ip') || ')', ''), ', ') FROM jsonb_array_elements(i.connected) x)", "Connected"),
+                new("neighbor", "Neighbour (LLDP/CDP)", ReportColumnType.Text, "i.neighbor", "Connected"),
+                new("uplink", "Uplink", ReportColumnType.YesNo, "CASE WHEN i.uplink THEN 'yes' ELSE 'no' END", "Connected"),
+                new("unmanaged", "Unmanaged switch suspected", ReportColumnType.YesNo, "CASE WHEN i.unmanaged_suspect THEN 'yes' ELSE 'no' END", "Connected"),
+                .. DeviceColumns,
+            ]),
+
+        new("network_neighbors", "Network links (LLDP/CDP)", "One row per neighbour reported by a network device: the network topology.",
+            """
+            zentriq.network_neighbors nb
+            JOIN zentriq.assets a ON a.id = nb.asset_id
+            LEFT JOIN zentriq.assets ra ON ra.id = nb.remote_asset_id
+            LEFT JOIN zentriq.asset_inventory_documents d ON d.asset_id = a.id
+            LEFT JOIN zentriq.hardware_inventory h ON h.asset_id = a.id
+            WHERE a.status = 'active'
+            """,
+            [
+                new("protocol", "Protocol", ReportColumnType.Text, "upper(nb.protocol)", "Link"),
+                new("local_port", "Local port", ReportColumnType.Text, "nb.local_port", "Link"),
+                new("remote_name", "Neighbour", ReportColumnType.Text, "COALESCE(nb.remote_name, nb.remote_chassis_id)", "Link"),
+                new("remote_port", "Neighbour port", ReportColumnType.Text, "nb.remote_port", "Link"),
+                new("remote_platform", "Neighbour platform", ReportColumnType.Text, "COALESCE(nb.remote_platform, left(nb.remote_description, 120))", "Link"),
+                new("remote_ip", "Neighbour IP address", ReportColumnType.Text, "host(nb.remote_address)", "Link"),
+                new("capabilities", "Neighbour capabilities", ReportColumnType.Text, "array_to_string(nb.capabilities, ', ')", "Link"),
+                new("remote_inventoried", "Neighbour in inventory", ReportColumnType.YesNo, "CASE WHEN nb.remote_asset_id IS NOT NULL THEN 'yes' ELSE 'no' END", "Link"),
+                .. DeviceColumns,
+            ]),
+
         new("discovery", "Discovery results", "One row per address checked by a discovery scan.",
             """
             zentriq.scan_results r

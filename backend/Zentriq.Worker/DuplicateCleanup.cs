@@ -17,7 +17,7 @@ public sealed class DuplicateCleanup(NpgsqlDataSource ds, AuditWriter audit, ILo
         try { await Task.Delay(TimeSpan.FromMinutes(2), stoppingToken); } catch (OperationCanceledException) { return; }
         while (!stoppingToken.IsCancellationRequested)
         {
-            try { await RunOnceAsync(ds, audit, logger, stoppingToken); }
+            try { await RunOnceAsync(ds, audit, logger, stoppingToken); await RefreshNetworkAsync(ds, stoppingToken); }
             catch (Exception ex) when (ex is NpgsqlException or InvalidOperationException or JsonException)
             {
                 logger.LogWarning("Duplicate clean-up failed: {Message}", ex.Message);
@@ -50,5 +50,12 @@ public sealed class DuplicateCleanup(NpgsqlDataSource ds, AuditWriter audit, ILo
         }
         if (merged > 0) logger.LogInformation("Merged {Count} duplicate device record(s).", merged);
         return merged;
+    }
+
+    /// <summary>Links devices found since the last network scan to the switch ports they are connected to.</summary>
+    public static async Task RefreshNetworkAsync(NpgsqlDataSource ds, CancellationToken ct)
+    {
+        await using var conn = await ds.OpenConnectionAsync(ct);
+        await NetworkStore.RefreshAsync(conn, null, ct);
     }
 }

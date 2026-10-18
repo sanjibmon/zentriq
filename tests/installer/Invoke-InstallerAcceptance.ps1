@@ -119,7 +119,7 @@ Remove-Item $answer -Force   # contains the administrator password
 
 if (-not $installed) {
     foreach ($t in 'T02 PostgreSQL provisioning', 'T03 Database migration', 'T04 Administrator sign-in', 'T05 API and worker services', 'T06 Trial initialization',
-                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent') {
+                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory') {
         Record $t.Substring(0, 3) $t.Substring(4) 'BLOCKED' 'installation failed'
     }
 } else {
@@ -1238,6 +1238,42 @@ if (-not $installed) {
         $r = Invoke-WebRequest "$base/api/v1/assets/$($kept.id)" -WebSession $s -SkipHttpErrorCheck
         Assert ($r.StatusCode -eq 404) "deleted device still readable ($($r.StatusCode))"
         "web page on 8080 recognised ($($res.detail -replace '.*(Recognised as [^:]+).*', '$1')); inventoried computer kept its type ($($me.deviceType)); added mfp, duplicate merged keeping $($kept.ip); type manual -> automatic; deleted 2 record(s)"
+    } | Out-Null
+
+    Check 'T63' 'Network inventory: summary, devices, port search, topology, VLANs, unmanaged switches, firmware, device network view, reports' {
+        $s = Login
+        $sum = Api GET '/network/summary' -Session $s
+        foreach ($k in 'devices', 'byType', 'byManagement', 'portsTotal', 'unmanagedSuspected', 'switchesManaged', 'vlans', 'links', 'speeds') {
+            Assert ($null -ne $sum.PSObject.Properties[$k]) "summary has no '$k'"
+        }
+        $dev = @(Api GET '/network/devices' -Session $s | ForEach-Object { $_ })
+        $sw = @(Api GET '/network/devices?type=switch&management=snmp' -Session $s | ForEach-Object { $_ })
+        $ports = @(Api GET '/network/ports?q=00:1a:2b&filter=up' -Session $s | ForEach-Object { $_ })
+        $links = @(Api GET '/network/neighbors' -Session $s | ForEach-Object { $_ })
+        $vl = @(Api GET '/network/vlans' -Session $s | ForEach-Object { $_ })
+        $un = Api GET '/network/unmanaged' -Session $s
+        Assert ($null -ne $un.PSObject.Properties['inferred'] -and $null -ne $un.PSObject.Properties['notManageable']) 'unmanaged: missing sections'
+        $fw = @(Api GET '/network/firmware' -Session $s | ForEach-Object { $_ })
+        # The network view of any device (here the first asset): which switch port it is connected to.
+        $any = (Api GET '/assets?page=1&pageSize=1' -Session $s).items | Select-Object -First 1
+        if ($any) {
+            $nv = Api GET "/assets/$($any.id)/network" -Session $s
+            Assert ($null -ne $nv.PSObject.Properties['connectedTo'] -and $null -ne $nv.PSObject.Properties['interfaces']) 'device network view incomplete'
+        }
+        # Built-in network reports run.
+        $lib = @(Api GET '/reports' -Session $s | ForEach-Object { $_ } | Where-Object { $_.system -and $_.dataset -like 'network_*' })
+        Assert ($lib.Count -ge 8) "built-in network reports: $($lib.Count)"
+        foreach ($rep in $lib) {
+            $r = Api GET "/reports/$($rep.id)/data" -Session $s
+            Assert ($r.columns.Count -ge 1) "report '$($rep.name)' returned no columns"
+        }
+        # Scans accept the follow-neighbours option.
+        $ip = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -match '^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)' -and $_.PrefixOrigin -ne 'WellKnown' } | Select-Object -First 1).IPAddress
+        $scan = Api POST '/discovery/scans' @{ name = 'ci-follow-neighbours'; scanType = 'single'; targetsText = $ip; followNeighbors = $true } -Session $s
+        $deadline = (Get-Date).AddMinutes(3)
+        do { Start-Sleep 3; $d = Api GET "/discovery/scans/$($scan.id)" -Session $s } while ($d.scan.status -in 'queued', 'running' -and (Get-Date) -lt $deadline)
+        Assert ($d.scan.status -in 'completed', 'completed_errors') "scan with follow neighbours: $($d.scan.status) $($d.scan.error)"
+        "summary: $($sum.devices) network device(s), $($sum.portsTotal) port(s); $($dev.Count) device(s), $($sw.Count) managed switch(es), $($ports.Count) port match(es), $($links.Count) link(s), $($vl.Count) VLAN(s), $(@($un.inferred).Count) unmanaged, $($fw.Count) firmware row(s); $($lib.Count) network reports ran; follow-neighbours scan $($d.scan.status)"
     } | Out-Null
 
     if ($UpgradeBundle) {

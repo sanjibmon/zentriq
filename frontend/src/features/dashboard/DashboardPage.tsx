@@ -10,6 +10,7 @@ import { CategoryChart, CHART_KINDS, HBars, PostureBars, TrendArea, type ChartKi
 import { ReportWidget } from './ReportWidget';
 import { deviceTypeLabel } from '../assets/deviceTypes';
 import { ChangedDevices, type ChangeSummary } from '../inventory/Changes';
+import { type Management, type NetworkSummary } from '../network/types';
 
 const TYPE_LABEL: Record<string, string> = {
   laptop: 'Laptop', desktop: 'Desktop', server: 'Physical server', virtual: 'Virtual machine', other: 'Other hardware',
@@ -69,6 +70,10 @@ const WIDGETS: WidgetDef[] = [
   { id: 'assets.department', chart: 'bar', title: 'Assets by department', defaultOn: true, description: 'Devices per department / unit · click to list them' },
   { id: 'changes.hardware', title: 'Hardware changes', wide: true, defaultOn: true, description: 'Devices whose hardware changed in the last 30 days (memory, disks, CPU, serial…)' },
   { id: 'changes.software', title: 'Software changes', wide: true, defaultOn: true, description: 'Devices with software installed, uninstalled or updated in the last 30 days' },
+  { id: 'network.types', chart: 'donut', title: 'Network devices', defaultOn: true, description: 'Switches, routers, firewalls, access points · click to list them' },
+  { id: 'network.management', chart: 'bar', title: 'Switch management', defaultOn: true, description: 'Managed over SNMP, web interface only, no management, unmanaged switches found behind ports' },
+  { id: 'network.ports', title: 'Switch port usage', defaultOn: true, description: 'Ports in use, free and disabled; link speeds; PoE' },
+  { id: 'network.attention', title: 'Network attention', defaultOn: false, description: 'Unmanaged switches, port errors, half duplex, high CPU, devices not seen' },
   { id: 'assets.seen', chart: 'bar', title: 'Last contact / offline', defaultOn: true, description: 'Online now … offline more than 30 days' },
   { id: 'assets.os', chart: 'bar', title: 'Operating systems', wide: true, defaultOn: true, description: 'Top operating systems' },
   { id: 'security.posture', title: 'Security posture', defaultOn: true, description: 'Encryption, firewall, Secure Boot, TPM, antivirus' },
@@ -104,7 +109,7 @@ const toBody = (layout: Layout) => layout.map((w) => ({
   settings: { ...(w.chart ? { chart: w.chart } : {}), ...(w.reportId ? { reportId: w.reportId } : {}) },
 }));
 /** Widgets added in later releases: shown once on a saved dashboard until the user saves their layout. */
-const NEW_WIDGETS = ['assets.department', 'changes.hardware', 'changes.software'];
+const NEW_WIDGETS = ['assets.department', 'changes.hardware', 'changes.software', 'network.types', 'network.management', 'network.ports'];
 const withNew = (layout: Layout, d: DashboardDto | null): Layout => {
   const seen = d?.filters?.seenWidgets ?? [];
   const add = NEW_WIDGETS.filter((id) => !seen.includes(id) && !layout.some((w) => w.id === id));
@@ -156,6 +161,8 @@ export function DashboardPage() {
   const vulns = useApi(() => (wantsVulns ? api.get<VulnSummary>('/vulnerabilities/overview') : Promise.resolve(null)), [tick, wantsVulns]);
   const wantsChanges = layout.some((w) => w.id.startsWith('changes.'));
   const changes = useApi(() => (wantsChanges ? api.get<ChangeSummary>('/inventory/changes/summary', { days: 30 }) : Promise.resolve(null)), [tick, wantsChanges]);
+  const wantsNetwork = layout.some((w) => w.id.startsWith('network.'));
+  const net = useApi(() => (wantsNetwork ? api.get<NetworkSummary>('/network/summary') : Promise.resolve(null)), [tick, wantsNetwork]);
   const wantsSecurity = layout.some((w) => w.id.startsWith('security.') && w.id !== 'security.posture') && can('security.view');
   const sec = useApi(() => (wantsSecurity ? api.get<SecuritySummary>('/security/overview') : Promise.resolve(null)), [tick, wantsSecurity]);
 
@@ -200,6 +207,51 @@ export function DashboardPage() {
         if (!v) return <div className="chart-empty">Loading…</div>;
         return C(v.aging.map((b) => ({ key: b.bucket, label: b.bucket, value: b.critical + b.high + b.medium + b.low })),
           () => navigate('/vulnerabilities?tab=findings&sort=age'), { centerLabel: 'open' });
+      }
+      case 'network.types':
+      case 'network.management':
+      case 'network.ports':
+      case 'network.attention': {
+        const v = net.data;
+        if (!v) return <div className="chart-empty">{net.error ? net.error.message : 'Loading…'}</div>;
+        if (v.devices === 0) return <div className="chart-empty">No network devices yet. <Link to="/discovery?new=1">Scan your network</Link> with an SNMP credential.</div>;
+        const toNet = (q: string) => () => navigate(`/network?${q}`);
+        if (id === 'network.types')
+          return C(Object.entries(v.byType).sort((a, b) => b[1] - a[1]).map(([t, n]) => ({ key: t, label: deviceTypeLabel(t) ?? fmt.label(t), value: n })),
+            (sl) => navigate(`/network?tab=devices&type=${encodeURIComponent(sl.key)}`), { centerLabel: 'devices' });
+        if (id === 'network.management')
+          return C([
+            { key: 'snmp', label: 'Managed (SNMP)', value: v.switchesManaged, color: 'var(--ok)' },
+            { key: 'web', label: 'Web interface only', value: v.switchesWebOnly, color: 'var(--warn)' },
+            { key: 'none', label: 'No management found', value: v.switchesNoManagement, color: 'var(--line-strong)' },
+            { key: 'unmanaged', label: 'Unmanaged (behind ports)', value: v.unmanagedSuspected, color: 'var(--crit)' },
+          ], (sl) => (sl.key === 'unmanaged' ? navigate('/network?tab=unmanaged') : navigate(`/network?tab=devices&type=switch&management=${sl.key as Management}`)), { centerLabel: 'switches' });
+        if (id === 'network.ports') {
+          const free = v.portsTotal - v.portsUp - v.portsAdminDown;
+          return (
+            <div className="stack-v">
+              <div className="big-stat"><b>{pctOf(v.portsUp, v.portsTotal)}%</b> <span className="muted">of {v.portsTotal.toLocaleString()} switch ports in use</span></div>
+              <HBars data={[
+                { key: 'up', label: 'In use (up)', value: v.portsUp, color: 'var(--ok)' },
+                { key: 'down', label: 'Free (not connected)', value: Math.max(0, free), color: 'var(--info)' },
+                { key: 'disabled', label: 'Disabled', value: v.portsAdminDown, color: 'var(--line-strong)' },
+              ]} max={Math.max(1, v.portsTotal)} onSelect={(sl) => navigate(`/network?tab=ports&filter=${sl.key}`)} />
+              <div className="faint" style={{ fontSize: 12 }}>
+                {Object.entries(v.speeds).filter(([sp]) => sp !== 'unknown').map(([sp, n]) => `${n} at ${sp}`).join(' · ') || 'No link speeds yet'}
+                {v.poeBudgetWatts > 0 ? ` · PoE ${v.poeUsedWatts} of ${v.poeBudgetWatts} W` : ''}
+              </div>
+            </div>
+          );
+        }
+        const items: [string, number, string, string][] = [
+          ['Suspected unmanaged switches', v.unmanagedSuspected, 'tab=unmanaged', 'var(--warn)'],
+          ['Ports with errors', v.portsWithErrors, 'tab=ports&filter=errors', 'var(--crit)'],
+          ['Ports at half duplex', v.portsHalfDuplex, 'tab=ports&filter=halfduplex', 'var(--warn)'],
+          ['Devices with CPU ≥ 80%', v.highCpu, 'tab=devices', 'var(--crit)'],
+          ['Devices not seen 7+ days', v.staleDevices, 'tab=devices', 'var(--warn)'],
+          ['Switches without SNMP management', v.switchesWebOnly + v.switchesNoManagement, 'tab=unmanaged', 'var(--info)'],
+        ];
+        return <HBars data={items.map(([label, n, , color]) => ({ key: label, label, value: n, color }))} onSelect={(sl) => toNet(items.find((x) => x[0] === sl.key)![2])()} />;
       }
       case 'assets.department': {
         const rows = o.byDepartment ?? [];
@@ -317,11 +369,15 @@ export function DashboardPage() {
   const sub: Record<string, string> = {
     'assets.type': 'From hardware inventory', 'assets.trend': 'Green bars = newly discovered', 'security.posture': 'Windows devices · click a colour to list devices',
     'assets.seen': 'Online = agent checked in (45 min); otherwise last scan or inventory', 'agents.health': 'Online = checked in within 45 min; not seen recently = up to 7 days', 'hw.free': 'Lowest free space on any volume', 'scans.results': `${k?.scans30 ?? 0} scans in the last 30 days`,
+    'network.types': net.data ? `${net.data.devices} device(s) · ${net.data.links} LLDP/CDP links` : '',
+    'network.management': 'Switches by how they can be managed', 'network.ports': 'Ethernet ports of managed switches and routers',
   };
   const links: Record<string, ReactNode> = {
     'agents.health': <Link to="/agents" className="btn sm">Agents</Link>, 'software.top': <Link to="/software" className="btn sm">All software</Link>,
     'scans.results': <Link to="/discovery" className="btn sm">Scans</Link>, 'license.usage': <Link to="/licensing" className="btn sm">Details</Link>,
     'scans.recent': <Link to="/discovery" className="btn sm">All scans</Link>,
+    'network.types': <Link to="/network" className="btn sm">Network Inventory</Link>, 'network.ports': <Link to="/network?tab=ports" className="btn sm">Port map</Link>,
+    'network.management': <Link to="/network?tab=unmanaged" className="btn sm">Unmanaged</Link>, 'network.attention': <Link to="/network" className="btn sm">Open</Link>,
   };
 
   return (
