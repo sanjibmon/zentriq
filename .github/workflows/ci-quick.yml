@@ -65,9 +65,9 @@ jobs:
           echo "ZENTRIQ_TEST_MESHCENTRAL=$RUNNER_TEMP/mc" >> "$GITHUB_ENV"
       - name: SNMP agent simulator (snmpsim) for the live SNMP test
         run: |
-          python3 -m pip install --user --break-system-packages --quiet snmpsim 2>&1 | tail -5 | tee snmp.log || true
+          python3 -m pip install --user --break-system-packages --quiet snmpsim pysmi 2>&1 | tail -5 | tee snmp.log || true
           exe="$HOME/.local/bin/snmpsim-command-responder"
-          if [ -x "$exe" ]; then echo "ZENTRIQ_TEST_SNMPSIM=$exe" >> "$GITHUB_ENV"; "$exe" --version 2>&1 | head -3 | tee -a snmp.log || true; else echo "snmpsim not available" | tee -a snmp.log; fi
+          if [ -x "$exe" ] && "$exe" --help >/dev/null 2>>snmp.log; then echo "ZENTRIQ_TEST_SNMPSIM=$exe" >> "$GITHUB_ENV"; "$exe" --version 2>&1 | head -3 | tee -a snmp.log || true; else echo "snmpsim not available" | tee -a snmp.log; fi
       - name: Tests (unit + PostgreSQL)
         env:
           ZENTRIQ_TEST_PG: Host=localhost;Port=5432;Username=postgres;Password=root
