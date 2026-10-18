@@ -1,9 +1,20 @@
 # Test report
 
-Latest: GitHub Actions run 39056576162, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
-10.0.20348** VM. Release: `v1.1.1-build.57` (pre-release, **unsigned**), package version **1.1.1.57**. Results: unit +
-PostgreSQL integration tests **183 PASS, 1 skipped** (live MeshCentral test runs in ci-quick: PASS); installer
-acceptance **52 passed, 0 failed, 0 blocked, 10 not run**; in-place updates PASS.
+Latest: GitHub Actions run 39118403672, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
+10.0.20348** VM. Release: `v1.1.1-build.60` (pre-release, **unsigned**), package version **1.1.1.60**. Results: unit +
+PostgreSQL integration tests **188 PASS, 2 skipped** (the live MeshCentral and live SNMP tests run in ci-quick: PASS);
+installer acceptance: see the results file of the run; in-place updates PASS.
+
+New in build 60 (Network Inventory):
+
+| ID | Test | Result | Detail |
+|---|---|---|---|
+| T63 | Network inventory API, built-in reports, follow-neighbours scan | **PASS** | summary, devices, port search, topology, VLANs, unmanaged, firmware and device network view answer; 8 built-in network reports run; a scan with "follow neighbours" completes |
+| T62 | Devices without an agent (re-run) | **PASS** | the inventoried computer kept its type: a scanned address is now matched to any adapter of an inventoried computer and to its short host name |
+| — | Unit tests | **PASS** | SNMP switch mapping: ports, speed/duplex/errors, access VLAN, trunk, Q-BRIDGE MAC table, ARP, LLDP (management address, capabilities, chassis-id subtypes) and CDP neighbours merged, PoE, CPU, stack, spanning-tree root; access point / switch / router typing; hex octet strings |
+| — | PostgreSQL tests | **PASS** | port links: uplink by LLDP neighbour, PC on its port, unmanaged switch inferred (3 devices, no neighbour, no trunk), printer found behind it; MAC table kept out of the document; re-collection replaces rows |
+| — | Live SNMP test (ci-quick, snmpsim) | **PASS** | the real collector (SNMP v2c GET + GETBULK) reads a simulated access switch end to end |
+| — | Builds 58–59 | FAIL → fixed | T62: a scan of the runner matched a discovered-only record instead of the inventoried computer (product fix in discovery matching) |
 
 New in build 57 (IT Asset Inventory: devices without an agent, device types, duplicates, navigation):
 
