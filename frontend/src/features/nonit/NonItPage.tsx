@@ -197,11 +197,11 @@ function AssetsTab({ tick, summary, categories, departments, canEdit, onOpen, on
                 <th style={{ width: 32 }}><input type="checkbox" className="row-sel" checked={allOn} aria-label="Select all"
                   onChange={(e) => setSel(e.target.checked ? [...new Set([...sel, ...rows.map((r) => r.id)])] : sel.filter((id) => !rows.some((r) => r.id === id)))} /></th>
                 {head('tag', 'Asset tag')}{head('name', 'Name')}{head('category', 'Category')}{head('status', 'Status')}
-                {head('location', 'Location / department')}<th>Assigned to</th>{head('cost', 'Cost')}{head('warranty', 'Warranty')}{head('maintenance', 'Next maintenance')}
+                {head('location', 'Location / department')}<th>Assigned to</th>{head('cost', 'Cost')}{head('maintenance', 'Warranty / maintenance')}
               </tr>
             </thead>
             <tbody>
-              {rows.length === 0 ? <tr><td colSpan={10} className="empty-cell">{data.loading ? 'Loading…' : 'No assets match.'}</td></tr> : rows.map((r) => {
+              {rows.length === 0 ? <tr><td colSpan={9} className="empty-cell">{data.loading ? 'Loading…' : 'No assets match.'}</td></tr> : rows.map((r) => {
                 const w = daysUntil(r.warrantyUntil), m = daysUntil(r.nextMaintenance);
                 return (
                   <tr key={r.id} className="click" onClick={() => onOpen(r.id)}>
@@ -214,8 +214,11 @@ function AssetsTab({ tick, summary, categories, departments, canEdit, onOpen, on
                     <td>{r.location ?? '—'}{r.department && <div className="faint" style={{ fontSize: 12 }}>{r.department}</div>}</td>
                     <td>{r.assignedTo ?? '—'}</td>
                     <td className="num">{money(r.purchaseCost)}</td>
-                    <td>{r.warrantyUntil ? <span style={w != null && w < 0 ? { color: 'var(--muted)' } : w != null && w <= 90 ? { color: 'var(--warn)', fontWeight: 600 } : undefined}>{day(r.warrantyUntil)}</span> : '—'}</td>
-                    <td>{r.nextMaintenance ? <span style={m != null && m < 0 ? { color: 'var(--crit)', fontWeight: 600 } : m != null && m <= 30 ? { color: 'var(--warn)', fontWeight: 600 } : undefined}>{day(r.nextMaintenance)}</span> : '—'}</td>
+                    <td style={{ fontSize: 12.5 }}>
+                      {r.warrantyUntil && <div><span className="faint">Warranty</span> <span style={w != null && w < 0 ? { color: 'var(--muted)' } : w != null && w <= 90 ? { color: 'var(--warn)', fontWeight: 600 } : undefined}>{day(r.warrantyUntil)}</span></div>}
+                      {r.nextMaintenance && <div><span className="faint">Service</span> <span style={m != null && m < 0 ? { color: 'var(--crit)', fontWeight: 600 } : m != null && m <= 30 ? { color: 'var(--warn)', fontWeight: 600 } : undefined}>{day(r.nextMaintenance)}</span></div>}
+                      {!r.warrantyUntil && !r.nextMaintenance && '—'}
+                    </td>
                   </tr>
                 );
               })}
