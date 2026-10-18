@@ -1180,7 +1180,7 @@ if (-not $installed) {
 
     Check 'T62' 'Devices without an agent: recognised from their web interface; add, device type, duplicates merged (newest kept), delete' {
         $s = Login
-        $ip = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -match '^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)' -and $_.PrefixOrigin -ne 'WellKnown' } | Select-Object -First 1).IPAddress
+        $ip = (@(Get-NetIPConfiguration | Where-Object { $_.IPv4DefaultGateway -and $_.NetAdapter.Status -eq 'Up' }) | Select-Object -First 1).IPv4Address[0].IPAddress
         # A printer's web page on port 8080 (what a network printer shows before sign-in).
         $web = Start-Job {
             $l = [Net.HttpListener]::new(); $l.Prefixes.Add('http://+:8080/'); $l.Start()
@@ -1268,7 +1268,7 @@ if (-not $installed) {
             Assert ($r.columns.Count -ge 1) "report '$($rep.name)' returned no columns"
         }
         # Scans accept the follow-neighbours option.
-        $ip = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -match '^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)' -and $_.PrefixOrigin -ne 'WellKnown' } | Select-Object -First 1).IPAddress
+        $ip = (@(Get-NetIPConfiguration | Where-Object { $_.IPv4DefaultGateway -and $_.NetAdapter.Status -eq 'Up' }) | Select-Object -First 1).IPv4Address[0].IPAddress
         $scan = Api POST '/discovery/scans' @{ name = 'ci-follow-neighbours'; scanType = 'single'; targetsText = $ip; followNeighbors = $true } -Session $s
         $deadline = (Get-Date).AddMinutes(3)
         do { Start-Sleep 3; $d = Api GET "/discovery/scans/$($scan.id)" -Session $s } while ($d.scan.status -in 'queued', 'running' -and (Get-Date) -lt $deadline)
