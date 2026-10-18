@@ -9,7 +9,7 @@ import { Callout, ErrorBox, Kpis, PageHead, Pager, Panel, Pill } from '../../com
 import { useDepartments } from '../departments/Departments';
 import { AssetDetails, AssetForm, BulkUpload, errText, printLabels, ScanDialog } from './NonItDialogs';
 import {
-  daysUntil, day, money, STATUSES, statusLabel, statusTone, CONDITIONS,
+  daysUntil, day, money, total, STATUSES, statusLabel, statusTone, CONDITIONS,
   type NonItAsset, type NonItCategory, type NonItField, type NonItSummary,
 } from './types';
 
@@ -50,7 +50,7 @@ export function NonItPage() {
       {s && (
         <Kpis items={[
           { label: 'Assets', value: s.total.toLocaleString(), sub: `${s.items.toLocaleString()} items · ${s.addedLast30} added in 30 days` },
-          { label: 'Purchase value', value: money(s.purchaseValue), sub: `Current value ${money(s.currentValue)}` },
+          { label: 'Purchase value', value: total(s.purchaseValue), sub: `Current value ${total(s.currentValue)}` },
           { label: 'Cover ending in 90 days', value: (s.warranty90 + s.amc90 + s.insurance90).toLocaleString(), sub: `${s.warranty90} warranty · ${s.amc90} AMC · ${s.insurance90} insurance`, to: '/non-it?tab=assets&due=warranty' },
           { label: 'Maintenance due', value: s.maintenance30.toLocaleString(), sub: s.maintenanceOverdue ? `${s.maintenanceOverdue} overdue` : 'next 30 days', to: '/non-it?tab=assets&due=maintenance' },
           { label: 'Disposed', value: s.disposed.toLocaleString(), sub: 'kept for the record', to: '/non-it?tab=assets&status=disposed' },
@@ -128,7 +128,7 @@ function AssetsTab({ tick, summary, categories, departments, canEdit, onOpen, on
           <Panel title="Coming up" sub="Warranty, AMC, insurance and maintenance">
             {summary.upcoming.length === 0 ? <div className="chart-empty">Nothing due in the next 90 days.</div> : (
               <div className="mini-list">
-                {summary.upcoming.map((u, i) => {
+                {summary.upcoming.slice(0, 6).map((u, i) => {
                   const d = daysUntil(u.date) ?? 0;
                   return (
                     <div key={i} className="mi" onClick={() => onOpen(u.id)}>
@@ -197,11 +197,11 @@ function AssetsTab({ tick, summary, categories, departments, canEdit, onOpen, on
                 <th style={{ width: 32 }}><input type="checkbox" className="row-sel" checked={allOn} aria-label="Select all"
                   onChange={(e) => setSel(e.target.checked ? [...new Set([...sel, ...rows.map((r) => r.id)])] : sel.filter((id) => !rows.some((r) => r.id === id)))} /></th>
                 {head('tag', 'Asset tag')}{head('name', 'Name')}{head('category', 'Category')}{head('status', 'Status')}
-                {head('location', 'Location')}{head('department', 'Department')}<th>Assigned to</th>{head('cost', 'Cost')}{head('warranty', 'Warranty')}{head('maintenance', 'Next maintenance')}
+                {head('location', 'Location / department')}<th>Assigned to</th>{head('cost', 'Cost')}{head('warranty', 'Warranty')}{head('maintenance', 'Next maintenance')}
               </tr>
             </thead>
             <tbody>
-              {rows.length === 0 ? <tr><td colSpan={11} className="empty-cell">{data.loading ? 'Loading…' : 'No assets match.'}</td></tr> : rows.map((r) => {
+              {rows.length === 0 ? <tr><td colSpan={10} className="empty-cell">{data.loading ? 'Loading…' : 'No assets match.'}</td></tr> : rows.map((r) => {
                 const w = daysUntil(r.warrantyUntil), m = daysUntil(r.nextMaintenance);
                 return (
                   <tr key={r.id} className="click" onClick={() => onOpen(r.id)}>
@@ -211,8 +211,7 @@ function AssetsTab({ tick, summary, categories, departments, canEdit, onOpen, on
                     <td className="wrap"><b>{r.name}</b>{(r.manufacturer || r.model) && <div className="faint" style={{ fontSize: 12 }}>{[r.manufacturer, r.model].filter(Boolean).join(' ')}</div>}</td>
                     <td>{r.category ?? '—'}<div className="faint" style={{ fontSize: 12 }}>{r.group}</div></td>
                     <td><Pill tone={statusTone(r.status)}>{statusLabel(r.status)}</Pill>{r.quantity !== 1 && <span className="faint"> ×{r.quantity}</span>}</td>
-                    <td>{r.location ?? '—'}</td>
-                    <td>{r.department ?? '—'}</td>
+                    <td>{r.location ?? '—'}{r.department && <div className="faint" style={{ fontSize: 12 }}>{r.department}</div>}</td>
                     <td>{r.assignedTo ?? '—'}</td>
                     <td className="num">{money(r.purchaseCost)}</td>
                     <td>{r.warrantyUntil ? <span style={w != null && w < 0 ? { color: 'var(--muted)' } : w != null && w <= 90 ? { color: 'var(--warn)', fontWeight: 600 } : undefined}>{day(r.warrantyUntil)}</span> : '—'}</td>

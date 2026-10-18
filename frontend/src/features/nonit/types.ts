@@ -34,6 +34,8 @@ export const CONDITIONS: [string, string][] = [['new', 'New'], ['good', 'Good'],
 export const statusLabel = (s: string) => STATUSES.find(([k]) => k === s)?.[1] ?? s;
 export const statusTone = (s: string) => STATUSES.find(([k]) => k === s)?.[2] ?? '';
 export const money = (n: number | null | undefined) => (n == null ? '—' : n.toLocaleString(undefined, { maximumFractionDigits: 2 }));
+/** Totals: whole numbers. */
+export const total = (n: number | null | undefined) => (n == null ? '—' : Math.round(n).toLocaleString());
 export const day = (s: string | null | undefined) => (s ? new Date(`${s.slice(0, 10)}T00:00:00`).toLocaleDateString(undefined, { dateStyle: 'medium' }) : '—');
 export function daysUntil(s: string | null | undefined): number | null {
   if (!s) return null;

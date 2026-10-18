@@ -162,3 +162,14 @@ h4.sec { margin-top: 18px; }
 .cat-list .faint { margin-left: auto; font-variant-numeric: tabular-nums; }
 .cat-list .acts { display: inline-flex; gap: 2px; }
 .cat-list .acts .icon-btn { width: 26px; height: 26px; }
+
+/* ---- Layout polish ---- */
+.app { height: auto; min-height: 100vh; }
+.rail { position: sticky; top: 0; height: 100vh; }
+.topbar { position: sticky; top: 0; }
+.page > .panel { margin-bottom: 14px; }
+.modal-card { display: flex; flex-direction: column; }
+.modal-card > header { position: sticky; top: 0; background: var(--surface); z-index: 2; }
+.modal-card > footer { position: sticky; bottom: 0; background: var(--surface); z-index: 2; box-shadow: 0 -1px 0 var(--line); }
+.steps-v .row-check { display: flex; gap: 8px; align-items: center; margin-top: 6px; font-size: 13.5px; }
+@media (max-width: 760px) { .rail { position: fixed; height: 100%; } }

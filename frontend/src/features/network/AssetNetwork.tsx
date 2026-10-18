@@ -6,6 +6,8 @@ import { DataTable, fmt, Panel, Pill } from '../../components/ui';
 import { ConnectedCell, ManagementPill, TrafficCell } from './NetworkPage';
 import { portState, speedLabel, type AssetNetwork as AssetNetworkData } from './types';
 
+/** "powerSupply" → "Power supply", "notPresent" → "Not present". */
+const human = (s: string | null | undefined) => { if (!s) return '—'; const t = s.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase(); return t[0]!.toUpperCase() + t.slice(1); };
 const yesNo = (b: boolean | null | undefined) => (b == null ? '—' : b ? 'Yes' : 'No');
 
 function KV({ items }: { items: [string, ReactNode][] }) {
@@ -93,13 +95,13 @@ export function AssetNetwork({ assetId }: { assetId: string }) {
               {(n.sensors.length > 0 || n.components.length > 0) && (
                 <Panel flush title="Health" sub="Sensors, fans and power supplies">
                   <DataTable rows={[
-                    ...n.components.map((c, i) => ({ id: `c${i}`, kind: fmt.label(c.kind), name: c.name, value: '', status: c.status })),
-                    ...n.sensors.filter((x) => x.type !== 'optical').map((x, i) => ({ id: `s${i}`, kind: fmt.label(x.type), name: x.name, value: x.value != null ? `${x.value} ${x.unit ?? ''}` : '', status: x.status })),
+                    ...n.components.map((c, i) => ({ id: `c${i}`, kind: human(c.kind), name: c.name, value: '', status: c.status })),
+                    ...n.sensors.filter((x) => x.type !== 'optical').map((x, i) => ({ id: `s${i}`, kind: human(x.type), name: x.name, value: x.value != null ? `${x.value} ${x.unit ?? ''}` : '', status: x.status })),
                   ]} columns={[
                     { key: 'k', label: 'Kind', render: (r) => r.kind },
                     { key: 'n', label: 'Name', className: 'wrap', render: (r) => r.name ?? '—' },
                     { key: 'v', label: 'Reading', render: (r) => <span className="num">{r.value || '—'}</span> },
-                    { key: 's', label: 'State', render: (r) => r.status ? <Pill tone={r.status === 'normal' || r.status === 'ok' ? 'ok' : r.status === 'notPresent' ? '' : 'crit'}>{fmt.label(r.status)}</Pill> : '—' },
+                    { key: 's', label: 'State', render: (r) => r.status ? <Pill tone={r.status === 'normal' || r.status === 'ok' ? 'ok' : r.status === 'notPresent' ? '' : 'crit'}>{human(r.status)}</Pill> : '—' },
                   ]} />
                 </Panel>
               )}
@@ -109,7 +111,7 @@ export function AssetNetwork({ assetId }: { assetId: string }) {
                     { key: 'p', label: 'Protocol', render: (x) => x.protocol.toUpperCase() },
                     { key: 'a', label: 'Neighbour', render: (x) => <span className="mono">{x.address ?? '—'}</span> },
                     { key: 'r', label: 'Remote AS', render: (x) => x.remoteAs ?? '—' },
-                    { key: 's', label: 'State', render: (x) => <Pill tone={x.up ? 'ok' : 'crit'}>{fmt.label(x.state)}</Pill> },
+                    { key: 's', label: 'State', render: (x) => <Pill tone={x.up ? 'ok' : 'crit'}>{human(x.state)}</Pill> },
                   ]} />
                 </Panel>
               )}
@@ -120,7 +122,7 @@ export function AssetNetwork({ assetId }: { assetId: string }) {
               <DataTable rows={n.sensors.filter((x) => x.type === 'optical').map((x, i) => ({ ...x, id: i }))} columns={[
                 { key: 'n', label: 'Sensor', className: 'wrap', render: (x) => x.name ?? '—' },
                 { key: 'v', label: 'Level', render: (x) => <span className="num">{x.value != null ? `${x.value} dBm` : '—'}</span> },
-                { key: 's', label: 'State', render: (x) => x.status ? <Pill tone={x.status === 'ok' ? 'ok' : 'crit'}>{fmt.label(x.status)}</Pill> : '—' },
+                { key: 's', label: 'State', render: (x) => x.status ? <Pill tone={x.status === 'ok' ? 'ok' : 'crit'}>{human(x.status)}</Pill> : '—' },
               ]} />
             </Panel>
           )}
@@ -137,7 +139,7 @@ export function AssetNetwork({ assetId }: { assetId: string }) {
             {n.modules.length > 0 && (
               <Panel flush title="Modules, transceivers, power supplies & fans" sub="From the device's hardware inventory">
                 <DataTable rows={n.modules.map((m, i) => ({ ...m, id: i }))} columns={[
-                  { key: 'c', label: 'Kind', render: (m) => fmt.label(m.class) },
+                  { key: 'c', label: 'Kind', render: (m) => human(m.class) },
                   { key: 'n', label: 'Name / model', className: 'wrap', render: (m) => [m.name, m.model].filter(Boolean).join(' · ') || '—' },
                   { key: 's', label: 'Serial', render: (m) => <span className="mono">{m.serial ?? '—'}</span> },
                   { key: 'f', label: 'Firmware', render: (m) => <span className="mono">{m.firmware ?? '—'}</span> },

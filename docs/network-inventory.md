@@ -53,14 +53,32 @@ Virtual NICs (VMware, Hyper-V, KVM/QEMU, VirtualBox, Xen) and randomised (locall
 | PoE budget and use, PoE per port | POWER-ETHERNET-MIB |
 | CPU | CISCO-PROCESS-MIB, HOST-RESOURCES-MIB |
 | Spanning-tree root | BRIDGE-MIB |
+| Port traffic and utilisation (64-bit counters), discards | IF-MIB `ifHCIn/OutOctets`, `ifIn/OutDiscards` |
+| Spanning-tree state per port (blocking, forwarding …), link aggregation membership | BRIDGE-MIB `dot1dStpPortState`, IEEE8023-LAG-MIB |
+| Memory in use | HOST-RESOURCES-MIB (RAM), CISCO-MEMORY-POOL-MIB |
+| Temperature, voltage, current, power, fan speed, transceiver optical levels (dBm) | ENTITY-SENSOR-MIB |
+| Fans, power supplies and temperature alarms | CISCO-ENVMON-MIB |
+| BGP and OSPF neighbours and their state | BGP4-MIB, OSPF-MIB |
+| Transceivers (SFP, SFP+, QSFP …) with model and serial | ENTITY-MIB |
 
 Reads are GET and bounded GETBULK walks only. The row limits are 8,192 MAC entries, 4,096 ARP entries and 1,024 ports per device. A v2c community that gets no answer is retried with SNMPv1 for older devices.
 
 MAC address and ARP tables are stored in their own tables, not in the device document. Each new collection replaces them.
 
+## Traffic and health
+
+**Traffic.** Each collection stores the port counters. From the second collection on, Zentriq shows the average traffic in and out since the previous collection and the utilisation against the port speed. A port above 70 % counts as **busy**. Schedule the network scan regularly, for example every few hours, to keep these figures meaningful.
+
+**Health.** These problems are counted on the page and the dashboard:
+
+- fans, power supplies or temperatures not normal;
+- BGP or OSPF neighbours that are not established;
+- CPU at 80 % or more, memory at 85 % or more, or temperature at 60 °C or more;
+- ports blocked by spanning tree, ports with errors or discards, and ports running half duplex.
+
 ## The Network Inventory page
 
-- **Tiles**: network devices, managed switches, suspected unmanaged switches, ports in use, PoE use, VLANs and links. A warning appears for ports with errors or half duplex, high CPU, and devices not seen for 7 days.
+- **Tiles**: network devices, managed switches, suspected unmanaged switches, ports in use, PoE use, VLANs and links. Below them is one line listing what needs a look (alarms, neighbours down, busy ports, errors, half duplex, spanning-tree blocks, high CPU, memory or temperature, devices not seen), each linked to the matching list.
 - **Devices**: breakdown by type, management and manufacturer, plus a list with firmware, ports up, VLANs, PoE, CPU, unmanaged switches behind it, and last seen.
 - **Switch ports**: the switch port map.
   - Search a **MAC address** (any notation), an **IP address**, a device name or a port to find where a device is connected.
@@ -73,13 +91,16 @@ MAC address and ARP tables are stored in their own tables, not in the device doc
 On a **device page**, the **Network** tab shows:
 
 - for every device, **Connected to**: the switch and port where its MAC address was learned, with the VLAN, and whether it is behind an unmanaged switch;
-- for network devices, a summary, the ports with connected devices, neighbours, VLANs and modules.
+- for network devices, a summary (CPU, memory, temperature, up time), the ports with traffic and connected devices, neighbours, health (sensors, fans, power supplies), routing neighbours, optical levels, VLANs, and modules and transceivers.
 
 ## Dashboard and reports
 
 **Dashboard widgets.** Customize → Network devices, Switch management, Switch port usage, Network attention. The first three are added to existing dashboards automatically.
 
 **Built-in reports.** Reports & Analytics provides these:
+
+- Network device health
+- Busiest switch ports
 
 - Network device register
 - Network devices by type and management

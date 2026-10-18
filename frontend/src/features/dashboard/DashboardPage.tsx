@@ -11,7 +11,7 @@ import { ReportWidget } from './ReportWidget';
 import { deviceTypeLabel } from '../assets/deviceTypes';
 import { ChangedDevices, type ChangeSummary } from '../inventory/Changes';
 import { type Management, type NetworkSummary } from '../network/types';
-import { money, statusLabel, type NonItSummary } from '../nonit/types';
+import { total, statusLabel, type NonItSummary } from '../nonit/types';
 
 const TYPE_LABEL: Record<string, string> = {
   laptop: 'Laptop', desktop: 'Desktop', server: 'Physical server', virtual: 'Virtual machine', other: 'Other hardware',
@@ -273,7 +273,7 @@ export function DashboardPage() {
         if (id === 'nonit.value')
           return (
             <div className="stack-v">
-              <div className="big-stat"><b>{money(v.purchaseValue)}</b> <span className="muted">purchase value · {money(v.currentValue)} today</span></div>
+              <div className="big-stat"><b>{total(v.purchaseValue)}</b> <span className="muted">purchase value · {total(v.currentValue)} today</span></div>
               <HBars data={v.byStatus.map((x) => ({ key: x.key, label: statusLabel(x.key), value: x.count }))} onSelect={(sl) => navigate(`/non-it?tab=assets&status=${sl.key}`)} />
             </div>
           );
