@@ -118,7 +118,7 @@ public static class NetworkEndpoints
 
         g.MapGet("/neighbors", async (NpgsqlDataSource ds, CancellationToken ct) => await JsonAsync(ds, """
             SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY t."deviceName", t."localPort"), '[]')::text FROM (
-              SELECT nb.asset_id AS "assetId", COALESCE(a.hostname, host(a.primary_ip)) AS "deviceName", nb.protocol AS "protocol",
+              SELECT nb.asset_id AS "assetId", COALESCE(a.hostname, host(a.primary_ip)) AS "deviceName", COALESCE(a.device_type, 'network') AS "deviceType", nb.protocol AS "protocol",
                      nb.local_port AS "localPort", nb.remote_name AS "remoteName", nb.remote_port AS "remotePort", nb.remote_platform AS "remotePlatform",
                      nb.remote_description AS "remoteDescription", host(nb.remote_address) AS "remoteAddress", nb.remote_chassis_id AS "remoteChassisId",
                      nb.capabilities AS "capabilities", nb.remote_asset_id AS "remoteAssetId", ra.hostname AS "remoteAssetName",

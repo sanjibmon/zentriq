@@ -31,13 +31,13 @@ export function TopologyMap({ links }: { links: NetworkLink[] }) {
     const node = (key: string, label: string, assetId: string | null, kind: string, managed: boolean) => {
       let n = map.get(key);
       if (!n) { n = { key, label, assetId, kind, managed, degree: 0, x: 0, y: 0 }; map.set(key, n); }
-      else { if (managed) n.managed = true; if (n.kind === 'other') n.kind = kind; }
+      else { if (managed) n.managed = true; if (n.kind === 'other' || (assetId && kind !== 'other' && n.kind !== kind && key === assetId)) n.kind = kind; }
       return n;
     };
     const seen = new Set<string>();
     const edges: Edge[] = [];
     for (const l of links) {
-      const a = node(l.assetId, l.deviceName ?? l.assetId, l.assetId, 'switch', true);
+      const a = node(l.assetId, l.deviceName ?? l.assetId, l.assetId, kindOf(l.deviceType, []), true);
       const rkey = l.remoteAssetId ?? `n:${(l.remoteName ?? l.remoteChassisId ?? l.remoteAddress ?? '?').toLowerCase()}`;
       const b = node(rkey, l.remoteAssetName ?? l.remoteName ?? l.remoteChassisId ?? '?', l.remoteAssetId, kindOf(l.remoteDeviceType, l.capabilities), l.remoteManaged);
       const id = [a.key, b.key].sort().join('|');

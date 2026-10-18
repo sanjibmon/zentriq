@@ -31,7 +31,7 @@ export interface NetworkPort {
 }
 
 export interface NetworkLink {
-  assetId: string; deviceName: string | null; protocol: 'lldp' | 'cdp'; localPort: string | null; remoteName: string | null; remotePort: string | null;
+  assetId: string; deviceName: string | null; deviceType?: string | null; protocol: 'lldp' | 'cdp'; localPort: string | null; remoteName: string | null; remotePort: string | null;
   remotePlatform: string | null; remoteDescription: string | null; remoteAddress: string | null; remoteChassisId: string | null;
   capabilities: string[]; remoteAssetId: string | null; remoteAssetName: string | null; remoteDeviceType: string | null; remoteManaged: boolean;
 }

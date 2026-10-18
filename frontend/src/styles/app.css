@@ -305,7 +305,7 @@ button.link:hover { text-decoration: underline; }
 /* Network inventory */
 .mini-meter { display: inline-block; vertical-align: middle; width: 46px; height: 5px; background: var(--surface-2); border-radius: 3px; overflow: hidden; margin-left: 4px; }
 .mini-meter i { display: block; height: 100%; background: var(--accent); }
-.topo svg { width: 100%; max-height: 720px; display: block; }
+.topo svg { width: 100%; height: clamp(360px, 60vh, 640px); display: block; }
 .topo .edge { stroke: var(--line-strong); stroke-width: 1.4; }
 .topo .edge.on { stroke: var(--accent); stroke-width: 2.4; }
 .topo .edge-label { font-size: 10px; fill: var(--fg); text-anchor: middle; paint-order: stroke; stroke: var(--surface); stroke-width: 3px; }
