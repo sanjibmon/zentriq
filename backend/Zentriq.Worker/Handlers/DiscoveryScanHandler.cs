@@ -388,9 +388,18 @@ public sealed class DiscoveryScanHandler(NpgsqlDataSource ds, IHostPinger pinger
         await using var tx = await conn.BeginTransactionAsync(ct);
         Guid? existing;
         await using (var find = new NpgsqlCommand("""
-            SELECT id FROM zentriq.assets
-             WHERE status = 'active' AND (primary_ip = @ip OR (@h::text IS NOT NULL AND (lower(hostname) = lower(@h) OR lower(fqdn) = lower(@h))))
-             ORDER BY (primary_ip = @ip) DESC, last_seen_at DESC LIMIT 1 FOR UPDATE
+            WITH m AS (
+                SELECT a.id, a.last_seen_at, a.inventory_status = 'success' AS inventoried,
+                       a.primary_ip = @ip OR EXISTS (
+                           SELECT 1 FROM zentriq.asset_inventory_documents d,
+                                  jsonb_array_elements(CASE WHEN jsonb_typeof(d.document -> 'network') = 'array' THEN d.document -> 'network' ELSE '[]' END) n
+                            WHERE d.asset_id = a.id AND jsonb_typeof(n -> 'ipv4') = 'array' AND n -> 'ipv4' ? host(@ip)) AS by_ip,
+                       @h::text IS NOT NULL AND (lower(a.hostname) = lower(@h) OR lower(a.fqdn) = lower(@h) OR lower(a.hostname) = lower(split_part(@h, '.', 1))) AS by_name
+                  FROM zentriq.assets a
+                 WHERE a.status = 'active')
+            SELECT id FROM m WHERE by_ip OR by_name
+             -- Same address (also any adapter of an inventoried computer) first; an inventoried record before one only discovered.
+             ORDER BY by_ip DESC, inventoried DESC, last_seen_at DESC LIMIT 1
             """, conn, tx))
         {
             find.Parameters.Add(new NpgsqlParameter("ip", NpgsqlDbType.Inet) { Value = ip });
