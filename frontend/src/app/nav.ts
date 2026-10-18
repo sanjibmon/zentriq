@@ -18,6 +18,7 @@ export const NAV: [string, NavItem[]][] = [
     { id: 'assets', label: 'IT Asset Inventory', icon: 'box', path: '/assets', ready: true },
     { id: 'hardware', label: 'Hardware Inventory', icon: 'cpu', path: '/hardware', ready: true },
     { id: 'software', label: 'Software Inventory', icon: 'apps', path: '/software', ready: true },
+    { id: 'network', label: 'Network Inventory', icon: 'network', path: '/network', ready: true },
     { id: 'agents', label: 'Agents', icon: 'host', path: '/agents', ready: true },
     { id: 'activity', label: 'Activity Log', icon: 'activity', path: '/activity', ready: true },
   ]],

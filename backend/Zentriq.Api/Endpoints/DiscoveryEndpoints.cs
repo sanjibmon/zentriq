@@ -13,7 +13,7 @@ namespace Zentriq.Api.Endpoints;
 public static class DiscoveryEndpoints
 {
     public sealed record ScanRequest(string? Name, string ScanType, string? TargetsText, string? ExcludeText, int? Concurrency, int? TimeoutMs, int[]? Ports,
-        Guid[]? CredentialIds = null, DirectorySource? Directory = null, bool? SnmpPublic = null);
+        Guid[]? CredentialIds = null, DirectorySource? Directory = null, bool? SnmpPublic = null, bool? FollowNeighbors = null);
     /// <summary>Active Directory source for scan type "ad": computers under BaseDn become targets.</summary>
     public sealed record DeleteScansBody(Guid[]? Ids, int? OlderThanDays);
     public sealed record DirectorySource(string? Server, string? BaseDn, bool Ldaps, Guid? CredentialId, int? InactiveDays, Guid? ConnectionId = null);
@@ -22,7 +22,7 @@ public static class DiscoveryEndpoints
 
     /// <summary>Persisted scan configuration consumed by the worker (no secrets).</summary>
     public sealed record ScanConfig(string ScanType, string TargetsText, string ExcludeText, int Concurrency, int TimeoutMs, int[] Ports, IReadOnlyList<string> ApprovedScopes, int MaxTargets,
-        Guid[]? CredentialIds = null, DirectorySource? Directory = null, bool? SnmpPublic = null);
+        Guid[]? CredentialIds = null, DirectorySource? Directory = null, bool? SnmpPublic = null, bool? FollowNeighbors = null);
 
     public static readonly int[] DefaultPorts = [22, 80, 135, 139, 443, 445, 3389, 5985, 5986, 161];
     private static readonly string[] SupportedTypes = ["ip", "single", "list", "ad"];
@@ -231,7 +231,7 @@ public static class DiscoveryEndpoints
         var concurrency = Math.Clamp(body.Concurrency ?? sg.DefaultConcurrency, 1, sg.MaxConcurrency);
         var timeout = Math.Clamp(body.TimeoutMs ?? sg.ProbeTimeoutMs, 200, 10_000);
         var ports = (body.Ports is { Length: > 0 } ? body.Ports : DefaultPorts).Where(p => p is > 0 and < 65536).Distinct().Take(32).ToArray();
-        var config = new ScanConfig(body.ScanType, body.TargetsText ?? "", body.ExcludeText ?? "", concurrency, timeout, ports, sg.Safeguards.ApprovedScopes, sg.Safeguards.MaxTargets, credIds, SnmpPublic: body.SnmpPublic);
+        var config = new ScanConfig(body.ScanType, body.TargetsText ?? "", body.ExcludeText ?? "", concurrency, timeout, ports, sg.Safeguards.ApprovedScopes, sg.Safeguards.MaxTargets, credIds, SnmpPublic: body.SnmpPublic, FollowNeighbors: body.FollowNeighbors);
         return await PersistScanAsync(body, config, parsed.TotalAddresses, profileId, db, jobs, rc, ct);
     }
 

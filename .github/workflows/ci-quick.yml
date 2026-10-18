@@ -63,6 +63,11 @@ jobs:
           done
           ls node_modules/meshcentral/agents | tee -a "$log"
           echo "ZENTRIQ_TEST_MESHCENTRAL=$RUNNER_TEMP/mc" >> "$GITHUB_ENV"
+      - name: SNMP agent simulator (snmpsim) for the live SNMP test
+        run: |
+          python3 -m pip install --user --break-system-packages --quiet snmpsim pysmi 2>&1 | tail -5 | tee snmp.log || true
+          exe="$HOME/.local/bin/snmpsim-command-responder"
+          if [ -x "$exe" ] && python3 -c "import snmpsim.commands.responder" 2>>snmp.log; then echo "ZENTRIQ_TEST_SNMPSIM=$exe" >> "$GITHUB_ENV"; "$exe" --version 2>&1 | head -3 | tee -a snmp.log || true; else echo "snmpsim not available" | tee -a snmp.log; fi
       - name: Tests (unit + PostgreSQL)
         env:
           ZENTRIQ_TEST_PG: Host=localhost;Port=5432;Username=postgres;Password=root
@@ -80,7 +85,7 @@ jobs:
         if: always()
         run: |
           d="$RUNNER_TEMP/logs"; mkdir -p "$d"
-          cp build.log test.log mesh.log "$d/" 2>/dev/null || true
+          cp build.log test.log mesh.log snmp.log "$d/" 2>/dev/null || true
           cp frontend/build.log "$d/console.log" 2>/dev/null || true
           if [ -d frontend/dist ]; then cp -r frontend/dist "$d/dist"; fi
           echo "run $GITHUB_RUN_ID commit $GITHUB_SHA branch $GITHUB_REF_NAME status ${{ job.status }}" > "$d/RUN.txt"

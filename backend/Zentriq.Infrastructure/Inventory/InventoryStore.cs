@@ -64,6 +64,11 @@ public sealed class InventoryStore(LicensingService licensing)
         await ReplaceSoftwareAsync(conn, tx, assetId.Value, doc, ct);
         await UpsertDocumentAsync(conn, tx, assetId.Value, doc, ct);
         await AddIdentifiersAsync(conn, tx, assetId.Value, doc, hints, ct);
+        if (doc.NetworkDevice is { } net)
+        {
+            await NetworkStore.SaveAsync(conn, tx, assetId.Value, net, ct);
+            await NetworkStore.RefreshAsync(conn, tx, ct, assetId.Value);
+        }
         await RecordChangesAsync(conn, tx, assetId.Value, InventoryChanges.Compare(prevDoc, prevSoftware, doc), doc.Source, ct);
         await tx.CommitAsync(ct);
         return new(assetId, created, null);
@@ -260,6 +265,8 @@ public sealed class InventoryStore(LicensingService licensing)
         // Software is stored in its own table; keep the document compact.
         var copy = JsonSerializer.SerializeToNode(doc, Json)!.AsObject();
         copy.Remove("software");
+        // The MAC address and ARP tables of network devices are stored in their own tables (they can be large).
+        if (copy["networkDevice"] is System.Text.Json.Nodes.JsonObject net) { net.Remove("macTable"); net.Remove("arp"); }
         await using var cmd = new NpgsqlCommand("""
             INSERT INTO zentriq.asset_inventory_documents (asset_id, source, collected_at, document) VALUES (@id, @s, @t, @d)
             ON CONFLICT (asset_id) DO UPDATE SET source = EXCLUDED.source, collected_at = EXCLUDED.collected_at, document = EXCLUDED.document

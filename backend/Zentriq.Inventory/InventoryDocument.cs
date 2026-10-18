@@ -31,6 +31,8 @@ public sealed class InventoryDocument
     [JsonPropertyName("printer")] public PrinterInfo? Printer { get; set; }
     /// <summary>Switches, routers, firewalls: interface counts and roles (SNMP).</summary>
     [JsonPropertyName("ports")] public PortSummary? Ports { get; set; }
+    /// <summary>Switches, routers, firewalls, access points: ports, neighbours, VLANs, MAC and ARP tables (SNMP).</summary>
+    [JsonPropertyName("networkDevice")] public NetworkDeviceInfo? NetworkDevice { get; set; }
 }
 
 public sealed class DeviceInfo

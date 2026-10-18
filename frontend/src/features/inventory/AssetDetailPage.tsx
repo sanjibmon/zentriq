@@ -12,6 +12,7 @@ import { ChangesView } from './Changes';
 import { DepartmentSelect, useDepartments } from '../departments/Departments';
 import { AssetVulnerabilities } from '../vulnerabilities/AssetVulnerabilities';
 import { DeviceTypeField, useDeleteDevices } from '../assets/DeviceManagement';
+import { AssetNetwork } from '../network/AssetNetwork';
 import { Callout, DataTable, ErrorBox, fmt, Loading, PageHead, Panel, Pill, statusTone } from '../../components/ui';
 
 const yesNo = (b: boolean | null | undefined) => (b == null ? '—' : b ? 'Yes' : 'No');
@@ -195,8 +196,9 @@ export function AssetDetailPage({ id }: { id: string }) {
         </Panel>
       )}
 
-      {tab === 'network' && (
-        <Panel flush>
+      {tab === 'network' && <AssetNetwork assetId={id} />}
+      {tab === 'network' && (a.category !== 'network_device' || (d?.network.length ?? 0) > 0) && (
+        <Panel flush title="Network adapters">
           <DataTable rows={(d?.network ?? []).map((x, i) => ({ ...x, id: i }))} empty="No network data." columns={[
             { key: 'n', label: 'Adapter', className: 'wrap', render: (x) => x.name ?? '—' },
             { key: 'm', label: 'MAC', render: (x) => <span className="mono">{x.mac ?? '—'}</span> },

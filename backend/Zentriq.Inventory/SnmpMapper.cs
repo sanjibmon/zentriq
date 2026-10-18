@@ -164,6 +164,27 @@ public static class SnmpMapper
                 Switching = hasBridge ? true : null,
             };
         }
+        if (!isHostOs && DeviceTypes.CategoryFor(doc.Device.Chassis) == "network_device")
+        {
+            var net = doc.NetworkDevice = NetworkSnmp.Map(v);
+            var caps = NetworkSnmp.LocalCapabilities(v);
+            void Retype(string type, string why) { doc.Device.Chassis = type; (doc.Device.IdentifiedBy ??= new List<string>()).Add(why); }
+            var radios = net.Interfaces.Count(i => i.Type == "wireless");
+            var wired = net.Interfaces.Count(i => i.Type == "ethernet");
+            // Access points bridge too (and so look like switches): radios with few wired ports, or LLDP says so.
+            if (doc.Device.Chassis is "network" or "switch" && (caps.Contains("wlan-ap") && !caps.Contains("router") || radios > 0 && wired <= 4))
+                Retype("access_point", caps.Contains("wlan-ap") ? "LLDP capability: WLAN access point" : "wireless (802.11) radios, few wired ports");
+            else if (doc.Device.Chassis == "network")
+            {
+                if (net.MacTable.Count > 0 || caps.Contains("bridge")) Retype("switch", net.MacTable.Count > 0 ? "MAC address table (switching)" : "LLDP capability: bridge");
+                else if (caps.Contains("router") || net.IpForwarding == true) Retype("router", "routes IP");
+            }
+            if (doc.Ports is not null)
+            {
+                doc.Ports.Routing ??= net.IpForwarding;
+                if (net.MacTable.Count > 0) doc.Ports.Switching = true;
+            }
+        }
         var ips = v.Where(kv => kv.Key.StartsWith(IpAdEntAddr + ".", StringComparison.Ordinal)).Select(kv => kv.Value).Where(a => a != "127.0.0.1").Distinct().ToList();
         if (doc.Network.Count > 0) doc.Network[0].Ipv4.AddRange(ips);
         else doc.Network.Add(new NetworkAdapter { Name = "management", Ipv4 = ips.Count > 0 ? ips : new List<string> { ip } });
