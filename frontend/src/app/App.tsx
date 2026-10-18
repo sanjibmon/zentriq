@@ -9,6 +9,7 @@ import { AgentsPage } from '../features/agents/AgentsPage';
 import { SoftwarePage } from '../features/inventory/SoftwarePage';
 import { HardwarePage } from '../features/inventory/HardwarePage';
 import { NetworkPage } from '../features/network/NetworkPage';
+import { NonItPage } from '../features/nonit/NonItPage';
 import { AssetDetailPage } from '../features/inventory/AssetDetailPage';
 import { ModulePage } from '../features/placeholder/ModulePage';
 import { ReportsPage } from '../features/reports/ReportsPage';
@@ -36,6 +37,7 @@ function Routes() {
   if (path === '/software') return <SoftwarePage />;
   if (path === '/hardware') return <HardwarePage />;
   if (path === '/network') return <NetworkPage />;
+  if (path === '/non-it') return <NonItPage />;
   if (path === '/agents') return <AgentsPage />;
   if (path === '/activity') return <ActivityPage />;
   if (path === '/discovery') return <DiscoveryPage />;

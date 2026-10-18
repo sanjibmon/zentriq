@@ -27,6 +27,9 @@ public static class NetworkEndpoints
                COALESCE(nd.vlans, 0) AS "vlans", COALESCE(nd.neighbors, 0) AS "neighbors", COALESCE(nd.mac_entries, 0) AS "macEntries",
                nd.ip_forwarding AS "routing", nd.routes AS "routes", nd.cpu_percent AS "cpuPercent",
                nd.poe_budget_w AS "poeBudgetWatts", nd.poe_used_w AS "poeUsedWatts", nd.stp_root AS "stpRoot", nd.stack_members AS "stackMembers",
+               nd.memory_percent AS "memoryPercent", nd.memory_total_mb AS "memoryTotalMb", nd.temperature_c AS "temperatureC",
+               COALESCE(nd.components_bad, 0) AS "componentsBad", COALESCE(nd.peers_down, 0) AS "peersDown", COALESCE(nd.busy_ports, 0) AS "busyPorts",
+               jsonb_array_length(COALESCE(nd.routing_peers, '[]')) AS "routingPeers",
                (SELECT count(*) FROM zentriq.network_interfaces i WHERE i.asset_id = a.id AND i.unmanaged_suspect)::int AS "unmanagedPorts",
                (SELECT count(*) FROM zentriq.network_interfaces i WHERE i.asset_id = a.id AND i.type = 'ethernet' AND i.oper = 'up' AND NOT i.uplink AND i.mac_count > 0)::int AS "edgePortsInUse",
                nd.collected_at AS "collectedAt", a.last_seen_at AS "lastSeenAt", dep.name AS "department"
@@ -66,6 +69,15 @@ public static class NetworkEndpoints
                 'firmwareVersions', (SELECT count(DISTINCT (COALESCE(manufacturer, '') || '|' || COALESCE(model, '') || '|' || firmware)) FROM dev WHERE firmware IS NOT NULL),
                 'staleDevices', (SELECT count(*) FROM dev WHERE "lastSeenAt" < now() - interval '7 days'),
                 'highCpu', (SELECT count(*) FROM dev WHERE "cpuPercent" >= 80),
+                'highMemory', (SELECT count(*) FROM dev WHERE "memoryPercent" >= 85),
+                'hotDevices', (SELECT count(*) FROM dev WHERE "temperatureC" >= 60),
+                'componentsBad', (SELECT COALESCE(sum("componentsBad"), 0) FROM dev),
+                'peersDown', (SELECT COALESCE(sum("peersDown"), 0) FROM dev),
+                'routingPeers', (SELECT COALESCE(sum("routingPeers"), 0) FROM dev),
+                'busyPorts', (SELECT count(*) FROM ports WHERE util_percent >= 70),
+                'blockingPorts', (SELECT count(*) FROM ports WHERE stp_state = 'blocking'),
+                'portsWithDiscards', (SELECT count(*) FROM ports WHERE COALESCE(in_discards, 0) + COALESCE(out_discards, 0) > 0),
+                'transceivers', (SELECT count(*) FROM zentriq.network_modules m JOIN zentriq.assets a ON a.id = m.asset_id AND a.status = 'active' WHERE m.class = 'transceiver'),
                 'speeds', (SELECT COALESCE(jsonb_object_agg(s, n), '{}') FROM (SELECT CASE WHEN speed_mbps >= 10000 THEN '10G+' WHEN speed_mbps >= 1000 THEN '1G'
                               WHEN speed_mbps >= 100 THEN '100M' WHEN speed_mbps > 0 THEN '10M' ELSE 'unknown' END s, count(*) n FROM ports WHERE oper = 'up' GROUP BY 1) x)
             )::text
@@ -86,6 +98,8 @@ public static class NetworkEndpoints
                      i.duplex AS "duplex", i.vlan AS "vlan", i.trunk AS "trunk", i.poe AS "poe", i.in_errors AS "inErrors", i.out_errors AS "outErrors",
                      i.mac AS "mac", i.ipv4 AS "ipv4", i.mac_count AS "macCount", i.connected AS "connected", i.neighbor AS "neighbor",
                      i.neighbor_asset_id AS "neighborAssetId", i.uplink AS "uplink", i.unmanaged_suspect AS "unmanagedSuspect",
+                     i.in_bps AS "inBps", i.out_bps AS "outBps", i.util_percent AS "utilPercent", i.in_discards AS "inDiscards", i.out_discards AS "outDiscards",
+                     i.stp_state AS "stpState", i.lag_if_index AS "lagIfIndex",
                      CASE WHEN @q::text IS NULL OR i.uplink THEN NULL ELSE (
                         SELECT jsonb_agg(jsonb_build_object('mac', m.mac::text, 'ip', (SELECT host(r.ip) FROM zentriq.network_arp r WHERE r.mac = m.mac LIMIT 1), 'vlan', m.vlan))
                           FROM zentriq.network_mac_table m WHERE m.asset_id = i.asset_id AND m.if_index = i.if_index
@@ -100,6 +114,9 @@ public static class NetworkEndpoints
                       OR (@filter = 'unmanaged' AND i.unmanaged_suspect) OR (@filter = 'poe' AND i.poe)
                       OR (@filter = 'errors' AND COALESCE(i.in_errors, 0) + COALESCE(i.out_errors, 0) > 0)
                       OR (@filter = 'halfduplex' AND i.oper = 'up' AND i.duplex = 'half')
+                      OR (@filter = 'busy' AND i.util_percent >= 70)
+                      OR (@filter = 'blocking' AND i.stp_state = 'blocking')
+                      OR (@filter = 'discards' AND COALESCE(i.in_discards, 0) + COALESCE(i.out_discards, 0) > 0)
                       OR (@filter = 'unused' AND i.type = 'ethernet' AND i.oper <> 'up' AND i.mac_count = 0))
                  AND (@q::text IS NULL
                       OR i.name ILIKE '%' || @q || '%' OR i.alias ILIKE '%' || @q || '%' OR a.hostname ILIKE '%' || @q || '%' OR i.neighbor ILIKE '%' || @q || '%'
@@ -173,10 +190,14 @@ public static class NetworkEndpoints
                     'type', i.type, 'mac', i.mac, 'admin', i.admin, 'oper', i.oper, 'speedMbps', i.speed_mbps, 'duplex', i.duplex, 'mtu', i.mtu, 'vlan', i.vlan,
                     'trunk', i.trunk, 'poe', i.poe, 'inErrors', i.in_errors, 'outErrors', i.out_errors, 'ipv4', i.ipv4, 'macCount', i.mac_count,
                     'connected', i.connected, 'neighbor', i.neighbor, 'neighborAssetId', i.neighbor_asset_id, 'uplink', i.uplink,
-                    'unmanagedSuspect', i.unmanaged_suspect) ORDER BY i.if_index), '[]') FROM zentriq.network_interfaces i WHERE i.asset_id = @id),
+                    'unmanagedSuspect', i.unmanaged_suspect, 'inBps', i.in_bps, 'outBps', i.out_bps, 'utilPercent', i.util_percent,
+                    'inDiscards', i.in_discards, 'outDiscards', i.out_discards, 'stpState', i.stp_state, 'lagIfIndex', i.lag_if_index) ORDER BY i.if_index), '[]') FROM zentriq.network_interfaces i WHERE i.asset_id = @id),
               'neighbors', (SELECT COALESCE(jsonb_agg(jsonb_build_object('protocol', nb.protocol, 'localPort', nb.local_port, 'remoteName', nb.remote_name,
                     'remotePort', nb.remote_port, 'remotePlatform', nb.remote_platform, 'remoteAddress', host(nb.remote_address), 'capabilities', nb.capabilities,
                     'remoteAssetId', nb.remote_asset_id) ORDER BY nb.local_port), '[]') FROM zentriq.network_neighbors nb WHERE nb.asset_id = @id),
+              'sensors', (SELECT COALESCE(nd.sensors, '[]') FROM zentriq.network_devices nd WHERE nd.asset_id = @id),
+              'components', (SELECT COALESCE(nd.components, '[]') FROM zentriq.network_devices nd WHERE nd.asset_id = @id),
+              'routingPeers', (SELECT COALESCE(nd.routing_peers, '[]') FROM zentriq.network_devices nd WHERE nd.asset_id = @id),
               'vlans', (SELECT COALESCE(jsonb_agg(jsonb_build_object('id', v.vlan_id, 'name', v.name) ORDER BY v.vlan_id), '[]') FROM zentriq.network_vlans v WHERE v.asset_id = @id),
               'modules', (SELECT COALESCE(jsonb_agg(jsonb_build_object('class', m.class, 'name', m.name, 'model', m.model, 'serial', m.serial, 'firmware', m.firmware) ORDER BY m.id), '[]')
                     FROM zentriq.network_modules m WHERE m.asset_id = @id),

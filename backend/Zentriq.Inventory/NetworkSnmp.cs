@@ -61,6 +61,39 @@ public static class NetworkSnmp
     public const string PethMainPseConsumption = "1.3.6.1.2.1.105.1.3.1.1.4";
     public const string PethPsePortDetectionStatus = "1.3.6.1.2.1.105.1.1.1.6";
     public const string HrProcessorLoad = "1.3.6.1.2.1.25.3.3.1.2";
+    // Traffic, discards, spanning tree per port, link aggregation
+    public const string IfInDiscards = "1.3.6.1.2.1.2.2.1.13";
+    public const string IfOutDiscards = "1.3.6.1.2.1.2.2.1.19";
+    public const string IfHcInOctets = "1.3.6.1.2.1.31.1.1.1.6";
+    public const string IfHcOutOctets = "1.3.6.1.2.1.31.1.1.1.10";
+    public const string Dot1dStpPortState = "1.3.6.1.2.1.17.2.15.1.3";
+    public const string Dot3adAggPortAttachedAggId = "1.2.840.10006.300.43.1.2.1.1.13";
+    // Memory: HOST-RESOURCES-MIB storage, CISCO-MEMORY-POOL-MIB
+    public const string HrStorageType = "1.3.6.1.2.1.25.2.3.1.2";
+    public const string HrStorageUnits = "1.3.6.1.2.1.25.2.3.1.4";
+    public const string HrStorageSize = "1.3.6.1.2.1.25.2.3.1.5";
+    public const string HrStorageUsed = "1.3.6.1.2.1.25.2.3.1.6";
+    public const string HrStorageRam = "1.3.6.1.2.1.25.2.1.2";
+    public const string CiscoMemPoolUsed = "1.3.6.1.4.1.9.9.48.1.1.1.5";
+    public const string CiscoMemPoolFree = "1.3.6.1.4.1.9.9.48.1.1.1.6";
+    // ENTITY-SENSOR-MIB
+    public const string EntPhySensorType = "1.3.6.1.2.1.99.1.1.1.1";
+    public const string EntPhySensorScale = "1.3.6.1.2.1.99.1.1.1.2";
+    public const string EntPhySensorPrecision = "1.3.6.1.2.1.99.1.1.1.3";
+    public const string EntPhySensorValue = "1.3.6.1.2.1.99.1.1.1.4";
+    public const string EntPhySensorOperStatus = "1.3.6.1.2.1.99.1.1.1.5";
+    // CISCO-ENVMON-MIB: fans, power supplies, temperature
+    public const string CiscoEnvFanDescr = "1.3.6.1.4.1.9.9.13.1.4.1.2";
+    public const string CiscoEnvFanState = "1.3.6.1.4.1.9.9.13.1.4.1.3";
+    public const string CiscoEnvSupplyDescr = "1.3.6.1.4.1.9.9.13.1.5.1.2";
+    public const string CiscoEnvSupplyState = "1.3.6.1.4.1.9.9.13.1.5.1.3";
+    public const string CiscoEnvTempDescr = "1.3.6.1.4.1.9.9.13.1.3.1.2";
+    public const string CiscoEnvTempValue = "1.3.6.1.4.1.9.9.13.1.3.1.3";
+    public const string CiscoEnvTempState = "1.3.6.1.4.1.9.9.13.1.3.1.6";
+    // BGP4-MIB, OSPF-MIB
+    public const string BgpPeerState = "1.3.6.1.2.1.15.3.1.2";
+    public const string BgpPeerRemoteAs = "1.3.6.1.2.1.15.3.1.9";
+    public const string OspfNbrState = "1.3.6.1.2.1.14.10.1.6";
 
     /// <summary>Scalars read with GET.</summary>
     public static readonly string[] GetOids = { IpCidrRouteNumber, InetCidrRouteNumber, Dot1dStpDesignatedRoot, LldpLocSysCapEnabled };
@@ -77,6 +110,12 @@ public static class NetworkSnmp
         [VtpVlanName] = 4094, [VlanTrunkPortDynamicStatus] = 1024, [CiscoVmVlan] = 1024, [CiscoCpu5Min] = 16,
         [EntPhysicalDescr] = 2048, [EntPhysicalName] = 2048, [PethMainPsePower] = 16, [PethMainPseConsumption] = 16, [PethPsePortDetectionStatus] = 1024,
         [HrProcessorLoad] = 64,
+        [IfInDiscards] = 1024, [IfOutDiscards] = 1024, [IfHcInOctets] = 1024, [IfHcOutOctets] = 1024, [Dot1dStpPortState] = 1024, [Dot3adAggPortAttachedAggId] = 1024,
+        [HrStorageType] = 64, [HrStorageUnits] = 64, [HrStorageSize] = 64, [HrStorageUsed] = 64, [CiscoMemPoolUsed] = 32, [CiscoMemPoolFree] = 32,
+        [EntPhySensorType] = 512, [EntPhySensorScale] = 512, [EntPhySensorPrecision] = 512, [EntPhySensorValue] = 512, [EntPhySensorOperStatus] = 512,
+        [CiscoEnvFanDescr] = 64, [CiscoEnvFanState] = 64, [CiscoEnvSupplyDescr] = 64, [CiscoEnvSupplyState] = 64,
+        [CiscoEnvTempDescr] = 64, [CiscoEnvTempValue] = 64, [CiscoEnvTempState] = 64,
+        [BgpPeerState] = 512, [BgpPeerRemoteAs] = 512, [OspfNbrState] = 512,
     };
 
     /// <summary>Octet strings that are binary: always delivered as hex.</summary>
@@ -105,6 +144,8 @@ public static class NetworkSnmp
                 Duplex = Col(Dot3Duplex) switch { "2" => "half", "3" => "full", "1" => "unknown", _ => null },
                 Mtu = (int?)Long(Col(IfMtu)), InErrors = Long(Col(IfInErrors)), OutErrors = Long(Col(IfOutErrors)),
                 LastChangeSeconds = Long(Col(IfLastChange)) is { } lc ? lc / 100 : null,
+                InOctets = Long(Col(IfHcInOctets)), OutOctets = Long(Col(IfHcOutOctets)),
+                InDiscards = Long(Col(IfInDiscards)), OutDiscards = Long(Col(IfOutDiscards)),
             };
             byIndex[i] = it;
             n.Interfaces.Add(it);
@@ -247,7 +288,103 @@ public static class NetworkSnmp
         n.BridgeAddress = WindowsCollector.NormalizeMac(Get(v, SnmpMapper.Dot1dBaseBridgeAddress));
         var root = Get(v, Dot1dStpDesignatedRoot)?.Replace(" ", "").Replace(":", "");
         if (root is { Length: 16 } && n.BridgeAddress is not null) n.StpRoot = string.Equals(root.Substring(4), n.BridgeAddress.Replace(":", ""), StringComparison.OrdinalIgnoreCase);
+        MapHealth(v, n, byIndex, IfOfPort);
         return n;
+    }
+
+    /// <summary>Port traffic counters, spanning-tree state, aggregation; memory, sensors, fans, power supplies; BGP / OSPF peers.</summary>
+    private static void MapHealth(IReadOnlyDictionary<string, string> v, NetworkDeviceInfo n, Dictionary<int, NetInterface> byIndex, Func<int, int?> ifOfPort)
+    {
+        foreach (var kv in Column(v, Dot1dStpPortState))
+            if (int.TryParse(kv.Key, out var bp) && ifOfPort(bp) is { } ifi && byIndex.TryGetValue(ifi, out var it))
+                it.StpState = kv.Value switch { "1" => "disabled", "2" => "blocking", "3" => "listening", "4" => "learning", "5" => "forwarding", "6" => "broken", _ => null };
+        foreach (var kv in Column(v, Dot3adAggPortAttachedAggId))
+            if (int.TryParse(kv.Key, out var ifi) && int.TryParse(kv.Value, out var agg) && agg > 0 && agg != ifi && byIndex.TryGetValue(ifi, out var it)) it.LagIfIndex = agg;
+
+        // Memory: RAM storage entries, else Cisco memory pools.
+        long total = 0, used = 0;
+        foreach (var kv in Column(v, HrStorageType))
+        {
+            if (kv.Value.TrimStart('.') != HrStorageRam) continue;
+            var units = Long(Get(v, HrStorageUnits + "." + kv.Key)) ?? 1;
+            total += (Long(Get(v, HrStorageSize + "." + kv.Key)) ?? 0) * units;
+            used += (Long(Get(v, HrStorageUsed + "." + kv.Key)) ?? 0) * units;
+        }
+        if (total == 0)
+            foreach (var kv in Column(v, CiscoMemPoolUsed))
+            {
+                var u = Long(kv.Value) ?? 0;
+                var f = Long(Get(v, CiscoMemPoolFree + "." + kv.Key)) ?? 0;
+                used += u; total += u + f;
+            }
+        if (total > 0) { n.MemoryPercent = (int)Math.Round(used * 100.0 / total); n.MemoryTotalMb = total / (1024 * 1024); }
+
+        // ENTITY-SENSOR-MIB: value × 10^(scale exponent) / 10^precision.
+        foreach (var kv in Column(v, EntPhySensorType).Take(512))
+        {
+            var (type, unit) = kv.Value switch
+            {
+                "8" => ("temperature", "°C"), "3" or "4" => ("voltage", "V"), "5" => ("current", "A"), "6" => ("power", "W"),
+                "10" => ("fan", "rpm"), "14" => ("optical", "dBm"), _ => ("other", (string?)null),
+            };
+            if (type == "other") continue;
+            var raw = Long(Get(v, EntPhySensorValue + "." + kv.Key));
+            if (raw is null) continue;
+            var scale = (int)(Long(Get(v, EntPhySensorScale + "." + kv.Key)) ?? 9);   // 9 = units
+            var precision = (int)(Long(Get(v, EntPhySensorPrecision + "." + kv.Key)) ?? 0);
+            var value = raw.Value * Math.Pow(10, (scale - 9) * 3) / Math.Pow(10, precision);
+            if (type == "optical" && precision == 0 && Math.Abs(value) > 100) value /= 10;           // some report tenths of dBm
+            var status = Get(v, EntPhySensorOperStatus + "." + kv.Key) switch { "1" => "ok", "2" => "unavailable", "3" => "nonoperational", _ => null };
+            n.Sensors.Add(new NetSensor
+            {
+                Name = Clean(Get(v, EntPhysicalName + "." + kv.Key)) ?? Clean(Get(v, EntPhysicalDescr + "." + kv.Key)) ?? "Sensor " + kv.Key,
+                Type = type, Unit = unit, Value = Math.Round(value, 2), Status = status,
+            });
+        }
+        // Cisco environmental monitor.
+        static string? EnvState(string? s) => s switch { "1" => "normal", "2" => "warning", "3" => "critical", "4" => "shutdown", "5" => "notPresent", "6" => "notFunctioning", _ => null };
+        foreach (var kv in Column(v, CiscoEnvFanState))
+            n.Components.Add(new NetComponent { Kind = "fan", Name = Clean(Get(v, CiscoEnvFanDescr + "." + kv.Key)) ?? "Fan " + kv.Key, Status = EnvState(kv.Value) });
+        foreach (var kv in Column(v, CiscoEnvSupplyState))
+            n.Components.Add(new NetComponent { Kind = "powerSupply", Name = Clean(Get(v, CiscoEnvSupplyDescr + "." + kv.Key)) ?? "Power supply " + kv.Key, Status = EnvState(kv.Value) });
+        foreach (var kv in Column(v, CiscoEnvTempState))
+        {
+            var name = Clean(Get(v, CiscoEnvTempDescr + "." + kv.Key)) ?? "Temperature " + kv.Key;
+            n.Components.Add(new NetComponent { Kind = "temperature", Name = name, Status = EnvState(kv.Value) });
+            if (Long(Get(v, CiscoEnvTempValue + "." + kv.Key)) is { } t && t is > 0 and < 150 && !n.Sensors.Any(x => x.Type == "temperature" && x.Name == name))
+                n.Sensors.Add(new NetSensor { Name = name, Type = "temperature", Unit = "°C", Value = t, Status = "ok" });
+        }
+        var temps = n.Sensors.Where(x => x.Type == "temperature" && x.Value is > -40 and < 150).Select(x => x.Value!.Value).ToList();
+        if (temps.Count > 0) n.TemperatureC = temps.Max();
+
+        // Routing peers.
+        foreach (var kv in Column(v, BgpPeerState).Take(512))
+        {
+            var st = kv.Value switch { "1" => "idle", "2" => "connect", "3" => "active", "4" => "openSent", "5" => "openConfirm", "6" => "established", _ => "unknown" };
+            n.RoutingPeers.Add(new NetRoutingPeer { Protocol = "bgp", Address = kv.Key, RemoteAs = Long(Get(v, BgpPeerRemoteAs + "." + kv.Key)), State = st, Up = st == "established" });
+        }
+        foreach (var kv in Column(v, OspfNbrState).Take(512))
+        {
+            var p = kv.Key.Split('.');
+            if (p.Length < 4) continue;
+            var st = kv.Value switch { "1" => "down", "2" => "attempt", "3" => "init", "4" => "twoWay", "5" => "exchangeStart", "6" => "exchange", "7" => "loading", "8" => "full", _ => "unknown" };
+            n.RoutingPeers.Add(new NetRoutingPeer { Protocol = "ospf", Address = string.Join(".", p, 0, 4), State = st, Up = st is "full" or "twoWay" });
+        }
+
+        // Transceivers: ENTITY entries that are optics (SFP, SFP+, QSFP, XFP, GBIC).
+        foreach (var kv in Column(v, SnmpMapper.EntPhysicalClass).Take(2048))
+        {
+            if (kv.Value is not ("10" or "9")) continue;
+            var descr = Get(v, EntPhysicalDescr + "." + kv.Key) ?? "";
+            var model = Get(v, SnmpMapper.EntPhysicalModelName + "." + kv.Key) ?? "";
+            var text = (descr + " " + model).ToUpperInvariant();
+            if (!(text.Contains("SFP") || text.Contains("XFP") || text.Contains("GBIC") || text.Contains("TRANSCEIVER") || text.Contains("OPTIC"))) continue;
+            var serial = WindowsCollector.Clean(Get(v, SnmpMapper.EntPhysicalSerialNum + "." + kv.Key));
+            var name = Clean(Get(v, EntPhysicalName + "." + kv.Key)) ?? Clean(descr);
+            var existing = n.Modules.FirstOrDefault(m => m.Class == "module" && m.Name == name && m.Serial == serial);
+            if (existing is not null) { existing.Class = "transceiver"; continue; }
+            n.Modules.Add(new NetModule { Class = "transceiver", Name = name, Model = WindowsCollector.Clean(model) ?? Clean(descr), Serial = serial });
+        }
     }
 
     /// <summary>What the device itself says it is over LLDP (bridge, router, wlan-ap, phone …).</summary>

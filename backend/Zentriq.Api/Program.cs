@@ -164,6 +164,7 @@ api.MapAuthEndpoints();
 api.MapAccountEndpoints(options);
 api.MapAssetEndpoints();
 api.MapNetworkEndpoints();
+api.MapNonItEndpoints();
 api.MapAssetActionEndpoints();
 api.MapActivityAndUninstallEndpoints();
 api.MapDiscoveryEndpoints();

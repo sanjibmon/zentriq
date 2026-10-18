@@ -341,3 +341,66 @@ public sealed class SnmpLiveTests : IDisposable
         Assert.Equal("10:00:00:00:00:01", n.Arp.Single().Mac);
     }
 }
+
+/// <summary>Deeper network inventory: traffic, health sensors, fans and power supplies, routing neighbours, transceivers.</summary>
+public sealed class NetworkHealthTests
+{
+    [Fact]
+    public void Health_traffic_routing_and_transceivers_are_read()
+    {
+        var v = NetworkSnmpTests.AccessSwitch();
+        v[$"{NetworkSnmp.IfHcInOctets}.1"] = "900000000000"; v[$"{NetworkSnmp.IfHcOutOctets}.1"] = "120000000000";
+        v[$"{NetworkSnmp.IfInDiscards}.2"] = "42";
+        v[$"{NetworkSnmp.Dot1dStpPortState}.3"] = "2";                          // blocking
+        v[$"{NetworkSnmp.Dot3adAggPortAttachedAggId}.1"] = "50";
+        // RAM: 4 GB with 3 GB used in 1 kB units.
+        v[$"{NetworkSnmp.HrStorageType}.1"] = NetworkSnmp.HrStorageRam; v[$"{NetworkSnmp.HrStorageUnits}.1"] = "1024";
+        v[$"{NetworkSnmp.HrStorageSize}.1"] = "4194304"; v[$"{NetworkSnmp.HrStorageUsed}.1"] = "3145728";
+        // ENTITY-SENSOR: 41 °C; optical receive power -3.5 dBm (precision 1); a fan sensor failing.
+        v[$"{NetworkSnmp.EntPhySensorType}.2001"] = "8"; v[$"{NetworkSnmp.EntPhySensorScale}.2001"] = "9"; v[$"{NetworkSnmp.EntPhySensorPrecision}.2001"] = "0";
+        v[$"{NetworkSnmp.EntPhySensorValue}.2001"] = "41"; v[$"{NetworkSnmp.EntPhySensorOperStatus}.2001"] = "1"; v[$"{NetworkSnmp.EntPhysicalName}.2001"] = "Inlet temperature";
+        v[$"{NetworkSnmp.EntPhySensorType}.2002"] = "14"; v[$"{NetworkSnmp.EntPhySensorScale}.2002"] = "9"; v[$"{NetworkSnmp.EntPhySensorPrecision}.2002"] = "1";
+        v[$"{NetworkSnmp.EntPhySensorValue}.2002"] = "-35"; v[$"{NetworkSnmp.EntPhySensorOperStatus}.2002"] = "1"; v[$"{NetworkSnmp.EntPhysicalName}.2002"] = "Te1/1/1 Receive Power";
+        // Cisco environment: one fan critical, power supply normal.
+        v[$"{NetworkSnmp.CiscoEnvFanDescr}.1"] = "Switch 1 - FAN 1"; v[$"{NetworkSnmp.CiscoEnvFanState}.1"] = "3";
+        v[$"{NetworkSnmp.CiscoEnvSupplyDescr}.1"] = "Switch 1 - Power Supply A"; v[$"{NetworkSnmp.CiscoEnvSupplyState}.1"] = "1";
+        // BGP: one peer established, one idle; OSPF neighbour full.
+        v[$"{NetworkSnmp.BgpPeerState}.192.0.2.1"] = "6"; v[$"{NetworkSnmp.BgpPeerRemoteAs}.192.0.2.1"] = "65001";
+        v[$"{NetworkSnmp.BgpPeerState}.192.0.2.9"] = "1";
+        v[$"{NetworkSnmp.OspfNbrState}.10.0.0.1.0"] = "8";
+        // An SFP in ENTITY-MIB (class port).
+        v[$"{SnmpMapper.EntPhysicalClass}.3001"] = "10"; v[$"{NetworkSnmp.EntPhysicalDescr}.3001"] = "10GBase-SR SFP+ Module";
+        v[$"{SnmpMapper.EntPhysicalModelName}.3001"] = "SFP-10G-SR"; v[$"{SnmpMapper.EntPhysicalSerialNum}.3001"] = "AGM1234ABCD";
+
+        var n = SnmpMapper.Map(v, "10.0.10.2", "1").NetworkDevice!;
+        var up = n.Interfaces.Single(i => i.Index == 1);
+        Assert.Equal((900000000000L, 120000000000L, 50), (up.InOctets!.Value, up.OutOctets!.Value, up.LagIfIndex!.Value));
+        Assert.Equal(42L, n.Interfaces.Single(i => i.Index == 2).InDiscards);
+        Assert.Equal("blocking", n.Interfaces.Single(i => i.Index == 3).StpState);
+        Assert.Equal((75, 4096L), (n.MemoryPercent!.Value, n.MemoryTotalMb!.Value));
+        Assert.Equal(41.0, n.TemperatureC);
+        Assert.Contains(n.Sensors, s => s.Type == "optical" && s.Value == -3.5 && s.Unit == "dBm");
+        Assert.Contains(n.Components, c => c.Kind == "fan" && c.Status == "critical");
+        Assert.Contains(n.Components, c => c.Kind == "powerSupply" && c.Status == "normal");
+        Assert.Equal(3, n.RoutingPeers.Count);
+        Assert.Contains(n.RoutingPeers, p => p.Protocol == "bgp" && p.Address == "192.0.2.1" && p.RemoteAs == 65001 && p.Up);
+        Assert.Contains(n.RoutingPeers, p => p.Protocol == "bgp" && p.Address == "192.0.2.9" && !p.Up && p.State == "idle");
+        Assert.Contains(n.RoutingPeers, p => p.Protocol == "ospf" && p.Address == "10.0.0.1" && p.Up);
+        Assert.Contains(n.Modules, m => m.Class == "transceiver" && m.Model == "SFP-10G-SR" && m.Serial == "AGM1234ABCD");
+    }
+
+    [Fact]
+    public void Traffic_rate_comes_from_two_collections()
+    {
+        var t0 = new DateTime(2026, 10, 1, 10, 0, 0, DateTimeKind.Utc);
+        // 75 GB in and 7.5 GB out in 10 minutes on a 1 Gbit/s port: 1 Gbit/s in (100 %), 100 Mbit/s out.
+        var (i, o, u) = Zentriq.Infrastructure.Inventory.NetworkStore.Traffic(1_000_000_000m, 500_000_000m, t0, 76_000_000_000, 8_000_000_000, t0.AddMinutes(10), 1000);
+        Assert.Equal(1_000_000_000L, i);
+        Assert.Equal(100_000_000L, o);
+        Assert.Equal(100.0, u);
+        var reset = Zentriq.Infrastructure.Inventory.NetworkStore.Traffic(5m, 5m, t0, 1, 1, t0.AddMinutes(10), 1000);          // counter reset
+        Assert.True(reset.InBps is null && reset.OutBps is null && reset.Util is null);
+        var first = Zentriq.Infrastructure.Inventory.NetworkStore.Traffic(null, null, null, 1, 1, t0, 1000);                   // first collection
+        Assert.True(first.InBps is null && first.Util is null);
+    }
+}

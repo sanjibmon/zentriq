@@ -24,7 +24,7 @@ function useTip() {
 const fmtN = (n: number) => n.toLocaleString();
 const pct = (v: number, t: number) => (t ? `${Math.round((v / t) * 100)}%` : '0%');
 
-/** Part-to-whole: donut with the total in the centre and a clickable legend (identity never by colour alone). */
+/** Pie (and the legacy donut renderer) with the total in the centre and a clickable legend (identity never by colour alone). */
 export function Donut({ data, onSelect, centerLabel = 'total', size = 150, pie = false }: { data: Slice[]; onSelect?: (s: Slice) => void; centerLabel?: string; size?: number; pie?: boolean }) {
   const { ref, show, hide, el } = useTip();
   const [hover, setHover] = useState<string | null>(null);
@@ -109,12 +109,46 @@ export function VBars({ data, onSelect, color, max, height = 170 }: { data: Slic
   );
 }
 
-export type ChartKind = 'donut' | 'pie' | 'bar' | 'column';
-export const CHART_KINDS: [ChartKind, string][] = [['donut', 'Donut'], ['pie', 'Pie'], ['bar', 'Bar'], ['column', 'Column']];
+/** Part-to-whole without a donut: the total, one stacked bar and a clickable legend. */
+export function ShareBar({ data, onSelect, centerLabel = 'total' }: { data: Slice[]; onSelect?: (s: Slice) => void; centerLabel?: string }) {
+  const { ref, show, hide, el } = useTip();
+  const [hover, setHover] = useState<string | null>(null);
+  const rows = data.filter((d) => d.value > 0);
+  const total = rows.reduce((a, d) => a + d.value, 0);
+  if (total === 0) return <div className="chart-empty">No data yet.</div>;
+  const items = rows.map((d, i) => ({ d, color: d.color ?? slotColor(i, d.key) }));
+  return (
+    <div className="pw">
+      <div className="pw-total"><b>{fmtN(total)}</b><span>{centerLabel}</span></div>
+      <div className="chart" ref={ref} onMouseLeave={() => { hide(); setHover(null); }}>
+        <div className="pw-bar" role="img" aria-label={rows.map((d) => `${d.label} ${d.value}`).join(', ')}>
+          {items.map(({ d, color }) => (
+            <span key={d.key} className={onSelect ? 'hit' : ''} style={{ flexGrow: d.value, background: color, opacity: hover && hover !== d.key ? 0.35 : 1 }}
+              onClick={() => onSelect?.(d)} onMouseMove={(e) => { setHover(d.key); show(e, <><b>{d.label}</b> · {fmtN(d.value)} ({pct(d.value, total)})</>); }} />
+          ))}
+        </div>
+        {el}
+      </div>
+      <div className="pw-legend">
+        {items.map(({ d, color }) => (
+          <button key={d.key} type="button" className={hover === d.key ? 'on' : ''} onMouseEnter={() => setHover(d.key)} onMouseLeave={() => setHover(null)}
+            onClick={() => onSelect?.(d)} disabled={!onSelect} title={onSelect ? `Show ${d.label}` : undefined}>
+            <span className="sw" style={{ background: color }} /><span>{d.label}</span><span className="v">{fmtN(d.value)} · {pct(d.value, total)}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Chart types offered for a tile. "donut" is no longer offered; layouts saved with it are drawn as a share bar. */
+export type ChartKind = 'share' | 'bar' | 'column' | 'pie' | 'donut';
+export const CHART_KINDS: [ChartKind, string][] = [['share', 'Share bar'], ['bar', 'Bar'], ['column', 'Column'], ['pie', 'Pie']];
 
 /** One categorical dataset drawn as the chart type chosen for the widget. */
 export function CategoryChart({ kind, data, onSelect, centerLabel, color, max }: { kind: ChartKind; data: Slice[]; onSelect?: (s: Slice) => void; centerLabel?: string; color?: string; max?: number }) {
-  if (kind === 'donut' || kind === 'pie') return <Donut data={data.filter((d) => d.value > 0)} onSelect={onSelect} centerLabel={centerLabel} pie={kind === 'pie'} />;
+  if (kind === 'share' || kind === 'donut') return <ShareBar data={data} onSelect={onSelect} centerLabel={centerLabel} />;
+  if (kind === 'pie') return <Donut data={data.filter((d) => d.value > 0)} onSelect={onSelect} centerLabel={centerLabel} pie />;
   if (kind === 'column') return <VBars data={data} onSelect={onSelect} color={color} max={max} />;
   return <HBars data={data} onSelect={onSelect} color={color} max={max} />;
 }
@@ -195,14 +229,14 @@ export function PostureBars({ rows, onSelect }: { rows: { key: string; yes: numb
 /** The chart type a viewer picked for one tile, remembered in this browser. */
 export function useChartKind(key: string, fallback: ChartKind): [ChartKind, (k: ChartKind) => void] {
   const read = (): ChartKind => {
-    try { const v = localStorage.getItem(`zq.chart.${key}`); return CHART_KINDS.some(([k]) => k === v) ? (v as ChartKind) : fallback; } catch { return fallback; }
+    try { const v = localStorage.getItem(`zq.chart.${key}`); return CHART_KINDS.some(([k]) => k === v) ? (v as ChartKind) : fallback === 'donut' ? 'share' : fallback; } catch { return fallback === 'donut' ? 'share' : fallback; }
   };
   const [kind, setKind] = useState<ChartKind>(read);
   const set = (k: ChartKind) => { setKind(k); try { localStorage.setItem(`zq.chart.${key}`, k); } catch { /* storage unavailable */ } };
   return [kind, set];
 }
 
-/** Compact chart-type selector for a tile (donut, pie, bar, column; optionally one extra view such as "Stacked"). */
+/** Compact chart-type selector for a tile (share bar, bar, column, pie; optionally one extra view such as "Stacked"). */
 export function ChartKindPicker({ value, onChange, extra }: { value: string; onChange: (k: ChartKind) => void; extra?: [string, string, () => void] }) {
   return (
     <select className="in sm chart-pick" value={value} aria-label="Chart type" title="Chart type"

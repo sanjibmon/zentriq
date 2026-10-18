@@ -3,6 +3,7 @@ export const ICONS = {
   "dashboard": "<rect x=\"3\" y=\"3\" width=\"7\" height=\"9\" rx=\"1\"/><rect x=\"14\" y=\"3\" width=\"7\" height=\"5\" rx=\"1\"/><rect x=\"14\" y=\"12\" width=\"7\" height=\"9\" rx=\"1\"/><rect x=\"3\" y=\"16\" width=\"7\" height=\"5\" rx=\"1\"/>",
   "radar": "<circle cx=\"12\" cy=\"12\" r=\"9\"/><circle cx=\"12\" cy=\"12\" r=\"5\"/><path d=\"M12 12l6-6\"/><circle cx=\"12\" cy=\"12\" r=\"1.2\" fill=\"currentColor\"/>",
   "network": "<rect x=\"2.5\" y=\"13.5\" width=\"19\" height=\"7\" rx=\"1.5\"/><path d=\"M6.5 17h.01M10 17h.01M13.5 17h.01M17 17h.01\"/><path d=\"M12 13.5V9.5\"/><rect x=\"8\" y=\"3.5\" width=\"8\" height=\"6\" rx=\"1\"/>",
+  "chair": "<path d=\"M7 3h10a1 1 0 0 1 1 1v8H6V4a1 1 0 0 1 1-1z\"/><path d=\"M4 12h16v3H4z\"/><path d=\"M6 15v6M18 15v6M9 15v3M15 15v3\"/>",
   "box": "<path d=\"M21 8l-9-5-9 5 9 5 9-5z\"/><path d=\"M3 8v8l9 5 9-5V8\"/><path d=\"M12 13v8\"/>",
   "cpu": "<rect x=\"6\" y=\"6\" width=\"12\" height=\"12\" rx=\"1.5\"/><rect x=\"9.5\" y=\"9.5\" width=\"5\" height=\"5\"/><path d=\"M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3\"/>",
   "apps": "<rect x=\"3\" y=\"3\" width=\"7\" height=\"7\" rx=\"1.5\"/><rect x=\"14\" y=\"3\" width=\"7\" height=\"7\" rx=\"1.5\"/><rect x=\"3\" y=\"14\" width=\"7\" height=\"7\" rx=\"1.5\"/><path d=\"M17.5 14v7M14 17.5h7\"/>",

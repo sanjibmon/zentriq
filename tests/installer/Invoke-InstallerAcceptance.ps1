@@ -119,7 +119,7 @@ Remove-Item $answer -Force   # contains the administrator password
 
 if (-not $installed) {
     foreach ($t in 'T02 PostgreSQL provisioning', 'T03 Database migration', 'T04 Administrator sign-in', 'T05 API and worker services', 'T06 Trial initialization',
-                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory') {
+                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets') {
         Record $t.Substring(0, 3) $t.Substring(4) 'BLOCKED' 'installation failed'
     }
 } else {
@@ -1274,6 +1274,56 @@ if (-not $installed) {
         do { Start-Sleep 3; $d = Api GET "/discovery/scans/$($scan.id)" -Session $s } while ($d.scan.status -in 'queued', 'running' -and (Get-Date) -lt $deadline)
         Assert ($d.scan.status -in 'completed', 'completed_errors') "scan with follow neighbours: $($d.scan.status) $($d.scan.error)"
         "summary: $($sum.devices) network device(s), $($sum.portsTotal) port(s); $($dev.Count) device(s), $($sw.Count) managed switch(es), $($ports.Count) port match(es), $($links.Count) link(s), $($vl.Count) VLAN(s), $(@($un.inferred).Count) unmanaged, $($fw.Count) firmware row(s); $($lib.Count) network reports ran; follow-neighbours scan $($d.scan.status)"
+    } | Out-Null
+
+    Check 'T64' 'Non-IT assets: categories, add, barcode lookup, Excel form, bulk upload (check and apply), bulk change, export, reports, delete' {
+        $s = Login
+        $cats = @(Api GET '/nonit/categories' -Session $s | ForEach-Object { $_ })
+        Assert ($cats.Count -ge 50) "built-in categories: $($cats.Count)"
+        $chair = $cats | Where-Object name -eq 'Office chair' | Select-Object -First 1
+        $custom = Api POST '/nonit/categories' @{ name = 'CI podium'; group = 'Furniture' } -Session $s
+        $field = Api POST '/nonit/fields' @{ label = 'Cost centre'; type = 'text' } -Session $s
+        $a = Api POST '/nonit/assets' @{ name = 'CI ergonomic chair'; categoryId = $chair.id; barcode = 'CI-BC-0001'; purchaseCost = 12500; quantity = 2; purchaseDate = '2025-04-01'; usefulLifeYears = 5; warrantyUntil = (Get-Date).AddDays(40).ToString('yyyy-MM-dd'); custom = @{ cost_centre = 'CC-42' } } -Session $s
+        $got = Api GET "/nonit/lookup?code=CI-BC-0001" -Session $s
+        Assert ($got.id -eq $a.id -and $got.assetTag -match '^NIT-\d{6}$' -and $got.custom.cost_centre -eq 'CC-42') "lookup: $($got | ConvertTo-Json -Compress -Depth 3)"
+        Assert ($got.currentValue -gt 0 -and $got.currentValue -lt 12500) "current value $($got.currentValue)"
+        # Excel form.
+        $t = Invoke-WebRequest "$base/api/v1/nonit/template" -WebSession $s
+        $bytes = $t.RawContentStream.ToArray()
+        Assert ($bytes[0] -eq 0x50 -and $bytes[1] -eq 0x4B) 'form is not an xlsx package'
+        [IO.File]::WriteAllBytes((Join-Path $OutDir 'ci-nonit-form.xlsx'), $bytes)
+        # Bulk upload (CSV with the form headings): check, then apply.
+        $csv = "Asset tag,Name *,Category *,Status,Purchase date,Purchase cost,Location,Cost centre`r`nCI-FUR-1,CI desk,Desk / workstation,In use,31/03/2025,`"8,000`",Floor 1,CC-1`r`n,CI AC,Air conditioner,In store,,45000,Store room,`r`n,CI golf cart,CI golf cart,,,,,`r`n"
+        $file = Join-Path $OutDir 'ci-nonit.csv'; [IO.File]::WriteAllText($file, $csv)
+        $up = { param($q) Invoke-RestMethod "$base/api/v1/nonit/import?$q" -Method Post -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } -ContentType 'application/octet-stream' -InFile $file }
+        $check = & $up 'dryRun=true'
+        Assert (-not $check.ok -and @($check.errors | Where-Object { $_.row -eq 4 }).Count -ge 1) "check should report the unknown category in row 4: $($check | ConvertTo-Json -Compress -Depth 4)"
+        $check2 = & $up 'dryRun=true&createCategories=true'
+        Assert ($check2.ok -and $check2.created -eq 3) "check with new categories: $($check2 | ConvertTo-Json -Compress -Depth 4)"
+        $applied = & $up 'dryRun=false&createCategories=true'
+        Assert ($applied.ok -and -not $applied.dryRun -and $applied.created -eq 3) "upload: $($applied | ConvertTo-Json -Compress -Depth 4)"
+        $list = Api GET '/nonit/assets?q=CI&pageSize=50' -Session $s
+        Assert ($list.total -ge 4) "assets after upload: $($list.total)"
+        $desk = $list.items | Where-Object assetTag -eq 'CI-FUR-1'
+        Assert ($desk.purchaseCost -eq 8000 -and $desk.custom.cost_centre -eq 'CC-1') "desk: $($desk | ConvertTo-Json -Compress -Depth 3)"
+        # Bulk change, export, summary, reports.
+        $b = Api POST '/nonit/assets/bulk' @{ ids = @($a.id, $desk.id); status = 'under_maintenance'; location = 'Workshop' } -Session $s
+        Assert ($b.updated -eq 2) "bulk change: $($b.updated)"
+        $one = Api GET "/nonit/assets/$($a.id)" -Session $s
+        Assert ($one.status -eq 'under_maintenance' -and @($one.history).Count -ge 2) "history: $(@($one.history).Count)"
+        $x = Invoke-WebRequest "$base/api/v1/nonit/export?format=xlsx" -WebSession $s
+        Assert ($x.RawContentStream.ToArray()[0] -eq 0x50) 'export is not xlsx'
+        $sum = Api GET '/nonit/summary' -Session $s
+        Assert ($sum.total -ge 4 -and $sum.warranty90 -ge 1) "summary: $($sum | ConvertTo-Json -Compress -Depth 2)"
+        $lib = @(Api GET '/reports' -Session $s | ForEach-Object { $_ } | Where-Object { $_.system -and $_.dataset -eq 'nonit_assets' })
+        Assert ($lib.Count -ge 7) "built-in non-IT reports: $($lib.Count)"
+        foreach ($rep in $lib) { $r = Api GET "/reports/$($rep.id)/data" -Session $s; Assert ($r.columns.Count -ge 1) "report '$($rep.name)' returned no columns" }
+        # Delete.
+        $ids = @($list.items | ForEach-Object id) + @($a.id) | Select-Object -Unique
+        $d = Api POST '/nonit/assets/delete' @{ ids = $ids } -Session $s
+        Assert ($d.deleted -ge 4) "deleted $($d.deleted)"
+        Invoke-RestMethod "$base/api/v1/nonit/fields/$($field.id)" -Method Delete -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } | Out-Null
+        "categories $($cats.Count) (+1 custom); lookup by barcode OK; form $($bytes.Length) bytes; upload checked (unknown category reported) and applied (3 new, 1 new category); bulk change + history; export; $($lib.Count) reports ran; $($d.deleted) deleted"
     } | Out-Null
 
     if ($UpgradeBundle) {

@@ -11,6 +11,7 @@ import { ReportWidget } from './ReportWidget';
 import { deviceTypeLabel } from '../assets/deviceTypes';
 import { ChangedDevices, type ChangeSummary } from '../inventory/Changes';
 import { type Management, type NetworkSummary } from '../network/types';
+import { money, statusLabel, type NonItSummary } from '../nonit/types';
 
 const TYPE_LABEL: Record<string, string> = {
   laptop: 'Laptop', desktop: 'Desktop', server: 'Physical server', virtual: 'Virtual machine', other: 'Other hardware',
@@ -63,17 +64,20 @@ interface VulnSummary { bySeverity: KC[]; aging: { bucket: string; critical: num
 interface WidgetDef { id: string; title: string; wide?: boolean; full?: boolean; defaultOn: boolean; description: string; chart?: ChartKind }
 const WIDGETS: WidgetDef[] = [
   { id: 'kpi.tiles', title: 'Summary tiles', full: true, defaultOn: true, description: 'Assets, servers, endpoints, coverage, offline devices, software' },
-  { id: 'assets.category', chart: 'donut', title: 'Assets by category', defaultOn: true, description: 'Endpoints, servers, network devices · click to list those assets' },
-  { id: 'assets.type', chart: 'donut', title: 'Device type', defaultOn: true, description: 'Laptop, desktop, physical server, virtual machine' },
-  { id: 'assets.coverage', chart: 'donut', title: 'How assets are inventoried', defaultOn: true, description: 'Agent, agentless or discovered only' },
+  { id: 'assets.category', chart: 'share', title: 'Assets by category', defaultOn: true, description: 'Endpoints, servers, network devices · click to list those assets' },
+  { id: 'assets.type', chart: 'bar', title: 'Device type', defaultOn: true, description: 'Laptop, desktop, physical server, virtual machine' },
+  { id: 'assets.coverage', chart: 'share', title: 'How assets are inventoried', defaultOn: true, description: 'Agent, agentless or discovered only' },
   { id: 'assets.trend', title: 'Asset growth', wide: true, defaultOn: true, description: 'Active assets per day, last 30 days' },
   { id: 'assets.department', chart: 'bar', title: 'Assets by department', defaultOn: true, description: 'Devices per department / unit · click to list them' },
   { id: 'changes.hardware', title: 'Hardware changes', wide: true, defaultOn: true, description: 'Devices whose hardware changed in the last 30 days (memory, disks, CPU, serial…)' },
   { id: 'changes.software', title: 'Software changes', wide: true, defaultOn: true, description: 'Devices with software installed, uninstalled or updated in the last 30 days' },
-  { id: 'network.types', chart: 'donut', title: 'Network devices', defaultOn: true, description: 'Switches, routers, firewalls, access points · click to list them' },
+  { id: 'network.types', chart: 'bar', title: 'Network devices', defaultOn: true, description: 'Switches, routers, firewalls, access points · click to list them' },
   { id: 'network.management', chart: 'bar', title: 'Switch management', defaultOn: true, description: 'Managed over SNMP, web interface only, no management, unmanaged switches found behind ports' },
   { id: 'network.ports', title: 'Switch port usage', defaultOn: true, description: 'Ports in use, free and disabled; link speeds; PoE' },
-  { id: 'network.attention', title: 'Network attention', defaultOn: false, description: 'Unmanaged switches, port errors, half duplex, high CPU, devices not seen' },
+  { id: 'network.attention', title: 'Network attention', defaultOn: false, description: 'Alarms, neighbours down, busy ports, unmanaged switches, port errors, high CPU' },
+  { id: 'nonit.groups', chart: 'bar', title: 'Non-IT assets', defaultOn: true, description: 'Furniture, appliances, vehicles and other items by category group' },
+  { id: 'nonit.value', title: 'Non-IT asset value', defaultOn: true, description: 'Purchase and current value, status of the items' },
+  { id: 'nonit.due', title: 'Non-IT: coming up', defaultOn: true, description: 'Warranty, AMC, insurance and maintenance due' },
   { id: 'assets.seen', chart: 'bar', title: 'Last contact / offline', defaultOn: true, description: 'Online now … offline more than 30 days' },
   { id: 'assets.os', chart: 'bar', title: 'Operating systems', wide: true, defaultOn: true, description: 'Top operating systems' },
   { id: 'security.posture', title: 'Security posture', defaultOn: true, description: 'Encryption, firewall, Secure Boot, TPM, antivirus' },
@@ -85,10 +89,10 @@ const WIDGETS: WidgetDef[] = [
   { id: 'hw.free', chart: 'bar', title: 'Free disk space', defaultOn: true, description: 'Lowest free space on any volume' },
   { id: 'hw.cpu', chart: 'bar', title: 'Processor models', defaultOn: false, description: 'Top CPU models' },
   { id: 'hw.vendor', chart: 'bar', title: 'Manufacturers', defaultOn: true, description: 'Hardware vendors' },
-  { id: 'scans.results', chart: 'donut', title: 'Discovery results', defaultOn: true, description: 'Outcome of scans in the last 30 days' },
+  { id: 'scans.results', chart: 'share', title: 'Discovery results', defaultOn: true, description: 'Outcome of scans in the last 30 days' },
   { id: 'license.usage', title: 'Licensing', defaultOn: true, description: 'Trial or license and device usage' },
   { id: 'scans.recent', title: 'Recent scans', defaultOn: false, description: 'Last five scans' },
-  { id: 'vuln.severity', chart: 'donut', title: 'Open vulnerabilities', defaultOn: false, description: 'Software and Windows findings by severity' },
+  { id: 'vuln.severity', chart: 'share', title: 'Open vulnerabilities', defaultOn: false, description: 'Software and Windows findings by severity' },
   { id: 'vuln.aging', chart: 'column', title: 'Vulnerability aging', defaultOn: false, description: 'How long open findings have been open' },
   { id: 'security.score', chart: 'column', title: 'Security configuration score', defaultOn: false, description: 'Windows devices per compliance score band' },
   { id: 'security.failing', chart: 'bar', title: 'Most failed security checks', defaultOn: false, description: 'Configuration checks failing on the most devices' },
@@ -109,7 +113,7 @@ const toBody = (layout: Layout) => layout.map((w) => ({
   settings: { ...(w.chart ? { chart: w.chart } : {}), ...(w.reportId ? { reportId: w.reportId } : {}) },
 }));
 /** Widgets added in later releases: shown once on a saved dashboard until the user saves their layout. */
-const NEW_WIDGETS = ['assets.department', 'changes.hardware', 'changes.software', 'network.types', 'network.management', 'network.ports'];
+const NEW_WIDGETS = ['assets.department', 'changes.hardware', 'changes.software', 'network.types', 'network.management', 'network.ports', 'nonit.groups', 'nonit.value', 'nonit.due'];
 const withNew = (layout: Layout, d: DashboardDto | null): Layout => {
   const seen = d?.filters?.seenWidgets ?? [];
   const add = NEW_WIDGETS.filter((id) => !seen.includes(id) && !layout.some((w) => w.id === id));
@@ -163,6 +167,8 @@ export function DashboardPage() {
   const changes = useApi(() => (wantsChanges ? api.get<ChangeSummary>('/inventory/changes/summary', { days: 30 }) : Promise.resolve(null)), [tick, wantsChanges]);
   const wantsNetwork = layout.some((w) => w.id.startsWith('network.'));
   const net = useApi(() => (wantsNetwork ? api.get<NetworkSummary>('/network/summary') : Promise.resolve(null)), [tick, wantsNetwork]);
+  const wantsNonIt = layout.some((w) => w.id.startsWith('nonit.'));
+  const nonit = useApi(() => (wantsNonIt ? api.get<NonItSummary>('/nonit/summary') : Promise.resolve(null)), [tick, wantsNonIt]);
   const wantsSecurity = layout.some((w) => w.id.startsWith('security.') && w.id !== 'security.posture') && can('security.view');
   const sec = useApi(() => (wantsSecurity ? api.get<SecuritySummary>('/security/overview') : Promise.resolve(null)), [tick, wantsSecurity]);
 
@@ -244,6 +250,9 @@ export function DashboardPage() {
           );
         }
         const items: [string, number, string, string][] = [
+          ['Fan / power / temperature alarms', v.componentsBad ?? 0, 'tab=devices', 'var(--crit)'],
+          ['Routing neighbours down', v.peersDown ?? 0, 'tab=devices', 'var(--crit)'],
+          ['Busy ports (≥ 70 %)', v.busyPorts ?? 0, 'tab=ports&filter=busy', 'var(--warn)'],
           ['Suspected unmanaged switches', v.unmanagedSuspected, 'tab=unmanaged', 'var(--warn)'],
           ['Ports with errors', v.portsWithErrors, 'tab=ports&filter=errors', 'var(--crit)'],
           ['Ports at half duplex', v.portsHalfDuplex, 'tab=ports&filter=halfduplex', 'var(--warn)'],
@@ -252,6 +261,32 @@ export function DashboardPage() {
           ['Switches without SNMP management', v.switchesWebOnly + v.switchesNoManagement, 'tab=unmanaged', 'var(--info)'],
         ];
         return <HBars data={items.map(([label, n, , color]) => ({ key: label, label, value: n, color }))} onSelect={(sl) => toNet(items.find((x) => x[0] === sl.key)![2])()} />;
+      }
+      case 'nonit.groups':
+      case 'nonit.value':
+      case 'nonit.due': {
+        const v = nonit.data;
+        if (!v) return <div className="chart-empty">{nonit.error ? nonit.error.message : 'Loading…'}</div>;
+        if (v.total === 0) return <div className="chart-empty">No non-IT assets yet. <Link to="/non-it">Add items or upload the Excel form</Link>.</div>;
+        if (id === 'nonit.groups')
+          return C(v.byGroup.map((g) => ({ key: g.key, label: g.key, value: g.count })), () => navigate('/non-it'), { centerLabel: 'assets' });
+        if (id === 'nonit.value')
+          return (
+            <div className="stack-v">
+              <div className="big-stat"><b>{money(v.purchaseValue)}</b> <span className="muted">purchase value · {money(v.currentValue)} today</span></div>
+              <HBars data={v.byStatus.map((x) => ({ key: x.key, label: statusLabel(x.key), value: x.count }))} onSelect={(sl) => navigate(`/non-it?tab=assets&status=${sl.key}`)} />
+            </div>
+          );
+        return v.upcoming.length === 0 ? <div className="chart-empty">Nothing due in the next 90 days.</div> : (
+          <div className="mini-list">
+            {v.upcoming.slice(0, 8).map((u, i) => (
+              <div key={i} className="mi" onClick={() => navigate(`/non-it?id=${u.id}`)}>
+                <span><b>{u.name}</b> <span className="faint">{u.what}</span></span>
+                <span className="r faint">{new Date(`${u.date}T00:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</span>
+              </div>
+            ))}
+          </div>
+        );
       }
       case 'assets.department': {
         const rows = o.byDepartment ?? [];
@@ -376,6 +411,7 @@ export function DashboardPage() {
     'agents.health': <Link to="/agents" className="btn sm">Agents</Link>, 'software.top': <Link to="/software" className="btn sm">All software</Link>,
     'scans.results': <Link to="/discovery" className="btn sm">Scans</Link>, 'license.usage': <Link to="/licensing" className="btn sm">Details</Link>,
     'scans.recent': <Link to="/discovery" className="btn sm">All scans</Link>,
+    'nonit.groups': <Link to="/non-it" className="btn sm">Open</Link>, 'nonit.due': <Link to="/non-it?tab=assets&due=maintenance" className="btn sm">All</Link>,
     'network.types': <Link to="/network" className="btn sm">Network Inventory</Link>, 'network.ports': <Link to="/network?tab=ports" className="btn sm">Port map</Link>,
     'network.management': <Link to="/network?tab=unmanaged" className="btn sm">Unmanaged</Link>, 'network.attention': <Link to="/network" className="btn sm">Open</Link>,
   };
@@ -450,7 +486,7 @@ function CustomizeDialog({ layout, onClose, onSave }: { layout: Layout; onClose:
         <header><h2 id="cz-title">Customize dashboard</h2></header>
         <div className="body form-v">
           {error && <Callout tone="crit" icon="alert">The layout was not saved: {error}</Callout>}
-          <small className="muted">Tick the charts you want, choose how each is drawn (donut, pie, bar or column), drag them (or use the arrows) to change the order, and choose which ones are wide. Saved reports can be added as charts too. Saved for your account.</small>
+          <small className="muted">Tick the charts you want, choose how each is drawn (share bar, bar, column or pie), drag them (or use the arrows) to change the order, and choose which ones are wide. Saved reports can be added as charts too. Saved for your account.</small>
           <ul className="cz-list">
             {items.map((it, i) => {
               const def = defFor(it)!;

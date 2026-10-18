@@ -7,7 +7,7 @@ import { Callout, DataTable, ErrorBox, fmt, Kpis, Loading, PageHead, Panel, Pill
 import { deviceTypeLabel } from '../assets/deviceTypes';
 import { TopologyMap } from './Topology';
 import {
-  MANAGEMENT, portState, speedLabel, type FirmwareRow, type Management, type NetworkDevice, type NetworkLink, type NetworkPort,
+  bpsLabel, MANAGEMENT, portState, speedLabel, type FirmwareRow, type Management, type NetworkDevice, type NetworkLink, type NetworkPort,
   type NetworkSummary, type NetworkVlan, type UnmanagedData,
 } from './types';
 
@@ -29,7 +29,7 @@ export function NetworkPage() {
 
   return (
     <>
-      <PageHead title="Network Inventory" desc="Switches (managed and unmanaged), routers, firewalls, access points and controllers found by discovery — ports, connected devices, neighbours, VLANs, PoE and firmware."
+      <PageHead title="Network Inventory" desc="Every switch, router, firewall and access point on your network."
         actions={<>
           <Link className="btn" to="/reports">Reports</Link>
           <Link className="btn primary" to="/discovery?new=1">Scan network devices</Link>
@@ -52,17 +52,7 @@ export function NetworkPage() {
           { label: 'VLANs · links', value: `${s.vlans} · ${s.links}`, sub: 'VLANs · LLDP/CDP links', to: '/network?tab=topology' },
         ]} />
       )}
-      {s && (s.portsWithErrors > 0 || s.portsHalfDuplex > 0 || s.highCpu > 0 || s.staleDevices > 0) && (
-        <Callout tone="warn" icon="alert">
-          {[
-            s.portsWithErrors > 0 && `${s.portsWithErrors} port(s) with errors`,
-            s.portsHalfDuplex > 0 && `${s.portsHalfDuplex} port(s) at half duplex`,
-            s.highCpu > 0 && `${s.highCpu} device(s) with CPU ≥ 80%`,
-            s.staleDevices > 0 && `${s.staleDevices} device(s) not seen for 7+ days`,
-          ].filter(Boolean).join(' · ')}
-          {' '}— <Link to="/network?tab=ports&filter=errors">show ports with errors</Link>
-        </Callout>
-      )}
+      {s && <Attention s={s} />}
       <div className="tabs" role="tablist">
         {TABS.map(([t, label]) => (
           <button key={t} role="tab" aria-selected={tab === t} className={tab === t ? 'on' : ''} onClick={() => setTab(t)}>{label}
@@ -77,6 +67,29 @@ export function NetworkPage() {
       {tab === 'unmanaged' && <UnmanagedTab />}
       {tab === 'firmware' && <FirmwareTab />}
     </>
+  );
+}
+
+/** What needs a look, each linked to the list behind it. */
+function Attention({ s }: { s: NetworkSummary }) {
+  const items: [number, string, string][] = [
+    [s.componentsBad, 'fan, power supply or temperature alarm(s)', '/network?tab=devices'],
+    [s.peersDown, 'BGP / OSPF neighbour(s) down', '/network?tab=devices'],
+    [s.busyPorts, 'busy port(s) above 70 %', '/network?tab=ports&filter=busy'],
+    [s.portsWithErrors, 'port(s) with errors', '/network?tab=ports&filter=errors'],
+    [s.portsHalfDuplex, 'port(s) at half duplex', '/network?tab=ports&filter=halfduplex'],
+    [s.blockingPorts, 'port(s) blocked by spanning tree', '/network?tab=ports&filter=blocking'],
+    [s.highCpu, 'device(s) with CPU ≥ 80 %', '/network?tab=devices'],
+    [s.highMemory, 'device(s) with memory ≥ 85 %', '/network?tab=devices'],
+    [s.hotDevices, 'device(s) at 60 °C or more', '/network?tab=devices'],
+    [s.staleDevices, 'device(s) not seen for 7 days', '/network?tab=devices'],
+  ];
+  const shown = items.filter(([n]) => n > 0);
+  if (shown.length === 0) return null;
+  return (
+    <Callout tone="warn" icon="alert">
+      {shown.map(([n, label, to], i) => <span key={label}>{i > 0 ? ' · ' : ''}<Link to={to}>{n} {label}</Link></span>)}
+    </Callout>
   );
 }
 
@@ -102,10 +115,10 @@ function DevicesTab({ summary }: { summary: NetworkSummary | null }) {
       {summary && summary.devices > 0 && (
         <div className="grid-3">
           <Panel title="By type">
-            <CategoryChart kind="donut" centerLabel="devices" data={Object.entries(summary.byType).map(([k, v]) => ({ key: k, label: typeName(k), value: v }))} onSelect={(x) => setType(x.key)} />
+            <CategoryChart kind="bar" centerLabel="devices" data={Object.entries(summary.byType).map(([k, v]) => ({ key: k, label: typeName(k), value: v }))} onSelect={(x) => setType(x.key)} />
           </Panel>
           <Panel title="By management" sub="How each device can be inventoried">
-            <CategoryChart kind="donut" centerLabel="devices" data={(['snmp', 'web', 'none'] as Management[]).map((k) => ({ key: k, label: MANAGEMENT[k][0], value: summary.byManagement[k] ?? 0, color: k === 'snmp' ? 'var(--ok)' : k === 'web' ? 'var(--warn)' : 'var(--line-strong)' }))} onSelect={(x) => setMgmt(x.key)} />
+            <CategoryChart kind="share" centerLabel="devices" data={(['snmp', 'web', 'none'] as Management[]).map((k) => ({ key: k, label: MANAGEMENT[k][0], value: summary.byManagement[k] ?? 0, color: k === 'snmp' ? 'var(--ok)' : k === 'web' ? 'var(--warn)' : 'var(--line-strong)' }))} onSelect={(x) => setMgmt(x.key)} />
           </Panel>
           <Panel title="By manufacturer">
             <CategoryChart kind="bar" centerLabel="devices" data={summary.byManufacturer.map((m) => ({ key: m.name, label: m.name, value: m.count }))} onSelect={(x) => { setQ(x.key === 'Unknown' ? '' : x.key); setSearch(x.key === 'Unknown' ? '' : x.key); }} />
@@ -135,7 +148,7 @@ function DevicesTab({ summary }: { summary: NetworkSummary | null }) {
           { key: 'p', label: 'Ports up', render: (d) => d.portsTotal ? <><span>{d.portsUp}/{d.portsTotal}</span> <Meter value={pct(d.portsUp, d.portsTotal)} /></> : '—' },
           { key: 'v', label: 'VLANs', render: (d) => d.vlans || '—' },
           { key: 'e', label: 'PoE', render: (d) => (d.poeBudgetWatts ? `${d.poeUsedWatts ?? 0}/${d.poeBudgetWatts} W` : '—') },
-          { key: 'c', label: 'CPU', render: (d) => (d.cpuPercent != null ? <span style={d.cpuPercent >= 80 ? { color: 'var(--crit)' } : undefined}>{d.cpuPercent}%</span> : '—') },
+          { key: 'c', label: 'Health', render: (d) => <DeviceHealth d={d} /> },
           { key: 'u', label: 'Unmanaged behind', render: (d) => (d.unmanagedPorts ? <Link to="/network?tab=unmanaged"><Pill tone="warn">{d.unmanagedPorts}</Pill></Link> : '—') },
           { key: 's', label: 'Last seen', render: (d) => <span title={fmt.date(d.lastSeenAt)}>{fmt.ago(d.lastSeenAt)}</span> },
         ]} />
@@ -161,6 +174,34 @@ export function ConnectedCell({ p }: { p: Pick<NetworkPort, 'connected' | 'neigh
   return parts.length ? <>{parts}</> : <span className="faint">—</span>;
 }
 
+function DeviceHealth({ d }: { d: NetworkDevice }) {
+  const hot = (v: number | null, limit: number) => (v != null && v >= limit ? { color: 'var(--crit)', fontWeight: 600 } : undefined);
+  const parts: ReactNode[] = [];
+  if (d.cpuPercent != null) parts.push(<span key="c" style={hot(d.cpuPercent, 80)}>CPU {d.cpuPercent}%</span>);
+  if (d.memoryPercent != null) parts.push(<span key="m" style={hot(d.memoryPercent, 85)}>Mem {d.memoryPercent}%</span>);
+  if (d.temperatureC != null) parts.push(<span key="t" style={hot(d.temperatureC, 60)}>{Math.round(d.temperatureC)} °C</span>);
+  return (
+    <div style={{ fontSize: 12.5 }}>
+      {parts.length ? parts.reduce<ReactNode[]>((acc, x, i) => (i ? [...acc, ' · ', x] : [x]), []) : <span className="faint">—</span>}
+      {(d.componentsBad > 0 || d.peersDown > 0) && <div>{d.componentsBad > 0 && <Pill tone="crit">{d.componentsBad} alarm(s)</Pill>} {d.peersDown > 0 && <Pill tone="crit">{d.peersDown} peer(s) down</Pill>}</div>}
+    </div>
+  );
+}
+
+export function TrafficCell({ p }: { p: Pick<NetworkPort, 'inBps' | 'outBps' | 'utilPercent' | 'oper'> }) {
+  if (p.oper !== 'up' || (p.inBps == null && p.outBps == null)) return <span className="faint">—</span>;
+  const u = p.utilPercent ?? 0;
+  return (
+    <div style={{ fontSize: 12, minWidth: 120 }}>
+      <div><span className="faint">in</span> {bpsLabel(p.inBps)} <span className="faint">out</span> {bpsLabel(p.outBps)}</div>
+      {p.utilPercent != null && <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span className="mini-meter" style={{ marginLeft: 0 }}><i style={{ width: `${Math.min(100, u)}%`, background: u >= 70 ? 'var(--crit)' : u >= 40 ? 'var(--warn)' : undefined }} /></span>
+        <span style={u >= 70 ? { color: 'var(--crit)', fontWeight: 600 } : undefined}>{u}%</span>
+      </div>}
+    </div>
+  );
+}
+
 function PortFlags({ p }: { p: NetworkPort }) {
   const errs = (p.inErrors ?? 0) + (p.outErrors ?? 0);
   return (
@@ -168,6 +209,8 @@ function PortFlags({ p }: { p: NetworkPort }) {
       {p.uplink && <Pill tone="info">Uplink</Pill>} {p.trunk && <Pill>Trunk</Pill>} {p.unmanagedSuspect && <Pill tone="warn">Unmanaged switch?</Pill>}
       {p.poe && <Pill tone="ok">PoE</Pill>} {errs > 0 && <Pill tone="crit">{errs.toLocaleString()} errors</Pill>}
       {p.oper === 'up' && p.duplex === 'half' && <Pill tone="warn">Half duplex</Pill>}
+      {p.stpState === 'blocking' && <Pill tone="warn">STP blocking</Pill>} {p.lagIfIndex != null && <Pill>LAG member</Pill>}
+      {((p.inDiscards ?? 0) + (p.outDiscards ?? 0)) > 0 && <Pill tone="warn">{((p.inDiscards ?? 0) + (p.outDiscards ?? 0)).toLocaleString()} discards</Pill>}
     </>
   );
 }
@@ -175,6 +218,7 @@ function PortFlags({ p }: { p: NetworkPort }) {
 const PORT_FILTERS: [string, string][] = [
   ['', 'All ports'], ['up', 'Connected (up)'], ['down', 'Not connected'], ['unused', 'Unused (no device ever learned)'], ['disabled', 'Disabled'],
   ['uplink', 'Uplinks'], ['unmanaged', 'Unmanaged switch suspected'], ['poe', 'PoE powered'], ['errors', 'With errors'], ['halfduplex', 'Half duplex'],
+  ['busy', 'Busy (≥ 70 % of speed)'], ['blocking', 'Blocked by spanning tree'], ['discards', 'With discards'],
 ];
 
 export function PortsTab({ assetId }: { assetId?: string }) {
@@ -201,6 +245,7 @@ export function PortsTab({ assetId }: { assetId?: string }) {
           { key: 's', label: 'Status', render: (p) => { const [l, t] = portState(p); return <Pill tone={t}>{l}</Pill>; } },
           { key: 'v', label: 'Speed', render: (p) => <>{p.oper === 'up' ? speedLabel(p.speedMbps) : '—'}{p.oper === 'up' && p.duplex && p.duplex !== 'full' ? <span className="faint"> {p.duplex}</span> : null}</> },
           { key: 'l', label: 'VLAN', render: (p) => (p.trunk ? 'trunk' : p.vlan ?? '—') },
+          { key: 't', label: 'Traffic', render: (p) => <TrafficCell p={p} /> },
           { key: 'c', label: 'Connected', className: 'wrap', render: (p) => <ConnectedCell p={p} /> },
           { key: 'f', label: '', render: (p) => <PortFlags p={p} /> },
         ]} />
@@ -271,12 +316,7 @@ function UnmanagedTab() {
   const { inferred, notManageable } = data.data;
   return (
     <>
-      <Callout>
-        Unmanaged switches have no IP address or management interface, so they cannot be scanned. Zentriq finds them from the MAC address tables of your managed switches:
-        an access port on which two or more devices were learned, with no LLDP/CDP neighbour and no trunk, has an unmanaged switch, hub or unknown access point behind it.
-        Virtual machines (VMware, Hyper-V, KVM, VirtualBox MACs) and randomised MAC addresses are not counted.
-      </Callout>
-      <Panel flush title={`Suspected unmanaged switches (${inferred.length})`} sub="Behind a port of a managed switch">
+      <Panel flush title={`Suspected unmanaged switches (${inferred.length})`} sub="Two or more devices behind one access port, with no neighbour and no trunk">
         <DataTable rows={inferred.map((u) => ({ ...u, id: `${u.assetId}:${u.ifIndex}` }))} empty="None found. Every access port has at most one device." columns={[
           { key: 'd', label: 'Managed switch · port', render: (u) => <><Link to={`/assets/${u.assetId}?tab=network`}><b>{u.deviceName}</b></Link> <span className="mono">{u.port}</span>{u.alias && <div className="faint" style={{ fontSize: 11.5 }}>{u.alias}</div>}</> },
           { key: 'v', label: 'VLAN', render: (u) => u.vlan ?? '—' },
