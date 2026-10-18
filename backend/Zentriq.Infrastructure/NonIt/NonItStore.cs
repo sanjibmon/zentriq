@@ -145,7 +145,7 @@ public static class NonItStore
               RETURNING NULL::jsonb, to_jsonb(nonit_assets.*)
               """
             : """
-              WITH old AS (SELECT to_jsonb(a.*) AS j FROM zentriq.nonit_assets a WHERE a.id = @id FOR UPDATE)
+              WITH old AS (SELECT to_jsonb(a.*) AS j FROM zentriq.nonit_assets a WHERE a.id = @id)
               UPDATE zentriq.nonit_assets SET asset_tag = COALESCE(@tag, asset_tag), barcode = @bc, name = @name, category_id = @cat, manufacturer = @mf, model = @mo,
                   serial_number = @sn, status = @st, condition = @co, quantity = @qty, location = @loc, department_id = @dep, assigned_to = @asg,
                   purchase_date = @pd, vendor = @ven, purchase_cost = @cost, invoice_number = @inv, po_number = @po, warranty_until = @wu, amc_vendor = @amcv,

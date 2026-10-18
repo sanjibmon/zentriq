@@ -40,7 +40,7 @@ public sealed class ReportSpec
     [JsonPropertyName("aggregates")] public List<ReportAggregate>? Aggregates { get; set; }
     /// <summary>Summary reports: date columns in the grouping are bucketed by day, week, month, quarter or year.</summary>
     [JsonPropertyName("dateBucket")] public string? DateBucket { get; set; }
-    /// <summary>How the console draws a summary (donut, pie, bar, column, line); kept with the report for dashboards and PDF.</summary>
+    /// <summary>How the console draws a summary (share bar, pie, bar, column, line; "donut" from older reports); kept with the report for dashboards and PDF.</summary>
     [JsonPropertyName("chart")] public string? Chart { get; set; }
 
     public static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
@@ -59,7 +59,7 @@ public static class ReportEngine
     public static readonly string[] Operators = ["eq", "neq", "contains", "not_contains", "starts", "gt", "gte", "lt", "lte", "empty", "not_empty", "last_days", "older_days", "in"];
     public static readonly string[] AggregateFunctions = ["count_distinct", "sum", "avg", "min", "max"];
     public static readonly string[] DateBuckets = ["day", "week", "month", "quarter", "year"];
-    public static readonly string[] Charts = ["donut", "pie", "bar", "column", "line", "table"];
+    public static readonly string[] Charts = ["share", "donut", "pie", "bar", "column", "line", "table"];
     public const int MaxColumns = 40;
     public const int MaxFilters = 25;
     public const int MaxAggregates = 6;
