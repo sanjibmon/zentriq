@@ -1,9 +1,18 @@
 # Test report
 
-Latest: GitHub Actions run 39118403672, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
-10.0.20348** VM. Release: `v1.1.1-build.60` (pre-release, **unsigned**), package version **1.1.1.60**. Results: unit +
-PostgreSQL integration tests **188 PASS, 2 skipped** (the live MeshCentral and live SNMP tests run in ci-quick: PASS);
-installer acceptance **53 passed, 0 failed, 0 blocked, 10 not run**; in-place updates PASS.
+Latest: GitHub Actions run 39146271985, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
+10.0.20348** VM. Release: `v1.1.1-build.61` (pre-release, **unsigned**), package version **1.1.1.61**. Results: unit +
+PostgreSQL integration tests **201 PASS, 2 skipped** (the live MeshCentral and live SNMP tests run in ci-quick: PASS, 203/203);
+installer acceptance **54 passed, 0 failed, 0 blocked, 10 not run**; in-place updates PASS.
+
+New in build 61 (modern console look, share bars instead of donuts, deeper network inventory, Non-IT Asset Inventory):
+
+| ID | Test | Result | Detail |
+|---|---|---|---|
+| T64 | Non-IT assets end to end | **PASS** | 61 categories (+1 custom); add with custom field; lookup by barcode; Excel form downloaded; CSV upload checked (unknown category reported in row 4) and applied (3 new, 1 new category); bulk change with history; Excel export; 7 built-in reports ran; delete |
+| T63 | Network inventory (re-run) | **PASS** | 10 built-in network reports ran (2 new: device health, busiest ports) |
+| — | Unit tests | **PASS** | port counters, discards, spanning-tree state, LAG membership, memory, ENTITY-SENSOR (temperature, optical dBm), Cisco fan / power-supply alarms, BGP / OSPF peers, transceivers; traffic rate from two collections (counter reset ignored); xlsx written and read back; CSV with quotes and semicolons; dates and amounts; Excel form drop-downs |
+| — | PostgreSQL tests | **PASS** | non-IT save: automatic tags, history of changes, duplicate tag and stale edit refused; bulk upload: check reports row errors, file with errors never applied, new categories, update by tag changes only filled cells |
 
 New in build 60 (Network Inventory):
 
