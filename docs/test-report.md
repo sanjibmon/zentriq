@@ -1,11 +1,21 @@
 # Test report
 
-Latest: GitHub Actions run 39146271985, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
-10.0.20348** VM. Release: `v1.1.1-build.61` (pre-release, **unsigned**), package version **1.1.1.61**. Results: unit +
-PostgreSQL integration tests **201 PASS, 2 skipped** (the live MeshCentral and live SNMP tests run in ci-quick: PASS, 203/203);
-installer acceptance **54 passed, 0 failed, 0 blocked, 10 not run**; in-place updates PASS.
+Latest: GitHub Actions run 39391653255, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
+10.0.20348** VM. Release: `v1.1.1-build.62` (pre-release, **unsigned**), package version **1.1.1.62**. Results: unit +
+PostgreSQL integration tests **204 PASS, 2 skipped** (the live MeshCentral and live SNMP tests run in ci-quick: PASS, 206/206);
+installer acceptance **56 passed, 0 failed, 0 blocked, 10 not run**; in-place updates PASS.
 
-New in build 61 (modern console look, share bars instead of donuts, deeper network inventory, Non-IT Asset Inventory):
+New in build 62 (Remote Support quick support over the internet, simpler remote UI, Non-IT groups and departments, section headers):
+
+| ID | Test | Result | Detail |
+|---|---|---|---|
+| T65 | Remote quick support end to end | **PASS** | session created; invitation page is run-only; the support app (`connect`, nothing installed) joined the session's own consent group as the runner; technician desktop link opened signed in; logged in History; ended and its group removed; install link page (install-only) |
+| T66 | Non-IT groups and departments | **PASS** | group added on its own; category joined it (case-insensitive); group rename moved the category; department counted 1 non-IT asset; cleaned up |
+| T59, T60, T64 | Remote support, remote agent via Zentriq Agent, Non-IT (re-run) | **PASS** | unchanged behaviour |
+| — | Live MeshCentral (ci-quick) | **PASS** | quick session group + invitation; Windows, Linux (ELF) and macOS (pkg zip) downloads from the invitation page; technician link; end removes group; stray quick group removed by refresh; install link; internet address used for invitations |
+| — | Unit / DB tests | **PASS** | technician rights (terminal on/off, chat, no AMT); quick codes and invitation text; internet address parse/apply (agentAliasDNS/Port); Non-IT groups table and trigger |
+
+Build 61 (modern console look, share bars instead of donuts, deeper network inventory, Non-IT Asset Inventory):
 
 | ID | Test | Result | Detail |
 |---|---|---|---|
