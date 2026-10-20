@@ -20,7 +20,17 @@ There are about 60 built-in categories in 11 groups:
 | Medical & lab | Medical equipment, laboratory instrument, weighing scale |
 | Other | Artwork, signage, planters |
 
-To add your own categories, open the **Categories** tab, give the category a name and pick a group (an existing one or a new one). You can rename any category. A category can be deleted only when no asset uses it.
+Tagline: *Every chair, vehicle, appliance and tool — tagged, tracked and valued.*
+
+**Groups & categories tab** (build 62):
+
+- **Add group** creates a group on its own (for example *Medical equipment*), before it has categories. Groups can be renamed (their categories move with them) and deleted when they have no categories.
+- **Add category**: a name and a group (pick one, or *＋ New group…*). Each group card also has **+** to add a category straight into it. Names are matched without regard to case, so *furniture* joins *Furniture*.
+- Categories can be renamed, moved to another group (*Move…*) and deleted when no asset uses them.
+
+**While adding or editing an asset** you don't have to leave the form: the *Category* list ends with **＋ Add new category…** (name and group, existing or new) and the *Department* list with **＋ Add new department…**. The new entry is selected at once.
+
+**Departments tab:** the departments shared with IT Asset Inventory, with the number of non-IT and IT assets in each; add, rename and delete. Clicking a non-IT count opens the asset list filtered to that department.
 
 ## What is recorded per asset
 
@@ -90,7 +100,7 @@ The **Non-IT assets** data source holds about 35 columns for your own reports, i
 ## Permissions and API
 
 - **Viewing** (assets.view): lists, details, export, the Excel form and reports.
-- **Changing** (assets.manage): adding, editing, bulk changes, upload, deleting, categories and custom fields.
+- **Changing** (assets.manage): adding, editing, bulk changes, upload, deleting, groups, categories, departments and custom fields.
 
 | Endpoint | Purpose |
 |---|---|
@@ -103,6 +113,7 @@ The **Non-IT assets** data source holds about 35 columns for your own reports, i
 | `POST /api/v1/nonit/assets/bulk` | Change several assets at once |
 | `POST /api/v1/nonit/assets/delete` | Delete assets |
 | `GET`, `POST`, `PUT`, `DELETE /api/v1/nonit/categories` | Categories |
+| `GET`, `POST`, `PUT`, `DELETE /api/v1/nonit/groups` | Groups (rename moves the categories; delete only when empty) |
 | `GET`, `POST`, `PUT`, `DELETE /api/v1/nonit/fields` | Custom fields |
 | `GET /api/v1/nonit/template` | The Excel form |
 | `POST /api/v1/nonit/import?dryRun=&update=&createCategories=` | Bulk upload; the request body is the file |

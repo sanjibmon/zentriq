@@ -1,6 +1,47 @@
 # Remote Support
 
-Remote Support is in the console under **Remote management › Remote Support**. It is no longer listed under *Secure & remediate*. Technicians can open a remote desktop, a terminal or a file browser on a device, with the user's consent. Every session is logged.
+Remote Support is in the console under **Remote management › Remote Support**. Tagline: *Help anyone, anywhere — see the screen, take control and move files, always with the user's consent.* Every session is logged.
+
+The page has four tabs (build 62):
+
+| Tab | What it is for |
+|---|---|
+| **Quick support** (default) | On-demand help for anyone, in the office or over the internet, in the way hosted tools such as Zoho Assist work: create a session, send the link, the person runs a small app and approves |
+| **Unattended devices** | Devices with the installed remote agent: connect at any time (consent settings apply) |
+| **History** | Every session opened from Zentriq |
+| **Settings** | Consent and privacy, terminal on/off, internet access, installing the agent, trusting the server, advanced |
+
+Session buttons are the same everywhere: **Remote desktop** (or **Connect**) and **Files** (file transfer), plus a small menu with **Chat & device details** and **Terminal** (only when allowed in Settings).
+
+## Quick support (on demand, anywhere)
+
+1. Click **New support session**. Optionally enter the person's name, e-mail and the problem; choose how long the link is valid (1 hour to 3 days).
+2. Zentriq creates a **device group for this session only** (*Quick support 482 913 077*) with consent always on (the person must allow screen, files and terminal; they are notified and see a bar with a disconnect button), and an **invitation link** (`https://<address>:8446/agentinvite?c=…`).
+3. Send the link: Zentriq can e-mail it (when e-mail is set up in System Settings), or copy the link or the ready-made message into chat, or open it in your mail app.
+4. The person opens the link and runs **Zentriq Remote Support**:
+   - **Windows:** a run-only app — nothing is installed; it disconnects when they close it.
+   - **macOS / Linux:** the page offers the agent for their system (a small package / install command).
+5. The session shows **Connected** with the device name, OS and address within about 15 seconds. Click **Remote desktop** or **Files**.
+6. Click **End** when done: the session's group is deleted and the app disconnects. If someone runs an old copy of the app later, the engine restores the group; Zentriq removes quick support groups that belong to no active session at its next check (within 2 minutes), so nobody can be reached through an ended session.
+
+Sessions end by themselves when nobody joins before the link expires (*Expired*), when the app has been closed for 30 minutes, or after 12 hours. The Worker checks every 2 minutes; the page checks every 15 seconds while sessions are active. Ended sessions stay listed for 7 days and every remote desktop / files / terminal session is in History and the audit log (`remote.quick_create`, `remote.session`, `remote.quick_end`).
+
+**Admin rights on the person's PC:** the run-only Windows app runs with the person's own rights. To answer UAC prompts, ask them to start it with *Run as administrator*, or use an **unattended** device (the installed agent runs as a service and shows the secure desktop, the sign-in screen and UAC prompts).
+
+## Internet access
+
+By default remote support works on your network. To help people at home or on the road:
+
+1. In **Settings › Internet access** enter a public DNS name (for example `support.contoso.com`) and the public port (default 8446).
+2. Create the DNS record (public IP outside; inside the office let it resolve to the server, or use NAT loopback).
+3. On the router/firewall forward **TCP 8446** (or the public port you chose) to the server's port 8446. Only the remote support engine is published, not the console (443) or the agent port (8444).
+4. So that people outside see no certificate warning, give the server a certificate from a public CA that includes the name (thumbprint in the Setup answer file; remote support uses the console's certificate).
+
+Saving writes `<data>\Remote\cert\internet.txt`; the ZentriqRemote service applies it within a minute (MeshCentral `agentAliasDNS` / `agentAliasPort`) and restarts the engine. Invitation links, install links and **new** agent installers then use the public name; agents already installed keep the address they have. Clearing the field returns to LAN only.
+
+## Install for unattended access
+
+Settings › *Install for unattended access* offers three ways: through the Zentriq Agent (select devices, **Install**), the Windows installer (`ZentriqRemoteSupport.exe -fullinstall`), and an **install link** valid for 3 days whose page offers Windows, macOS and Linux — useful for laptops outside the office. The installer bundles the Windows, macOS (universal, Apple silicon, Intel) and Linux (x64, ARM64) agents.
 
 ## Engine
 
@@ -29,9 +70,9 @@ Zentriq does not build its own remote-control stack. It bundles **MeshCentral 1.
 
 There is no second password:
 
-1. The technician clicks **Desktop**, **Terminal** or **Files** in Zentriq.
+1. The technician clicks **Remote desktop**, **Files** or **Terminal** in Zentriq.
 2. The API checks the permission and makes sure the technician has a personal account in the engine (`zq-<user id>`).
-3. The API grants that account rights on the device group. "Remote control" is the default; full rights come with `remote.unattended`.
+3. The API grants that account rights on the device group (the Zentriq group, or the quick support session's group): remote desktop, files and chat; terminal only when *Allow technicians to open a terminal* is on; never Intel AMT. Full rights come with `remote.unattended`.
 4. The API returns a sign-in link that is encrypted with a key known only to the server (AES-256-GCM, `AppSecrets.RemoteLoginKey`) and is **valid for 2 minutes**.
 5. The browser opens the device straight away in a new tab.
 
@@ -41,8 +82,8 @@ Each session is recorded in the session history and the audit log, with user, de
 
 | Permission | Allows |
 |---|---|
-| `remote.start` | See Remote Support; open desktop, terminal or files on a device |
-| `remote.manage` | Install or remove the remote agent, download the installer, consent settings, match devices |
+| `remote.start` | See Remote Support; create and end quick support sessions; open desktop, files or terminal on a device |
+| `remote.manage` | Install or remove the remote agent, download the installer, create install links, settings (consent, terminal, internet access), match devices |
 | `remote.unattended` | Full rights and the full remote console |
 
 All three permissions are given to the Administrator role.
@@ -60,13 +101,14 @@ All three permissions are given to the Administrator role.
 
 Every 2 minutes the Worker syncs the engine's device list to Zentriq. Devices are matched to assets by host name; you can match one by hand if the names differ.
 
-## Consent (Deployment & settings)
+## Consent (Settings)
 
-These settings apply to all devices immediately. All are on by default:
+These settings apply to all unattended devices immediately (quick support sessions always ask). All are on by default:
 
 - **Ask the user** to allow each desktop, terminal or files session.
 - **Notify the user** when a session starts.
 - **Privacy bar** on the device's screen, with a disconnect button.
+- **Allow technicians to open a terminal** (command line). Remote desktop and file transfer are always available.
 
 ## Server address and certificate (nothing is tied to a fixed IP)
 
@@ -78,11 +120,11 @@ These settings apply to all devices immediately. All are on by default:
 
 - **Browser origins:** the engine only accepts sessions from pages it knows (protection against other websites using a technician's session). It accepts every name and IPv4 address of the server, kept current by the ZentriqRemote service; a host name the server does not know (a DNS alias) is added the first time a technician uses it (that session waits up to a minute while the engine restarts).
 
-To support devices outside the LAN, publish port 8446 (and 8444 for the Zentriq Agent).
+To support devices outside the LAN, see *Internet access* above (and publish 8444 if Zentriq Agents should also report from outside).
 
 ## Antivirus
 
-The installer ships only the MeshCentral files Zentriq uses: the Windows agents and their core scripts (`installer/remote/agents-keep.txt`). Linux/macOS/Android agents, MeshCmd, MeshCentral Router and Satellite are left out. The installer is not code-signed yet; if Microsoft Defender or another product still blocks it, note the threat name and file from *Protection history* (`Get-MpThreatDetection`) — sign the build or submit the file as a false positive.
+The installer ships only the MeshCentral files Zentriq uses: the Windows, macOS and Linux agents and their core scripts (`installer/remote/agents-keep.txt`). Android agents, MeshCmd, MeshCentral Router and Satellite are left out. The installer is not code-signed yet; if Microsoft Defender or another product still blocks it, note the threat name and file from *Protection history* (`Get-MpThreatDetection`) — sign the build or submit the file as a false positive.
 
 ## Troubleshooting
 
@@ -95,8 +137,9 @@ The installer ships only the MeshCentral files Zentriq uses: the Windows agents 
 
 ## Tests
 
-- **Unit tests:** sign-in cookie format (matches MeshCentral), server configuration, rights and consent flags.
-- **Live test (ci-quick, real MeshCentral):** the control channel, group, user and consent management, a signed-in session link (a forged link is refused), the agent installer and sync.
+- **Unit tests:** sign-in cookie format (matches MeshCentral), server configuration, rights and consent flags, technician rights (terminal on/off), quick support codes and invitation text, internet address parsing and how it is applied to the engine.
+- **Live test (ci-quick, real MeshCentral):** the control channel, group, user and consent management, a signed-in session link (a forged link is refused), the agent installer and sync; a quick support session (own group, public run-only invitation page, Windows/Linux/macOS downloads, technician link, end removes the group and the link), the install link, invitation address with an internet name.
 - **Windows acceptance tests:**
   - **T59:** service and health; branded sign-in page and installer; the remote agent connects; a session link opens the signed-in device view.
   - **T60:** removing and reinstalling the remote agent through the Zentriq Agent from the console.
+  - **T65:** quick support end to end: create a session, the invitation page is run-only, the support app (`connect`) joins the session's group, the technician's desktop link opens, the session is in History; ending it removes the group and the link; install link page.

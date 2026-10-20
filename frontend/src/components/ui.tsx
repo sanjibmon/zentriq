@@ -1,21 +1,38 @@
 import type { ReactNode } from 'react';
 import { ApiError } from '../api/client';
-import { Link } from '../app/router';
+import { NAV, type NavItem } from '../app/nav';
+import { Link, useRouter } from '../app/router';
 import { Icon } from './Icon';
 import type { IconName } from './icons';
 
-export function PageHead({ title, desc, actions, crumbs = true }: { title: string; desc?: ReactNode; actions?: ReactNode; crumbs?: boolean }) {
+/** The navigation entry (and its group) a path belongs to: the longest matching path prefix. */
+function navFor(path: string): { group: string; item: NavItem } | null {
+  let best: { group: string; item: NavItem } | null = null;
+  for (const [group, items] of NAV)
+    for (const item of items)
+      if ((item.path === '/' ? path === '/' : path === item.path || path.startsWith(item.path + '/')) && (!best || item.path.length > best.item.path.length)) best = { group, item };
+  return best;
+}
+
+export function PageHead({ title, desc, actions, crumbs = true, icon }: { title: string; desc?: ReactNode; actions?: ReactNode; crumbs?: boolean; icon?: IconName }) {
+  const { path } = useRouter();
+  const nav = navFor(path);
+  const glyph = icon ?? nav?.item.icon;
+  const section = nav && nav.item.label !== title ? nav.item : null;
   return (
     <>
       {crumbs && (
         <div className="crumbs">
           <Link to="/">Zentriq</Link>
+          {nav && nav.group !== 'Overview' && <><span>›</span><span>{nav.group}</span></>}
+          {section && <><span>›</span><Link to={section.path}>{section.label}</Link></>}
           <span>›</span>
-          <span>{title}</span>
+          <span aria-current="page">{title}</span>
         </div>
       )}
       <div className="page-head">
-        <div>
+        {glyph && <span className="page-icon" aria-hidden><Icon name={glyph} size={22} /></span>}
+        <div className="page-title">
           <h1>{title}</h1>
           {desc && <p>{desc}</p>}
         </div>

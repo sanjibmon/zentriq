@@ -104,7 +104,7 @@ export function AgentsPage() {
 
   return (
     <>
-      <PageHead title="Agents" desc="Always-on inventory from every Windows device."
+      <PageHead title="Agents" desc="One lightweight agent for Windows, macOS and Linux — always-on inventory, wherever the device is."
         actions={<>
           {pkg.data?.package && <a className="btn" href={pkg.data.package.url} download>Download agent</a>}
           {manage && <button className="btn primary" onClick={() => setNewOpen(true)}>New enrollment code</button>}

@@ -119,7 +119,7 @@ Remove-Item $answer -Force   # contains the administrator password
 
 if (-not $installed) {
     foreach ($t in 'T02 PostgreSQL provisioning', 'T03 Database migration', 'T04 Administrator sign-in', 'T05 API and worker services', 'T06 Trial initialization',
-                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets') {
+                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments') {
         Record $t.Substring(0, 3) $t.Substring(4) 'BLOCKED' 'installation failed'
     }
 } else {
@@ -1324,6 +1324,63 @@ if (-not $installed) {
         Assert ($d.deleted -ge 4) "deleted $($d.deleted)"
         Invoke-RestMethod "$base/api/v1/nonit/fields/$($field.id)" -Method Delete -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } | Out-Null
         "categories $($cats.Count) (+1 custom); lookup by barcode OK; form $($bytes.Length) bytes; upload checked (unknown category reported) and applied (3 new, 1 new category); bulk change + history; export; $($lib.Count) reports ran; $($d.deleted) deleted"
+    } | Out-Null
+
+    Check 'T65' 'Remote quick support: session link, run-only support app joins its own consent group, technician opens it, ending removes it' {
+        Assert $remoteOk 'T59 did not pass'
+        $s = Login
+        $created = Api POST '/remote/quick' @{ customer = 'CI user'; note = 'acceptance'; hours = 1 } -Session $s
+        $q = $created.session
+        Assert ($q.code -match '^\d{9}$' -and $q.inviteUrl -match '/agentinvite\?c=' -and $q.status -eq 'waiting') "session: $($q | ConvertTo-Json -Compress)"
+        Assert ($created.invitation.text -match [regex]::Escape($q.inviteUrl)) 'the invitation text does not contain the link'
+        $page = Invoke-WebRequest $q.inviteUrl -SkipCertificateCheck
+        Assert ($page.Content -match "installFlags = '1'") 'the invitation page does not offer the run-only app'
+        $mid = [regex]::Match($page.Content, "var meshid = '([^']+)'").Groups[1].Value
+        Assert $mid 'no device group in the invitation page'
+        $origin = ([Uri]$q.inviteUrl).GetLeftPart([UriPartial]::Authority)
+        $exe = Join-Path $OutDir 'ZentriqQuickSupport.exe'
+        Invoke-WebRequest "$origin/meshagents?id=4&meshid=$mid&installflags=1" -OutFile $exe -SkipCertificateCheck
+        Assert ((Get-Item $exe).Length -gt 100000) 'support app download is too small'
+        $proc = Start-Process $exe -ArgumentList 'connect' -PassThru -WindowStyle Hidden
+        try {
+            $joined = Remote-Wait { @((Api GET '/remote/quick' -Session $s).items | Where-Object { $_.id -eq $q.id -and $_.status -eq 'connected' -and $_.online }) | Select-Object -First 1 } 4 'the support app to join the session'
+            $open = Api POST "/remote/quick/$($q.id)/open" @{ view = 'desktop' } -Session $s
+            Assert ($open.url -match '[?&]login=' -and $open.url -match 'gotonode=') "open: $($open.url)"
+            Assert ((Invoke-WebRequest $open.url -SkipCertificateCheck).Content -match 'MainDevDesktop') 'the session link did not open the device'
+            $hist = Api GET '/remote/sessions' -Session $s
+            Assert (@($hist.items | Where-Object { $_.device -match [regex]::Escape(($q.code -replace '(\d{3})(\d{3})(\d{3})', '$1 $2 $3')) }).Count -ge 1) 'quick session not in the history'
+        }
+        finally {
+            try { Api POST "/remote/quick/$($q.id)/end" @{} -Session $s | Out-Null } catch { }
+            Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+        }
+        $after = @((Api GET '/remote/quick' -Session $s).items | Where-Object id -eq $q.id)[0]
+        Assert ($after.status -eq 'ended') "after end: $($after.status)"
+        $link = Api POST '/remote/install-link' @{ hours = 1 } -Session $s
+        Assert ((Invoke-WebRequest $link.url -SkipCertificateCheck).Content -match "installFlags = '2'") 'install link page'
+        "session $($q.code): invitation page run-only, app joined as $($joined.deviceName) ($($joined.deviceOs)), desktop link opened, logged; ended and its group removed; install link OK"
+    } | Out-Null
+
+    Check 'T66' 'Non-IT groups and departments: add a group, a category in it, rename the group, department with non-IT count, clean up' {
+        $s = Login
+        $g = Api POST '/nonit/groups' @{ name = 'CI lab equipment' } -Session $s
+        $c = Api POST '/nonit/categories' @{ name = 'CI microscope'; group = 'ci LAB equipment' } -Session $s
+        Assert ($c.group -eq 'CI lab equipment') "category group: $($c.group)"
+        $grp = @(Api GET '/nonit/groups' -Session $s | ForEach-Object { $_ }) | Where-Object id -eq $g.id
+        Assert ($grp.categories -eq 1) "group categories: $($grp.categories)"
+        Api PUT "/nonit/groups/$($g.id)" @{ name = 'CI laboratory' } -Session $s | Out-Null
+        $cat = @(Api GET '/nonit/categories' -Session $s | ForEach-Object { $_ }) | Where-Object id -eq $c.id
+        Assert ($cat.group -eq 'CI laboratory') "category after group rename: $($cat.group)"
+        $dep = Api POST '/departments' @{ name = 'CI non-IT department' } -Session $s
+        $a = Api POST '/nonit/assets' @{ name = 'CI scope'; categoryId = $c.id; departmentId = $dep.id } -Session $s
+        $d = @((Api GET '/departments' -Session $s).items) | Where-Object id -eq $dep.id
+        Assert ($d.nonItAssets -eq 1) "department non-IT count: $($d.nonItAssets)"
+        Api POST '/nonit/assets/delete' @{ ids = @($a.id) } -Session $s | Out-Null
+        Api DELETE "/nonit/categories/$($c.id)" -Session $s | Out-Null
+        Api DELETE "/nonit/groups/$($g.id)" -Session $s | Out-Null
+        Api DELETE "/departments/$($dep.id)" -Session $s | Out-Null
+        Assert (-not (@(Api GET '/nonit/groups' -Session $s | ForEach-Object { $_ }) | Where-Object id -eq $g.id)) 'group not deleted'
+        "group added, category joined it (case-insensitive), rename followed, department counted 1 non-IT asset; cleaned up"
     } | Out-Null
 
     if ($UpgradeBundle) {

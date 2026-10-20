@@ -29,7 +29,7 @@ export function NetworkPage() {
 
   return (
     <>
-      <PageHead title="Network Inventory" desc="Every switch, router, firewall and access point on your network."
+      <PageHead title="Network Inventory" desc="Every switch, router, firewall and access point — mapped port by port."
         actions={<>
           <Link className="btn" to="/reports">Reports</Link>
           <Link className="btn primary" to="/discovery?new=1">Scan network devices</Link>

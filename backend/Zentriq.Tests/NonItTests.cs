@@ -192,4 +192,27 @@ public sealed class NonItStoreTests : IAsyncLifetime
         Assert.Equal("2028-03-31", await Scalar<string>(c, "SELECT warranty_until::text FROM zentriq.nonit_assets WHERE asset_tag = 'FUR-001'"));
         _ = lk;
     }
+
+    [DbFact]
+    public async Task Groups_exist_on_their_own_and_follow_categories()
+    {
+        await using var c = new NpgsqlConnection(_db.AppConnection);
+        await c.OpenAsync();
+        // Built-in groups come from the built-in categories.
+        Assert.True(await Scalar<long>(c, "SELECT count(*) FROM zentriq.nonit_groups WHERE builtin") >= 8);
+        Assert.Equal(0L, await Scalar<long>(c, """
+            SELECT count(*) FROM (SELECT DISTINCT lower(group_name) g FROM zentriq.nonit_categories) x
+             WHERE NOT EXISTS (SELECT 1 FROM zentriq.nonit_groups n WHERE lower(n.name) = x.g)
+            """));
+        // A group can be added before it has categories; a category naming a new group adds that group.
+        await using (var cmd = new NpgsqlCommand("INSERT INTO zentriq.nonit_groups (name) VALUES ('Medical equipment')", c)) await cmd.ExecuteNonQueryAsync();
+        await using (var cmd = new NpgsqlCommand("INSERT INTO zentriq.nonit_categories (name, group_name) VALUES ('Golf cart', 'Campus vehicles')", c)) await cmd.ExecuteNonQueryAsync();
+        Assert.Equal(1L, await Scalar<long>(c, "SELECT count(*) FROM zentriq.nonit_groups WHERE name = 'Campus vehicles' AND NOT builtin"));
+        // Names are unique regardless of case.
+        await using (var dup = new NpgsqlCommand("INSERT INTO zentriq.nonit_groups (name) VALUES ('medical EQUIPMENT')", c))
+            Assert.Equal(PostgresErrorCodes.UniqueViolation, (await Assert.ThrowsAsync<PostgresException>(() => dup.ExecuteNonQueryAsync())).SqlState);
+        // Moving a category to another (new) group adds it too.
+        await using (var cmd = new NpgsqlCommand("UPDATE zentriq.nonit_categories SET group_name = 'Grounds' WHERE name = 'Golf cart'", c)) await cmd.ExecuteNonQueryAsync();
+        Assert.Equal(1L, await Scalar<long>(c, "SELECT count(*) FROM zentriq.nonit_groups WHERE name = 'Grounds'"));
+    }
 }

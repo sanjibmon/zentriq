@@ -69,6 +69,59 @@ public sealed class RemoteSupportTests
         var id = Guid.Parse("11111111-2222-3333-4444-555555555555");
         Assert.Equal("zq-11111111222233334444555555555555", RemoteSupportService.MeshUserName(id));
         Assert.Equal("abc$def", new MeshNode("node//abc$def", "PC", null, null, true, null, 4, null).UrlId);
+        // Technicians: desktop and files always, chat; terminal only when allowed; never Intel AMT.
+        Assert.Equal(8u | 16384u | 2048u, MeshRights.Technician(terminal: true));
+        Assert.Equal(8u | 16384u | 2048u | 512u, MeshRights.Technician(terminal: false));
+        Assert.Equal(MeshRights.Consent(true, true, true), MeshRights.QuickConsent);
+    }
+
+    [Fact]
+    public void Quick_support_codes_and_invitation()
+    {
+        for (var i = 0; i < 50; i++) Assert.Matches("^[1-9][0-9]{8}$", RemoteSupportService.NewQuickCode());
+        Assert.Equal("482 913 077", RemoteSupportService.FormatCode("482913077"));
+        var q = new QuickSession(1, "482913077", "https://support.example.com:8446/agentinvite?c=abc", "Anita", "anita@example.com", null, "Priya Rao",
+            DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddHours(1), "waiting", null, null, null, null, false, null, null, null, null, null);
+        var (subject, text) = RemoteSupportService.QuickInvitation(q, "Priya Rao");
+        Assert.Equal("Remote support session 482 913 077", subject);
+        Assert.Contains("Hello Anita,", text);
+        Assert.Contains(q.InviteUrl, text);
+        Assert.Contains("Priya Rao", text);
+        Assert.Contains("nothing is installed", text);
+    }
+
+    [Fact]
+    public void Internet_address_is_parsed_and_applied_to_the_engine()
+    {
+        Assert.Equal(new RemoteServerConfig.Internet("support.example.com", 443), RemoteServerConfig.ParseInternet("Support.Example.com:443"));
+        Assert.Null(RemoteServerConfig.ParseInternet("support.example.com"));
+        Assert.Null(RemoteServerConfig.ParseInternet("bad host:443"));
+        Assert.Null(RemoteServerConfig.ParseInternet("x.example.com:70000"));
+        Assert.Null(RemoteServerConfig.ParseInternet(""));
+
+        var s = RemoteServerConfig.Build(new("zq-server.corp.local", 8446, new string('a', 160), "s", @"C:\d", @"C:\f", @"C:\b"))["settings"]!.AsObject();
+        Assert.False(RemoteServerConfig.ApplyInternet(s, "zq-server.corp.local", null));          // nothing to change
+        Assert.True(RemoteServerConfig.ApplyInternet(s, "zq-server.corp.local", new("support.example.com", 8446)));
+        Assert.Equal("support.example.com", s["agentAliasDNS"]!.GetValue<string>());
+        Assert.Null(s["agentAliasPort"]);                                                          // same port: no alias
+        Assert.True(RemoteServerConfig.ApplyInternet(s, "zq-server.corp.local", new("support.example.com", 443)));
+        Assert.Equal(443, s["agentAliasPort"]!.GetValue<int>());
+        Assert.False(RemoteServerConfig.ApplyInternet(s, "zq-server.corp.local", new("support.example.com", 443)));
+        Assert.True(RemoteServerConfig.ApplyInternet(s, "zq-server.corp.local", null));            // removed: back to the LAN name
+        Assert.Equal("zq-server.corp.local", s["agentAliasDNS"]!.GetValue<string>());
+        Assert.Null(s["agentAliasPort"]);
+        Assert.Equal(8446, s["port"]!.GetValue<int>());                                           // browsers keep the engine's port
+
+        var dir = Path.Combine(Path.GetTempPath(), "zq-inet-" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(dir);
+        try
+        {
+            RemoteServerConfig.WriteInternet(dir, new("support.example.com", 443));
+            Assert.Equal(new RemoteServerConfig.Internet("support.example.com", 443), RemoteServerConfig.ReadInternet(dir));
+            RemoteServerConfig.WriteInternet(dir, null);
+            Assert.Null(RemoteServerConfig.ReadInternet(dir));
+        }
+        finally { Directory.Delete(dir, true); }
     }
 }
 
@@ -206,6 +259,62 @@ public sealed class RemoteSupportLiveTests : IAsyncLifetime
         Assert.Equal($"https://localhost:{Port}/", remote.UrlFor("bad host/x"));
         var sync = await remote.SyncAsync(default);
         Assert.Equal(0, sync.Nodes);
+
+        // Quick support: a session gets its own device group (consent always on) and a public invitation page that runs
+        // the agent without installing it; ending the session removes the group and the page.
+        var quick = await remote.CreateQuickAsync(null, "Priya Rao", "Anita Desai", "anita@example.com", "Outlook", 1, "127.0.0.1", default);
+        Assert.Equal("waiting", quick.Status);
+        Assert.Matches("^[0-9]{9}$", quick.Code);
+        Assert.StartsWith($"https://127.0.0.1:{Port}/agentinvite?c=", quick.InviteUrl);
+        using (var anonymous = new HttpClient(new HttpClientHandler { ServerCertificateCustomValidationCallback = (_, _, _, _) => true }))
+        {
+            var invite = await anonymous.GetAsync(quick.InviteUrl);
+            Assert.True(invite.IsSuccessStatusCode, $"invitation page: HTTP {(int)invite.StatusCode}");
+            var html = await invite.Content.ReadAsStringAsync();
+            Assert.Contains("installFlags = '1'", html);                                       // run only, nothing installed
+            Assert.Contains("Zentriq", html);
+            // The page's downloads work for Windows, Linux and macOS (the agents Zentriq ships, installer/remote/agents-keep.txt).
+            var mid = System.Text.RegularExpressions.Regex.Match(html, "var meshid = '([^']+)'").Groups[1].Value;
+            Assert.NotEmpty(mid);
+            var origin = new Uri(quick.InviteUrl).GetLeftPart(UriPartial.Authority);
+            var win = await anonymous.GetByteArrayAsync($"{origin}/meshagents?id=4&meshid={mid}&installflags=1");
+            Assert.Equal((byte)'M', win[0]);
+            var linux = await anonymous.GetByteArrayAsync($"{origin}/meshagents?id=6&meshid={mid}&installflags=1");
+            Assert.Equal(new byte[] { 0x7F, (byte)'E', (byte)'L', (byte)'F' }, linux[..4]);
+            var mac = await anonymous.GetByteArrayAsync($"{origin}/meshosxagent?id=10005&meshid={mid}");
+            Assert.Equal(new byte[] { (byte)'P', (byte)'K' }, mac[..2]);
+        }
+        var active = await remote.ActiveQuickAsync(quick.Id, default);
+        Assert.NotNull(active);
+        await using (var mc = await MeshControlClient.ConnectAsync(new Uri($"https://127.0.0.1:{Port}/"), options.Remote.ServiceUser, key, default))
+            Assert.Equal(RemoteSupportService.QuickGroupPrefix + RemoteSupportService.FormatCode(quick.Code), (await mc.GroupsAsync(default))[active!.Value.MeshId]);
+        var techLink = await remote.SessionUrlAsync(uid, "Priya Rao", false, false, null, "console", default, "127.0.0.1", groupId: active!.Value.MeshId);
+        Assert.StartsWith($"https://127.0.0.1:{Port}/?login=", techLink);
+        Assert.Equal(0, await remote.RefreshQuickAsync(default));                               // still waiting, not expired
+        Assert.Single(await remote.QuickSessionsAsync(default));
+        Assert.True(await remote.EndQuickAsync(quick.Id, "Priya Rao", "Ended by the technician.", default));
+        Assert.False(await remote.EndQuickAsync(quick.Id, "Priya Rao", "again", default));
+        Assert.Equal("ended", (await remote.QuickSessionAsync(quick.Id, default))!.Status);
+        await using (var mc = await MeshControlClient.ConnectAsync(new Uri($"https://127.0.0.1:{Port}/"), options.Remote.ServiceUser, key, default))
+            Assert.DoesNotContain(active.Value.MeshId, (await mc.GroupsAsync(default)).Keys);
+        // A quick support group without an active session (the engine restores a deleted group when an old copy of the
+        // app connects again) is removed by the next refresh.
+        await using (var mc = await MeshControlClient.ConnectAsync(new Uri($"https://127.0.0.1:{Port}/"), options.Remote.ServiceUser, key, default))
+        {
+            var stray = await mc.CreateGroupAsync(RemoteSupportService.QuickGroupPrefix + "000 000 000", "stray", MeshRights.QuickConsent, default);
+            Assert.Equal(1, await remote.RefreshQuickAsync(default));
+            Assert.DoesNotContain(stray, (await mc.GroupsAsync(default)).Keys);
+        }
+
+        // Install link for unattended access (Windows, macOS, Linux).
+        var installLink = await remote.InstallLinkAsync(24, "127.0.0.1", default);
+        using (var anonymous = new HttpClient(new HttpClientHandler { ServerCertificateCustomValidationCallback = (_, _, _, _) => true }))
+            Assert.Contains("installFlags = '2'", await (await anonymous.GetAsync(installLink)).Content.ReadAsStringAsync());
+
+        // With an internet address, invitations use it.
+        await remote.SaveSettingsAsync(new RemoteSettings { InternetHost = "support.example.com", InternetPort = 443 }, default);
+        Assert.Equal("https://support.example.com:443/", remote.InviteBase(await remote.SettingsAsync(default), "127.0.0.1"));
+        await remote.SaveSettingsAsync(new RemoteSettings(), default);
         await remote.SaveSettingsAsync(new RemoteSettings { Prompt = false, Notify = true, PrivacyBar = true }, default);
         Assert.False((await remote.SettingsAsync(default)).Prompt);
 

@@ -129,10 +129,23 @@ public sealed class RemoteHost(ZentriqPaths paths, ILogger<RemoteHost> logger) :
             }
         }
 
+        // Internet access: devices and invitation links use the public address when one is set (Remote Support ›
+        // Settings), otherwise the LAN host name Setup configured (remembered in zentriq-host.txt).
+        var lanFile = Path.Combine(data, RemoteServerConfig.LanHostFile);
+        if (!File.Exists(lanFile)) File.WriteAllText(lanFile, settings?["agentAliasDNS"]?.GetValue<string>() ?? "localhost");
+        var lanHost = File.ReadAllText(lanFile).Trim();
+        var internet = RemoteServerConfig.ReadInternet(src);
+        if (settings is not null && RemoteServerConfig.ApplyInternet(settings, lanHost, internet))
+        {
+            cfgChanged = true;
+            changes.Add(internet is null ? "internet address removed" : $"internet address {internet}");
+        }
+
         if (domain is not null)
         {
-            var host = settings?["agentAliasDNS"]?.GetValue<string>() ?? "localhost";
-            var origins = RemoteServerConfig.Origins(host, RemoteServerConfig.ReadLines(Path.Combine(src, RemoteServerConfig.OriginsFile)));
+            var extra = RemoteServerConfig.ReadLines(Path.Combine(src, RemoteServerConfig.OriginsFile)).ToList();
+            if (internet is not null) extra.Add(internet.Host);
+            var origins = RemoteServerConfig.Origins(lanHost, extra);
             var current = (domain["allowedOrigin"] as System.Text.Json.Nodes.JsonArray)?.Select(n => n?.GetValue<string>() ?? "").ToArray() ?? [];
             if (!current.SequenceEqual(origins))
             {

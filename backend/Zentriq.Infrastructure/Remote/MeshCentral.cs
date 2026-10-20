@@ -164,6 +164,26 @@ public sealed class MeshControlClient : IAsyncDisposable
         return id;
     }
 
+    /// <summary>Deletes a device group and every device in it (connected agents are disconnected).</summary>
+    public async Task DeleteGroupAsync(string meshId, CancellationToken ct)
+    {
+        var r = await SendAsync(new JsonObject { ["action"] = "deletemesh", ["meshid"] = meshId }, ct);
+        var res = Result(r);
+        if (res is null or "ok" || res.Contains("Unknown", StringComparison.OrdinalIgnoreCase)) return;
+        throw new MeshException("Could not remove the device group: " + res);
+    }
+
+    /// <summary>
+    /// An invitation for a device group: the cookie for the engine's public agentinvite page, valid for
+    /// <paramref name="hours"/> hours. Flags: 0 install or run, 1 run only (nothing installed), 2 install only.
+    /// </summary>
+    public async Task<string> CreateInviteAsync(string meshId, int hours, int flags, CancellationToken ct)
+    {
+        var r = await SendAsync(new JsonObject { ["action"] = "createInviteLink", ["meshid"] = meshId, ["expire"] = hours, ["flags"] = flags }, ct);
+        if (r["cookie"]?.ToString() is { Length: > 0 } cookie) return cookie;
+        throw new MeshException("Could not create the invitation: " + (Result(r) ?? "no answer"));
+    }
+
     public async Task SetGroupConsentAsync(string meshId, int consent, CancellationToken ct)
     {
         var r = await SendAsync(new JsonObject { ["action"] = "editmesh", ["meshid"] = meshId, ["consent"] = consent }, ct);
@@ -237,6 +257,16 @@ public static class MeshRights
 {
     public const uint RemoteControl = 8;
     public const uint ViewOnly = 256;
+    public const uint NoTerminal = 512;
+    public const uint NoAmt = 2048;
+    /// <summary>Chat with the user and send notifications.</summary>
+    public const uint ChatNotify = 16384;
+
+    /// <summary>A technician's rights: remote desktop and files (always), chat, terminal when allowed.</summary>
+    public static uint Technician(bool terminal) => RemoteControl | ChatNotify | NoAmt | (terminal ? 0 : NoTerminal);
+
+    /// <summary>Quick support sessions: every kind of access needs the user's approval, the user is notified and sees the bar.</summary>
+    public const int QuickConsent = 1 | 2 | 4 | 8 | 16 | 32 | 64;
     public const uint Full = 0xFFFFFFFF;
 
     /// <summary>Consent flags: 1/2/4 notify (desktop, terminal, files), 8/16/32 prompt, 64 toolbar (privacy bar).</summary>

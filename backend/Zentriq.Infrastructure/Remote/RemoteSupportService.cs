@@ -17,6 +17,12 @@ public sealed class RemoteSettings
     public bool Notify { get; set; } = true;
     /// <summary>Show a bar on the device's screen during remote desktop sessions (with a disconnect button).</summary>
     public bool PrivacyBar { get; set; } = true;
+    /// <summary>Technicians may open a command window (terminal) on devices. Remote desktop and file transfer are always available.</summary>
+    public bool AllowTerminal { get; set; } = true;
+    /// <summary>Public DNS name (or address) that devices and users outside the network use to reach remote support.</summary>
+    public string? InternetHost { get; set; }
+    /// <summary>Port published on the router/firewall for <see cref="InternetHost"/> (forwarded to the remote support port).</summary>
+    public int? InternetPort { get; set; }
 }
 
 public sealed record RemoteStatus(bool Installed, bool Running, string? Message, string? PublicUrl, int Port);
@@ -28,7 +34,7 @@ public sealed record SyncResult(int Nodes, int Connected, int Mapped);
 /// ZentriqRemote service. Keeps one device group for Zentriq, maps remote agents to assets, creates a remote support
 /// account per technician on first use and signs technicians in with short-lived links (no separate password).
 /// </summary>
-public sealed class RemoteSupportService(NpgsqlDataSource ds, ZentriqOptions options, Func<AppSecrets> secrets, ILogger<RemoteSupportService> logger)
+public sealed partial class RemoteSupportService(NpgsqlDataSource ds, ZentriqOptions options, Func<AppSecrets> secrets, ILogger<RemoteSupportService> logger)
 {
     public const string GroupName = "Zentriq devices";
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
@@ -39,6 +45,7 @@ public sealed class RemoteSupportService(NpgsqlDataSource ds, ZentriqOptions opt
     }
 
     public bool Configured => options.Remote.Enabled && Key is { Length: 160 };
+    public int Port => options.Remote.Port;
     public Uri LocalUrl => new($"https://127.0.0.1:{options.Remote.Port}/");
     public string PublicHost => string.IsNullOrWhiteSpace(options.Remote.PublicHost) ? options.Https.HostName : options.Remote.PublicHost.Trim();
     public string PublicUrl => $"https://{PublicHost}:{options.Remote.Port}/";
@@ -192,14 +199,15 @@ public sealed class RemoteSupportService(NpgsqlDataSource ds, ZentriqOptions opt
     /// A sign-in link for one technician that opens the device (or the full remote console when nodeId is null).
     /// The technician's remote support account is created or updated first; the link is valid for 2 minutes.
     /// </summary>
-    public async Task<string> SessionUrlAsync(Guid userId, string displayName, bool fullRights, bool viewOnly, string? nodeId, string view, CancellationToken ct, string? browserHost = null)
+    public async Task<string> SessionUrlAsync(Guid userId, string displayName, bool fullRights, bool viewOnly, string? nodeId, string view, CancellationToken ct, string? browserHost = null, string? groupId = null)
     {
         await using var c = await ConnectAsync(ct);
         var mesh = await EnsureGroupAsync(c, null, ct);
         var name = MeshUserName(userId);
         var meshUser = "user//" + name;
         await c.EnsureUserAsync(name, displayName, null, ct);
-        await c.GrantGroupAsync(mesh, meshUser, fullRights ? MeshRights.Full : MeshRights.RemoteControl | (viewOnly ? MeshRights.ViewOnly : 0), ct);
+        var settings = await SettingsAsync(ct);
+        await c.GrantGroupAsync(groupId ?? mesh, meshUser, fullRights ? MeshRights.Full : MeshRights.Technician(settings.AllowTerminal) | (viewOnly ? MeshRights.ViewOnly : 0), ct);
         var url = UrlFor(browserHost) + "?login=" + Uri.EscapeDataString(MeshCookie.Login(meshUser, Key!));
         if (nodeId is not null)
         {
@@ -231,6 +239,19 @@ public sealed class RemoteSupportService(NpgsqlDataSource ds, ZentriqOptions opt
         {
             logger.LogWarning("Remote support: could not record host name {Host}: {Message}", h, ex.Message);
         }
+    }
+
+    /// <summary>
+    /// An invitation page for installing the agent into the Zentriq device group (unattended access) on Windows, macOS or
+    /// Linux, valid for <paramref name="hours"/> hours; uses the internet address when one is set.
+    /// </summary>
+    public async Task<string> InstallLinkAsync(int hours, string? browserHost, CancellationToken ct)
+    {
+        var settings = await SettingsAsync(ct);
+        await using var c = await ConnectAsync(ct);
+        var mesh = await EnsureGroupAsync(c, settings, ct);
+        var cookie = await c.CreateInviteAsync(mesh, hours, flags: 2, ct); // install only (background service)
+        return InviteBase(settings, browserHost) + "agentinvite?c=" + Uri.EscapeDataString(cookie);
     }
 
     // ---- agent installer ----------------------------------------------------------------------------

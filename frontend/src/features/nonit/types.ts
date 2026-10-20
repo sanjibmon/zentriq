@@ -11,6 +11,7 @@ export interface NonItAsset {
 }
 
 export interface NonItCategory { id: string; name: string; group: string; builtin: boolean; count: number }
+export interface NonItGroup { id: string; name: string; builtin: boolean; categories: number; count: number }
 export interface NonItField { id: string; key: string; label: string; type: 'text' | 'number' | 'date' | 'yesno' | 'list'; options: string[]; sort: number }
 export interface KCount { key: string; count: number; id?: string; value?: number }
 

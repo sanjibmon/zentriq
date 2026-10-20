@@ -4,6 +4,7 @@ using Npgsql;
 using NpgsqlTypes;
 using Zentriq.Api.Infrastructure;
 using Zentriq.Domain;
+using Zentriq.Infrastructure.Mail;
 using Zentriq.Infrastructure.Remote;
 
 namespace Zentriq.Api.Endpoints;
@@ -18,21 +19,31 @@ public static class RemoteEndpoints
     public sealed record SessionBody(Guid? AssetId, string? NodeId, string View);
     public sealed record DeployBody(Guid[] AssetIds, string Operation);
     public sealed record MapBody(string NodeId, Guid? AssetId);
+    public sealed record QuickBody(string? Customer, string? Email, string? Note, int? Hours, bool? SendEmail);
+    public sealed record QuickOpenBody(string View);
+    public sealed record InstallLinkBody(int? Hours);
+
+    private static bool Unavailable(Exception ex) => ex is MeshException or WebSocketException or HttpRequestException or TaskCanceledException or IOException;
 
     public static void MapRemoteEndpoints(this RouteGroupBuilder api)
     {
         var g = api.MapGroup("/remote").WithTags("Remote support").RequireModule(Modules.Remote).RequireAuthorization(Permissions.RemoteStart);
 
-        g.MapGet("/status", async (RemoteSupportService remote, NpgsqlDataSource ds, HttpContext http, CancellationToken ct) =>
+        g.MapGet("/status", async (RemoteSupportService remote, NpgsqlDataSource ds, HttpContext http, ZentriqPaths paths, CancellationToken ct) =>
         {
             var st = await remote.StatusAsync(ct);
+            var settings = await remote.SettingsAsync(ct);
+            var inetHost = RemoteServerConfig.NormalizeHost(settings.InternetHost);
+            var inetApplied = inetHost is not null && RemoteServerConfig.ReadLines(Path.Combine(paths.RemoteCertificateDir, RemoteServerConfig.AppliedOriginsFile)).Contains(inetHost);
             await using var cmd = ds.CreateCommand("""
                 SELECT (SELECT count(*) FROM zentriq.remote_nodes), (SELECT count(*) FROM zentriq.remote_nodes WHERE connected),
                        (SELECT count(*) FROM zentriq.remote_nodes WHERE asset_id IS NULL),
                        (SELECT count(*) FROM zentriq.remote_sessions WHERE created_at > now() - interval '24 hours'),
                        (SELECT max(synced_at) FROM zentriq.remote_nodes),
                        (SELECT count(*) FROM zentriq.agent_registrations r WHERE r.status = 'active' AND 'remote-support' = ANY(r.capabilities)
-                           AND NOT EXISTS (SELECT 1 FROM zentriq.remote_nodes n WHERE n.asset_id = r.asset_id))
+                           AND NOT EXISTS (SELECT 1 FROM zentriq.remote_nodes n WHERE n.asset_id = r.asset_id)),
+                       (SELECT count(*) FROM zentriq.remote_quick_sessions WHERE status IN ('waiting','connected')),
+                       (SELECT count(*) FROM zentriq.remote_quick_sessions WHERE created_at > now() - interval '30 days')
                 """);
             await using var r = await cmd.ExecuteReaderAsync(ct);
             await r.ReadAsync(ct);
@@ -41,6 +52,8 @@ public static class RemoteEndpoints
                 st.Installed, st.Running, st.Message, PublicUrl = st.Installed ? remote.UrlFor(http.Request.Host.Host) : null, st.Port,
                 devices = r.GetInt64(0), online = r.GetInt64(1), unmapped = r.GetInt64(2), sessions24h = r.GetInt64(3),
                 lastSync = r.IsDBNull(4) ? (DateTimeOffset?)null : r.GetFieldValue<DateTimeOffset>(4), readyToInstall = r.GetInt64(5),
+                quickActive = r.GetInt64(6), quick30d = r.GetInt64(7),
+                internet = inetHost is null ? null : new { host = inetHost, port = settings.InternetPort ?? st.Port, applied = inetApplied },
             });
         });
 
@@ -146,6 +159,89 @@ public static class RemoteEndpoints
             return Results.Ok(new { url, expiresInSeconds = 120 });
         });
 
+        // ---- quick support (on demand, anywhere) ----------------------------------------------------------------
+
+        g.MapGet("/quick", async (RemoteSupportService remote, CancellationToken ct) =>
+        {
+            string? warning = null;
+            try { await remote.RefreshQuickAsync(ct); }
+            catch (Exception ex) when (Unavailable(ex)) { warning = "Remote support server not reachable; showing the last known state. " + ex.Message; }
+            return Results.Ok(new { items = await remote.QuickSessionsAsync(ct), warning });
+        });
+
+        g.MapPost("/quick", async (QuickBody body, RemoteSupportService remote, MailService mail, RequestContext rc, HttpContext http, ZentriqPaths paths, CancellationToken ct) =>
+        {
+            var email = body.Email?.Trim();
+            if (!string.IsNullOrEmpty(email) && (email.Length > 254 || !System.Net.Mail.MailAddress.TryCreate(email, out _))) return Validation.Problem("email", "Enter a valid e-mail address or leave it empty.");
+            var name = rc.Principal.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value ?? rc.UserName;
+            QuickSession q;
+            try
+            {
+                await remote.EnsureOriginAsync(paths.RemoteCertificateDir, http.Request.Host.Host, ct);
+                q = await remote.CreateQuickAsync(rc.UserId, name, body.Customer, email, body.Note, body.Hours ?? 1, http.Request.Host.Host, ct);
+            }
+            catch (Exception ex) when (Unavailable(ex)) { return Results.Problem(statusCode: 503, title: "Remote support is not available: " + ex.Message); }
+            await rc.AuditAsync("remote.quick_create", RemoteSupportService.FormatCode(q.Code), detail: new { q.Id, q.Customer, q.Email, q.ExpiresAt });
+            string? emailResult = null;
+            if (body.SendEmail == true && !string.IsNullOrEmpty(email))
+            {
+                var smtp = await mail.LoadAsync(ct);
+                if (!MailService.IsUsable(smtp)) emailResult = "E-mail is not set up (Settings › E-mail); copy the invitation instead.";
+                else
+                {
+                    var (subject, text) = RemoteSupportService.QuickInvitation(q, name);
+                    try { await mail.SendAsync(smtp, email, subject, text, null, ct); emailResult = "sent"; }
+                    catch (Exception ex) when (ex is MailException or System.Net.Mail.SmtpException or InvalidOperationException or IOException) { emailResult = "The e-mail could not be sent: " + ex.Message; }
+                }
+            }
+            var (subj, body2) = RemoteSupportService.QuickInvitation(q, name);
+            return Results.Ok(new { session = q, email = emailResult, invitation = new { subject = subj, text = body2 } });
+        });
+
+        g.MapPost("/quick/{id:long}/open", async (long id, QuickOpenBody body, NpgsqlDataSource ds, RemoteSupportService remote, RequestContext rc, HttpContext http, ZentriqPaths paths, CancellationToken ct) =>
+        {
+            if (body.View is not ("desktop" or "files" or "terminal" or "device")) return Validation.Problem("view", "Choose desktop, files, terminal or device.");
+            if (rc.UserId is not { } uid) return Results.Unauthorized();
+            if (await remote.ActiveQuickAsync(id, ct) is not { } q) return Results.Problem(statusCode: 404, title: "This quick support session has ended.");
+            if (q.NodeId is null) return Results.Problem(statusCode: 409, title: "Nobody has joined this session yet. Send the invitation link to the person who needs help.");
+            if (!q.Online) return Results.Problem(statusCode: 409, title: "The person's support app is not connected (closed or offline).");
+            var name = rc.Principal.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value ?? rc.UserName;
+            string url;
+            try
+            {
+                await remote.EnsureOriginAsync(paths.RemoteCertificateDir, http.Request.Host.Host, ct);
+                url = await remote.SessionUrlAsync(uid, name, fullRights: false, viewOnly: false, q.NodeId, body.View, ct, http.Request.Host.Host, groupId: q.MeshId);
+            }
+            catch (Exception ex) when (Unavailable(ex)) { return Results.Problem(statusCode: 503, title: "Remote support is not available: " + ex.Message); }
+            await using (var log = ds.CreateCommand("""
+                INSERT INTO zentriq.remote_sessions (user_id, user_name, node_id, device_name, view, source_ip, quick_session_id) VALUES (@u, @n, @node, @d, @v, @ip, @q)
+                """))
+            {
+                log.Parameters.AddWithValue("u", uid);
+                log.Parameters.AddWithValue("n", name);
+                log.Parameters.AddWithValue("node", q.NodeId);
+                log.Parameters.AddWithValue("d", $"{q.Device ?? "Quick support"} (quick support {RemoteSupportService.FormatCode(q.Code)})");
+                log.Parameters.AddWithValue("v", body.View);
+                log.Parameters.Add(new NpgsqlParameter("ip", NpgsqlDbType.Text) { Value = (object?)http.Connection.RemoteIpAddress?.ToString() ?? DBNull.Value });
+                log.Parameters.AddWithValue("q", id);
+                await log.ExecuteNonQueryAsync(ct);
+            }
+            await rc.AuditAsync("remote.session", $"quick support {RemoteSupportService.FormatCode(q.Code)}", detail: new { body.View, quickSessionId = id, q.NodeId });
+            return Results.Ok(new { url, expiresInSeconds = 120 });
+        });
+
+        g.MapPost("/quick/{id:long}/end", async (long id, RemoteSupportService remote, RequestContext rc, CancellationToken ct) =>
+        {
+            var name = rc.Principal.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value ?? rc.UserName;
+            try
+            {
+                if (!await remote.EndQuickAsync(id, name, "Ended by the technician.", ct)) return Results.NotFound();
+            }
+            catch (Exception ex) when (Unavailable(ex)) { return Results.Problem(statusCode: 503, title: "Remote support is not available: " + ex.Message); }
+            await rc.AuditAsync("remote.quick_end", id.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            return Results.NoContent();
+        });
+
         g.MapGet("/sessions", async (Guid? assetId, int? page, int? pageSize, NpgsqlDataSource ds, CancellationToken ct) =>
         {
             var (p, ps) = Paging.Normalize(page, pageSize);
@@ -242,6 +338,19 @@ public static class RemoteEndpoints
             }
         }).RequireAuthorization(Permissions.RemoteManage);
 
+        // An invitation page to install the agent for unattended access (Windows, macOS, Linux), e.g. for laptops off the network.
+        g.MapPost("/install-link", async (InstallLinkBody body, RemoteSupportService remote, RequestContext rc, HttpContext http, CancellationToken ct) =>
+        {
+            var hours = Math.Clamp(body.Hours ?? 24, 1, 720);
+            try
+            {
+                var url = await remote.InstallLinkAsync(hours, http.Request.Host.Host, ct);
+                await rc.AuditAsync("remote.install_link", null, detail: new { hours });
+                return Results.Ok(new { url, expiresAt = DateTimeOffset.UtcNow.AddHours(hours) });
+            }
+            catch (Exception ex) when (Unavailable(ex)) { return Results.Problem(statusCode: 503, title: "Remote support is not available: " + ex.Message); }
+        }).RequireAuthorization(Permissions.RemoteManage);
+
         g.MapPost("/sync", async (RemoteSupportService remote, RequestContext rc, CancellationToken ct) =>
         {
             try
@@ -271,8 +380,20 @@ public static class RemoteEndpoints
 
         g.MapGet("/settings", async (RemoteSupportService remote, CancellationToken ct) => Results.Ok(await remote.SettingsAsync(ct)));
 
-        g.MapPut("/settings", async (RemoteSettings body, RemoteSupportService remote, RequestContext rc, CancellationToken ct) =>
+        g.MapPut("/settings", async (RemoteSettings body, RemoteSupportService remote, RequestContext rc, ZentriqPaths paths, CancellationToken ct) =>
         {
+            if (string.IsNullOrWhiteSpace(body.InternetHost)) { body.InternetHost = null; body.InternetPort = null; }
+            else
+            {
+                var raw = body.InternetHost.Trim();
+                if (raw.Contains("://", StringComparison.Ordinal) && Uri.TryCreate(raw, UriKind.Absolute, out var u)) raw = u.Host;
+                if (RemoteServerConfig.NormalizeHost(raw) is not { } h || !h.Contains('.')) return Validation.Problem("internetHost", "Enter a DNS name such as support.example.com (or a public IPv4 address).");
+                body.InternetHost = h;
+                body.InternetPort ??= remote.Port;
+                if (body.InternetPort is < 1 or > 65535) return Validation.Problem("internetPort", "Enter a port between 1 and 65535.");
+            }
+            try { RemoteServerConfig.WriteInternet(paths.RemoteCertificateDir, body.InternetHost is null ? null : new(body.InternetHost, body.InternetPort!.Value)); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return Results.Problem(statusCode: 500, title: "Could not save the internet address for the remote support service: " + ex.Message); }
             try { await remote.SaveSettingsAsync(body, ct); }
             catch (Exception ex) when (ex is MeshException or WebSocketException or HttpRequestException or TaskCanceledException)
             {

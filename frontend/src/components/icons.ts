@@ -1,5 +1,12 @@
 // Icon paths from the Zentriq prototype (24x24, stroke icons).
 export const ICONS = {
+  "mail": "<rect x=\"3\" y=\"5\" width=\"18\" height=\"14\" rx=\"2\"/><path d=\"M3.5 6.5L12 13l8.5-6.5\"/>",
+  "link": "<path d=\"M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1\"/><path d=\"M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1\"/>",
+  "folder": "<path d=\"M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2.5h8.5A1.5 1.5 0 0 1 21 9v9.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z\"/>",
+  "terminal": "<rect x=\"3\" y=\"4\" width=\"18\" height=\"16\" rx=\"2\"/><path d=\"M7 9l3 3-3 3M12.5 15H17\"/>",
+  "chat": "<path d=\"M20 12a7.5 7.5 0 0 1-11.2 6.5L4 20l1.5-4.3A7.5 7.5 0 1 1 20 12z\"/>",
+  "monitor": "<rect x=\"2.5\" y=\"4\" width=\"19\" height=\"12.5\" rx=\"1.5\"/><path d=\"M8.5 20.5h7M12 16.5v4\"/>",
+  "shield": "<path d=\"M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z\"/><path d=\"M8.5 12l2.5 2.5 4.5-5\"/>",
   "dashboard": "<rect x=\"3\" y=\"3\" width=\"7\" height=\"9\" rx=\"1\"/><rect x=\"14\" y=\"3\" width=\"7\" height=\"5\" rx=\"1\"/><rect x=\"14\" y=\"12\" width=\"7\" height=\"9\" rx=\"1\"/><rect x=\"3\" y=\"16\" width=\"7\" height=\"5\" rx=\"1\"/>",
   "radar": "<circle cx=\"12\" cy=\"12\" r=\"9\"/><circle cx=\"12\" cy=\"12\" r=\"5\"/><path d=\"M12 12l6-6\"/><circle cx=\"12\" cy=\"12\" r=\"1.2\" fill=\"currentColor\"/>",
   "network": "<rect x=\"2.5\" y=\"13.5\" width=\"19\" height=\"7\" rx=\"1.5\"/><path d=\"M6.5 17h.01M10 17h.01M13.5 17h.01M17 17h.01\"/><path d=\"M12 13.5V9.5\"/><rect x=\"8\" y=\"3.5\" width=\"8\" height=\"6\" rx=\"1\"/>",

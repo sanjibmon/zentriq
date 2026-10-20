@@ -23,7 +23,8 @@ public static class DepartmentEndpoints
             var list = new List<object>();
             await using var cmd = ds.CreateCommand("""
                 SELECT d.id, d.name, d.code, d.description, d.created_at,
-                       (SELECT count(*) FROM zentriq.assets a WHERE a.department_id = d.id AND a.status = 'active')
+                       (SELECT count(*) FROM zentriq.assets a WHERE a.department_id = d.id AND a.status = 'active'),
+                       (SELECT count(*) FROM zentriq.nonit_assets n WHERE n.department_id = d.id AND n.status <> 'disposed')
                   FROM zentriq.departments d ORDER BY lower(d.name)
                 """);
             await using var r = await cmd.ExecuteReaderAsync(ct);
@@ -31,7 +32,7 @@ public static class DepartmentEndpoints
                 list.Add(new
                 {
                     id = r.GetGuid(0), name = r.GetString(1), code = r.IsDBNull(2) ? null : r.GetString(2), description = r.IsDBNull(3) ? null : r.GetString(3),
-                    createdAt = r.GetFieldValue<DateTimeOffset>(4), assets = r.GetInt64(5),
+                    createdAt = r.GetFieldValue<DateTimeOffset>(4), assets = r.GetInt64(5), nonItAssets = r.GetInt64(6),
                 });
             await using var un = ds.CreateCommand("SELECT count(*) FROM zentriq.assets WHERE status = 'active' AND department_id IS NULL");
             return Results.Ok(new { items = list, unassigned = (long)(await un.ExecuteScalarAsync(ct))! });
