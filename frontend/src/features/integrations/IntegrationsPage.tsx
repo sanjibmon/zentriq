@@ -56,7 +56,7 @@ export function IntegrationsPage() {
   const catalog = useApi(() => api.get<Catalog>('/integrations/catalog'), []);
   return (
     <>
-      <PageHead title="Integrations & Automation" desc="Send Zentriq events to chat, e-mail, your SIEM and ticketing system, and give scripts and BI tools read-only API access." />
+      <PageHead title="Integrations & Automation" />
       <div className="tabs" role="tablist">
         {TABS.map(([t, l]) => <button key={t} role="tab" aria-selected={tab === t} className={tab === t ? 'on' : ''} onClick={() => navigate(`/integrations?tab=${t}`, true)}>{l}</button>)}
       </div>

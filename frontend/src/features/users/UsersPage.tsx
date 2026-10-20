@@ -23,7 +23,7 @@ export function UsersPage() {
   }
   return (
     <>
-      <PageHead title="Users, Roles & Sites" desc="Who can sign in to Zentriq and what each role may do. Permissions are enforced by the server for every request."
+      <PageHead title="Users, Roles & Sites"
         actions={<button className="btn primary" onClick={() => setEdit('new')}>Add user</button>} />
       {msg && <Callout tone={msg.tone} icon={msg.tone === 'crit' ? 'alert' : 'info'}>{msg.text}</Callout>}
       <div className="tabs" role="tablist">

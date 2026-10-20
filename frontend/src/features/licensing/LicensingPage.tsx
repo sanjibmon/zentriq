@@ -39,7 +39,7 @@ export function LicensingPage() {
 
   return (
     <>
-      <PageHead title="Licensing" desc="Trial status, workload usage and offline license activation. No internet connection is required."
+      <PageHead title="Licensing"
         actions={can('licensing.manage') && (
           <>
             <button className="btn" onClick={() => void exportRequest()}>Export activation request</button>

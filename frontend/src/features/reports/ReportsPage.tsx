@@ -15,7 +15,7 @@ export function ReportsPage() {
   const tab = query.get('tab') === 'history' ? 'history' : 'library';
   return (
     <>
-      <PageHead title="Reports & Analytics" desc="Turn every inventory and security record into a report."
+      <PageHead title="Reports & Analytics"
         actions={<Link className="btn primary" to="/reports/new"><Icon name="plus" size={14} /> New report</Link>} />
       <div className="tabs" role="tablist">
         <button role="tab" aria-selected={tab === 'library'} className={tab === 'library' ? 'on' : ''} onClick={() => navigate('/reports', true)}>Reports</button>

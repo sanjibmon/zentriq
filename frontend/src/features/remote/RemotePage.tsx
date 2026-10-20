@@ -35,7 +35,7 @@ export function RemotePage() {
   const s = status.data;
   return (
     <>
-      <PageHead title="Remote Support" desc="Help anyone, anywhere — see the screen, take control and move files, always with the user's consent."
+      <PageHead title="Remote Support"
         actions={s?.running && <button className="btn primary" onClick={() => { setCreating(true); if (tab !== 'quick') navigate('/remote?tab=quick', true); }}><Icon name="plus" size={13} /> New support session</button>} />
       <div className="tabs" role="tablist">
         {TABS.filter(([t]) => t !== 'setup' || can('remote.manage')).map(([t, l]) => <button key={t} role="tab" aria-selected={tab === t} className={tab === t ? 'on' : ''} onClick={() => navigate(`/remote?tab=${t}`, true)}>{l}</button>)}
@@ -312,8 +312,10 @@ function Devices({ status, allowTerminal, onMsg, onChanged }: { status: RemoteSt
           { key: 'n', label: 'Device', className: 'wrap', render: (d) => <div className="rs-devcell">
             <span className={`rs-dot ${d.nodeId ? (d.online ? 'on' : 'off') : 'none'}`} title={!d.nodeId ? 'Not installed' : d.online ? 'Online' : 'Offline'} />
             <div>{d.assetId ? <Link to={`/assets/${d.assetId}`}>{d.hostname ?? d.name}</Link> : <b>{d.name}</b>}
-              <div className="faint" style={{ fontSize: 11.5 }}>{[d.os, d.ip, d.department].filter(Boolean).join(' · ')}</div>
+              {d.department && <div className="faint" style={{ fontSize: 11.5 }}>{d.department}</div>}
               {d.nodeId && !d.assetId && <div className="faint" style={{ fontSize: 11.5 }}>Not matched to an asset (different host name)</div>}</div></div> },
+          { key: 'os', label: 'Operating system', className: 'wrap', render: (d) => d.os ?? <span className="faint">—</span> },
+          { key: 'ip', label: 'IP address', render: (d) => d.ip ? <span className="mono">{d.ip}</span> : <span className="faint">—</span> },
           { key: 's', label: 'Status', render: (d) => !d.nodeId ? (d.lastAction && d.lastAction.status !== 'succeeded'
             ? <span title={d.lastAction.detail ?? ''}><Pill tone={d.lastAction.status === 'failed' ? 'crit' : 'info'}>{d.lastAction.status === 'failed' ? 'Install failed' : 'Installing'}</Pill></span> : <Pill>Not installed</Pill>)
             : d.online ? <Pill tone="ok">Online</Pill> : <span title={d.lastConnectedAt ? fmt.date(d.lastConnectedAt) : ''}><Pill tone="warn">Offline</Pill>{d.lastConnectedAt && <div className="faint" style={{ fontSize: 11 }}>seen {fmt.ago(d.lastConnectedAt)}</div>}</span> },

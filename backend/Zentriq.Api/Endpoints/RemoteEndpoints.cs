@@ -322,6 +322,7 @@ public static class RemoteEndpoints
                 await ins.ExecuteNonQueryAsync(ct);
                 queued++;
             }
+            AgentPresence.Instance.Nudge();
             await rc.AuditAsync($"remote.{body.Operation}", $"{queued} device(s)", detail: new { queued, noAgent, oldAgent, pending });
             var parts = new List<string>();
             if (queued > 0) parts.Add($"{queued} device(s) will {(body.Operation == "install" ? "install" : "remove")} Zentriq Remote Support at their next agent check-in (set by the check-in interval).");

@@ -16,7 +16,7 @@ export function HardwarePage() {
   const data = useApi(() => api.get<Paged<HardwareRow>>('/inventory/hardware', { q: search, page, pageSize }), [search, page]);
   return (
     <>
-      <PageHead title="Hardware Inventory" desc="What every device is made of." />
+      <PageHead title="Hardware Inventory" />
       <div className="tabs" role="tablist">
         <button role="tab" aria-selected={tab === 'all'} className={tab === 'all' ? 'on' : ''} onClick={() => setTab('all')}>Devices</button>
         <button role="tab" aria-selected={tab === 'changes'} className={tab === 'changes' ? 'on' : ''} onClick={() => setTab('changes')}>Changes</button>

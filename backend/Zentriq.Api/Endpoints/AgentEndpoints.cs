@@ -171,6 +171,56 @@ public static class AgentEndpoints
             }
         }).RequireRateLimiting("agent-enroll").AllowAnonymous();
 
+        // Live connection: the agent keeps one request open (renewed at once when it returns). Online from the moment it
+        // arrives; offline the moment it is closed (agent stopped, device shut down, connection reset) or, when it dies
+        // silently, once it has not been renewed for AgentPresence.OnlineGrace. Returns early with wake = true when work
+        // was queued for the agent (it then checks in at once).
+        g.MapPost("/presence", async (HttpContext http, NpgsqlDataSource ds, AgentServer server, AgentPresence presence,
+            IHostApplicationLifetime life, ILoggerFactory lf, CancellationToken ct) =>
+        {
+            var (agent, error) = await AuthenticateAsync(http, ds, server, ct);
+            if (agent is null) return error!;
+            presence.Enter(agent.Id);
+            var aborted = false;
+            try
+            {
+                var deadline = DateTime.UtcNow + AgentPresence.Hold;
+                var (wake, wasOffline) = await PresenceSeenAsync(ds, agent.Id, http.Connection.RemoteIpAddress, ct);
+                if (wasOffline) lf.CreateLogger("Zentriq.Agents").LogInformation("Agent {AgentId} connected (live)", agent.Id);
+                while (!wake)
+                {
+                    var left = deadline - DateTime.UtcNow;
+                    if (left <= TimeSpan.Zero) break;
+                    var nudged = presence.Nudged;
+                    var done = await Task.WhenAny(nudged, Task.Delay(left, ct));
+                    ct.ThrowIfCancellationRequested();
+                    if (done != nudged) break;
+                    wake = await PendingWorkAsync(ds, agent.Id, ct);
+                }
+                return Results.Ok(new { wake, holdSeconds = (int)AgentPresence.Hold.TotalSeconds, onlineSeconds = (int)AgentPresence.OnlineGrace.TotalSeconds });
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                aborted = true;
+                return Results.Empty;
+            }
+            finally
+            {
+                // The agent closed its live connection: offline now (not when the server itself is shutting down).
+                if (presence.Leave(agent.Id) && aborted && !life.ApplicationStopping.IsCancellationRequested)
+                {
+                    try
+                    {
+                        await using var off = ds.CreateCommand("UPDATE zentriq.agent_registrations SET online_until = LEAST(online_until, now()) WHERE id = @id");
+                        off.Parameters.AddWithValue("id", agent.Id);
+                        await off.ExecuteNonQueryAsync(CancellationToken.None);
+                        lf.CreateLogger("Zentriq.Agents").LogInformation("Agent {AgentId} disconnected", agent.Id);
+                    }
+                    catch (Exception ex) { lf.CreateLogger("Zentriq.Agents").LogWarning(ex, "Could not record that agent {AgentId} disconnected", agent.Id); }
+                }
+            }
+        }).AllowAnonymous();
+
         g.MapPost("/checkin", async (CheckinRequest req, HttpContext http, NpgsqlDataSource ds, AgentServer server,
             Zentriq.Infrastructure.Secrets.CredentialProtector protector, ILoggerFactory lf, CancellationToken ct) =>
         {
@@ -183,7 +233,9 @@ public static class AgentEndpoints
                 UPDATE zentriq.agent_registrations
                    SET last_checkin_at = now(), last_ip = @ip, agent_version = COALESCE(@v, agent_version),
                        hostname = COALESCE(@h, hostname), os_name = COALESCE(@os, os_name), capabilities = COALESCE(@cap, capabilities),
-                       online_until = now() + make_interval(mins => checkin_minutes * 2 + 5),
+                       online_until = CASE WHEN 'presence' = ANY(COALESCE(@cap, ARRAY[]::text[]))
+                                           THEN GREATEST(online_until, now() + make_interval(secs => @grace))
+                                           ELSE now() + make_interval(mins => checkin_minutes * 2 + 5) END,
                        last_outage_from = COALESCE(@off, last_outage_from), last_outage_to = CASE WHEN @off::timestamptz IS NULL THEN last_outage_to ELSE now() END,
                        uninstall_protected = COALESCE(@up, uninstall_protected)
                  WHERE id = @id
@@ -191,6 +243,7 @@ public static class AgentEndpoints
                 """);
             cmd.Parameters.Add(new NpgsqlParameter("off", NpgsqlDbType.TimestampTz) { Value = (object?)outageFrom ?? DBNull.Value });
             cmd.Parameters.Add(new NpgsqlParameter("up", NpgsqlDbType.Boolean) { Value = (object?)req.UninstallProtected ?? DBNull.Value });
+            cmd.Parameters.AddWithValue("grace", AgentPresence.OnlineGrace.TotalSeconds);
             cmd.Parameters.AddWithValue("id", agent.Id);
             cmd.Parameters.Add(new NpgsqlParameter("ip", NpgsqlDbType.Inet) { Value = (object?)http.Connection.RemoteIpAddress ?? DBNull.Value });
             cmd.Parameters.Add(Text("v", Trunc(req.AgentVersion, 40)));
@@ -423,6 +476,7 @@ public static class AgentEndpoints
                     update = r.IsDBNull(15) ? null : new { status = r.GetString(15), target = r.GetString(16), detail = S(17), requestedAt = r.GetFieldValue<DateTimeOffset>(18), completedAt = D(19) },
                     checkinMinutes = r.GetInt32(20), inventoryMinutes = r.GetInt32(21), online = r.GetBoolean(22),
                     lastOutage = D(23) is { } of ? new { from = of, to = D(24) } : null, uninstallProtected = r.GetBoolean(25),
+                    live = !r.IsDBNull(14) && r.GetFieldValue<string[]>(14).Contains("presence"),
                 });
             }
             return Results.Ok(list);
@@ -450,7 +504,8 @@ public static class AgentEndpoints
             cmd.Parameters.AddWithValue("id", id);
             if (await cmd.ExecuteNonQueryAsync(ct) == 0) return Results.NotFound();
             await rc.AuditAsync("agent.collect_requested", id.ToString());
-            return Results.Accepted(value: new { message = "The agent will send inventory at its next check-in (set by its check-in interval)." });
+            AgentPresence.Instance.Nudge();
+            return Results.Accepted(value: new { message = "Inventory requested: an agent that is online sends it within a minute, otherwise at its next check-in." });
         }).RequireAuthorization(Permissions.AgentsManage);
 
         // Update agents to the package served by this server. Agents of earlier builds without the self-update
@@ -499,6 +554,7 @@ public static class AgentEndpoints
                 await ins.ExecuteNonQueryAsync(ct);
                 queued++;
             }
+            AgentPresence.Instance.Nudge();
             await rc.AuditAsync("agent.update_requested", latest, detail: new { queued, current, pending, manual, noAsset, all = body.All == true });
             var parts = new List<string>();
             if (queued > 0) parts.Add($"{queued} agent(s) will update to {latest} at their next check-in (set by their check-in interval).");
@@ -799,6 +855,43 @@ public static class AgentEndpoints
     }
 
     internal static string RequestKey(Guid agentId) => "agent.collect." + agentId.ToString("N");
+
+    private const string PendingSql = """
+        EXISTS (SELECT 1 FROM zentriq.asset_actions x WHERE x.agent_id = @id AND x.channel = 'agent' AND x.status = 'queued'
+                   AND x.requested_at > now() - interval '24 hours')
+        OR EXISTS (SELECT 1 FROM zentriq.system_settings s WHERE s.key = @rk)
+        """;
+
+    /// <summary>
+    /// A presence request arrived: the agent is online now; its last contact is now. If it had been offline, the gap
+    /// since its previous contact is recorded as its latest outage. Returns whether work is waiting for it.
+    /// </summary>
+    private static async Task<(bool Wake, bool WasOffline)> PresenceSeenAsync(NpgsqlDataSource ds, Guid agentId, System.Net.IPAddress? ip, CancellationToken ct)
+    {
+        await using var cmd = ds.CreateCommand($"""
+            UPDATE zentriq.agent_registrations r
+               SET last_outage_from = CASE WHEN r.online_until < now() AND r.last_checkin_at IS NOT NULL THEN r.last_checkin_at ELSE r.last_outage_from END,
+                   last_outage_to   = CASE WHEN r.online_until < now() AND r.last_checkin_at IS NOT NULL THEN now() ELSE r.last_outage_to END,
+                   online_until = now() + make_interval(secs => @grace), last_checkin_at = now(), last_ip = COALESCE(@ip, r.last_ip)
+              FROM (SELECT online_until AS before FROM zentriq.agent_registrations WHERE id = @id) o
+             WHERE r.id = @id
+            RETURNING ({PendingSql}), COALESCE(o.before < now(), true)
+            """);
+        cmd.Parameters.AddWithValue("id", agentId);
+        cmd.Parameters.AddWithValue("rk", RequestKey(agentId));
+        cmd.Parameters.AddWithValue("grace", AgentPresence.OnlineGrace.TotalSeconds);
+        cmd.Parameters.Add(new NpgsqlParameter("ip", NpgsqlDbType.Inet) { Value = (object?)ip ?? DBNull.Value });
+        await using var r = await cmd.ExecuteReaderAsync(ct);
+        return await r.ReadAsync(ct) ? (r.GetBoolean(0), r.GetBoolean(1)) : (false, false);
+    }
+
+    private static async Task<bool> PendingWorkAsync(NpgsqlDataSource ds, Guid agentId, CancellationToken ct)
+    {
+        await using var cmd = ds.CreateCommand($"SELECT {PendingSql}");
+        cmd.Parameters.AddWithValue("id", agentId);
+        cmd.Parameters.AddWithValue("rk", RequestKey(agentId));
+        return await cmd.ExecuteScalarAsync(ct) is true;
+    }
 
     private static async Task<bool> RequestedAsync(NpgsqlDataSource ds, Guid agentId, CancellationToken ct)
     {

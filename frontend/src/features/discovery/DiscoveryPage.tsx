@@ -63,7 +63,7 @@ export function DiscoveryPage() {
 
   return (
     <>
-      <PageHead title="Discovery & Scans" desc="Find every device on your network."
+      <PageHead title="Discovery & Scans"
         actions={can('scans.run') && <button className="btn primary" onClick={() => setOpen(true)}>New scan</button>} />
       <div className="tabs" role="tablist">
         <button className={tab === 'scans' ? 'on' : ''} onClick={() => setTab('scans')}>Scans</button>

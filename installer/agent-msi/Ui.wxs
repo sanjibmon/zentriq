@@ -52,7 +52,7 @@
         <Control Id="CodeLabel" Type="Text" X="20" Y="82" Width="330" Height="11" NoPrefix="yes" Text="Enrollment code (20 letters and digits, e.g. AB12C-DE34F-GH56J-KM78N):" />
         <Control Id="Code" Type="Edit" X="20" Y="94" Width="330" Height="16" Property="ENROLLMENTCODE" Text="{2048}" />
         <Control Id="CheckinLabel" Type="Text" X="20" Y="115" Width="160" Height="11" NoPrefix="yes" Text="Check the connection every:" />
-        <Control Id="Checkin" Type="ComboBox" X="20" Y="127" Width="160" Height="16" Property="CHECKININTERVAL" ComboList="yes">
+        <Control Id="Checkin" Type="ComboBox" X="20" Y="127" Width="160" Height="16" Property="CHECKININTERVAL" ComboList="yes" Sorted="yes">
           <ComboBox Property="CHECKININTERVAL">
             <ListItem Value="5" Text="5 minutes" />
             <ListItem Value="15" Text="15 minutes" />
@@ -63,7 +63,7 @@
           </ComboBox>
         </Control>
         <Control Id="InventoryLabel" Type="Text" X="190" Y="115" Width="160" Height="11" NoPrefix="yes" Text="Send inventory every:" />
-        <Control Id="Inventory" Type="ComboBox" X="190" Y="127" Width="160" Height="16" Property="INVENTORYINTERVAL" ComboList="yes">
+        <Control Id="Inventory" Type="ComboBox" X="190" Y="127" Width="160" Height="16" Property="INVENTORYINTERVAL" ComboList="yes" Sorted="yes">
           <ComboBox Property="INVENTORYINTERVAL">
             <ListItem Value="30" Text="30 minutes" />
             <ListItem Value="60" Text="1 hour" />

@@ -12,7 +12,7 @@ export function AuditPage() {
   const data = useApi(() => api.get<Paged<AuditEvent>>('/audit', { q: search, outcome, page, pageSize: 50 }), [search, outcome, page]);
   return (
     <>
-      <PageHead title="Audit Logs" desc="Append-only record of sign-ins, scans, configuration and licensing changes." />
+      <PageHead title="Audit Logs" />
       <form className="toolbar-row" onSubmit={(e) => { e.preventDefault(); setPage(1); setSearch(q); }}>
         <input className="in grow" placeholder="Search user, action or target…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search audit log" />
         <select className="in" value={outcome} onChange={(e) => { setPage(1); setOutcome(e.target.value); }} aria-label="Outcome">
