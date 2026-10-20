@@ -1,9 +1,23 @@
 # Test report
 
-Latest: GitHub Actions run 39391653255, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
-10.0.20348** VM. Release: `v1.1.1-build.62` (pre-release, **unsigned**), package version **1.1.1.62**. Results: unit +
-PostgreSQL integration tests **204 PASS, 2 skipped** (the live MeshCentral and live SNMP tests run in ci-quick: PASS, 206/206);
-installer acceptance **56 passed, 0 failed, 0 blocked, 10 not run**; in-place updates PASS.
+Latest: GitHub Actions run 39418561129, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
+10.0.20348** VM. Release: `v1.1.1-build.65` (pre-release, **unsigned**), package version **1.1.1.65**. Results: unit +
+PostgreSQL integration tests **223 PASS, 2 skipped** (the live MeshCentral and live SNMP tests run in ci-quick: PASS, 225/225);
+installer acceptance **57 passed, 0 failed, 0 blocked, 10 not run**; in-place updates PASS.
+
+New in build 65 (agent schedule and reconnection, 20-character enrollment codes, uninstall protection codes, deleting old
+codes, internet check for remote support links, Zentriq-branded remote pages for Windows, macOS and Linux only):
+
+| ID | Test | Result | Detail |
+|---|---|---|---|
+| T26 | Agent install with the new codes and intervals | **PASS** | 20-character enrollment code; installed with `SERVERURL`, `CHECKININTERVAL=2`, `INVENTORYINTERVAL=30`; the console shows check-in every 2 min and inventory every 30 min |
+| T67 | Agent uninstall protection | **PASS** | removal without a code refused (1603); wrong code refused (1603); uninstall key not readable by administrators; `Stop-Service` refused; one-hour code from the console removed the agent (`ZentriqAgent.exe --uninstall <code>`); reinstalled; protection switched off from Agents › Settings |
+| T33 | Enrollment codes: show again, delete old/revoked | **PASS** | code shown again; revoked code refused (410); active code not deletable (409); revoked codes deleted (bulk: 2) |
+| T65 | Remote quick support (re-run) | **PASS** | internet link refused without a checked public address (409 `internet-required`); private IP refused (400); office-network session works end to end |
+| T29, T47 | Agent revoke/uninstall, agent update from the console (re-run) | **PASS** | 1.1.1.65 → 1.1.2.65 in place |
+| — | Live MeshCentral (ci-quick) | **PASS** | Zentriq invitation page (no MeshCentral / Mesh Agent / Android text); run-only and install modes; Windows, Linux and macOS downloads |
+| — | Unit tests | **PASS** | enrollment codes (format, typing mistakes O/I/L), enrollment proof bound to the server key, uninstall codes valid one hour on one device only, public/private address checks, internet address input checks |
+| — | Builds 63–64 | FAIL → fixed | T67: `--uninstall` ran from the agent folder and Windows Installer closed it while removing the files; it now runs the removal from a temporary copy |
 
 New in build 62 (Remote Support quick support over the internet, simpler remote UI, Non-IT groups and departments, section headers):
 
