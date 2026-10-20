@@ -191,6 +191,8 @@ Intune command-line arguments, the Configuration Manager install command. Zentri
   (`ABCD-EFGH-JKMN-PQRS`), works **only on that device** and **expires after one hour**; creating it is audited. Then on
   the device, as administrator: `"C:\Program Files\Zentriq Agent\ZentriqAgent.exe" --uninstall <code>`, or
   *Apps › Zentriq Agent › Modify › Remove* and enter the code, or `msiexec /x {product} UNINSTALLCODE=<code>`.
+  (`--uninstall` starts the removal from a temporary copy and returns at once; Windows Installer shows the progress and
+  the result is logged in `%TEMP%\ZentriqAgent-uninstall.log`.)
 * Without a valid code Windows Installer refuses the removal (the code is checked as SYSTEM against the device's key),
   and while protected administrators cannot stop, reconfigure or delete the agent service. Agent updates from the
   console keep working. Turning protection off removes the key and the restriction at the next check-in; a revoked
