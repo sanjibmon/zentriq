@@ -1,9 +1,20 @@
 # Test report
 
-Latest: GitHub Actions run 39418561129, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
-10.0.20348** VM. Release: `v1.1.1-build.65` (pre-release, **unsigned**), package version **1.1.1.65**. Results: unit +
-PostgreSQL integration tests **223 PASS, 2 skipped** (the live MeshCentral and live SNMP tests run in ci-quick: PASS, 225/225);
-installer acceptance **57 passed, 0 failed, 0 blocked, 10 not run**; in-place updates PASS.
+Latest: GitHub Actions run 39475167689, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
+10.0.20348** VM. Release: `v1.1.1-build.71` (pre-release, **unsigned**), package version **1.1.1.71**. Results: unit +
+PostgreSQL integration tests **224 PASS, 2 skipped** (the live MeshCentral and live SNMP tests run in ci-quick: PASS, 226/226);
+installer acceptance **58 passed, 0 failed, 0 blocked, 10 not run**; in-place updates PASS.
+
+New in build 71 (live agent connection, dashboard layout saving, installer interval order, device / OS / IP columns,
+section taglines removed):
+
+| ID | Test | Result | Detail |
+|---|---|---|---|
+| T68 | Live agent connection | **PASS** | online over the live connection; **offline 1 s** after the agent service stopped; **online again 1 s** after it started (gap recorded as last outage); *collect now* picked up in 2 s; installer lists in order (check-in 5/15/30/60/120/180 min, MSI Control table *Sorted*) |
+| T26, T47, T67 | Agent install, update, uninstall protection (re-run) | **PASS** | 1.1.1.71 → 1.1.2.71 in place |
+| S05 | New features after an in-place update | **PASS** | dashboard layout saved and read back |
+| — | Unit test | **PASS** | every dashboard widget the console offers is accepted by the API (network and Non-IT widgets were refused, so no layout could be saved) |
+| — | Builds 66–70 | FAIL → fixed | the upgrade test enrolled the build-65 agent without the server address and with uninstall protection on (test fixes); T68: the live connection started up to 30 s after enrollment and check-ins kept a stopped agent online for 45 s (product fixes: online now means connected, goodbye on stop); runner `Get-NetIPConfiguration` failure (test uses the default route) |
 
 New in build 65 (agent schedule and reconnection, 20-character enrollment codes, uninstall protection codes, deleting old
 codes, internet check for remote support links, Zentriq-branded remote pages for Windows, macOS and Linux only):

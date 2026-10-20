@@ -168,7 +168,7 @@ Intune command-line arguments, the Configuration Manager install command. Zentri
 
 ### Schedule, connection and last contact
 
-* **Live connection** (agents from the October 2026 build 66 release on): the agent keeps one connection to the server open at all times (a
+* **Live connection** (agents from build 71 on): the agent keeps one connection to the server open at all times (a
   request on its mutually authenticated channel that the server holds for about 25 seconds and the agent renews at
   once). The device shows **Online** as soon as the agent connects, and **Offline** the moment the connection closes
   (agent stopped, device shut down or restarted, connection reset) — or within 45 seconds when it dies silently
