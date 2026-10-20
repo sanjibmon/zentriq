@@ -316,21 +316,28 @@ if (-not $installed) {
             $collectAfter = [int]((Get-Date) - $t2).TotalSeconds
             Assert (([datetime]$a.lastInventoryAt) -gt $before) 'collect now was not picked up within 100 seconds'
             # The installer's interval lists keep their order (5 min, 15 min, 30 min, 1 hour, …), not alphabetical.
-            $wi = New-Object -ComObject WindowsInstaller.Installer
-            $db = $wi.GetType().InvokeMember('OpenDatabase', 'InvokeMethod', $null, $wi, @($agentMsi, 0))
-            $view = $db.GetType().InvokeMember('OpenView', 'InvokeMethod', $null, $db, @("SELECT ``Control``, ``Attributes`` FROM ``Control`` WHERE ``Dialog_`` = 'ZqEnrollDlg'"))
-            $view.GetType().InvokeMember('Execute', 'InvokeMethod', $null, $view, $null) | Out-Null
-            $sorted = @{}
-            while ($rec = $view.GetType().InvokeMember('Fetch', 'InvokeMethod', $null, $view, $null)) {
-                $name = $rec.GetType().InvokeMember('StringData', 'GetProperty', $null, $rec, 1)
-                $attr = $rec.GetType().InvokeMember('IntegerData', 'GetProperty', $null, $rec, 2)
-                if ($name -in 'Checkin', 'Inventory') { $sorted[$name] = (($attr -band 0x10000) -ne 0) }
+            function MsiRows([string] $Path, [string] $Sql, [int] $Columns) {
+                $wi = New-Object -ComObject WindowsInstaller.Installer
+                $db = $wi.GetType().InvokeMember('OpenDatabase', 'InvokeMethod', $null, $wi, [object[]]@([System.IO.Path]::GetFullPath($Path), [int]0))
+                $v = $db.GetType().InvokeMember('OpenView', 'InvokeMethod', $null, $db, [object[]]@([string]$Sql))
+                $null = $v.GetType().InvokeMember('Execute', 'InvokeMethod', $null, $v, $null)
+                $rows = @()
+                while ($true) {
+                    $r = $v.GetType().InvokeMember('Fetch', 'InvokeMethod', $null, $v, $null)
+                    if ($null -eq $r) { break }
+                    $rows += ,@(1..$Columns | ForEach-Object { [string]$r.GetType().InvokeMember('StringData', 'GetProperty', $null, $r, [object[]]@([int]$_)) })
+                }
+                $null = $v.GetType().InvokeMember('Close', 'InvokeMethod', $null, $v, $null)
+                [System.Runtime.InteropServices.Marshal]::ReleaseComObject($db) | Out-Null
+                return ,$rows
             }
-            $view.GetType().InvokeMember('Close', 'InvokeMethod', $null, $view, $null) | Out-Null
+            $sorted = @{}
+            foreach ($row in (MsiRows ([string]$agentMsi) "SELECT ``Control``, ``Attributes`` FROM ``Control`` WHERE ``Dialog_`` = 'ZqEnrollDlg'" 2)) {
+                if ($row[0] -in 'Checkin', 'Inventory') { $sorted[$row[0]] = (([int]$row[1] -band 0x10000) -ne 0) }
+            }
             Assert ($sorted['Checkin'] -and $sorted['Inventory']) "installer interval lists are shown alphabetically: $($sorted | ConvertTo-Json -Compress)"
-            $view2 = $db.GetType().InvokeMember('OpenView', 'InvokeMethod', $null, $db, @("SELECT ``Value`` FROM ``ComboBox`` WHERE ``Property`` = 'CHECKININTERVAL' ORDER BY ``Order``"))
-            $view2.GetType().InvokeMember('Execute', 'InvokeMethod', $null, $view2, $null) | Out-Null
-            $vals = @(); while ($rec = $view2.GetType().InvokeMember('Fetch', 'InvokeMethod', $null, $view2, $null)) { $vals += $rec.GetType().InvokeMember('StringData', 'GetProperty', $null, $rec, 1) }
+            $combo = MsiRows ([string]$agentMsi) "SELECT ``Value``, ``Order`` FROM ``ComboBox`` WHERE ``Property`` = 'CHECKININTERVAL'" 2
+            $vals = @($combo | Sort-Object { [int]$_[1] } | ForEach-Object { $_[0] })
             Assert (($vals -join ',') -eq '5,15,30,60,120,180') "check-in choices: $($vals -join ',')"
             "online over the live connection; offline $offAfter s after the service stopped; online again $onAfter s after it started (gap recorded); collect now picked up in $collectAfter s; installer lists in order (check-in $($vals -join '/') min)"
         } | Out-Null
