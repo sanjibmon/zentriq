@@ -127,7 +127,7 @@
               '<li>To remove it later:' + cmd('sudo -E ./zentriq-install.sh uninstall ' + base + " '" + meshid + "'") + '</li>';
 
         var ua = navigator.userAgent;
-        show(/Macintosh|Mac OS X/.test(ua) ? 'mac' : /Linux|X11/.test(ua) && !/Android/.test(ua) ? 'linux' : 'win');
+        show(/Macintosh|Mac OS X/.test(ua) ? 'mac' : /Linux|X11/.test(ua) && !/Mobile/.test(ua) ? 'linux' : 'win');
     </script>
 </body>
 </html>
