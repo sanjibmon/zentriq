@@ -31,8 +31,9 @@ internal static class Presence
                 var cert = state.Enrolled && !string.IsNullOrEmpty(state.ServerUrl) ? CertificateStore.Find(state.CertThumbprint) : null;
                 if (cert is null)
                 {
+                    // Not enrolled yet: enrollment sets Retry, so the live connection starts right after it.
                     Connected = false;
-                    if (WaitAny(ct, TimeSpan.FromSeconds(30))) return;
+                    if (WaitAny(ct, TimeSpan.FromSeconds(10))) return;
                     continue;
                 }
                 var key = state.ServerUrl + "|" + state.CertThumbprint + "|" + string.Join(",", state.ServerPins) + "|" + state.ProxyUrl;
@@ -94,9 +95,25 @@ internal static class Presence
         }
         finally
         {
+            // Stopping (service stop, shutdown): say goodbye so the server shows the device offline at once, then close.
+            if (Connected) Leave();
             Connected = false;
-            client?.Dispose();   // closes the connection: the server shows the device offline at once
+            client?.Dispose();
         }
+    }
+
+    private static void Leave()
+    {
+        try
+        {
+            var state = AgentState.Load();
+            var cert = CertificateStore.Find(state.CertThumbprint);
+            if (cert is null || string.IsNullOrEmpty(state.ServerUrl)) return;
+            using var c = new ServerClient(state.ServerUrl!, state.ServerPins, cert, state.ProxyUrl, timeout: TimeSpan.FromSeconds(3));
+            c.LeaveAsync().GetAwaiter().GetResult();
+            Log.Info("Live connection closed (agent stopping).");
+        }
+        catch (Exception ex) { Log.Info("Could not say goodbye to the server: " + AgentWorker.Describe(ex)); }
     }
 
     /// <summary>Waits; returns true when the agent is stopping. The network changing ends the wait early.</summary>

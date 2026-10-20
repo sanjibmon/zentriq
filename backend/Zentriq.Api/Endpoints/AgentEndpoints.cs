@@ -129,7 +129,7 @@ public static class AgentEndpoints
                 await using (var ins = new NpgsqlCommand("""
                     INSERT INTO zentriq.agent_registrations (id, agent_version, cert_thumbprint, cert_serial, cert_not_after, status, hostname, os_name, last_ip, token_id,
                                                             enrolled_at, last_checkin_at, checkin_minutes, inventory_minutes, online_until, uninstall_key_protected)
-                    VALUES (@id, @v, @tp, @sn, @na, 'active', @h, @os, @ip, @tok, now(), now(), @ci, @inv, now() + make_interval(mins => @ci * 2 + 5), @uk)
+                    VALUES (@id, @v, @tp, @sn, @na, 'active', @h, @os, @ip, @tok, now(), now(), @ci, @inv, now() + interval '45 seconds', @uk)   -- then the live connection (or, older agents, the check-in) keeps it online
                     """, conn, tx))
                 {
                     ins.Parameters.AddWithValue("ci", checkin);
@@ -221,6 +221,17 @@ public static class AgentEndpoints
             }
         }).AllowAnonymous();
 
+        // The agent is stopping (service stop, shutdown): offline now, without waiting for the connection to close.
+        g.MapPost("/presence/leave", async (HttpContext http, NpgsqlDataSource ds, AgentServer server, CancellationToken ct) =>
+        {
+            var (agent, error) = await AuthenticateAsync(http, ds, server, ct);
+            if (agent is null) return error!;
+            await using var off = ds.CreateCommand("UPDATE zentriq.agent_registrations SET online_until = LEAST(online_until, now()) WHERE id = @id");
+            off.Parameters.AddWithValue("id", agent.Id);
+            await off.ExecuteNonQueryAsync(ct);
+            return Results.NoContent();
+        }).AllowAnonymous();
+
         g.MapPost("/checkin", async (CheckinRequest req, HttpContext http, NpgsqlDataSource ds, AgentServer server,
             Zentriq.Infrastructure.Secrets.CredentialProtector protector, ILoggerFactory lf, CancellationToken ct) =>
         {
@@ -233,8 +244,8 @@ public static class AgentEndpoints
                 UPDATE zentriq.agent_registrations
                    SET last_checkin_at = now(), last_ip = @ip, agent_version = COALESCE(@v, agent_version),
                        hostname = COALESCE(@h, hostname), os_name = COALESCE(@os, os_name), capabilities = COALESCE(@cap, capabilities),
-                       online_until = CASE WHEN 'presence' = ANY(COALESCE(@cap, ARRAY[]::text[]))
-                                           THEN GREATEST(online_until, now() + make_interval(secs => @grace))
+                       -- Agents with a live connection are online exactly while it is open (see /presence).
+                       online_until = CASE WHEN 'presence' = ANY(COALESCE(@cap, ARRAY[]::text[])) THEN online_until
                                            ELSE now() + make_interval(mins => checkin_minutes * 2 + 5) END,
                        last_outage_from = COALESCE(@off, last_outage_from), last_outage_to = CASE WHEN @off::timestamptz IS NULL THEN last_outage_to ELSE now() END,
                        uninstall_protected = COALESCE(@up, uninstall_protected)
@@ -243,7 +254,6 @@ public static class AgentEndpoints
                 """);
             cmd.Parameters.Add(new NpgsqlParameter("off", NpgsqlDbType.TimestampTz) { Value = (object?)outageFrom ?? DBNull.Value });
             cmd.Parameters.Add(new NpgsqlParameter("up", NpgsqlDbType.Boolean) { Value = (object?)req.UninstallProtected ?? DBNull.Value });
-            cmd.Parameters.AddWithValue("grace", AgentPresence.OnlineGrace.TotalSeconds);
             cmd.Parameters.AddWithValue("id", agent.Id);
             cmd.Parameters.Add(new NpgsqlParameter("ip", NpgsqlDbType.Inet) { Value = (object?)http.Connection.RemoteIpAddress ?? DBNull.Value });
             cmd.Parameters.Add(Text("v", Trunc(req.AgentVersion, 40)));
@@ -438,7 +448,7 @@ public static class AgentEndpoints
     {
         var g = api.MapGroup("/agents").WithTags("Agents");
 
-        g.MapGet("", async (NpgsqlDataSource ds, IWebHostEnvironment env, CancellationToken ct) =>
+        g.MapGet("", async (NpgsqlDataSource ds, IWebHostEnvironment env, AgentPresence presence, CancellationToken ct) =>
         {
             var latest = PackageVersion(env);
             await using var cmd = ds.CreateCommand("""
@@ -477,6 +487,7 @@ public static class AgentEndpoints
                     checkinMinutes = r.GetInt32(20), inventoryMinutes = r.GetInt32(21), online = r.GetBoolean(22),
                     lastOutage = D(23) is { } of ? new { from = of, to = D(24) } : null, uninstallProtected = r.GetBoolean(25),
                     live = !r.IsDBNull(14) && r.GetFieldValue<string[]>(14).Contains("presence"),
+                    connected = presence.IsConnected(r.GetGuid(0)),
                 });
             }
             return Results.Ok(list);

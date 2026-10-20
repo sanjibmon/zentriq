@@ -35,7 +35,10 @@ internal sealed class AgentWorker
         try
         {
             if (!string.IsNullOrEmpty(state.EnrollmentCode))
+            {
                 Enroll(state, ct);
+                if (state.Enrolled) Presence.Retry.Set();   // live connection right after enrollment
+            }
             if (!state.Enrolled)
             {
                 var msg = state.Status == "revoked"

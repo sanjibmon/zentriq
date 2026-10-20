@@ -292,8 +292,8 @@ if (-not $installed) {
             $s = Login
             function AgentNow { @(Api GET '/agents' -Session $s) | Where-Object { $_.id -eq $script:agentId } | Select-Object -First 1 }
             $deadline = (Get-Date).AddSeconds(90)
-            do { Start-Sleep 3; $a = AgentNow } while (-not ($a.live -and $a.online) -and (Get-Date) -lt $deadline)
-            Assert ($a.live -and $a.online) "no live connection (live=$($a.live), online=$($a.online), health=$($a.health))"
+            do { Start-Sleep 2; $a = AgentNow } while (-not ($a.connected -and $a.online) -and (Get-Date) -lt $deadline)
+            Assert ($a.live -and $a.connected -and $a.online) "no live connection (live=$($a.live), connected=$($a.connected), online=$($a.online), health=$($a.health))"
             # Stopping the agent closes its connection: offline at once (not after two check-in intervals).
             $t0 = Get-Date
             Stop-Service ZentriqAgent

@@ -289,6 +289,8 @@ export interface AgentRow {
   uninstallProtected: boolean;
   /** The agent keeps a live connection (online/offline within seconds). */
   live?: boolean;
+  /** The live connection is open right now. */
+  connected?: boolean;
   status: string;
   health: 'online' | 'stale' | 'offline' | 'never' | 'revoked' | 'replaced';
   version: string;

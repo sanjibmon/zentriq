@@ -175,6 +175,14 @@ internal sealed class ServerClient : IDisposable
     public Task<PresenceResponse> PresenceAsync(CancellationToken ct) =>
         PostJsonAsync<PresenceResponse>("api/agent/v1/presence", new Dictionary<string, object?>(), ct);
 
+    /// <summary>The agent is stopping: the server shows it offline at once.</summary>
+    public async Task LeaveAsync()
+    {
+        using var content = new StringContent("{}", Encoding.UTF8, "application/json");
+        using var resp = await _http.PostAsync(new Uri(_base, "api/agent/v1/presence/leave"), content).ConfigureAwait(false);
+        await EnsureAsync(resp).ConfigureAwait(false);
+    }
+
     public async Task ReportActionAsync(string actionId, bool ok, string? state, string message, CancellationToken ct)
     {
         var body = new Dictionary<string, object?> { ["ok"] = ok, ["state"] = state, ["message"] = message };
