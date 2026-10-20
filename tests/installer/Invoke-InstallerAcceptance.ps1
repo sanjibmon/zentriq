@@ -119,7 +119,7 @@ Remove-Item $answer -Force   # contains the administrator password
 
 if (-not $installed) {
     foreach ($t in 'T02 PostgreSQL provisioning', 'T03 Database migration', 'T04 Administrator sign-in', 'T05 API and worker services', 'T06 Trial initialization',
-                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments') {
+                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection') {
         Record $t.Substring(0, 3) $t.Substring(4) 'BLOCKED' 'installation failed'
     }
 } else {
@@ -255,13 +255,17 @@ if (-not $installed) {
         Assert ($pkg.package) 'agent MSI is not served by the console'
         Invoke-WebRequest "$base$($pkg.package.url)" -OutFile $agentMsi
         $sig = Get-AuthenticodeSignature $agentMsi
+        # Uninstall protection is tested on its own (T67); the service must be stoppable for the foreground check-ins below.
+        Api PUT '/agents/settings' @{ checkinMinutes = 30; inventoryMinutes = 180; uninstallProtection = $false } -Session $s | Out-Null
         $tok = Api POST '/agents/enrollment-tokens' @{ name = 'ci'; validDays = 1; maxUses = 2; serverUrl = 'https://localhost:8444' } -Session $s
-        Assert ($tok.code -like 'ZQ1.*') 'no enrollment code returned'
+        Assert ($tok.code -match '^[0-9A-Z]{5}(-[0-9A-Z]{5}){3}$') "enrollment code is not 20 characters: $($tok.code)"
+        Assert ($tok.installCommand -match 'SERVERURL=' -and $tok.installCommand -match 'CHECKININTERVAL=30') "install command: $($tok.installCommand)"
         $log = Join-Path $OutDir 'agent-install.log'
-        $p = Start-Process msiexec.exe -ArgumentList '/i', "`"$agentMsi`"", '/qn', "ENROLLMENTCODE=$($tok.code)", '/l*v', "`"$log`"" -Wait -PassThru
+        $p = Start-Process msiexec.exe -ArgumentList '/i', "`"$agentMsi`"", '/qn', "SERVERURL=https://localhost:8444", "ENROLLMENTCODE=$($tok.code)", 'CHECKININTERVAL=2', 'INVENTORYINTERVAL=30', '/l*v', "`"$log`"" -Wait -PassThru
         Assert ($p.ExitCode -eq 0) "agent MSI exit $($p.ExitCode); see $log"
         Assert ((Get-Service ZentriqAgent).Status -eq 'Running') 'ZentriqAgent service not running'
         Assert (-not (Select-String -Path $log -SimpleMatch $tok.code -Quiet)) 'enrollment code written to the MSI log'
+        Assert (-not (Select-String -Path $log -SimpleMatch ($tok.code -replace '-', '') -Quiet)) 'enrollment code written to the MSI log'
         $deadline = (Get-Date).AddMinutes(4)
         do {
             Start-Sleep 5
@@ -279,7 +283,9 @@ if (-not $installed) {
         Assert (-not $reg.PSObject.Properties['EnrollmentCode']) 'enrollment code left in the registry'
         $cert = Get-ChildItem Cert:\LocalMachine\My | Where-Object Thumbprint -eq $reg.CertThumbprint
         Assert $cert 'agent certificate not in LocalMachine\My'
-        "$($a.hostname): $(@($inv.software).Count) applications, $([math]::Round($inv.document.hardware.memoryBytes/1GB)) GB RAM, health $($a.health); MSI signature: $($sig.Status)"
+        Assert ($a.checkinMinutes -eq 2 -and $a.inventoryMinutes -eq 30) "intervals chosen at installation not used: check-in $($a.checkinMinutes), inventory $($a.inventoryMinutes)"
+        Assert ($a.health -eq 'online') "agent health $($a.health)"
+        "$($a.hostname): 20-character code; check-in every $($a.checkinMinutes) min, inventory every $($a.inventoryMinutes) min (chosen at installation); $(@($inv.software).Count) applications, $([math]::Round($inv.document.hardware.memoryBytes/1GB)) GB RAM; MSI signature: $($sig.Status)"
     }
     Check 'T27' 'Agent port serves only the agent API and requires a client certificate' {
         $r1 = Invoke-WebRequest 'https://localhost:8444/' -SkipHttpErrorCheck
@@ -442,6 +448,45 @@ if (-not $installed) {
     } | Out-Null
 
     if ($agentInstalled) {
+        Check 'T67' 'Agent uninstall protection: removal needs a one-hour code from the console; service cannot be stopped; reinstall' {
+            $s = Login
+            $exe = Join-Path $env:ProgramFiles 'Zentriq Agent\ZentriqAgent.exe'
+            Api PUT '/agents/settings' @{ checkinMinutes = 30; inventoryMinutes = 180; uninstallProtection = $true } -Session $s | Out-Null
+            # The agent service (SYSTEM) turns protection on at its next check-in (every 2 minutes here).
+            $deadline = (Get-Date).AddMinutes(5)
+            do { Start-Sleep 10; $reg = Get-ItemProperty 'HKLM:\SOFTWARE\Zentriq\Agent' } while (-not $reg.PSObject.Properties['UninstallProtected'] -and (Get-Date) -lt $deadline)
+            Assert ($reg.PSObject.Properties['UninstallProtected'] -and $reg.UninstallProtected -eq 1) 'agent did not turn uninstall protection on'
+            $readable = $true; try { Get-ItemProperty 'HKLM:\SOFTWARE\Zentriq\Agent\Protection' -ErrorAction Stop | Out-Null } catch { $readable = $false }
+            Assert (-not $readable) 'the uninstall key is readable by administrators'
+            $stopped = $true; try { Stop-Service ZentriqAgent -ErrorAction Stop } catch { $stopped = $false }
+            Assert (-not $stopped -and (Get-Service ZentriqAgent).Status -eq 'Running') 'an administrator could stop the protected agent service'
+            $product = (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*' -ErrorAction SilentlyContinue | Where-Object { $_.PSObject.Properties['DisplayName'] -and $_.DisplayName -eq 'Zentriq Agent' } | Select-Object -First 1).PSChildName
+            $p1 = Start-Process msiexec.exe -ArgumentList '/x', $product, '/qn', '/l*v', "`"$(Join-Path $OutDir 'agent-uninstall-nocode.log')`"" -Wait -PassThru
+            Assert ($p1.ExitCode -ne 0 -and (Get-Service ZentriqAgent -ErrorAction SilentlyContinue)) "uninstall without a code was not refused (exit $($p1.ExitCode))"
+            $p2 = Start-Process msiexec.exe -ArgumentList '/x', $product, '/qn', 'UNINSTALLCODE=ABCD-EFGH-JKMN-PQRS', '/l*v', "`"$(Join-Path $OutDir 'agent-uninstall-badcode.log')`"" -Wait -PassThru
+            Assert ($p2.ExitCode -ne 0 -and (Get-Service ZentriqAgent -ErrorAction SilentlyContinue)) "uninstall with a wrong code was not refused (exit $($p2.ExitCode))"
+            $code = Api POST "/agents/$($script:agentId)/uninstall-code" @{} -Session $s
+            Assert ($code.code -match '^[0-9A-Z]{4}(-[0-9A-Z]{4}){3}$' -and ([datetime]$code.expiresAt) -lt (Get-Date).ToUniversalTime().AddMinutes(61)) "uninstall code: $($code | ConvertTo-Json -Compress)"
+            $p3 = Start-Process $exe -ArgumentList '--uninstall', $code.code -Wait -PassThru
+            Assert ($p3.ExitCode -eq 0 -and -not (Get-Service ZentriqAgent -ErrorAction SilentlyContinue)) "uninstall with the console code failed (exit $($p3.ExitCode))"
+            # Reinstall for the remaining tests, then switch protection off again.
+            $tok = Api POST '/agents/enrollment-tokens' @{ name = 'ci-reinstall'; validDays = 1; maxUses = 1; serverUrl = 'https://localhost:8444' } -Session $s
+            $p4 = Start-Process msiexec.exe -ArgumentList '/i', "`"$agentMsi`"", '/qn', "SERVERURL=https://localhost:8444", "ENROLLMENTCODE=$($tok.code)", 'CHECKININTERVAL=2', 'INVENTORYINTERVAL=30', '/l*v', "`"$(Join-Path $OutDir 'agent-reinstall.log')`"" -Wait -PassThru
+            Assert ($p4.ExitCode -eq 0) "reinstall exit $($p4.ExitCode)"
+            $deadline = (Get-Date).AddMinutes(4)
+            do { Start-Sleep 5; $a = @(Api GET '/agents' -Session $s | ForEach-Object { $_ }) | Where-Object { $_.status -eq 'active' -and $_.assetId -and $_.lastInventoryAt -and $_.id -ne $script:agentId } | Select-Object -First 1 } while (-not $a -and (Get-Date) -lt $deadline)
+            Assert $a 'reinstalled agent did not enroll'
+            $script:agentId = $a.id; $script:agentAsset = $a.assetId
+            Api PUT '/agents/settings' @{ checkinMinutes = 30; inventoryMinutes = 180; uninstallProtection = $false } -Session $s | Out-Null
+            $deadline = (Get-Date).AddMinutes(5)
+            do { Start-Sleep 10 } while ((Get-ItemProperty 'HKLM:\SOFTWARE\Zentriq\Agent').PSObject.Properties['UninstallProtected'] -and (Get-Date) -lt $deadline)
+            Assert (-not (Get-ItemProperty 'HKLM:\SOFTWARE\Zentriq\Agent').PSObject.Properties['UninstallProtected']) 'protection still on after switching it off'
+            Stop-Service ZentriqAgent; Start-Service ZentriqAgent   # stoppable again
+            "no code: exit $($p1.ExitCode); wrong code: exit $($p2.ExitCode); service stop refused; console code $($code.code) (valid until $($code.expiresAt)) removed the agent; reinstalled and protection switched off"
+        } | Out-Null
+    } else { Record 'T67' 'Agent uninstall protection' 'BLOCKED' 'agent install failed' }
+
+    if ($agentInstalled) {
         Check 'T29' 'Agent revocation is enforced and uninstall removes the agent' {
             $s = Login
             Api POST "/agents/$($script:agentId)/revoke" -Session $s | Out-Null
@@ -485,7 +530,15 @@ if (-not $installed) {
         Assert ($r.StatusCode -eq 410) "revoked code returned $($r.StatusCode)"
         $db = Invoke-WebRequest "$base/api/v1/agents/enrollment-tokens" -WebSession $s
         Assert ($db.Content -notmatch [regex]::Escape($tok.code)) 'token list exposes codes'
-        'code shown again; revoked code refused (410); list does not expose codes'
+        $active = Api POST '/agents/enrollment-tokens' @{ name = 'ci-active'; validDays = 1; maxUses = 1; serverUrl = 'https://localhost:8444' } -Session $s
+        $refused = Invoke-WebRequest "$base/api/v1/agents/enrollment-tokens/$($active.id)" -Method Delete -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } -SkipHttpErrorCheck
+        Assert ($refused.StatusCode -eq 409) "deleting an active code returned $($refused.StatusCode)"
+        Api DELETE "/agents/enrollment-tokens/$($tok.id)" -Session $s | Out-Null
+        Api POST "/agents/enrollment-tokens/$($active.id)/revoke" -Session $s | Out-Null
+        $bulk = Api POST '/agents/enrollment-tokens/delete-inactive' @{} -Session $s
+        $left = @(Api GET '/agents/enrollment-tokens' -Session $s | ForEach-Object { $_ } | Where-Object { $_.id -in $tok.id, $active.id })
+        Assert ($left.Count -eq 0) 'revoked codes still listed after delete'
+        "code shown again; revoked code refused (410); list does not expose codes; active code not deletable (409); revoked codes deleted (bulk: $($bulk.deleted))"
     } | Out-Null
 
     Check 'T34' 'Scan history can be deleted (single and by age); assets are kept' {
@@ -1099,7 +1152,7 @@ if (-not $installed) {
         Assert (Test-Path $agentMsi) 'agent package from T26 not available'
         $s = Login
         $tok = Api POST '/agents/enrollment-tokens' @{ name = 'ci-remote'; validDays = 1; maxUses = 1; serverUrl = 'https://localhost:8444' } -Session $s
-        $p = Start-Process msiexec.exe -ArgumentList '/i', "`"$agentMsi`"", '/qn', "ENROLLMENTCODE=$($tok.code)", '/l*v', "`"$(Join-Path $OutDir 'agent-install-remote.log')`"" -Wait -PassThru
+        $p = Start-Process msiexec.exe -ArgumentList '/i', "`"$agentMsi`"", '/qn', "SERVERURL=https://localhost:8444", "ENROLLMENTCODE=$($tok.code)", 'CHECKININTERVAL=2', 'INVENTORYINTERVAL=30', '/l*v', "`"$(Join-Path $OutDir 'agent-install-remote.log')`"" -Wait -PassThru
         Assert ($p.ExitCode -eq 0) "agent MSI exit $($p.ExitCode)"
         try {
             $dev = Remote-Wait { @(Api GET "/remote/devices?q=$env:COMPUTERNAME" -Session $s | ForEach-Object { $_ }) | Where-Object { $_.assetId -and $_.canInstall } | Select-Object -First 1 } 6 'the Zentriq agent to report the remote-support capability'
@@ -1329,12 +1382,19 @@ if (-not $installed) {
     Check 'T65' 'Remote quick support: session link, run-only support app joins its own consent group, technician opens it, ending removes it' {
         Assert $remoteOk 'T59 did not pass'
         $s = Login
-        $created = Api POST '/remote/quick' @{ customer = 'CI user'; note = 'acceptance'; hours = 1 } -Session $s
+        # Without a checked public address, links for people outside the network are refused (409); on the LAN they work.
+        $noInet = Invoke-WebRequest "$base/api/v1/remote/quick" -Method Post -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } -ContentType 'application/json' -Body '{"customer":"x","hours":1}' -SkipHttpErrorCheck
+        Assert ($noInet.StatusCode -eq 409) "internet link without a public address returned $($noInet.StatusCode)"
+        $priv = Invoke-WebRequest "$base/api/v1/remote/internet" -Method Post -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } -ContentType 'application/json' -Body '{"host":"192.168.1.4","port":8446,"save":true}' -SkipHttpErrorCheck
+        Assert ($priv.StatusCode -eq 400) "a private address was accepted as internet address ($($priv.StatusCode))"
+        $created = Api POST '/remote/quick' @{ customer = 'CI user'; note = 'acceptance'; hours = 1; lan = $true } -Session $s
         $q = $created.session
         Assert ($q.code -match '^\d{9}$' -and $q.inviteUrl -match '/agentinvite\?c=' -and $q.status -eq 'waiting') "session: $($q | ConvertTo-Json -Compress)"
         Assert ($created.invitation.text -match [regex]::Escape($q.inviteUrl)) 'the invitation text does not contain the link'
         $page = Invoke-WebRequest $q.inviteUrl -SkipCertificateCheck
-        Assert ($page.Content -match "installFlags = '1'") 'the invitation page does not offer the run-only app'
+        Assert ($page.Content -match "parseInt\('1'\)") 'the invitation page does not offer the run-only app'
+        $visible = [regex]::Replace($page.Content, '<script[\s\S]*?</script>', '')
+        Assert ($visible -notmatch 'MeshCentral' -and $page.Content -notmatch 'Android') 'the invitation page is not Zentriq branded'
         $mid = [regex]::Match($page.Content, "var meshid = '([^']+)'").Groups[1].Value
         Assert $mid 'no device group in the invitation page'
         $origin = ([Uri]$q.inviteUrl).GetLeftPart([UriPartial]::Authority)
@@ -1357,7 +1417,7 @@ if (-not $installed) {
         $after = @((Api GET '/remote/quick' -Session $s).items | Where-Object id -eq $q.id)[0]
         Assert ($after.status -eq 'ended') "after end: $($after.status)"
         $link = Api POST '/remote/install-link' @{ hours = 1 } -Session $s
-        Assert ((Invoke-WebRequest $link.url -SkipCertificateCheck).Content -match "installFlags = '2'") 'install link page'
+        Assert ((Invoke-WebRequest $link.url -SkipCertificateCheck).Content -match "parseInt\('2'\)") 'install link page'
         "session $($q.code): invitation page run-only, app joined as $($joined.deviceName) ($($joined.deviceOs)), desktop link opened, logged; ended and its group removed; install link OK"
     } | Out-Null
 
@@ -1400,7 +1460,7 @@ if (-not $installed) {
                 $s = Login
                 $tok = Api POST '/agents/enrollment-tokens' @{ name = 'ci-update'; validDays = 1; maxUses = 1; serverUrl = 'https://localhost:8444' } -Session $s
                 $log = Join-Path $OutDir 'agent-install-for-update.log'
-                $p = Start-Process msiexec.exe -ArgumentList '/i', "`"$agentMsi`"", '/qn', "ENROLLMENTCODE=$($tok.code)", '/l*v', "`"$log`"" -Wait -PassThru
+                $p = Start-Process msiexec.exe -ArgumentList '/i', "`"$agentMsi`"", '/qn', "SERVERURL=https://localhost:8444", "ENROLLMENTCODE=$($tok.code)", 'CHECKININTERVAL=2', 'INVENTORYINTERVAL=30', '/l*v', "`"$log`"" -Wait -PassThru
                 Assert ($p.ExitCode -eq 0) "agent MSI exit $($p.ExitCode)"
                 $deadline = (Get-Date).AddMinutes(5)
                 do {

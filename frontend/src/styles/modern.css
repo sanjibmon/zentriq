@@ -279,3 +279,18 @@ details.rs-advanced[open] summary { margin-bottom: 12px; }
 .rs-install p { margin: 0; font-size: 13px; color: var(--muted); }
 @media (max-width: 1000px) { .rs-steps, .rs-install { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 760px) { .page-icon { width: 38px; height: 38px; border-radius: 11px; } .tabs { width: 100%; overflow-x: auto; } }
+
+/* ==== Build 63 ==== */
+.code-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+@media (max-width: 760px) { .code-pair { grid-template-columns: minmax(0, 1fr); } }
+.big-code { font: 600 26px/1.2 Consolas, "SF Mono", monospace; letter-spacing: .08em; text-align: center; padding: 16px; border-radius: 12px; background: var(--accent-soft); color: var(--accent); }
+.rs-check { border-radius: 12px; padding: 12px 14px; border: 1px solid var(--line); background: var(--surface-2); }
+.rs-check.ok { border-color: color-mix(in srgb, var(--ok) 40%, var(--line)); background: var(--ok-soft); }
+.rs-check.bad { border-color: color-mix(in srgb, var(--warn) 45%, var(--line)); background: var(--warn-soft); }
+.rs-check p { margin: 6px 0 2px; font-size: 13px; }
+.rs-check-steps { display: flex; gap: 6px; flex-wrap: wrap; }
+.rs-need { border: 1px dashed color-mix(in srgb, var(--accent) 40%, var(--line)); border-radius: 12px; padding: 12px 14px; background: color-mix(in srgb, var(--accent-soft) 45%, var(--surface)); }
+.rs-need p { margin: 4px 0 10px; font-size: 13px; color: var(--muted); }
+.rs-where { display: flex; width: 100%; }
+.rs-where button { flex: 1; display: inline-flex; gap: 6px; align-items: center; justify-content: center; }
+.rs-current { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); }

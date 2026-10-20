@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   ZentriqAgent-x64.msi — Zentriq Agent for Windows endpoints and servers.
-    Silent:  msiexec /i ZentriqAgent-x64.msi /qn ENROLLMENTCODE="ZQ1...." [PROXYURL="http://proxy:8080"]
+    Silent:  msiexec /i ZentriqAgent-x64.msi /qn SERVERURL="https://zentriq.example.com:8444" ENROLLMENTCODE="XXXXX-XXXXX-XXXXX-XXXXX"
+             [CHECKININTERVAL=30] [INVENTORYINTERVAL=180] [PROXYURL="http://proxy:8080"]
+    Remove:  "C:\Program Files\Zentriq Agent\ZentriqAgent.exe" --uninstall <code>   (uninstall code from the console when protected)
   Runs as LocalSystem (read-only inventory needs WMI/registry access), outbound HTTPS only, no listening ports.
   The enrollment code is a hidden property, written by a hidden custom action (never in MSI logs), and deleted
   by the agent once used.
@@ -31,9 +33,19 @@
 
     <Icon Id="AgentIcon" SourceFile="$(var.AssetsDir)\zentriq-agent.ico" />
     <Property Id="ARPPRODUCTICON" Value="AgentIcon" />
-    <Property Id="ARPNOMODIFY" Value="1" />
+    <!-- Modify opens the wizard, where Remove asks for the uninstall code when the agent is protected. -->
 
     <Property Id="ENROLLMENTCODE" Secure="yes" Hidden="yes" />
+    <!-- Zentriq server (agent port), e.g. https://zentriq.example.com:8444; used with 20-character enrollment codes. -->
+    <Property Id="SERVERURL" Secure="yes" />
+    <!-- Minutes between connectivity checks / inventory uploads chosen at installation (empty: the code's defaults). -->
+    <Property Id="CHECKININTERVAL" Secure="yes" />
+    <Property Id="INVENTORYINTERVAL" Secure="yes" />
+    <!-- Uninstall protection: one-hour code from the console (checked as SYSTEM against the device's key). -->
+    <Property Id="UNINSTALLCODE" Secure="yes" Hidden="yes" />
+    <Property Id="ZQ_PROTECTED">
+      <RegistrySearch Id="RegProtected" Root="HKLM" Key="SOFTWARE\Zentriq\Agent" Name="UninstallProtected" Type="raw" Bitness="always64" />
+    </Property>
     <Property Id="PROXYURL" Secure="yes">
       <RegistrySearch Id="RegProxy" Root="HKLM" Key="SOFTWARE\Zentriq\Agent" Name="ProxyUrl" Type="raw" Bitness="always64" />
     </Property>
@@ -82,9 +94,15 @@
     <CustomAction Id="ZqAgentPrepare" BinaryRef="ZqCA" DllEntry="PrepareAgentEnrollment" Execute="immediate" Return="check" HideTarget="yes" />
     <CustomAction Id="ZqAgentEnroll" BinaryRef="ZqCA" DllEntry="WriteAgentEnrollment" Execute="deferred" Impersonate="no" Return="check" HideTarget="yes" />
 
+    <!-- Uninstall protection (not on upgrade): a code is needed while the device holds an uninstall key. -->
+    <CustomAction Id="ZqUninstallGate" BinaryRef="ZqCA" DllEntry="UninstallGate" Execute="immediate" Return="check" HideTarget="yes" />
+    <CustomAction Id="ZqUninstallCheck" BinaryRef="ZqCA" DllEntry="CheckUninstallCode" Execute="deferred" Impersonate="no" Return="check" HideTarget="yes" />
+
     <!-- Uninstall: remove the agent certificate and state (not on upgrade). -->
     <CustomAction Id="AgentCleanup" FileRef="AgentExe" ExeCommand="--cleanup" Execute="deferred" Impersonate="no" Return="ignore" />
     <InstallExecuteSequence>
+      <Custom Action="ZqUninstallGate" After="InstallValidate" Condition='REMOVE = "ALL" AND NOT UPGRADINGPRODUCTCODE' />
+      <Custom Action="ZqUninstallCheck" After="InstallInitialize" Condition='REMOVE = "ALL" AND NOT UPGRADINGPRODUCTCODE' />
       <Custom Action="AgentCleanup" After="StopServices" Condition='REMOVE = "ALL" AND NOT UPGRADINGPRODUCTCODE' />
       <Custom Action="ZqAgentPrepare" Before="ZqAgentEnroll" Condition='ENROLLMENTCODE AND NOT (REMOVE = "ALL")' />
       <Custom Action="ZqAgentEnroll" After="WriteRegistryValues" Condition='ENROLLMENTCODE AND NOT (REMOVE = "ALL")' />

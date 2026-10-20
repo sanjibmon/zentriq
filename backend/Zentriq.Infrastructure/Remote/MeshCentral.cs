@@ -179,7 +179,7 @@ public sealed class MeshControlClient : IAsyncDisposable
     /// </summary>
     public async Task<string> CreateInviteAsync(string meshId, int hours, int flags, CancellationToken ct)
     {
-        var r = await SendAsync(new JsonObject { ["action"] = "createInviteLink", ["meshid"] = meshId, ["expire"] = hours, ["flags"] = flags }, ct);
+        var r = await SendAsync(new JsonObject { ["action"] = "createInviteLink", ["meshid"] = meshId, ["expire"] = hours, ["flags"] = flags, ["agents"] = 7 }, ct); // Windows, Linux, macOS
         if (r["cookie"]?.ToString() is { Length: > 0 } cookie) return cookie;
         throw new MeshException("Could not create the invitation: " + (Result(r) ?? "no answer"));
     }

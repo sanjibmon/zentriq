@@ -16,7 +16,7 @@ public static class AssetEndpoints
         string InventoryStatus, DateTimeOffset FirstSeenAt, DateTimeOffset LastSeenAt, DateTimeOffset? LastInventoryAt, int RowVersion,
         IReadOnlyList<string>? Ipv4 = null, IReadOnlyList<string>? Ipv6 = null, string? LoggedOnUser = null, string? Chassis = null,
         bool? IsVirtual = null, Guid? AgentId = null, string? AgentHealth = null, string? InventorySource = null,
-        DateTimeOffset? AgentLastCheckinAt = null, DateTimeOffset? LastContactAt = null, int? OfflineDays = null, bool? Online = null,
+        DateTimeOffset? AgentLastCheckinAt = null, DateTimeOffset? LastContactAt = null, int? OfflineDays = null, bool? Online = null, int? AgentCheckinMinutes = null,
         Guid? DepartmentId = null, string? Department = null, string? DeviceType = null, bool DeviceTypeManual = false,
         string? Manufacturer = null, string? Model = null, IReadOnlyList<string>? IdentifiedBy = null);
 
@@ -303,11 +303,12 @@ public static class AssetEndpoints
         await using var cmd = ds.CreateCommand("""
             SELECT x.id, d.document #>> '{users,loggedOn}', d.document -> 'network', COALESCE(d.document #>> '{device,chassis}', h.chassis),
                    (d.document #>> '{hardware,isVirtual}')::boolean, d.source, ag.id, ag.last_checkin_at,
-                   (SELECT dp.name FROM zentriq.assets aa JOIN zentriq.departments dp ON dp.id = aa.department_id WHERE aa.id = x.id)
+                   (SELECT dp.name FROM zentriq.assets aa JOIN zentriq.departments dp ON dp.id = aa.department_id WHERE aa.id = x.id),
+                   ag.online, ag.checkin_minutes
               FROM unnest(@ids) AS x(id)
               LEFT JOIN zentriq.asset_inventory_documents d ON d.asset_id = x.id
               LEFT JOIN zentriq.hardware_inventory h ON h.asset_id = x.id
-              LEFT JOIN LATERAL (SELECT r.id, r.last_checkin_at FROM zentriq.agent_registrations r
+              LEFT JOIN LATERAL (SELECT r.id, r.last_checkin_at, COALESCE(r.online_until > now(), false) AS online, r.checkin_minutes FROM zentriq.agent_registrations r
                                   WHERE r.asset_id = x.id AND r.status = 'active' ORDER BY r.last_checkin_at DESC NULLS LAST LIMIT 1) ag ON true
             """);
         cmd.Parameters.AddWithValue("ids", items.Select(i => i.Id).ToArray());
@@ -331,7 +332,8 @@ public static class AssetEndpoints
                 if (a.Ip is { } primary && primary.Contains('.') && !v4.Contains(primary)) v4.Insert(0, primary);
                 else if (a.Ip is { } p4 && v4.Remove(p4)) v4.Insert(0, p4);
                 DateTimeOffset? lastCheckin = r.IsDBNull(7) ? null : r.GetFieldValue<DateTimeOffset>(7);
-                var health = r.IsDBNull(6) ? null : lastCheckin is null ? "never" : lastCheckin > DateTimeOffset.UtcNow.AddMinutes(-45) ? "online" : lastCheckin > DateTimeOffset.UtcNow.AddDays(-7) ? "stale" : "offline";
+                var agentOnline = !r.IsDBNull(9) && r.GetBoolean(9);
+                var health = r.IsDBNull(6) ? null : lastCheckin is null ? "never" : agentOnline ? "online" : lastCheckin > DateTimeOffset.UtcNow.AddDays(-7) ? "stale" : "offline";
                 extra[a.Id] = a with
                 {
                     Ip = a.Ip is { } ip && ip.Contains(':') && v4.Count > 0 ? v4[0] : a.Ip,
@@ -341,7 +343,8 @@ public static class AssetEndpoints
                     AgentId = r.IsDBNull(6) ? null : r.GetGuid(6), AgentHealth = health, AgentLastCheckinAt = lastCheckin,
                     LastContactAt = Max(lastCheckin, a.LastSeenAt),
                     OfflineDays = (int)Math.Floor((DateTimeOffset.UtcNow - Max(lastCheckin, a.LastSeenAt)).TotalDays),
-                    Online = lastCheckin is { } lc && lc > DateTimeOffset.UtcNow.AddMinutes(-30) ? true : r.IsDBNull(6) ? null : false,
+                    Online = r.IsDBNull(6) ? null : agentOnline,
+                    AgentCheckinMinutes = r.IsDBNull(10) ? null : r.GetInt32(10),
                     Department = r.IsDBNull(8) ? null : r.GetString(8),
                 };
             }

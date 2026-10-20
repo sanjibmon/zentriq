@@ -96,6 +96,7 @@ export interface Asset {
   lastContactAt?: string | null;
   offlineDays?: number | null;
   online?: boolean | null;
+  agentCheckinMinutes?: number | null;
   /** Device type key (see features/assets/deviceTypes.ts); deviceTypeManual when an administrator chose it. */
   deviceType?: string | null;
   deviceTypeManual?: boolean;
@@ -281,6 +282,11 @@ export interface SshHostKey {
 
 export interface AgentRow {
   id: string;
+  checkinMinutes: number;
+  inventoryMinutes: number;
+  online: boolean;
+  lastOutage: { from: string; to: string | null } | null;
+  uninstallProtected: boolean;
   status: string;
   health: 'online' | 'stale' | 'offline' | 'never' | 'revoked' | 'replaced';
   version: string;
@@ -322,6 +328,8 @@ export interface AgentPackage {
 
 export interface NewEnrollmentToken {
   id: string;
+  checkinMinutes: number;
+  inventoryMinutes: number;
   name: string;
   serverUrl: string;
   expiresAt: string;
@@ -480,3 +488,6 @@ export interface Overview {
   trend: { day: string; new: number; total: number }[];
   generatedAt: string;
 }
+
+export interface AgentSettings { checkinMinutes: number; inventoryMinutes: number; uninstallProtection: boolean }
+export interface AgentSettingsResponse { settings: AgentSettings; checkinChoices: number[]; inventoryChoices: number[] }

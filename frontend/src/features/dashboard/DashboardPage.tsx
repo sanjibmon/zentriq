@@ -178,7 +178,7 @@ export function DashboardPage() {
   const go = (facet: string, value: string, label: string) => navigate(`/assets?facet=${encodeURIComponent(facet)}&value=${encodeURIComponent(value)}&label=${encodeURIComponent(label)}`);
 
   async function collectAll() {
-    if (!(await confirm({ title: 'Collect inventory now from every asset?', confirmLabel: 'Collect now', message: 'Agents report within about 2 minutes; assets without an agent are scanned agentlessly with your stored credentials.' }))) return;
+    if (!(await confirm({ title: 'Collect inventory now from every asset?', confirmLabel: 'Collect now', message: 'Agents report at their next check-in; assets without an agent are scanned agentlessly with your stored credentials.' }))) return;
     try { setMsg((await api.post<{ message: string }>('/assets/collect', { all: true })).message); } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
   }
   async function saveLayout(next: Layout) {

@@ -43,6 +43,21 @@ public sealed class AgentServer(ZentriqOptions options, ZentriqPaths paths, Func
     public string DefaultUrl => !string.IsNullOrWhiteSpace(options.Https.AgentPublicUrl)
         ? options.Https.AgentPublicUrl!.TrimEnd('/')
         : $"https://{options.Https.HostName}:{options.Https.AgentPort}";
+
+    /// <summary>
+    /// Every address agents can try when the one they use stops answering (the server got a new IP address, or the
+    /// name does not resolve on the device): the configured URL, the server's names and its IPv4 addresses. Agents
+    /// trust only the pinned server key, so a wrong address can never pose as the server.
+    /// </summary>
+    public string[] AlternateUrls()
+    {
+        var list = new List<string> { DefaultUrl };
+        foreach (var n in Zentriq.Infrastructure.Certificates.ServerCertificates.Names(options.Https.HostName))
+            if (n != "localhost") list.Add($"https://{n}:{Port}");
+        foreach (var a in Zentriq.Infrastructure.Certificates.ServerCertificates.Addresses(options.Https.HostName))
+            if (!System.Net.IPAddress.IsLoopback(a)) list.Add($"https://{a}:{Port}");
+        return list.Distinct(StringComparer.OrdinalIgnoreCase).Take(16).ToArray();
+    }
 }
 
 /// <summary>The agent port serves only /api/agent and /downloads; agent APIs are not served on the console port.</summary>

@@ -10,7 +10,7 @@ public static class AssetFacets
         FROM zentriq.assets a
         LEFT JOIN zentriq.asset_inventory_documents d ON d.asset_id = a.id
         LEFT JOIN zentriq.hardware_inventory h ON h.asset_id = a.id
-        LEFT JOIN LATERAL (SELECT r.id, r.last_checkin_at FROM zentriq.agent_registrations r
+        LEFT JOIN LATERAL (SELECT r.id, r.last_checkin_at, COALESCE(r.online_until > now(), false) AS online FROM zentriq.agent_registrations r
                             WHERE r.asset_id = a.id AND r.status = 'active' ORDER BY r.last_checkin_at DESC NULLS LAST LIMIT 1) ag ON true
         """;
 
@@ -29,8 +29,8 @@ public static class AssetFacets
         ["inventory"] = "a.inventory_status",
         ["type"] = "COALESCE(a.device_type, d.document #>> '{device,chassis}', h.chassis, CASE WHEN a.category IN ('network_device','printer','iot') THEN a.category ELSE 'not inventoried' END)",
         ["coverage"] = "CASE WHEN ag.id IS NOT NULL THEN 'agent' WHEN a.inventory_status = 'success' THEN 'agentless' ELSE 'discovered only' END",
-        ["health"] = "CASE WHEN ag.id IS NULL THEN NULL WHEN ag.last_checkin_at IS NULL THEN 'never' WHEN ag.last_checkin_at > now() - interval '45 minutes' THEN 'online' WHEN ag.last_checkin_at > now() - interval '7 days' THEN 'stale' ELSE 'offline' END",
-        ["seen"] = $"CASE WHEN ag.id IS NOT NULL AND ag.last_checkin_at > now() - interval '30 minutes' THEN 'Online now' WHEN {LastContact} > now() - interval '1 day' THEN 'Last 24 hours' WHEN {LastContact} > now() - interval '7 days' THEN '1–7 days' WHEN {LastContact} > now() - interval '30 days' THEN '7–30 days' ELSE 'Over 30 days' END",
+        ["health"] = "CASE WHEN ag.id IS NULL THEN NULL WHEN ag.last_checkin_at IS NULL THEN 'never' WHEN ag.online THEN 'online' WHEN ag.last_checkin_at > now() - interval '7 days' THEN 'stale' ELSE 'offline' END",
+        ["seen"] = $"CASE WHEN ag.id IS NOT NULL AND ag.online THEN 'Online now' WHEN {LastContact} > now() - interval '1 day' THEN 'Last 24 hours' WHEN {LastContact} > now() - interval '7 days' THEN '1–7 days' WHEN {LastContact} > now() - interval '30 days' THEN '7–30 days' ELSE 'Over 30 days' END",
         // Actual detected values (no ranges): installed memory rounded to whole GB, exact core count, CPU model, disk size.
         ["ram"] = "CASE WHEN h.ram_gb IS NULL OR h.ram_gb <= 0 THEN NULL ELSE greatest(1, round(h.ram_gb))::int || ' GB' END",
         ["cores"] = "CASE WHEN h.cpu_cores IS NULL OR h.cpu_cores <= 0 THEN NULL WHEN h.cpu_cores = 1 THEN '1 core' ELSE h.cpu_cores || ' cores' END",

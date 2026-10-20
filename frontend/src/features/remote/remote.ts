@@ -5,7 +5,8 @@ export type RemoteView = 'desktop' | 'terminal' | 'files' | 'device' | 'console'
 export interface RemoteStatus {
   installed: boolean; running: boolean; message: string | null; publicUrl: string | null; port: number;
   devices: number; online: number; unmapped: number; sessions24h: number; lastSync: string | null; readyToInstall: number;
-  quickActive: number; quick30d: number; internet: { host: string; port: number; applied: boolean } | null;
+  quickActive: number; quick30d: number;
+  internet: { host: string; port: number; applied: boolean; usable: boolean; verified: boolean; confirmed: boolean; checkedAt: string | null; message: string | null } | null;
 }
 
 export interface RemoteDevice {

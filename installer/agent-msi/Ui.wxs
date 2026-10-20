@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Welcome → License → Enrollment (code + optional proxy) → Ready → Progress → Finish -->
+<!-- Welcome → License → Connect (server, code, intervals, optional proxy) → Ready → Progress → Finish.
+     Maintenance: Remove asks for the uninstall code when the agent is protected. -->
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
   <Fragment>
     <WixVariable Id="WixUILicenseRtf" Value="$(var.AssetsDir)\License.rtf" />
@@ -31,28 +32,52 @@
       <Publish Dialog="LicenseAgreementDlg" Control="Next" Event="NewDialog" Value="ZqEnrollDlg" Condition='LicenseAccepted = "1"' />
       <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="ZqEnrollDlg" Order="1" Condition="NOT Installed AND NOT WIX_UPGRADE_DETECTED" />
       <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" Order="1" Condition="NOT Installed AND WIX_UPGRADE_DETECTED" />
-      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="MaintenanceTypeDlg" Order="2" Condition="Installed AND NOT PATCH" />
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="MaintenanceTypeDlg" Order="2" Condition="Installed AND NOT PATCH AND NOT (WixUI_InstallMode = &quot;Remove&quot; AND ZQ_PROTECTED)" />
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="ZqUninstallDlg" Order="3" Condition="Installed AND WixUI_InstallMode = &quot;Remove&quot; AND ZQ_PROTECTED" />
       <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" Order="2" Condition="Installed AND PATCH" />
       <Publish Dialog="MaintenanceWelcomeDlg" Control="Next" Event="NewDialog" Value="MaintenanceTypeDlg" />
       <Publish Dialog="MaintenanceTypeDlg" Control="RepairButton" Event="NewDialog" Value="VerifyReadyDlg" />
-      <Publish Dialog="MaintenanceTypeDlg" Control="RemoveButton" Event="NewDialog" Value="VerifyReadyDlg" />
+      <Publish Dialog="MaintenanceTypeDlg" Control="RemoveButton" Event="NewDialog" Value="ZqUninstallDlg" Condition="ZQ_PROTECTED" />
+      <Publish Dialog="MaintenanceTypeDlg" Control="RemoveButton" Event="NewDialog" Value="VerifyReadyDlg" Condition="NOT ZQ_PROTECTED" />
       <Publish Dialog="MaintenanceTypeDlg" Control="Back" Event="NewDialog" Value="MaintenanceWelcomeDlg" />
       <Publish Dialog="ExitDialog" Control="Finish" Event="EndDialog" Value="Return" Order="999" />
 
       <Dialog Id="ZqEnrollDlg" Width="370" Height="270" Title="[ProductName] Setup">
         <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="WixUI_Bmp_Banner" />
         <Control Id="Title" Type="Text" X="15" Y="6" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Text="{\WixUI_Font_Title}Connect to Zentriq" />
-        <Control Id="Description" Type="Text" X="25" Y="23" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Text="Paste the enrollment code from the Zentriq Web Console." />
+        <Control Id="Description" Type="Text" X="25" Y="23" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Text="Server address and enrollment code from the Zentriq Web Console (Agents)." />
         <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
-        <Control Id="CodeLabel" Type="Text" X="20" Y="56" Width="330" Height="24" NoPrefix="yes"
-                 Text="Enrollment code (Zentriq Web Console > Agents > Enrollment codes > Show code). It starts with ZQ1. and already contains the server address:" />
-        <Control Id="Code" Type="Edit" X="20" Y="82" Width="330" Height="18" Property="ENROLLMENTCODE" Text="{2048}" />
-        <Control Id="CodeNote" Type="Text" X="20" Y="104" Width="330" Height="36" NoPrefix="yes"
-                 Text="You can leave this empty and enroll later from an elevated prompt: &quot;C:\Program Files\Zentriq Agent\ZentriqAgent.exe&quot; --enroll ZQ1...." />
-        <Control Id="ProxyLabel" Type="Text" X="20" Y="146" Width="330" Height="12" NoPrefix="yes" Text="Proxy (optional, only if this device must use a web proxy; normally leave empty):" />
-        <Control Id="Proxy" Type="Edit" X="20" Y="160" Width="330" Height="18" Property="PROXYURL" Text="{512}" />
-        <Control Id="Note" Type="Text" X="20" Y="186" Width="330" Height="40" NoPrefix="yes"
-                 Text="The agent connects out to the server over HTTPS (port 8444 by default). It does not open any inbound port and only reads inventory; it does not change settings on this device." />
+        <Control Id="ServerLabel" Type="Text" X="20" Y="50" Width="330" Height="11" NoPrefix="yes" Text="Zentriq server (name or address; agent port 8444 is used when none is given):" />
+        <Control Id="Server" Type="Edit" X="20" Y="62" Width="330" Height="16" Property="SERVERURL" Text="{512}" />
+        <Control Id="CodeLabel" Type="Text" X="20" Y="82" Width="330" Height="11" NoPrefix="yes" Text="Enrollment code (20 letters and digits, e.g. AB12C-DE34F-GH56J-KM78N):" />
+        <Control Id="Code" Type="Edit" X="20" Y="94" Width="330" Height="16" Property="ENROLLMENTCODE" Text="{2048}" />
+        <Control Id="CheckinLabel" Type="Text" X="20" Y="115" Width="160" Height="11" NoPrefix="yes" Text="Check the connection every:" />
+        <Control Id="Checkin" Type="ComboBox" X="20" Y="127" Width="160" Height="16" Property="CHECKININTERVAL" ComboList="yes">
+          <ComboBox Property="CHECKININTERVAL">
+            <ListItem Value="5" Text="5 minutes" />
+            <ListItem Value="15" Text="15 minutes" />
+            <ListItem Value="30" Text="30 minutes" />
+            <ListItem Value="60" Text="1 hour" />
+            <ListItem Value="120" Text="2 hours" />
+            <ListItem Value="180" Text="3 hours" />
+          </ComboBox>
+        </Control>
+        <Control Id="InventoryLabel" Type="Text" X="190" Y="115" Width="160" Height="11" NoPrefix="yes" Text="Send inventory every:" />
+        <Control Id="Inventory" Type="ComboBox" X="190" Y="127" Width="160" Height="16" Property="INVENTORYINTERVAL" ComboList="yes">
+          <ComboBox Property="INVENTORYINTERVAL">
+            <ListItem Value="30" Text="30 minutes" />
+            <ListItem Value="60" Text="1 hour" />
+            <ListItem Value="120" Text="2 hours" />
+            <ListItem Value="180" Text="3 hours" />
+            <ListItem Value="360" Text="6 hours" />
+            <ListItem Value="720" Text="12 hours" />
+            <ListItem Value="1440" Text="24 hours" />
+          </ComboBox>
+        </Control>
+        <Control Id="ProxyLabel" Type="Text" X="20" Y="148" Width="330" Height="11" NoPrefix="yes" Text="Proxy (optional, only if this device must use a web proxy; normally leave empty):" />
+        <Control Id="Proxy" Type="Edit" X="20" Y="160" Width="330" Height="16" Property="PROXYURL" Text="{512}" />
+        <Control Id="Note" Type="Text" X="20" Y="182" Width="330" Height="48" NoPrefix="yes"
+                 Text="The agent connects out to the server over HTTPS and opens no inbound port. If the server's address changes, the agent finds it again by itself. You can leave the code empty and enroll later: ZentriqAgent.exe --enroll &lt;code&gt; --server &lt;address&gt;. The intervals can be changed later in the console." />
         <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
         <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)">
           <Publish Event="NewDialog" Value="LicenseAgreementDlg" />
@@ -61,6 +86,26 @@
           <Publish Event="DoAction" Value="ZqAgentValidate" Order="1" />
           <Publish Event="SpawnDialog" Value="ZqMessageDlg" Order="2" Condition="ZQ_VALIDATION_ERROR" />
           <Publish Event="NewDialog" Value="VerifyReadyDlg" Order="3" Condition="NOT ZQ_VALIDATION_ERROR" />
+        </Control>
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
+          <Publish Event="SpawnDialog" Value="CancelDlg" />
+        </Control>
+      </Dialog>
+      <Dialog Id="ZqUninstallDlg" Width="370" Height="270" Title="[ProductName] Setup">
+        <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="WixUI_Bmp_Banner" />
+        <Control Id="Title" Type="Text" X="15" Y="6" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Text="{\WixUI_Font_Title}Uninstall code" />
+        <Control Id="Description" Type="Text" X="25" Y="23" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Text="This agent is protected by your IT team." />
+        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+        <Control Id="Text" Type="Text" X="20" Y="56" Width="330" Height="40" NoPrefix="yes"
+                 Text="Removing the Zentriq Agent needs an uninstall code for this device. Your IT team creates it in the Zentriq console (Agents > Uninstall code); it is valid for one hour." />
+        <Control Id="CodeLabel" Type="Text" X="20" Y="100" Width="330" Height="11" NoPrefix="yes" Text="Uninstall code (16 letters and digits, e.g. ABCD-EFGH-JKMN-PQRS):" />
+        <Control Id="Code" Type="Edit" X="20" Y="112" Width="200" Height="16" Property="UNINSTALLCODE" Text="{64}" />
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)">
+          <Publish Event="NewDialog" Value="MaintenanceTypeDlg" />
+        </Control>
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)">
+          <Publish Event="NewDialog" Value="VerifyReadyDlg" Condition="UNINSTALLCODE" />
         </Control>
         <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
           <Publish Event="SpawnDialog" Value="CancelDlg" />
@@ -75,6 +120,8 @@
       </Dialog>
     </UI>
     <CustomAction Id="ZqAgentValidate" BinaryRef="ZqCA" DllEntry="ValidateAgentInput" Execute="immediate" Return="check" />
+    <SetProperty Id="CHECKININTERVAL" Value="30" Before="CostInitialize" Sequence="ui" Condition="NOT CHECKININTERVAL AND NOT Installed" />
+    <SetProperty Id="INVENTORYINTERVAL" Value="180" Before="CostInitialize" Sequence="ui" Condition="NOT INVENTORYINTERVAL AND NOT Installed" />
 
     <UIRef Id="WixUI_Common" />
   </Fragment>

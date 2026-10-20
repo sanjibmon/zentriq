@@ -199,11 +199,15 @@
     <Component Id="FirewallAgentAny" Directory="INSTALLFOLDER" Condition='FIREWALLSCOPE = "any"'>
       <fw:FirewallException Id="FwAgentAny" Name="Zentriq Agent gateway (HTTPS 8444)" Description="Inbound connections from Zentriq Agents (client-certificate authenticated)."
                             Port="8444" Protocol="tcp" Scope="any" Profile="all" />
+      <fw:FirewallException Id="FwAgentDiscoveryAny" Name="Zentriq Agent discovery (UDP 8444, local subnet)" Description="Agents on the local network find the server after its address changed."
+                            Port="8444" Protocol="udp" Scope="localSubnet" Profile="all" />
       <RegistryValue Root="HKLM" Key="SOFTWARE\Zentriq\Console" Name="FirewallAgentRuleAny" Type="string" Value="any" KeyPath="yes" />
     </Component>
     <Component Id="FirewallAgentLocalSubnet" Directory="INSTALLFOLDER" Condition='FIREWALLSCOPE = "localsubnet"'>
       <fw:FirewallException Id="FwAgentSubnet" Name="Zentriq Agent gateway (HTTPS 8444, local subnet)" Description="Inbound connections from Zentriq Agents on the local subnet."
                             Port="8444" Protocol="tcp" Scope="localSubnet" Profile="all" />
+      <fw:FirewallException Id="FwAgentDiscoverySubnet" Name="Zentriq Agent discovery (UDP 8444, local subnet)" Description="Agents on the local network find the server after its address changed."
+                            Port="8444" Protocol="udp" Scope="localSubnet" Profile="all" />
       <RegistryValue Root="HKLM" Key="SOFTWARE\Zentriq\Console" Name="FirewallAgentRuleLocalSubnet" Type="string" Value="localsubnet" KeyPath="yes" />
     </Component>
 

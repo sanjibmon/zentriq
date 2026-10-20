@@ -34,6 +34,8 @@ export function Availability({ a, long }: { a: Asset; long?: boolean }) {
   const days = a.offlineDays ?? Math.floor((Date.now() - new Date(last).getTime()) / 86400000);
   const when = fmt.date(last);
   if (a.online) return <span title={`Agent checked in ${when}`}><Pill tone="ok">Online</Pill></span>;
+  // An agent that missed its check-ins: connection lost, show when the server last heard from it.
+  if (days < 1 && a.agentId && a.online === false) return <span title={`Last contact ${when} (agent checks in every ${a.agentCheckinMinutes ?? '?'} min)`}><Pill tone="warn">No contact</Pill> <span className="faint">{fmt.ago(last)}</span></span>;
   if (days < 1) return <span title={when}>{fmt.ago(last)}</span>;
   const tone: Tone = days >= 30 ? 'crit' : days >= 7 ? 'crit' : 'warn';
   return (
@@ -79,7 +81,7 @@ export function AssetsPage() {
 
   async function collect(all: boolean) {
     const n = all ? data.data?.total ?? 0 : picked.length;
-    if (!(await confirm({ title: `Collect inventory now from ${all ? `all ${n}` : n} asset(s)?`, confirmLabel: 'Collect now', message: 'Assets with an agent report within about 2 minutes; the others are collected agentlessly with your stored credentials (a scan is started).' }))) return;
+    if (!(await confirm({ title: `Collect inventory now from ${all ? `all ${n}` : n} asset(s)?`, confirmLabel: 'Collect now', message: 'Assets with an agent report at their next check-in; the others are collected agentlessly with your stored credentials (a scan is started).' }))) return;
     setBusy(true); setMsg(null);
     try {
       const r = await api.post<{ message: string }>('/assets/collect', all ? { all: true } : { assetIds: picked });

@@ -62,6 +62,7 @@ jobs:
             echo "$keep" | grep -qxF "$(basename "$f")" || rm -rf "$f"
           done
           ls node_modules/meshcentral/agents | tee -a "$log"
+          node "$GITHUB_WORKSPACE/installer/remote/brand.js" "$RUNNER_TEMP/mc" 2>&1 | tee -a "$log"
           echo "ZENTRIQ_TEST_MESHCENTRAL=$RUNNER_TEMP/mc" >> "$GITHUB_ENV"
       - name: SNMP agent simulator (snmpsim) for the live SNMP test
         run: |

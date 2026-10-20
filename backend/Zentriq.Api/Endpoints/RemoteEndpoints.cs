@@ -19,7 +19,8 @@ public static class RemoteEndpoints
     public sealed record SessionBody(Guid? AssetId, string? NodeId, string View);
     public sealed record DeployBody(Guid[] AssetIds, string Operation);
     public sealed record MapBody(string NodeId, Guid? AssetId);
-    public sealed record QuickBody(string? Customer, string? Email, string? Note, int? Hours, bool? SendEmail);
+    public sealed record QuickBody(string? Customer, string? Email, string? Note, int? Hours, bool? SendEmail, bool? Lan = null);
+    public sealed record InternetBody(string? Host, int? Port, bool? ConfirmedFromOutside, bool? Save);
     public sealed record QuickOpenBody(string View);
     public sealed record InstallLinkBody(int? Hours);
 
@@ -33,6 +34,7 @@ public static class RemoteEndpoints
         {
             var st = await remote.StatusAsync(ct);
             var settings = await remote.SettingsAsync(ct);
+            var inetCheck = await remote.InternetCheckAsync(ct);
             var inetHost = RemoteServerConfig.NormalizeHost(settings.InternetHost);
             var inetApplied = inetHost is not null && RemoteServerConfig.ReadLines(Path.Combine(paths.RemoteCertificateDir, RemoteServerConfig.AppliedOriginsFile)).Contains(inetHost);
             await using var cmd = ds.CreateCommand("""
@@ -53,7 +55,12 @@ public static class RemoteEndpoints
                 devices = r.GetInt64(0), online = r.GetInt64(1), unmapped = r.GetInt64(2), sessions24h = r.GetInt64(3),
                 lastSync = r.IsDBNull(4) ? (DateTimeOffset?)null : r.GetFieldValue<DateTimeOffset>(4), readyToInstall = r.GetInt64(5),
                 quickActive = r.GetInt64(6), quick30d = r.GetInt64(7),
-                internet = inetHost is null ? null : new { host = inetHost, port = settings.InternetPort ?? st.Port, applied = inetApplied },
+                internet = inetHost is null ? null : new
+                {
+                    host = inetHost, port = settings.InternetPort ?? st.Port, applied = inetApplied,
+                    usable = inetCheck?.Usable == true, verified = inetCheck?.Ok == true, confirmed = inetCheck?.ConfirmedFromOutside == true,
+                    checkedAt = inetCheck?.CheckedAt, message = inetCheck?.Message,
+                },
             });
         });
 
@@ -178,8 +185,9 @@ public static class RemoteEndpoints
             try
             {
                 await remote.EnsureOriginAsync(paths.RemoteCertificateDir, http.Request.Host.Host, ct);
-                q = await remote.CreateQuickAsync(rc.UserId, name, body.Customer, email, body.Note, body.Hours ?? 1, http.Request.Host.Host, ct);
+                q = await remote.CreateQuickAsync(rc.UserId, name, body.Customer, email, body.Note, body.Hours ?? 1, http.Request.Host.Host, ct, lan: body.Lan == true);
             }
+            catch (InternetRequiredException ex) { return Results.Problem(statusCode: 409, title: ex.Message, type: "internet-required"); }
             catch (Exception ex) when (Unavailable(ex)) { return Results.Problem(statusCode: 503, title: "Remote support is not available: " + ex.Message); }
             await rc.AuditAsync("remote.quick_create", RemoteSupportService.FormatCode(q.Code), detail: new { q.Id, q.Customer, q.Email, q.ExpiresAt });
             string? emailResult = null;
@@ -316,7 +324,7 @@ public static class RemoteEndpoints
             }
             await rc.AuditAsync($"remote.{body.Operation}", $"{queued} device(s)", detail: new { queued, noAgent, oldAgent, pending });
             var parts = new List<string>();
-            if (queued > 0) parts.Add($"{queued} device(s) will {(body.Operation == "install" ? "install" : "remove")} Zentriq Remote Support at their next agent check-in (within about 2 minutes).");
+            if (queued > 0) parts.Add($"{queued} device(s) will {(body.Operation == "install" ? "install" : "remove")} Zentriq Remote Support at their next agent check-in (set by the check-in interval).");
             if (pending > 0) parts.Add($"{pending} already have a request in progress.");
             if (oldAgent > 0) parts.Add($"{oldAgent} run an earlier Zentriq Agent: update the agent first (Agents › Update).");
             if (noAgent > 0) parts.Add($"{noAgent} have no Zentriq Agent: use the installer download or command on those devices.");
@@ -380,20 +388,39 @@ public static class RemoteEndpoints
 
         g.MapGet("/settings", async (RemoteSupportService remote, CancellationToken ct) => Results.Ok(await remote.SettingsAsync(ct)));
 
+        // Internet access: checks that a public name/address reaches this server over HTTPS before it is used for links.
+        g.MapGet("/internet", async (RemoteSupportService remote, CancellationToken ct) => Results.Ok(await remote.InternetCheckAsync(ct)));
+
+        g.MapPost("/internet", async (InternetBody body, RemoteSupportService remote, RequestContext rc, ZentriqPaths paths, CancellationToken ct) =>
+        {
+            var port = body.Port ?? remote.Port;
+            if (InternetCheck.Validate(body.Host, port, out var host) is { } problem) return Validation.Problem("host", problem);
+            var result = await remote.CheckInternetAsync(host, port, body.ConfirmedFromOutside == true, ct);
+            if (body.Save == true)
+            {
+                if (!result.Usable) return Results.Json(result, statusCode: 422);
+                try { RemoteServerConfig.WriteInternet(paths.RemoteCertificateDir, new(host, port)); }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return Results.Problem(statusCode: 500, title: "Could not save the internet address for the remote support service: " + ex.Message); }
+                await remote.SaveInternetAsync(result, ct);
+                await rc.AuditAsync("remote.internet", $"{host}:{port}", detail: new { result.Ok, result.ConfirmedFromOutside, result.Message });
+            }
+            return Results.Ok(result);
+        }).RequireAuthorization(Permissions.RemoteManage);
+
+        g.MapDelete("/internet", async (RemoteSupportService remote, RequestContext rc, ZentriqPaths paths, CancellationToken ct) =>
+        {
+            try { RemoteServerConfig.WriteInternet(paths.RemoteCertificateDir, null); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+            await remote.SaveInternetAsync(null, ct);
+            await rc.AuditAsync("remote.internet", "removed");
+            return Results.NoContent();
+        }).RequireAuthorization(Permissions.RemoteManage);
+
         g.MapPut("/settings", async (RemoteSettings body, RemoteSupportService remote, RequestContext rc, ZentriqPaths paths, CancellationToken ct) =>
         {
-            if (string.IsNullOrWhiteSpace(body.InternetHost)) { body.InternetHost = null; body.InternetPort = null; }
-            else
-            {
-                var raw = body.InternetHost.Trim();
-                if (raw.Contains("://", StringComparison.Ordinal) && Uri.TryCreate(raw, UriKind.Absolute, out var u)) raw = u.Host;
-                if (RemoteServerConfig.NormalizeHost(raw) is not { } h || !h.Contains('.')) return Validation.Problem("internetHost", "Enter a DNS name such as support.example.com (or a public IPv4 address).");
-                body.InternetHost = h;
-                body.InternetPort ??= remote.Port;
-                if (body.InternetPort is < 1 or > 65535) return Validation.Problem("internetPort", "Enter a port between 1 and 65535.");
-            }
-            try { RemoteServerConfig.WriteInternet(paths.RemoteCertificateDir, body.InternetHost is null ? null : new(body.InternetHost, body.InternetPort!.Value)); }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return Results.Problem(statusCode: 500, title: "Could not save the internet address for the remote support service: " + ex.Message); }
+            // The internet address is set (and checked) with PUT /remote/internet; keep it as it is.
+            var current = await remote.SettingsAsync(ct);
+            body.InternetHost = current.InternetHost;
+            body.InternetPort = current.InternetPort;
             try { await remote.SaveSettingsAsync(body, ct); }
             catch (Exception ex) when (ex is MeshException or WebSocketException or HttpRequestException or TaskCanceledException)
             {

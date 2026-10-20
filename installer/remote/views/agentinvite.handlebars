@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="icon" href="favicon.ico" />
+    <title>Zentriq Remote Support</title>
+    <style>
+        :root { --bg: #F1F4F6; --surface: #fff; --fg: #0F1F2B; --muted: #566775; --line: #E1E7EC; --accent: #0A7385; --accent-soft: #E0F1F3; --warn: #A86A12; --warn-soft: #FBEBD0; }
+        @media (prefers-color-scheme: dark) { :root { --bg: #0B141B; --surface: #111C24; --fg: #E6EEF3; --muted: #9FB0BC; --line: #213240; --accent: #38B3C4; --accent-soft: #12303A; --warn: #E0A443; --warn-soft: #3A2C12; } }
+        * { box-sizing: border-box; }
+        body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.55 "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif; }
+        header { background: #0D1C26; color: #fff; padding: 14px 24px; display: flex; align-items: center; gap: 12px; }
+        header svg { width: 34px; height: 34px; flex: none; }
+        header b { font-size: 17px; display: block; }
+        header small { color: #9FB6C3; font-size: 12.5px; }
+        main { max-width: 760px; margin: 28px auto; padding: 0 16px; }
+        .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 24px; box-shadow: 0 6px 18px -14px rgba(15,31,43,.3); }
+        h1 { font-size: 24px; margin: 0 0 6px; letter-spacing: -.01em; }
+        p { margin: 8px 0; color: var(--muted); }
+        .note { background: var(--warn-soft); color: var(--fg); border-left: 3px solid var(--warn); border-radius: 10px; padding: 10px 14px; font-size: 14px; margin: 16px 0; }
+        .tabs { display: inline-flex; gap: 2px; padding: 4px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); margin: 18px 0 14px; flex-wrap: wrap; }
+        .tabs button { border: 0; background: none; padding: 8px 16px; border-radius: 9px; font: inherit; color: var(--muted); cursor: pointer; }
+        .tabs button.on { background: var(--surface); color: var(--fg); font-weight: 600; box-shadow: 0 0 0 1px var(--line); }
+        .pane { display: none; } .pane.on { display: block; }
+        ol { padding-left: 22px; margin: 8px 0; } li { margin: 8px 0; }
+        a.btn { display: inline-flex; align-items: center; gap: 8px; background: var(--accent); color: #fff; text-decoration: none; border-radius: 10px; padding: 11px 20px; font-weight: 600; margin: 6px 0; }
+        a.link { color: var(--accent); }
+        .cmd { display: flex; gap: 8px; align-items: stretch; margin: 8px 0; }
+        .cmd code { flex: 1; display: block; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); font: 12.5px/1.5 Consolas, "SF Mono", monospace; word-break: break-all; color: var(--fg); }
+        .cmd button { border: 1px solid var(--line); background: var(--surface); color: var(--fg); border-radius: 10px; padding: 0 14px; cursor: pointer; font: inherit; }
+        footer { text-align: center; color: var(--muted); font-size: 12.5px; margin: 24px 0; }
+    </style>
+</head>
+<body>
+    <header>
+        <svg viewBox="0 0 34 34" aria-hidden="true"><rect width="34" height="34" rx="8" fill="#0A7385"/><path d="M10 10h14l-11 14h11" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div><b>Zentriq Remote Support</b><small>Secure help from your IT team</small></div>
+    </header>
+    <main>
+        <div class="card">
+            <h1 id="heading">Get help from your IT team</h1>
+            <p id="intro"></p>
+            <div class="note">Only continue if you asked for help or expected this invitation. You are asked to allow every request (seeing your screen, your files) and you can disconnect at any time.</div>
+            <div class="tabs" role="tablist">
+                <button id="t-win" role="tab" onclick="show('win')">Windows</button>
+                <button id="t-mac" role="tab" onclick="show('mac')">macOS</button>
+                <button id="t-linux" role="tab" onclick="show('linux')">Linux</button>
+            </div>
+
+            <section id="p-win" class="pane">
+                <ol>
+                    <li><a class="btn" id="win64">Download for Windows</a><br /><small>Windows on ARM: <a class="link" id="winarm">download here</a></small></li>
+                    <li id="win-run"></li>
+                    <li>When your IT technician connects, click <b>Allow</b> to share your screen or files.</li>
+                </ol>
+            </section>
+
+            <section id="p-mac" class="pane">
+                <ol id="mac-steps"></ol>
+            </section>
+
+            <section id="p-linux" class="pane">
+                <ol id="linux-steps"></ol>
+            </section>
+        </div>
+        <footer>Zentriq Remote Support · connections are encrypted (HTTPS)</footer>
+    </main>
+    <script>
+        'use strict';
+        var meshid = '{{{meshid}}}';
+        var installFlags = parseInt('{{{installflags}}}') || 0;   // 1 = run only (quick support), 2 = install (unattended)
+        var serverPort = '{{{serverport}}}';
+        var serverNoProxy = '{{{servernoproxy}}}';
+        var domainUrl = '{{{domainurl}}}';
+        var runOnly = installFlags === 1;
+        function $(id) { return document.getElementById(id); }
+        function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+        var origin = location.protocol + '//' + location.host + domainUrl;
+        var mid = encodeURIComponent(meshid);
+        var flags = installFlags ? '&installflags=' + installFlags : '';
+        function cmd(text) {
+            var id = 'c' + Math.random().toString(36).slice(2);
+            return '<div class="cmd"><code id="' + id + '">' + esc(text) + '</code><button type="button" onclick="copy(\'' + id + '\', this)">Copy</button></div>';
+        }
+        function copy(id, b) {
+            var t = $(id).textContent;
+            (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).catch(function () { var r = document.createRange(); r.selectNode($(id)); getSelection().removeAllRanges(); getSelection().addRange(r); document.execCommand('copy'); })
+                .then(function () { b.textContent = 'Copied'; setTimeout(function () { b.textContent = 'Copy'; }, 1500); });
+        }
+        function show(os) {
+            ['win', 'mac', 'linux'].forEach(function (x) { $('p-' + x).classList.toggle('on', x === os); $('t-' + x).classList.toggle('on', x === os); });
+        }
+
+        $('heading').textContent = runOnly ? 'Get help from your IT team' : 'Install Zentriq Remote Support';
+        $('intro').textContent = runOnly
+            ? 'Download and run the small Zentriq Remote Support app. On Windows nothing is installed: help is only possible while the app is open.'
+            : 'Install the Zentriq Remote Support agent so your IT team can help you on this device in the future, always with your permission.';
+
+        // Windows
+        $('win64').href = 'meshagents?id=4&meshid=' + mid + flags;
+        $('winarm').href = 'meshagents?id=43&meshid=' + mid + flags;
+        $('win-run').innerHTML = runOnly
+            ? 'Open the downloaded file and click <b>Connect</b>. Keep the window open while you are being helped.'
+            : 'Open the downloaded file and click <b>Install</b> (administrator rights needed).';
+
+        // macOS: run-only uses the agent binary in Terminal; install uses the package.
+        var macBin = origin + 'meshagents?id=10005&meshid=' + mid + flags;
+        $('mac-steps').innerHTML = runOnly
+            ? '<li>Open <b>Terminal</b> and run:' + cmd('curl -fsSL -o zentriq-support "' + macBin + '" && chmod +x zentriq-support && xattr -d com.apple.quarantine zentriq-support 2>/dev/null; sudo ./zentriq-support -connect') + '</li>' +
+              '<li>Enter your Mac password when asked. Keep the Terminal window open while you are being helped; press Ctrl+C to disconnect.</li>' +
+              '<li>Allow <b>Screen Recording</b> and <b>Accessibility</b> for zentriq-support in System Settings › Privacy &amp; Security if macOS asks.</li>'
+            : '<li><a class="btn" href="meshosxagent?id=10005&meshid=' + mid + '">Download for macOS</a></li>' +
+              '<li>Open the downloaded file, right-click the package and choose <b>Open</b>, then follow the installer.</li>' +
+              '<li>Allow <b>Screen Recording</b> and <b>Accessibility</b> for Zentriq Remote Support in System Settings › Privacy &amp; Security.</li>';
+
+        // Linux
+        var port = (serverPort == '443') ? '' : ':' + serverPort;
+        var base = 'https://' + location.hostname + port + domainUrl.replace(/\/$/, '');
+        var proxy = (serverNoProxy != '0') ? ' --no-proxy' : '';
+        var linBin = origin + 'meshagents?id=6&meshid=' + mid + flags;
+        $('linux-steps').innerHTML = runOnly
+            ? '<li>Open a terminal and run (64-bit Intel/AMD; for ARM64 replace <code>id=6</code> with <code>id=26</code>):' + cmd('wget' + proxy + ' -O zentriq-support "' + linBin + '" && chmod +x zentriq-support && sudo ./zentriq-support -connect') + '</li>' +
+              '<li>Keep the terminal open while you are being helped; press Ctrl+C to disconnect.</li>'
+            : '<li>Open a terminal and run as root:' + cmd('wget' + proxy + ' "' + base + '/meshagents?script=1" -O ./zentriq-install.sh && chmod 755 ./zentriq-install.sh && sudo -E ./zentriq-install.sh ' + base + " '" + meshid + "'") + '</li>' +
+              '<li>To remove it later:' + cmd('sudo -E ./zentriq-install.sh uninstall ' + base + " '" + meshid + "'") + '</li>';
+
+        var ua = navigator.userAgent;
+        show(/Macintosh|Mac OS X/.test(ua) ? 'mac' : /Linux|X11/.test(ua) && !/Android/.test(ua) ? 'linux' : 'win');
+    </script>
+</body>
+</html>

@@ -26,14 +26,40 @@ namespace Zentriq.Api.Endpoints;
 /// </summary>
 public static class AgentEndpoints
 {
-    public const int DefaultCheckinSeconds = 120;   // short, so "Collect now" and service actions run within ~2 minutes
-    public const int DefaultInventoryHours = 12;
+    /// <summary>Check-in (connectivity) and inventory intervals offered in the console and the agent installer, in minutes.</summary>
+    public static readonly int[] CheckinChoices = [5, 15, 30, 60, 120, 180];
+    public static readonly int[] InventoryChoices = [30, 60, 120, 180, 360, 720, 1440];
+    public const int MinCheckinMinutes = 2, MaxCheckinMinutes = 1440, MinInventoryMinutes = 30, MaxInventoryMinutes = 10080;
     private const long MaxInventoryCompressed = 8L * 1024 * 1024;
     private const long MaxInventoryJson = 48L * 1024 * 1024;
 
-    public sealed record EnrollRequest(string Token, string Csr, string? Hostname, string? OsName, string? AgentVersion, string? SmbiosUuid);
+    public sealed record EnrollRequest(string Token, string Csr, string? Hostname, string? OsName, string? AgentVersion, string? SmbiosUuid,
+        int? CheckinMinutes = null, int? InventoryMinutes = null);
+    public sealed record HelloRequest(string? CodeId, string? Nonce);
     public sealed record RenewRequest(string Csr);
-    public sealed record CheckinRequest(string? AgentVersion, string? Hostname, string? OsName, string? LastError, string[]? Capabilities = null);
+    public sealed record CheckinRequest(string? AgentVersion, string? Hostname, string? OsName, string? LastError, string[]? Capabilities = null,
+        DateTimeOffset? OfflineSince = null, bool? UninstallProtected = null);
+
+    /// <summary>System-wide agent settings (Agents › Settings).</summary>
+    public sealed class AgentSettings
+    {
+        public int CheckinMinutes { get; set; } = 30;
+        public int InventoryMinutes { get; set; } = 180;
+        /// <summary>Uninstalling the agent needs a one-hour code from the console.</summary>
+        public bool UninstallProtection { get; set; } = true;
+    }
+
+    public static int? ValidCheckin(int? m) => m is >= MinCheckinMinutes and <= MaxCheckinMinutes ? m : null;
+    public static int? ValidInventory(int? m) => m is >= MinInventoryMinutes and <= MaxInventoryMinutes ? m : null;
+
+    public static async Task<AgentSettings> LoadSettingsAsync(NpgsqlDataSource ds, CancellationToken ct)
+    {
+        await using var cmd = ds.CreateCommand("SELECT value::text FROM zentriq.system_settings WHERE key = 'agents.settings'");
+        var s = await cmd.ExecuteScalarAsync(ct) is string json ? JsonSerializer.Deserialize<AgentSettings>(json, new JsonSerializerOptions(JsonSerializerDefaults.Web)) ?? new() : new();
+        s.CheckinMinutes = ValidCheckin(s.CheckinMinutes) ?? 30;
+        s.InventoryMinutes = ValidInventory(s.InventoryMinutes) ?? 180;
+        return s;
+    }
     public sealed record ActionResult(bool Ok, string? State, string? Message);
 
     private sealed record AgentIdentity(Guid Id, Guid? AssetId, string Thumbprint);
@@ -42,43 +68,73 @@ public static class AgentEndpoints
     {
         var g = app.MapGroup("/api/agent/v1").WithTags("Agent protocol");
 
-        g.MapPost("/enroll", async (EnrollRequest req, HttpContext http, NpgsqlDataSource ds, AgentServer server, AuditWriter audit, ILoggerFactory lf, CancellationToken ct) =>
+        // Short enrollment codes carry no server key pins: before sending the code, the agent asks the server to prove that
+        // it knows the code, bound to the key it serves (see AgentCodes.EnrollProof).
+        g.MapPost("/enroll/hello", async (HelloRequest req, NpgsqlDataSource ds, AgentServer server, CancellationToken ct) =>
+        {
+            if (string.IsNullOrWhiteSpace(req.CodeId) || req.CodeId.Length != AgentCodes.EnrollmentIdLength || string.IsNullOrWhiteSpace(req.Nonce) || req.Nonce.Length is < 16 or > 128)
+                return Results.Problem(statusCode: 400, title: "Code id and nonce are required.");
+            await using var cmd = ds.CreateCommand("""
+                SELECT token_hash FROM zentriq.agent_enrollment_tokens
+                 WHERE short_id = @id AND revoked_at IS NULL AND expires_at > now() AND (max_uses IS NULL OR uses < max_uses)
+                """);
+            cmd.Parameters.AddWithValue("id", req.CodeId.ToUpperInvariant());
+            var pins = Pins(server);
+            if (await cmd.ExecuteScalarAsync(ct) is not byte[] hash)
+                return Results.Problem(statusCode: 403, title: "The enrollment code is invalid, expired, revoked or has reached its use limit.");
+            return Results.Ok(new { pins, proof = AgentCodes.EnrollProof(hash, req.Nonce, pins), serverUrls = server.AlternateUrls() });
+        }).RequireRateLimiting("agent-enroll").AllowAnonymous();
+
+        g.MapPost("/enroll", async (EnrollRequest req, HttpContext http, NpgsqlDataSource ds, AgentServer server, AuditWriter audit, ILoggerFactory lf,
+            Zentriq.Infrastructure.Secrets.CredentialProtector protector, CancellationToken ct) =>
         {
             var log = lf.CreateLogger("Zentriq.Agents");
             var ca = server.Ca;
             if (ca is null) return Results.Problem(statusCode: 503, title: "Agent enrollment is not configured on this server. Run 'zentriqctl repair'.");
             if (string.IsNullOrWhiteSpace(req.Token) || string.IsNullOrWhiteSpace(req.Csr)) return Results.Problem(statusCode: 400, title: "Token and certificate request are required.");
-            var hash = SHA256.HashData(Encoding.UTF8.GetBytes(req.Token.Trim()));
+            var tokenText = AgentCodes.NormalizeEnrollment(req.Token) ?? req.Token.Trim();
+            var hash = SHA256.HashData(Encoding.UTF8.GetBytes(tokenText));
+            var defaults = await LoadSettingsAsync(ds, ct);
 
             await using var conn = await ds.OpenConnectionAsync(ct);
             await using var tx = await conn.BeginTransactionAsync(ct);
             Guid tokenId;
+            int checkin, inventory;
             await using (var cmd = new NpgsqlCommand("""
-                SELECT id FROM zentriq.agent_enrollment_tokens
+                SELECT id, checkin_minutes, inventory_minutes FROM zentriq.agent_enrollment_tokens
                  WHERE token_hash = @h AND revoked_at IS NULL AND expires_at > now() AND (max_uses IS NULL OR uses < max_uses)
                  FOR UPDATE
                 """, conn, tx))
             {
                 cmd.Parameters.AddWithValue("h", hash);
-                if (await cmd.ExecuteScalarAsync(ct) is not Guid t)
+                await using var tr = await cmd.ExecuteReaderAsync(ct);
+                if (!await tr.ReadAsync(ct))
                 {
                     log.LogWarning("Agent enrollment rejected from {Ip}: invalid, expired, revoked or used-up token", http.Connection.RemoteIpAddress);
                     return Results.Problem(statusCode: 403, title: "The enrollment code is invalid, expired, revoked or has reached its use limit.");
                 }
-                tokenId = t;
+                tokenId = tr.GetGuid(0);
+                // Intervals: chosen at installation, else the code's, else the system defaults.
+                checkin = ValidCheckin(req.CheckinMinutes) ?? (tr.IsDBNull(1) ? null : tr.GetInt32(1)) ?? defaults.CheckinMinutes;
+                inventory = ValidInventory(req.InventoryMinutes) ?? (tr.IsDBNull(2) ? null : tr.GetInt32(2)) ?? defaults.InventoryMinutes;
             }
 
             var agentId = Guid.NewGuid();
+            var uninstallKey = AgentCodes.NewUninstallKey();
             X509Certificate2 cert;
             try { cert = AgentCertificateAuthority.Issue(ca, Convert.FromBase64String(req.Csr), agentId); }
             catch (Exception ex) when (ex is ArgumentException or FormatException) { return Results.Problem(statusCode: 400, title: ex.Message); }
             using (cert)
             {
                 await using (var ins = new NpgsqlCommand("""
-                    INSERT INTO zentriq.agent_registrations (id, agent_version, cert_thumbprint, cert_serial, cert_not_after, status, hostname, os_name, last_ip, token_id, enrolled_at, last_checkin_at)
-                    VALUES (@id, @v, @tp, @sn, @na, 'active', @h, @os, @ip, @tok, now(), now())
+                    INSERT INTO zentriq.agent_registrations (id, agent_version, cert_thumbprint, cert_serial, cert_not_after, status, hostname, os_name, last_ip, token_id,
+                                                            enrolled_at, last_checkin_at, checkin_minutes, inventory_minutes, online_until, uninstall_key_protected)
+                    VALUES (@id, @v, @tp, @sn, @na, 'active', @h, @os, @ip, @tok, now(), now(), @ci, @inv, now() + make_interval(mins => @ci * 2 + 5), @uk)
                     """, conn, tx))
                 {
+                    ins.Parameters.AddWithValue("ci", checkin);
+                    ins.Parameters.AddWithValue("inv", inventory);
+                    ins.Parameters.AddWithValue("uk", ProtectKey(protector, agentId, uninstallKey));
                     ins.Parameters.AddWithValue("id", agentId);
                     ins.Parameters.AddWithValue("v", Trunc(req.AgentVersion, 40) ?? "unknown");
                     ins.Parameters.AddWithValue("tp", cert.Thumbprint);
@@ -103,24 +159,38 @@ public static class AgentEndpoints
                     agentId,
                     certificate = Convert.ToBase64String(cert.Export(X509ContentType.Cert)),
                     caCertificate = Convert.ToBase64String(ca.Export(X509ContentType.Cert)),
-                    checkinSeconds = DefaultCheckinSeconds,
-                    inventoryHours = DefaultInventoryHours,
+                    checkinMinutes = checkin,
+                    inventoryMinutes = inventory,
+                    checkinSeconds = checkin * 60,
+                    inventoryHours = (inventory + 59) / 60,
                     serverPins = Pins(server),
+                    serverUrls = server.AlternateUrls(),
+                    uninstallProtection = defaults.UninstallProtection,
+                    uninstallKey = defaults.UninstallProtection ? Convert.ToBase64String(uninstallKey) : null,
                 });
             }
         }).RequireRateLimiting("agent-enroll").AllowAnonymous();
 
-        g.MapPost("/checkin", async (CheckinRequest req, HttpContext http, NpgsqlDataSource ds, AgentServer server, CancellationToken ct) =>
+        g.MapPost("/checkin", async (CheckinRequest req, HttpContext http, NpgsqlDataSource ds, AgentServer server,
+            Zentriq.Infrastructure.Secrets.CredentialProtector protector, ILoggerFactory lf, CancellationToken ct) =>
         {
             var (agent, error) = await AuthenticateAsync(http, ds, server, ct);
             if (agent is null) return error!;
+            var settings = await LoadSettingsAsync(ds, ct);
+            // An outage the agent reports after reconnecting (it could not reach the server since OfflineSince).
+            var outageFrom = req.OfflineSince is { } off && off < DateTimeOffset.UtcNow && off > DateTimeOffset.UtcNow.AddDays(-365) ? off : (DateTimeOffset?)null;
             await using var cmd = ds.CreateCommand("""
                 UPDATE zentriq.agent_registrations
                    SET last_checkin_at = now(), last_ip = @ip, agent_version = COALESCE(@v, agent_version),
-                       hostname = COALESCE(@h, hostname), os_name = COALESCE(@os, os_name), capabilities = COALESCE(@cap, capabilities)
+                       hostname = COALESCE(@h, hostname), os_name = COALESCE(@os, os_name), capabilities = COALESCE(@cap, capabilities),
+                       online_until = now() + make_interval(mins => checkin_minutes * 2 + 5),
+                       last_outage_from = COALESCE(@off, last_outage_from), last_outage_to = CASE WHEN @off::timestamptz IS NULL THEN last_outage_to ELSE now() END,
+                       uninstall_protected = COALESCE(@up, uninstall_protected)
                  WHERE id = @id
-                RETURNING last_inventory_at, cert_not_after
+                RETURNING last_inventory_at, cert_not_after, checkin_minutes, inventory_minutes, uninstall_key_protected
                 """);
+            cmd.Parameters.Add(new NpgsqlParameter("off", NpgsqlDbType.TimestampTz) { Value = (object?)outageFrom ?? DBNull.Value });
+            cmd.Parameters.Add(new NpgsqlParameter("up", NpgsqlDbType.Boolean) { Value = (object?)req.UninstallProtected ?? DBNull.Value });
             cmd.Parameters.AddWithValue("id", agent.Id);
             cmd.Parameters.Add(new NpgsqlParameter("ip", NpgsqlDbType.Inet) { Value = (object?)http.Connection.RemoteIpAddress ?? DBNull.Value });
             cmd.Parameters.Add(Text("v", Trunc(req.AgentVersion, 40)));
@@ -128,13 +198,33 @@ public static class AgentEndpoints
             cmd.Parameters.Add(Text("os", Trunc(req.OsName, 200)));
             cmd.Parameters.Add(new NpgsqlParameter("cap", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = (object?)req.Capabilities?.Take(20).Select(c => Trunc(c, 40)!).ToArray() ?? DBNull.Value });
             DateTimeOffset? lastInv = null, notAfter = null;
+            int checkin = settings.CheckinMinutes, inventory = settings.InventoryMinutes;
+            string? keyProtected = null;
             await using (var r = await cmd.ExecuteReaderAsync(ct))
                 if (await r.ReadAsync(ct))
                 {
                     lastInv = r.IsDBNull(0) ? null : r.GetFieldValue<DateTimeOffset>(0);
                     notAfter = r.IsDBNull(1) ? null : r.GetFieldValue<DateTimeOffset>(1);
+                    checkin = r.GetInt32(2);
+                    inventory = r.GetInt32(3);
+                    keyProtected = r.IsDBNull(4) ? null : r.GetString(4);
                 }
-            var inventoryDue = lastInv is null || lastInv < DateTimeOffset.UtcNow.AddHours(-DefaultInventoryHours) || await RequestedAsync(ds, agent.Id, ct);
+            if (outageFrom is not null) lf.CreateLogger("Zentriq.Agents").LogInformation("Agent {AgentId} reconnected after being offline since {Since:u}", agent.Id, outageFrom);
+            // The device's uninstall key (created here for agents enrolled before uninstall protection existed).
+            byte[]? uninstallKey = null;
+            if (settings.UninstallProtection)
+            {
+                if (keyProtected is not null) uninstallKey = UnprotectKey(protector, agent.Id, keyProtected);
+                if (uninstallKey is null)
+                {
+                    uninstallKey = AgentCodes.NewUninstallKey();
+                    await using var k = ds.CreateCommand("UPDATE zentriq.agent_registrations SET uninstall_key_protected = @k, uninstall_protected = false WHERE id = @id");
+                    k.Parameters.AddWithValue("id", agent.Id);
+                    k.Parameters.AddWithValue("k", ProtectKey(protector, agent.Id, uninstallKey));
+                    await k.ExecuteNonQueryAsync(ct);
+                }
+            }
+            var inventoryDue = lastInv is null || lastInv < DateTimeOffset.UtcNow.AddMinutes(-inventory) || await RequestedAsync(ds, agent.Id, ct);
             // Pending device actions (service start/stop/restart). Actions older than 1 hour are not handed out any more.
             var actions = new List<object>();
             var caps = req.Capabilities ?? [];
@@ -163,11 +253,18 @@ public static class AgentEndpoints
             {
                 actions,
                 agentId = agent.Id,
-                checkinSeconds = DefaultCheckinSeconds,
-                inventoryHours = DefaultInventoryHours,
+                checkinMinutes = checkin,
+                inventoryMinutes = inventory,
+                checkinSeconds = checkin * 60,               // agents before build 63
+                inventoryHours = (inventory + 59) / 60,
                 inventoryDue,
                 renewCertificate = notAfter is { } na && na < DateTimeOffset.UtcNow.AddDays(30),
                 serverPins = Pins(server),
+                serverUrls = server.AlternateUrls(),
+                uninstallProtection = settings.UninstallProtection,
+                // Always sent while protection is on (mutually authenticated channel only), so a key that was re-created
+                // reaches the agent; the agent stores it readable by SYSTEM only.
+                uninstallKey = settings.UninstallProtection && uninstallKey is not null ? Convert.ToBase64String(uninstallKey) : null,
             });
         }).AllowAnonymous();
 
@@ -278,7 +375,11 @@ public static class AgentEndpoints
 
     // ---- Admin API ---------------------------------------------------------------------------------
 
-    public sealed record TokenRequest(string Name, int? ValidDays, int? MaxUses, string? ServerUrl);
+    public sealed record TokenRequest(string Name, int? ValidDays, int? MaxUses, string? ServerUrl, int? CheckinMinutes = null, int? InventoryMinutes = null);
+
+    /// <summary>The silent install command for a code: server, code and the intervals chosen for the devices.</summary>
+    public static string InstallCommand(string serverUrl, string code, int checkin, int inventory) =>
+        $"msiexec /i ZentriqAgent-x64.msi /qn SERVERURL=\"{serverUrl}\" ENROLLMENTCODE=\"{code}\" CHECKININTERVAL={checkin} INVENTORYINTERVAL={inventory}";
 
     public static void MapAgentAdminEndpoints(this RouteGroupBuilder api)
     {
@@ -290,7 +391,8 @@ public static class AgentEndpoints
             await using var cmd = ds.CreateCommand("""
                 SELECT r.id, r.status, r.agent_version, r.hostname, r.os_name, host(r.last_ip), r.enrolled_at, r.last_checkin_at, r.last_inventory_at,
                        r.cert_not_after, r.asset_id, a.hostname, r.revoked_at, t.name, r.capabilities,
-                       u.status, u.target, u.detail, u.requested_at, u.completed_at
+                       u.status, u.target, u.detail, u.requested_at, u.completed_at,
+                       r.checkin_minutes, r.inventory_minutes, COALESCE(r.online_until > now(), false), r.last_outage_from, r.last_outage_to, r.uninstall_protected
                   FROM zentriq.agent_registrations r
                   LEFT JOIN LATERAL (SELECT x.status, x.target, x.detail, x.requested_at, x.completed_at FROM zentriq.asset_actions x
                                       WHERE x.agent_id = r.id AND x.kind = 'agent-update' ORDER BY x.requested_at DESC LIMIT 1) u ON true
@@ -308,7 +410,7 @@ public static class AgentEndpoints
                 var status = r.GetString(1);
                 var health = status == "revoked" ? "revoked" : status == "replaced" ? "replaced"
                     : lastCheckin is null ? "never"
-                    : lastCheckin > DateTimeOffset.UtcNow.AddSeconds(-DefaultCheckinSeconds * 3) ? "online"
+                    : r.GetBoolean(22) ? "online"
                     : lastCheckin > DateTimeOffset.UtcNow.AddDays(-7) ? "stale" : "offline";
                 list.Add(new
                 {
@@ -319,6 +421,8 @@ public static class AgentEndpoints
                     updateAvailable = status == "active" && IsOlder(r.GetString(2), latest),
                     latestVersion = latest,
                     update = r.IsDBNull(15) ? null : new { status = r.GetString(15), target = r.GetString(16), detail = S(17), requestedAt = r.GetFieldValue<DateTimeOffset>(18), completedAt = D(19) },
+                    checkinMinutes = r.GetInt32(20), inventoryMinutes = r.GetInt32(21), online = r.GetBoolean(22),
+                    lastOutage = D(23) is { } of ? new { from = of, to = D(24) } : null, uninstallProtected = r.GetBoolean(25),
                 });
             }
             return Results.Ok(list);
@@ -346,7 +450,7 @@ public static class AgentEndpoints
             cmd.Parameters.AddWithValue("id", id);
             if (await cmd.ExecuteNonQueryAsync(ct) == 0) return Results.NotFound();
             await rc.AuditAsync("agent.collect_requested", id.ToString());
-            return Results.Accepted(value: new { message = "The agent will send inventory at its next check-in (within about 2 minutes)." });
+            return Results.Accepted(value: new { message = "The agent will send inventory at its next check-in (set by its check-in interval)." });
         }).RequireAuthorization(Permissions.AgentsManage);
 
         // Update agents to the package served by this server. Agents of earlier builds without the self-update
@@ -397,12 +501,77 @@ public static class AgentEndpoints
             }
             await rc.AuditAsync("agent.update_requested", latest, detail: new { queued, current, pending, manual, noAsset, all = body.All == true });
             var parts = new List<string>();
-            if (queued > 0) parts.Add($"{queued} agent(s) will update to {latest} at their next check-in (within about 2 minutes).");
+            if (queued > 0) parts.Add($"{queued} agent(s) will update to {latest} at their next check-in (set by their check-in interval).");
             if (pending > 0) parts.Add($"{pending} already have an update in progress.");
             if (current > 0) parts.Add($"{current} are already up to date.");
             if (manual > 0) parts.Add($"{manual} run an earlier agent that cannot update itself ({string.Join(", ", manualHosts.Take(5))}{(manual > 5 ? ", …" : "")}): install the new ZentriqAgent-x64.msi on them once; later updates then work from here.");
             if (noAsset > 0) parts.Add($"{noAsset} have not sent inventory yet and were skipped.");
             return Results.Ok(new { queued, current, pending, manual, noAsset, version = latest, message = parts.Count > 0 ? string.Join(" ", parts) : "No agents selected." });
+        }).RequireAuthorization(Permissions.AgentsManage);
+
+        // Check-in and inventory intervals of selected agents (applied at their next check-in).
+        g.MapPut("/schedule", async (ScheduleRequest body, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
+        {
+            if (ValidCheckin(body.CheckinMinutes) is not { } ci) return Validation.Problem("checkinMinutes", $"Choose a check-in interval between {MinCheckinMinutes} minutes and 24 hours.");
+            if (ValidInventory(body.InventoryMinutes) is not { } inv) return Validation.Problem("inventoryMinutes", "Choose an inventory interval between 30 minutes and 7 days.");
+            if (inv < ci) return Validation.Problem("inventoryMinutes", "Inventory cannot be sent more often than the agent checks in.");
+            var ids = body.AgentIds?.Distinct().Take(20000).ToArray() ?? [];
+            if (ids.Length == 0 && body.All != true) return Validation.Problem("agentIds", "Select agents, or apply to all agents.");
+            await using var cmd = ds.CreateCommand("""
+                UPDATE zentriq.agent_registrations SET checkin_minutes = @ci, inventory_minutes = @inv
+                 WHERE status = 'active' AND (@all OR id = ANY(@ids))
+                """);
+            cmd.Parameters.AddWithValue("ci", ci);
+            cmd.Parameters.AddWithValue("inv", inv);
+            cmd.Parameters.AddWithValue("all", body.All == true);
+            cmd.Parameters.AddWithValue("ids", ids);
+            var n = await cmd.ExecuteNonQueryAsync(ct);
+            await rc.AuditAsync("agent.schedule", $"{n} agent(s)", detail: new { ci, inv, all = body.All == true });
+            return Results.Ok(new { updated = n, message = $"{n} agent(s) will check in every {Minutes(ci)} and send inventory every {Minutes(inv)}, from their next check-in." });
+        }).RequireAuthorization(Permissions.AgentsManage);
+
+        g.MapGet("/settings", async (NpgsqlDataSource ds, CancellationToken ct) =>
+            Results.Ok(new { settings = await LoadSettingsAsync(ds, ct), checkinChoices = CheckinChoices, inventoryChoices = InventoryChoices }))
+            .RequireAuthorization(Permissions.AssetsView);
+
+        g.MapPut("/settings", async (AgentSettings body, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
+        {
+            if (ValidCheckin(body.CheckinMinutes) is null) return Validation.Problem("checkinMinutes", "Choose a check-in interval.");
+            if (ValidInventory(body.InventoryMinutes) is null || body.InventoryMinutes < body.CheckinMinutes) return Validation.Problem("inventoryMinutes", "Choose an inventory interval at least as long as the check-in interval.");
+            await using var cmd = ds.CreateCommand("""
+                INSERT INTO zentriq.system_settings (key, value) VALUES ('agents.settings', @v::jsonb)
+                ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()
+                """);
+            cmd.Parameters.AddWithValue("v", JsonSerializer.Serialize(body, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+            await cmd.ExecuteNonQueryAsync(ct);
+            await rc.AuditAsync("agent.settings", null, detail: body);
+            return Results.NoContent();
+        }).RequireAuthorization(Permissions.AgentsManage);
+
+        // A one-hour code that allows uninstalling the agent on one device (uninstall protection).
+        g.MapPost("/{id:guid}/uninstall-code", async (Guid id, NpgsqlDataSource ds, RequestContext rc, Zentriq.Infrastructure.Secrets.CredentialProtector protector, CancellationToken ct) =>
+        {
+            await using var cmd = ds.CreateCommand("""
+                SELECT COALESCE(r.hostname, a.hostname, r.id::text), r.uninstall_key_protected, r.uninstall_protected, r.status
+                  FROM zentriq.agent_registrations r LEFT JOIN zentriq.assets a ON a.id = r.asset_id WHERE r.id = @id
+                """);
+            cmd.Parameters.AddWithValue("id", id);
+            string host; string? keyProtected; bool holds; string status;
+            await using (var r = await cmd.ExecuteReaderAsync(ct))
+            {
+                if (!await r.ReadAsync(ct)) return Results.NotFound();
+                host = r.GetString(0); keyProtected = r.IsDBNull(1) ? null : r.GetString(1); holds = r.GetBoolean(2); status = r.GetString(3);
+            }
+            var key = keyProtected is null ? null : UnprotectKey(protector, id, keyProtected);
+            if (key is null) return Results.Problem(statusCode: 409, title: $"{host} has no uninstall key yet: its agent has not checked in since uninstall protection was turned on, so it can be uninstalled without a code.");
+            var expires = DateTime.UtcNow.Add(AgentCodes.UninstallValidity);
+            var code = AgentCodes.Group(AgentCodes.UninstallCode(key, expires), 4);
+            await rc.AuditAsync("agent.uninstall_code", host, detail: new { agentId = id, expires });
+            return Results.Ok(new
+            {
+                code, expiresAt = new DateTimeOffset(expires, TimeSpan.Zero), hostname = host, agentHasKey = holds, status,
+                command = $"\"C:\\Program Files\\Zentriq Agent\\ZentriqAgent.exe\" --uninstall {code}",
+            });
         }).RequireAuthorization(Permissions.AgentsManage);
 
         g.MapGet("/enrollment-tokens", async (NpgsqlDataSource ds, CancellationToken ct) =>
@@ -435,37 +604,50 @@ public static class AgentEndpoints
             if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme != "https" || !string.IsNullOrEmpty(uri.Query) || uri.AbsolutePath != "/")
                 return Validation.Problem("serverUrl", "Enter an https:// address with host and optional port only, e.g. https://zentriq.example.com:8444");
             if (server.Ca is null) return Results.Problem(statusCode: 503, title: "Agent CA is not provisioned. Run 'zentriqctl repair' on the server.");
+            var defaults = await LoadSettingsAsync(ds, ct);
+            var checkin = ValidCheckin(req.CheckinMinutes) ?? defaults.CheckinMinutes;
+            var inventory = ValidInventory(req.InventoryMinutes) ?? defaults.InventoryMinutes;
+            if (inventory < checkin) return Validation.Problem("inventoryMinutes", "Inventory cannot be sent more often than the agent checks in.");
 
-            var secret = Base64Url(RandomNumberGenerator.GetBytes(32));
             var id = Guid.NewGuid();
             var expires = DateTimeOffset.UtcNow.AddDays(days);
-            await using var cmd = ds.CreateCommand("""
-                INSERT INTO zentriq.agent_enrollment_tokens (id, name, token_hash, server_url, max_uses, expires_at, created_by, code_protected)
-                VALUES (@id, @n, @h, @u, @m, @e, @by, @code)
-                """);
-            cmd.Parameters.AddWithValue("id", id);
-            cmd.Parameters.AddWithValue("n", req.Name.Trim());
-            cmd.Parameters.AddWithValue("h", SHA256.HashData(Encoding.UTF8.GetBytes(secret)));
-            cmd.Parameters.AddWithValue("u", url);
-            cmd.Parameters.Add(new NpgsqlParameter("m", NpgsqlDbType.Integer) { Value = (object?)req.MaxUses ?? DBNull.Value });
-            cmd.Parameters.AddWithValue("e", expires);
-            cmd.Parameters.Add(new NpgsqlParameter("by", NpgsqlDbType.Uuid) { Value = (object?)rc.UserId ?? DBNull.Value });
-            var code = BuildCode(url, secret, Pins(server));
-            // Kept encrypted so administrators can show the code again (Agents > Enrollment codes > Show code).
-            cmd.Parameters.AddWithValue("code", protector.Protect(id, new Zentriq.Infrastructure.Secrets.CredentialSecret { Password = code }));
-            await cmd.ExecuteNonQueryAsync(ct);
-            await rc.AuditAsync("agent.token_create", req.Name, detail: new { id, url, days, req.MaxUses });
+            string code = "";
+            // 20 characters; the first 6 identify the code (unique), the rest is the secret. Retry on the rare id collision.
+            for (var attempt = 0; ; attempt++)
+            {
+                code = AgentCodes.NewEnrollmentCode();
+                await using var cmd = ds.CreateCommand("""
+                    INSERT INTO zentriq.agent_enrollment_tokens (id, name, token_hash, server_url, max_uses, expires_at, created_by, code_protected, short_id, checkin_minutes, inventory_minutes)
+                    VALUES (@id, @n, @h, @u, @m, @e, @by, @code, @sid, @ci, @inv)
+                    """);
+                cmd.Parameters.AddWithValue("id", id);
+                cmd.Parameters.AddWithValue("n", req.Name.Trim());
+                cmd.Parameters.AddWithValue("h", SHA256.HashData(Encoding.UTF8.GetBytes(code)));
+                cmd.Parameters.AddWithValue("u", url);
+                cmd.Parameters.Add(new NpgsqlParameter("m", NpgsqlDbType.Integer) { Value = (object?)req.MaxUses ?? DBNull.Value });
+                cmd.Parameters.AddWithValue("e", expires);
+                cmd.Parameters.Add(new NpgsqlParameter("by", NpgsqlDbType.Uuid) { Value = (object?)rc.UserId ?? DBNull.Value });
+                // Kept encrypted so administrators can show the code again (Agents > Enrollment codes > Show code).
+                cmd.Parameters.AddWithValue("code", protector.Protect(id, new Zentriq.Infrastructure.Secrets.CredentialSecret { Password = code }));
+                cmd.Parameters.AddWithValue("sid", AgentCodes.EnrollmentId(code));
+                cmd.Parameters.AddWithValue("ci", checkin);
+                cmd.Parameters.AddWithValue("inv", inventory);
+                try { await cmd.ExecuteNonQueryAsync(ct); break; }
+                catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation && attempt < 5) { }
+            }
+            await rc.AuditAsync("agent.token_create", req.Name, detail: new { id, url, days, req.MaxUses, checkin, inventory });
             return Results.Ok(new
             {
-                id, name = req.Name.Trim(), serverUrl = url, expiresAt = expires, maxUses = req.MaxUses, code,
-                installCommand = $"msiexec /i ZentriqAgent-x64.msi /qn ENROLLMENTCODE=\"{code}\"",
+                id, name = req.Name.Trim(), serverUrl = url, expiresAt = expires, maxUses = req.MaxUses, code = AgentCodes.Group(code),
+                checkinMinutes = checkin, inventoryMinutes = inventory,
+                installCommand = InstallCommand(url, AgentCodes.Group(code), checkin, inventory),
                 package = PackageInfo(env),
             });
         }).RequireAuthorization(Permissions.AgentsManage);
 
         g.MapGet("/enrollment-tokens/{id:guid}/code", async (Guid id, NpgsqlDataSource ds, RequestContext rc, IWebHostEnvironment env, Zentriq.Infrastructure.Secrets.CredentialProtector protector, CancellationToken ct) =>
         {
-            await using var cmd = ds.CreateCommand("SELECT name, code_protected, revoked_at IS NULL AND expires_at > now() AND (max_uses IS NULL OR uses < max_uses), server_url, expires_at, max_uses, uses FROM zentriq.agent_enrollment_tokens WHERE id = @id");
+            await using var cmd = ds.CreateCommand("SELECT name, code_protected, revoked_at IS NULL AND expires_at > now() AND (max_uses IS NULL OR uses < max_uses), server_url, expires_at, max_uses, uses, checkin_minutes, inventory_minutes FROM zentriq.agent_enrollment_tokens WHERE id = @id");
             cmd.Parameters.AddWithValue("id", id);
             await using var r = await cmd.ExecuteReaderAsync(ct);
             if (!await r.ReadAsync(ct)) return Results.NotFound();
@@ -473,15 +655,44 @@ public static class AgentEndpoints
             if (r.IsDBNull(1)) return Results.Problem(statusCode: 410, title: "This code was created by an earlier version and cannot be shown again. Create a new enrollment code.");
             if (!r.GetBoolean(2)) return Results.Problem(statusCode: 410, title: "This enrollment code is no longer active (expired, revoked or used up).");
             var code = protector.Unprotect(id, r.GetString(1)).Password!;
+            var defaults = await LoadSettingsAsync(ds, ct);
+            var ci = r.IsDBNull(7) ? defaults.CheckinMinutes : r.GetInt32(7);
+            var inv = r.IsDBNull(8) ? defaults.InventoryMinutes : r.GetInt32(8);
+            var shown = AgentCodes.IsShortEnrollmentCode(code) ? AgentCodes.Group(code) : code;
             var result = new
             {
-                id, name, code, serverUrl = r.GetString(3), expiresAt = r.GetFieldValue<DateTimeOffset>(4), maxUses = r.IsDBNull(5) ? (int?)null : r.GetInt32(5), uses = r.GetInt32(6),
-                installCommand = $"msiexec /i ZentriqAgent-x64.msi /qn ENROLLMENTCODE=\"{code}\"",
+                id, name, code = shown, serverUrl = r.GetString(3), expiresAt = r.GetFieldValue<DateTimeOffset>(4), maxUses = r.IsDBNull(5) ? (int?)null : r.GetInt32(5), uses = r.GetInt32(6),
+                checkinMinutes = ci, inventoryMinutes = inv,
+                installCommand = AgentCodes.IsShortEnrollmentCode(code) ? InstallCommand(r.GetString(3), shown, ci, inv) : $"msiexec /i ZentriqAgent-x64.msi /qn ENROLLMENTCODE=\"{code}\"",
                 package = PackageInfo(env),
             };
             await r.DisposeAsync();
             await rc.AuditAsync("agent.token_viewed", name);
             return Results.Ok(result);
+        }).RequireAuthorization(Permissions.AgentsManage);
+
+        // Delete enrollment codes that can no longer be used (revoked, expired or used up); devices enrolled with them stay.
+        g.MapDelete("/enrollment-tokens/{id:guid}", async (Guid id, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
+        {
+            await using var cmd = ds.CreateCommand("""
+                DELETE FROM zentriq.agent_enrollment_tokens
+                 WHERE id = @id AND (revoked_at IS NOT NULL OR expires_at <= now() OR (max_uses IS NOT NULL AND uses >= max_uses)) RETURNING name
+                """);
+            cmd.Parameters.AddWithValue("id", id);
+            if (await cmd.ExecuteScalarAsync(ct) is string name) { await rc.AuditAsync("agent.token_delete", name); return Results.NoContent(); }
+            await using var ex = ds.CreateCommand("SELECT 1 FROM zentriq.agent_enrollment_tokens WHERE id = @id");
+            ex.Parameters.AddWithValue("id", id);
+            return await ex.ExecuteScalarAsync(ct) is null ? Results.NotFound() : Results.Problem(statusCode: 409, title: "This code can still be used. Revoke it first, then delete it.");
+        }).RequireAuthorization(Permissions.AgentsManage);
+
+        g.MapPost("/enrollment-tokens/delete-inactive", async (NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
+        {
+            await using var cmd = ds.CreateCommand("""
+                DELETE FROM zentriq.agent_enrollment_tokens WHERE revoked_at IS NOT NULL OR expires_at <= now() OR (max_uses IS NOT NULL AND uses >= max_uses)
+                """);
+            var n = await cmd.ExecuteNonQueryAsync(ct);
+            await rc.AuditAsync("agent.token_delete", $"{n} inactive code(s)");
+            return Results.Ok(new { deleted = n });
         }).RequireAuthorization(Permissions.AgentsManage);
 
         g.MapPost("/enrollment-tokens/{id:guid}/revoke", async (Guid id, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
@@ -503,6 +714,9 @@ public static class AgentEndpoints
     public const string PackagePath = "downloads/ZentriqAgent-x64.msi";
 
     public sealed record UpdateRequest(Guid[]? AgentIds, bool? All);
+    public sealed record ScheduleRequest(Guid[]? AgentIds, bool? All, int? CheckinMinutes, int? InventoryMinutes);
+
+    public static string Minutes(int m) => m % 1440 == 0 ? $"{m / 1440} day{(m == 1440 ? "" : "s")}" : m % 60 == 0 ? $"{m / 60} hour{(m == 60 ? "" : "s")}" : $"{m} minutes";
 
     /// <summary>Version of the agent package this server serves (from ZentriqAgent-x64.version), or null.</summary>
     internal static string? PackageVersion(IWebHostEnvironment env)
@@ -569,6 +783,20 @@ public static class AgentEndpoints
         AgentProtocol.FormatCode(new AgentProtocol.EnrollmentCode { Url = url, Token = secret, Pins = [.. pins] });
 
     private static string[] Pins(AgentServer server) => server.ServerPin is { } p ? [p] : [];
+
+    private static readonly Guid UninstallKeyAad = new("2b7f0c44-8a1e-4d6b-9c55-6e3f1a0d7b19");
+    internal static string ProtectKey(Zentriq.Infrastructure.Secrets.CredentialProtector protector, Guid agentId, byte[] key) =>
+        protector.Protect(UninstallKeyAad, new Zentriq.Infrastructure.Secrets.CredentialSecret { Password = agentId.ToString("N") + ":" + Convert.ToBase64String(key) });
+    internal static byte[]? UnprotectKey(Zentriq.Infrastructure.Secrets.CredentialProtector protector, Guid agentId, string value)
+    {
+        try
+        {
+            var p = protector.Unprotect(UninstallKeyAad, value).Password ?? "";
+            var parts = p.Split(':', 2);
+            return parts.Length == 2 && parts[0] == agentId.ToString("N") ? Convert.FromBase64String(parts[1]) : null;
+        }
+        catch (Exception ex) when (ex is CryptographicException or FormatException or InvalidOperationException) { return null; }
+    }
 
     internal static string RequestKey(Guid agentId) => "agent.collect." + agentId.ToString("N");
 

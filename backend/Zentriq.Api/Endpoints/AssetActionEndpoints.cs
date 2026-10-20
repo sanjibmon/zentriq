@@ -79,7 +79,7 @@ public static class AssetActionEndpoints
             }
             await rc.AuditAsync("asset.collect_requested", body.All == true ? "all assets" : $"{ids.Length} asset(s)", detail: new { agents = agents.Count, agentless = targets.Count, skipped, scanId });
             var parts = new List<string>();
-            if (agents.Count > 0) parts.Add($"{agents.Count} agent(s) will send inventory within about 2 minutes");
+            if (agents.Count > 0) parts.Add($"{agents.Count} agent(s) will send inventory at their next check-in");
             if (scanId is not null) parts.Add($"{targets.Count} asset(s) without an agent are being collected agentlessly (scan started)");
             if (skipped > 0) parts.Add($"{skipped} asset(s) have no address and were skipped");
             if (scanNote is not null) parts.Add(scanNote);
@@ -90,7 +90,7 @@ public static class AssetActionEndpoints
         g.MapGet("/{id:guid}/control", async (Guid id, NpgsqlDataSource ds, ZentriqDbContext db, CancellationToken ct) =>
         {
             await using var cmd = ds.CreateCommand("""
-                SELECT a.os_family, r.id, r.last_checkin_at, COALESCE('service-control' = ANY(r.capabilities), false), r.agent_version
+                SELECT a.os_family, r.id, r.last_checkin_at, COALESCE('service-control' = ANY(r.capabilities), false), r.agent_version, r.online_until
                   FROM zentriq.assets a
                   LEFT JOIN LATERAL (SELECT * FROM zentriq.agent_registrations x WHERE x.asset_id = a.id AND x.status = 'active'
                                      ORDER BY x.last_checkin_at DESC NULLS LAST LIMIT 1) r ON true
@@ -101,7 +101,7 @@ public static class AssetActionEndpoints
             if (!await r.ReadAsync(ct)) return Results.NotFound();
             var hasAgent = !r.IsDBNull(1);
             var capable = r.GetBoolean(3);
-            var online = !r.IsDBNull(2) && r.GetFieldValue<DateTimeOffset>(2) > DateTimeOffset.UtcNow.AddMinutes(-15);
+            var online = !r.IsDBNull(5) && r.GetFieldValue<DateTimeOffset>(5) > DateTimeOffset.UtcNow;
             var osFamily = r.IsDBNull(0) ? null : r.GetString(0);
             var agentVersion = r.IsDBNull(4) ? null : r.GetString(4);
             await r.DisposeAsync();
@@ -203,7 +203,7 @@ public static class AssetActionEndpoints
                 return Results.Accepted(value: new
                 {
                     id = actionId, channel,
-                    message = channel == "agent" ? $"Sent to the Zentriq Agent on {hostname}; it runs at the next check-in (within about 2 minutes)." : $"Running on {hostname} over WinRM/DCOM…",
+                    message = channel == "agent" ? $"Sent to the Zentriq Agent on {hostname}; it runs at its next check-in (set by its check-in interval)." : $"Running on {hostname} over WinRM/DCOM…",
                 });
             }
         }).RequireAuthorization(Permissions.AssetsControl);
@@ -304,7 +304,7 @@ public static class AssetActionEndpoints
             }
             await rc.AuditAsync("software.uninstall_requested", name, detail: new { version = body.Version, devices = targets.Select(t => t.Host), skippedNoAgent = noAgent, skippedOldAgent = oldAgent });
             var parts = new List<string>();
-            if (targets.Count > 0) parts.Add($"Uninstall of {name} sent to {targets.Count} device(s); each agent runs it at its next check-in (within about 2 minutes). Progress is in the Activity log");
+            if (targets.Count > 0) parts.Add($"Uninstall of {name} sent to {targets.Count} device(s); each agent runs it at its next check-in (set by its check-in interval). Progress is in the Activity log");
             if (noAgent.Count > 0) parts.Add($"{noAgent.Count} device(s) have no Zentriq Agent and were skipped ({string.Join(", ", noAgent.Take(5))}{(noAgent.Count > 5 ? "…" : "")})");
             if (oldAgent.Count > 0) parts.Add($"{oldAgent.Count} device(s) run an older agent without uninstall support; update the agent ({string.Join(", ", oldAgent.Take(5))}{(oldAgent.Count > 5 ? "…" : "")})");
             if (parts.Count == 0) parts.Add("No selected device has this software in its latest inventory");

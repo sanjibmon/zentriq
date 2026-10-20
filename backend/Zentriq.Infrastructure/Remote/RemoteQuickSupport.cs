@@ -1,9 +1,15 @@
 using System.Security.Cryptography;
+using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Npgsql;
 using NpgsqlTypes;
 
 namespace Zentriq.Infrastructure.Remote;
+
+/// <summary>An invitation for people outside the office needs a public address that has been checked.</summary>
+public sealed class InternetRequiredException(string? detail) : Exception(
+    "Invitations for people outside your network need a public address (public IP or domain name) that reaches this server over HTTPS. " +
+    "Set and check it in Remote Support › Settings › Internet access." + (string.IsNullOrEmpty(detail) ? "" : " Last check: " + detail));
 
 /// <summary>A quick support session as listed in the console.</summary>
 public sealed record QuickSession(
@@ -29,15 +35,52 @@ public sealed partial class RemoteSupportService
     public static string NewQuickCode() => RandomNumberGenerator.GetInt32(100_000_000, 1_000_000_000).ToString(System.Globalization.CultureInfo.InvariantCulture);
     public static string FormatCode(string code) => code.Length == 9 ? $"{code[..3]} {code[3..6]} {code[6..]}" : code;
 
-    /// <summary>The address invitation links use: the internet address when one is set, otherwise the one the technician uses.</summary>
-    public string InviteBase(RemoteSettings s, string? browserHost) =>
-        RemoteServerConfig.NormalizeHost(s.InternetHost) is { } h ? $"https://{h}:{(s.InternetPort is > 0 and < 65536 ? s.InternetPort : options.Remote.Port)}/" : UrlFor(browserHost);
+    /// <summary>
+    /// The address invitation links use: the internet address (HTTPS) for people anywhere, or — for someone on the office
+    /// network (<paramref name="lan"/>) — the address the technician uses.
+    /// </summary>
+    public string InviteBase(RemoteSettings s, string? browserHost, bool lan = false) =>
+        !lan && RemoteServerConfig.NormalizeHost(s.InternetHost) is { } h ? $"https://{h}:{(s.InternetPort is > 0 and < 65536 ? s.InternetPort : options.Remote.Port)}/" : UrlFor(browserHost);
+
+    private const string InternetCheckKey = "remote.internet_check";
+
+    /// <summary>The last check of the internet address (null when none is set).</summary>
+    public async Task<InternetCheckResult?> InternetCheckAsync(CancellationToken ct) =>
+        await SettingAsync(InternetCheckKey, ct) is { } json ? JsonSerializer.Deserialize<InternetCheckResult>(json, Json) : null;
+
+    /// <summary>Checks <paramref name="host"/>:<paramref name="port"/> from this server (see <see cref="InternetCheck"/>).</summary>
+    public Task<InternetCheckResult> CheckInternetAsync(string host, int port, bool confirmedFromOutside, CancellationToken ct) =>
+        InternetCheck.RunAsync(host, port, options.Remote.Port, ct, confirmedFromOutside);
+
+    /// <summary>Stores the internet address with its check result (or removes both).</summary>
+    public async Task SaveInternetAsync(InternetCheckResult? check, CancellationToken ct)
+    {
+        var s = await SettingsAsync(ct);
+        s.InternetHost = check?.Host;
+        s.InternetPort = check?.Port;
+        await SetSettingAsync("remote.settings", JsonSerializer.Serialize(s, Json), ct);
+        if (check is null)
+        {
+            await using var del = ds.CreateCommand("DELETE FROM zentriq.system_settings WHERE key = @k");
+            del.Parameters.AddWithValue("k", InternetCheckKey);
+            await del.ExecuteNonQueryAsync(ct);
+        }
+        else await SetSettingAsync(InternetCheckKey, JsonSerializer.Serialize(check, Json), ct);
+    }
 
     /// <summary>Creates a session: its device group (consent always on) and an invitation valid for <paramref name="hours"/> hours.</summary>
-    public async Task<QuickSession> CreateQuickAsync(Guid? userId, string userName, string? customer, string? email, string? note, int hours, string? browserHost, CancellationToken ct)
+    /// <param name="lan">The person is on the office network: the link uses the server's LAN address. Otherwise the link
+    /// uses the verified internet address, and creating it fails with <see cref="InternetRequiredException"/> when there is none.</param>
+    public async Task<QuickSession> CreateQuickAsync(Guid? userId, string userName, string? customer, string? email, string? note, int hours, string? browserHost, CancellationToken ct, bool lan = false)
     {
         hours = Math.Clamp(hours, 1, 72);
         var settings = await SettingsAsync(ct);
+        if (!lan)
+        {
+            var check = await InternetCheckAsync(ct);
+            if (RemoteServerConfig.NormalizeHost(settings.InternetHost) is null || check is null || !check.Usable)
+                throw new InternetRequiredException(check?.Message);
+        }
         string code;
         await using (var check = ds.CreateCommand("SELECT 1 FROM zentriq.remote_quick_sessions WHERE code = @c"))
         {
@@ -51,7 +94,7 @@ public sealed partial class RemoteSupportService
             try
             {
                 var cookie = await c.CreateInviteAsync(mesh, hours, flags: 1, ct); // run only: nothing is installed
-                url = InviteBase(settings, browserHost) + "agentinvite?c=" + Uri.EscapeDataString(cookie);
+                url = InviteBase(settings, browserHost, lan) + "agentinvite?c=" + Uri.EscapeDataString(cookie);
             }
             catch
             {

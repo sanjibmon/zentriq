@@ -44,7 +44,7 @@ export function SoftwarePage() {
       danger: true, confirmLabel: 'Uninstall',
       typeToConfirm: all && n > 1 ? 'UNINSTALL' : undefined,
       message: <>
-        <p style={{ marginTop: 0 }}>The Zentriq Agent on each device removes the application silently at its next check-in (within about 2 minutes). Users may lose unsaved work in that application, and some uninstallers restart services.</p>
+        <p style={{ marginTop: 0 }}>The Zentriq Agent on each device removes the application silently at its next check-in (set by its check-in interval). Users may lose unsaved work in that application, and some uninstallers restart services.</p>
         {noAgent > 0 && <p style={{ marginBottom: 0 }}>{noAgent} of these device(s) have no agent (or an outdated one) and will be skipped.</p>}
       </>,
     });
@@ -101,7 +101,7 @@ export function SoftwarePage() {
               { key: 'd', label: 'Installed', render: (r) => fmt.day(r.installedOn) },
               { key: 'a', label: 'Remote uninstall', render: (r) => r.lastUninstall
                 ? <span title={r.lastUninstall.detail ?? ''}><Pill tone={r.lastUninstall.status === 'succeeded' ? 'ok' : r.lastUninstall.status === 'failed' ? 'crit' : 'warn'}>{r.lastUninstall.status === 'failed' ? 'Failed' : r.lastUninstall.status === 'succeeded' ? 'Removed' : 'Pending'}</Pill></span>
-                : r.agent === 'ready' ? (canUninstall ? <button className="btn sm danger" onClick={() => { void (async () => { const ok = await confirm({ title: `Uninstall ${selected} from ${r.hostname ?? r.ip}?`, danger: true, confirmLabel: 'Uninstall', message: 'The Zentriq Agent removes the application silently at its next check-in (within about 2 minutes). The user may lose unsaved work in it.' }); if (!ok) return; try { const res = await api.post<{ message: string }>('/software/uninstall', { name: selected, assetIds: [r.assetId] }); setMsg({ tone: 'info', text: res.message }); installs.reload(); } catch (e) { setMsg({ tone: 'crit', text: e instanceof Error ? e.message : String(e) }); } })(); }}>Uninstall</button> : <span className="muted">Agent</span>)
+                : r.agent === 'ready' ? (canUninstall ? <button className="btn sm danger" onClick={() => { void (async () => { const ok = await confirm({ title: `Uninstall ${selected} from ${r.hostname ?? r.ip}?`, danger: true, confirmLabel: 'Uninstall', message: 'The Zentriq Agent removes the application silently at its next check-in (set by its check-in interval). The user may lose unsaved work in it.' }); if (!ok) return; try { const res = await api.post<{ message: string }>('/software/uninstall', { name: selected, assetIds: [r.assetId] }); setMsg({ tone: 'info', text: res.message }); installs.reload(); } catch (e) { setMsg({ tone: 'crit', text: e instanceof Error ? e.message : String(e) }); } })(); }}>Uninstall</button> : <span className="muted">Agent</span>)
                 : <span className="muted" title={r.agent === 'old' ? 'Update the agent to the latest version' : 'Install the Zentriq Agent to uninstall remotely'}>{r.agent === 'old' ? 'Agent update needed' : 'No agent'}</span> },
             ]} />
           </Panel>
