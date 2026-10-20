@@ -98,6 +98,9 @@ $agentFailed = $false
 if ($ok -and $withAgent) {
     try {
         $s = Login
+        # Builds 63+ protect the agent against removal by default; the test stops the service to run check-ins in the
+        # foreground, so switch protection off (older servers do not have the setting).
+        try { Api PUT '/agents/settings' @{ checkinMinutes = 30; inventoryMinutes = 180; uninstallProtection = $false } $s | Out-Null } catch { }
         $tok = Api POST '/agents/enrollment-tokens' @{ name = 'upgrade-ci'; validDays = 1; maxUses = 1; serverUrl = 'https://localhost:8444' } $s
         $log = Join-Path $OutDir 'agent-old-install.log'
         $p = Start-Process msiexec.exe -ArgumentList '/i', "`"$OldAgentMsi`"", '/qn', 'SERVERURL=https://localhost:8444', "ENROLLMENTCODE=$($tok.code)", '/l*v', "`"$log`"" -Wait -PassThru   # 20-character codes (build 63+) need the server address
