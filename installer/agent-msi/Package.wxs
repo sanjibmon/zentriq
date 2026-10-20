@@ -3,7 +3,7 @@
   ZentriqAgent-x64.msi — Zentriq Agent for Windows endpoints and servers.
     Silent:  msiexec /i ZentriqAgent-x64.msi /qn SERVERURL="https://zentriq.example.com:8444" ENROLLMENTCODE="XXXXX-XXXXX-XXXXX-XXXXX"
              [CHECKININTERVAL=30] [INVENTORYINTERVAL=180] [PROXYURL="http://proxy:8080"]
-    Remove:  "C:\Program Files\Zentriq Agent\ZentriqAgent.exe" --uninstall <code>   (uninstall code from the console when protected)
+    Remove:  ZentriqAgent.exe with the uninstall option and the code from the console (when protected)
   Runs as LocalSystem (read-only inventory needs WMI/registry access), outbound HTTPS only, no listening ports.
   The enrollment code is a hidden property, written by a hidden custom action (never in MSI logs), and deleted
   by the agent once used.

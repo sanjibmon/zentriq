@@ -28,16 +28,45 @@ Sessions end by themselves when nobody joins before the link expires (*Expired*)
 
 **Admin rights on the person's PC:** the run-only Windows app runs with the person's own rights. To answer UAC prompts, ask them to start it with *Run as administrator*, or use an **unattended** device (the installed agent runs as a service and shows the secure desktop, the sign-in screen and UAC prompts).
 
-## Internet access
+## Internet access (public address, checked)
 
-By default remote support works on your network. To help people at home or on the road:
+Zentriq is installed on your premises, so people outside your network can only reach it through a **public address**:
+your public IP or a domain name, published on HTTPS. Links for people outside are created **only** for an address that
+Zentriq has checked:
 
-1. In **Settings › Internet access** enter a public DNS name (for example `support.contoso.com`) and the public port (default 8446).
-2. Create the DNS record (public IP outside; inside the office let it resolve to the server, or use NAT loopback).
-3. On the router/firewall forward **TCP 8446** (or the public port you chose) to the server's port 8446. Only the remote support engine is published, not the console (443) or the agent port (8444).
-4. So that people outside see no certificate warning, give the server a certificate from a public CA that includes the name (thumbprint in the Setup answer file; remote support uses the console's certificate).
+1. In **Settings › Internet access** (or directly in *New support session* when none is set) enter the public domain
+   name or public IP and the HTTPS port (default 8446), then **Check**.
+2. Zentriq checks from the server that:
+   - the name resolves, and **every address is public** (10.x, 172.16–31.x, 192.168.x, 100.64.x carrier NAT, link-local
+     and loopback addresses are refused — "not reachable from the internet");
+   - an **HTTPS** connection to that address and port reaches **this server's remote support** (same certificate).
+     Plain HTTP and port 80 are not accepted.
+3. If the connection fails although the address is public, the router may not support *NAT loopback* (connecting to its
+   own public address from inside). Open the address from outside (for example a phone on mobile data); when it works,
+   tick *I opened … from outside the network* and save. Private addresses can never be confirmed.
+4. **Check and use this address** saves it; the ZentriqRemote service applies it within a minute (MeshCentral
+   `agentAliasDNS` / `agentAliasPort`). Invitation links, install links and new agent installers then use it.
 
-Saving writes `<data>\Remote\cert\internet.txt`; the ZentriqRemote service applies it within a minute (MeshCentral `agentAliasDNS` / `agentAliasPort`) and restarts the engine. Invitation links, install links and **new** agent installers then use the public name; agents already installed keep the address they have. Clearing the field returns to LAN only.
+Router/firewall: forward TCP **8446** (or the public port you chose) to the server's port 8446 — only remote support is
+published, not the console or the agent port. For no browser warning outside, use a certificate from a public CA that
+includes the name (the engine uses the console certificate).
+
+Without a checked address, *New support session › Anywhere (internet)* asks for one (administrators) or explains that it
+is missing; **On the office network** creates a link with the server's LAN address. The API refuses internet links with
+HTTP 409 (`internet-required`).
+
+## Zentriq branding, Windows / macOS / Linux
+
+* The invitation page people open is Zentriq's own page (`installer/remote/views/agentinvite.handlebars`, installed as a
+  MeshCentral page override): Zentriq logo and wording, only **Windows** (x64 and ARM64), **macOS** and **Linux**
+  (x64, ARM64) — no Android, Assistant, BSD or other platforms. It picks the visitor's system automatically.
+  - Quick support (run only): Windows downloads the app (*Connect*, nothing installed); macOS and Linux get a one-line
+    Terminal command that runs the agent with `-connect` until it is stopped.
+  - Install links: Windows installer, macOS package, Linux install script.
+* When the installer is built, `installer/remote/brand.js` replaces the MeshCentral product name with Zentriq in the
+  pages technicians see (identifiers, file names and licence texts are kept), removes the translated page copies (so
+  every page is the branded English one) and uses the Zentriq icon. The Windows agent is branded through the engine
+  configuration (name, service, icon, file information, consent texts).
 
 ## Install for unattended access
 
