@@ -475,7 +475,7 @@ internal sealed class AgentWorker
         while (e is AggregateException ae && ae.InnerException is not null) e = ae.InnerException;
         if (e is HttpRequestException hre && hre.InnerException is WebException we)
             return "Server unreachable: " + we.Message;
-        if (e is TaskCanceledException) return "Server unreachable: no answer within " + (int)ConnectTimeout.TotalSeconds + " seconds";
+        if (e is System.Threading.Tasks.TaskCanceledException) return "Server unreachable: no answer within " + (int)ConnectTimeout.TotalSeconds + " seconds";
         return e.Message;
     }
 
