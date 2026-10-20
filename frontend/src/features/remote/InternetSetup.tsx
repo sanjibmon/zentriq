@@ -65,7 +65,7 @@ export function InternetSetup({ host: initialHost, port: initialPort, enginePort
       </div>}
       {result && !result.ok && result.publicAddress && <label className="row-check">
         <input type="checkbox" checked={confirmed} onChange={(e) => { setConfirmed(e.target.checked); }} />
-        I opened <span className="mono">https://{host}:{port}</span> from outside the network (for example a phone on mobile data) and it works
+        <span>I opened <span className="mono">https://{host}:{port}</span> from outside the network (for example a phone on mobile data) and it works</span>
       </label>}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <button className="btn" disabled={!host.trim() || !!busy} onClick={() => void run(false)}><Icon name="globe" size={13} /> {busy === 'check' ? 'Checking…' : 'Check'}</button>
