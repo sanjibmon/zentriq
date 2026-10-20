@@ -468,7 +468,14 @@ if (-not $installed) {
             $code = Api POST "/agents/$($script:agentId)/uninstall-code" @{} -Session $s
             Assert ($code.code -match '^[0-9A-Z]{4}(-[0-9A-Z]{4}){3}$' -and ([datetime]$code.expiresAt) -lt (Get-Date).ToUniversalTime().AddMinutes(61)) "uninstall code: $($code | ConvertTo-Json -Compress)"
             $p3 = Start-Process $exe -ArgumentList '--uninstall', $code.code -Wait -PassThru
-            Assert ($p3.ExitCode -eq 0 -and -not (Get-Service ZentriqAgent -ErrorAction SilentlyContinue)) "uninstall with the console code failed (exit $($p3.ExitCode))"
+            Assert ($p3.ExitCode -eq 0) "--uninstall did not start the removal (exit $($p3.ExitCode))"
+            $deadline = (Get-Date).AddMinutes(3)
+            while ((Get-Service ZentriqAgent -ErrorAction SilentlyContinue) -and (Get-Date) -lt $deadline) { Start-Sleep 3 }
+            Start-Sleep 5
+            $unlog = Join-Path ([IO.Path]::GetTempPath()) 'ZentriqAgent-uninstall.log'
+            if (Test-Path $unlog) { Copy-Item $unlog (Join-Path $OutDir 'agent-uninstall-code.log') -Force }
+            Assert (-not (Get-Service ZentriqAgent -ErrorAction SilentlyContinue)) 'uninstall with the console code did not remove the agent (see agent-uninstall-code.log)'
+            
             # Reinstall for the remaining tests, then switch protection off again.
             $tok = Api POST '/agents/enrollment-tokens' @{ name = 'ci-reinstall'; validDays = 1; maxUses = 1; serverUrl = 'https://localhost:8444' } -Session $s
             $p4 = Start-Process msiexec.exe -ArgumentList '/i', "`"$agentMsi`"", '/qn', "SERVERURL=https://localhost:8444", "ENROLLMENTCODE=$($tok.code)", 'CHECKININTERVAL=2', 'INVENTORYINTERVAL=30', '/l*v', "`"$(Join-Path $OutDir 'agent-reinstall.log')`"" -Wait -PassThru

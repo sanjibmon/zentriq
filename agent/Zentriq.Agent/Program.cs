@@ -81,6 +81,8 @@ internal static class Program
                 }
                 case "--uninstall":
                     return Uninstall(args.Length > 1 ? args[1] : null);
+                case "--uninstall-run":
+                    return UninstallRun(args.Length > 1 ? args[1] : null);
                 case "--run":
                 {
                     using var cts = new CancellationTokenSource();
@@ -143,24 +145,70 @@ internal static class Program
         k.SetValue(name, minutes, Microsoft.Win32.RegistryValueKind.DWord);
     }
 
-    /// <summary>Removes the agent with Windows Installer, passing the uninstall code (checked by the package as SYSTEM).</summary>
+    /// <summary>The log of the most recent removal started with --uninstall.</summary>
+    public static string UninstallLogPath => Path.Combine(Path.GetTempPath(), "ZentriqAgent-uninstall.log");
+
+    /// <summary>
+    /// Removes the agent with Windows Installer, passing the uninstall code (checked by the package as SYSTEM).
+    /// This program runs from the folder being removed, and Windows Installer closes programs that use files it removes,
+    /// so the removal runs from a temporary copy and this process exits at once.
+    /// </summary>
     private static int Uninstall(string? code)
     {
-        string? product = null;
-        using (var hklm = Microsoft.Win32.RegistryKey.OpenBaseKey(Microsoft.Win32.RegistryHive.LocalMachine, Microsoft.Win32.RegistryView.Registry64))
-        using (var un = hklm.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"))
-            if (un is not null)
-                foreach (var name in un.GetSubKeyNames())
-                {
-                    using var k = un.OpenSubKey(name);
-                    if (k?.GetValue("DisplayName") as string == "Zentriq Agent" && name.StartsWith("{")) { product = name; break; }
-                }
-        if (product is null) { Console.Error.WriteLine("The Zentriq Agent is not installed (no Windows Installer product found)."); return 1; }
-        var arguments = $"/x {product} /passive /norestart" + (string.IsNullOrWhiteSpace(code) ? "" : $" UNINSTALLCODE={code!.Trim()}");
-        using var p = Process.Start(new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "msiexec.exe"), arguments) { UseShellExecute = false })!;
-        p.WaitForExit();
-        Console.WriteLine(p.ExitCode == 0 ? "Zentriq Agent removed." : $"Windows Installer exit code {p.ExitCode}. A missing, wrong or expired uninstall code stops the removal (see the Application event log).");
-        return p.ExitCode;
+        if (FindProduct() is null) { Console.Error.WriteLine("The Zentriq Agent is not installed (no Windows Installer product found)."); return 1; }
+        var source = AppDomain.CurrentDomain.BaseDirectory;
+        var temp = Path.Combine(Path.GetTempPath(), "ZentriqAgentRemove-" + Guid.NewGuid().ToString("N").Substring(0, 8));
+        Directory.CreateDirectory(temp);
+        foreach (var f in Directory.GetFiles(source))
+        {
+            var ext = Path.GetExtension(f).ToLowerInvariant();
+            if (ext == ".exe" || ext == ".dll" || ext == ".config") File.Copy(f, Path.Combine(temp, Path.GetFileName(f)), true);
+        }
+        var exe = Path.Combine(temp, Path.GetFileName(Process.GetCurrentProcess().MainModule!.FileName));
+        var arguments = "--uninstall-run" + (string.IsNullOrWhiteSpace(code) ? "" : " \"" + code!.Trim().Trim('"') + "\"");
+        Process.Start(new ProcessStartInfo(exe, arguments) { UseShellExecute = false, WorkingDirectory = temp });
+        Console.WriteLine("Removing the Zentriq Agent (Windows Installer shows the progress).");
+        Console.WriteLine("Result and details: " + UninstallLogPath);
+        return 0;
+    }
+
+    /// <summary>The removal itself, run from the temporary copy made by <see cref="Uninstall"/>.</summary>
+    private static int UninstallRun(string? code)
+    {
+        var product = FindProduct();
+        int exit;
+        if (product is null) { Console.Error.WriteLine("The Zentriq Agent is not installed."); exit = 1; }
+        else
+        {
+            var arguments = $"/x {product} /passive /norestart /l*v \"{UninstallLogPath}\"" + (string.IsNullOrWhiteSpace(code) ? "" : $" UNINSTALLCODE={code!.Trim()}");
+            using var p = Process.Start(new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "msiexec.exe"), arguments) { UseShellExecute = false })!;
+            p.WaitForExit();
+            exit = p.ExitCode;
+            Console.WriteLine(exit == 0 || exit == 3010 ? "Zentriq Agent removed." : $"Windows Installer exit code {exit}. A missing, wrong or expired uninstall code stops the removal (details: {UninstallLogPath}).");
+        }
+        // Remove this temporary copy once this process has ended.
+        try
+        {
+            var dir = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\');
+            if (Path.GetFileName(dir).StartsWith("ZentriqAgentRemove-", StringComparison.OrdinalIgnoreCase))
+                Process.Start(new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "cmd.exe"), $"/c ping -n 4 127.0.0.1 >nul & rd /s /q \"{dir}\"")
+                { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = Path.GetTempPath() });
+        }
+        catch { }
+        return exit;
+    }
+
+    private static string? FindProduct()
+    {
+        using var hklm = Microsoft.Win32.RegistryKey.OpenBaseKey(Microsoft.Win32.RegistryHive.LocalMachine, Microsoft.Win32.RegistryView.Registry64);
+        using var un = hklm.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall");
+        if (un is null) return null;
+        foreach (var name in un.GetSubKeyNames())
+        {
+            using var k = un.OpenSubKey(name);
+            if (k?.GetValue("DisplayName") as string == "Zentriq Agent" && name.StartsWith("{")) return name;
+        }
+        return null;
     }
 
     private static int Status()
