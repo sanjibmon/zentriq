@@ -119,7 +119,7 @@ Remove-Item $answer -Force   # contains the administrator password
 
 if (-not $installed) {
     foreach ($t in 'T02 PostgreSQL provisioning', 'T03 Database migration', 'T04 Administrator sign-in', 'T05 API and worker services', 'T06 Trial initialization',
-                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection') {
+                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection', 'T68 Live agent connection') {
         Record $t.Substring(0, 3) $t.Substring(4) 'BLOCKED' 'installation failed'
     }
 } else {
@@ -287,6 +287,54 @@ if (-not $installed) {
         Assert ($a.health -eq 'online') "agent health $($a.health)"
         "$($a.hostname): 20-character code; check-in every $($a.checkinMinutes) min, inventory every $($a.inventoryMinutes) min (chosen at installation); $(@($inv.software).Count) applications, $([math]::Round($inv.document.hardware.memoryBytes/1GB)) GB RAM; MSI signature: $($sig.Status)"
     }
+    if ($agentInstalled) {
+        Check 'T68' 'Live agent connection: online within seconds, offline the moment the agent stops, queued work picked up at once; installer interval lists in order' {
+            $s = Login
+            function AgentNow { @(Api GET '/agents' -Session $s) | Where-Object { $_.id -eq $script:agentId } | Select-Object -First 1 }
+            $deadline = (Get-Date).AddSeconds(90)
+            do { Start-Sleep 3; $a = AgentNow } while (-not ($a.live -and $a.online) -and (Get-Date) -lt $deadline)
+            Assert ($a.live -and $a.online) "no live connection (live=$($a.live), online=$($a.online), health=$($a.health))"
+            # Stopping the agent closes its connection: offline at once (not after two check-in intervals).
+            $t0 = Get-Date
+            Stop-Service ZentriqAgent
+            do { Start-Sleep 1; $a = AgentNow } while ($a.online -and ((Get-Date) - $t0).TotalSeconds -lt 30)
+            $offAfter = [int]((Get-Date) - $t0).TotalSeconds
+            Assert (-not $a.online) 'still online 30 seconds after the agent service stopped'
+            Assert ($a.health -ne 'online') "health $($a.health) after the agent stopped"
+            $t1 = Get-Date
+            Start-Service ZentriqAgent
+            do { Start-Sleep 1; $a = AgentNow } while (-not $a.online -and ((Get-Date) - $t1).TotalSeconds -lt 60)
+            $onAfter = [int]((Get-Date) - $t1).TotalSeconds
+            Assert ($a.online) 'not online 60 seconds after the agent service started'
+            Assert ($a.lastOutage -and ([datetime]$a.lastOutage.from) -lt ([datetime]$a.lastOutage.to)) "the gap was not recorded: $($a.lastOutage | ConvertTo-Json -Compress)"
+            # "Collect now" wakes the agent through its live connection (no waiting for the 2-minute check-in).
+            Start-Sleep 20
+            $before = [datetime](AgentNow).lastInventoryAt
+            $t2 = Get-Date
+            Api POST "/agents/$($script:agentId)/collect" @{} -Session $s | Out-Null
+            do { Start-Sleep 2; $a = AgentNow } while (([datetime]$a.lastInventoryAt) -le $before -and ((Get-Date) - $t2).TotalSeconds -lt 100)
+            $collectAfter = [int]((Get-Date) - $t2).TotalSeconds
+            Assert (([datetime]$a.lastInventoryAt) -gt $before) 'collect now was not picked up within 100 seconds'
+            # The installer's interval lists keep their order (5 min, 15 min, 30 min, 1 hour, …), not alphabetical.
+            $wi = New-Object -ComObject WindowsInstaller.Installer
+            $db = $wi.GetType().InvokeMember('OpenDatabase', 'InvokeMethod', $null, $wi, @($agentMsi, 0))
+            $view = $db.GetType().InvokeMember('OpenView', 'InvokeMethod', $null, $db, @("SELECT ``Control``, ``Attributes`` FROM ``Control`` WHERE ``Dialog_`` = 'ZqEnrollDlg'"))
+            $view.GetType().InvokeMember('Execute', 'InvokeMethod', $null, $view, $null) | Out-Null
+            $sorted = @{}
+            while ($rec = $view.GetType().InvokeMember('Fetch', 'InvokeMethod', $null, $view, $null)) {
+                $name = $rec.GetType().InvokeMember('StringData', 'GetProperty', $null, $rec, 1)
+                $attr = $rec.GetType().InvokeMember('IntegerData', 'GetProperty', $null, $rec, 2)
+                if ($name -in 'Checkin', 'Inventory') { $sorted[$name] = (($attr -band 0x10000) -ne 0) }
+            }
+            $view.GetType().InvokeMember('Close', 'InvokeMethod', $null, $view, $null) | Out-Null
+            Assert ($sorted['Checkin'] -and $sorted['Inventory']) "installer interval lists are shown alphabetically: $($sorted | ConvertTo-Json -Compress)"
+            $view2 = $db.GetType().InvokeMember('OpenView', 'InvokeMethod', $null, $db, @("SELECT ``Value`` FROM ``ComboBox`` WHERE ``Property`` = 'CHECKININTERVAL' ORDER BY ``Order``"))
+            $view2.GetType().InvokeMember('Execute', 'InvokeMethod', $null, $view2, $null) | Out-Null
+            $vals = @(); while ($rec = $view2.GetType().InvokeMember('Fetch', 'InvokeMethod', $null, $view2, $null)) { $vals += $rec.GetType().InvokeMember('StringData', 'GetProperty', $null, $rec, 1) }
+            Assert (($vals -join ',') -eq '5,15,30,60,120,180') "check-in choices: $($vals -join ',')"
+            "online over the live connection; offline $offAfter s after the service stopped; online again $onAfter s after it started (gap recorded); collect now picked up in $collectAfter s; installer lists in order (check-in $($vals -join '/') min)"
+        } | Out-Null
+    } else { Record 'T68' 'Live agent connection' 'BLOCKED' 'agent install failed' }
     Check 'T27' 'Agent port serves only the agent API and requires a client certificate' {
         $r1 = Invoke-WebRequest 'https://localhost:8444/' -SkipHttpErrorCheck
         $r2 = Invoke-WebRequest 'https://localhost:8444/api/v1/setup/status' -SkipHttpErrorCheck

@@ -87,6 +87,7 @@ internal static class Program
                 {
                     using var cts = new CancellationTokenSource();
                     Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
+                    new Thread(() => Presence.Loop(cts.Token)) { IsBackground = true, Name = "presence" }.Start();
                     AgentService.Loop(cts.Token, initialDelay: TimeSpan.Zero);
                     return 0;
                 }
@@ -248,10 +249,16 @@ internal sealed class AgentService : ServiceBase
 
     /// <summary>Set to run the next cycle early: the network changed or the device woke from sleep.</summary>
     internal static readonly AutoResetEvent Wake = new AutoResetEvent(false);
+    /// <summary>Set by the live connection: the server has work for this agent, or the connection came back after a gap.</summary>
+    internal static readonly AutoResetEvent ServerWake = new AutoResetEvent(false);
+    private Thread? _presence;
+
+    internal static void RequestServerWake() => ServerWake.Set();
     private static DateTime _lastWake;
 
     internal static void RequestWake(string why)
     {
+        Presence.Retry.Set();   // retry a lost live connection at once
         if (DateTime.UtcNow - _lastWake < TimeSpan.FromSeconds(30)) return;
         _lastWake = DateTime.UtcNow;
         Log.Info($"{why}: checking the connection to the server.");
@@ -275,12 +282,17 @@ internal sealed class AgentService : ServiceBase
         System.Net.NetworkInformation.NetworkChange.NetworkAddressChanged += (_, _) => RequestWake("Network changed");
         _thread = new Thread(() => Loop(_cts.Token, initial)) { IsBackground = true, Name = "agent" };
         _thread.Start();
+        // Live connection from the start: the console shows the device online within seconds.
+        var token = _cts.Token;
+        _presence = new Thread(() => { try { Presence.Loop(token); } catch (Exception ex) { Log.Error("Live connection stopped", ex); } }) { IsBackground = true, Name = "presence" };
+        _presence.Start();
     }
 
     protected override void OnStop()
     {
         RequestAdditionalTime(30000);
         _cts?.Cancel();
+        _presence?.Join(TimeSpan.FromSeconds(3));   // closing the live connection shows the device offline at once
         _thread?.Join(TimeSpan.FromSeconds(25));
         Log.Info("Zentriq Agent stopped.");
     }
@@ -289,8 +301,10 @@ internal sealed class AgentService : ServiceBase
 
     public static void Loop(CancellationToken ct, TimeSpan initialDelay)
     {
-        if (ct.WaitHandle.WaitOne(initialDelay)) return;
+        // Start after a short random delay, or at once when the server has work (live connection) or the network changes.
+        if (WaitHandle.WaitAny(new[] { ct.WaitHandle, ServerWake, Wake }, initialDelay) == 0) return;
         var worker = new AgentWorker();
+        var lastRun = DateTime.UtcNow;
         while (!ct.IsCancellationRequested)
         {
             AgentWorker.Outcome r;
@@ -300,9 +314,16 @@ internal sealed class AgentService : ServiceBase
             Log.Info($"{r.Message} Next run in {(int)r.NextRun.TotalMinutes} min.");
             // Wait for the next run, or run early when the network changes / the device resumes (the network needs a
             // few seconds to settle first).
-            var signalled = WaitHandle.WaitAny(new[] { ct.WaitHandle, Wake }, r.NextRun);
+            // Work queued by the server runs at once (at most every 10 seconds).
+            var signalled = WaitHandle.WaitAny(new[] { ct.WaitHandle, Wake, ServerWake }, r.NextRun);
             if (signalled == 0) return;
             if (signalled == 1 && ct.WaitHandle.WaitOne(TimeSpan.FromSeconds(20))) return;
+            if (signalled == 2)
+            {
+                var since = DateTime.UtcNow - lastRun;
+                if (since < TimeSpan.FromSeconds(10) && ct.WaitHandle.WaitOne(TimeSpan.FromSeconds(10) - since)) return;
+            }
+            lastRun = DateTime.UtcNow;
         }
     }
 }

@@ -41,7 +41,7 @@ export function SecurityPage() {
   );
   return (
     <>
-      <PageHead title="Security Configuration" desc="Harden every Windows device against CIS-aligned baselines."
+      <PageHead title="Security Configuration"
         actions={<>{picker}{can('security.manage') && <button className="btn primary" onClick={() => void evaluate()}><Icon name="retry" size={13} /> Evaluate now</button>}</>} />
       <div className="tabs" role="tablist">
         {TABS.map(([t, l]) => <button key={t} role="tab" aria-selected={tab === t} className={tab === t ? 'on' : ''} onClick={() => go(t)}>{l}</button>)}

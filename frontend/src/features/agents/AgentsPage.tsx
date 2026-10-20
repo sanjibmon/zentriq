@@ -12,7 +12,7 @@ import { useConfirm } from '../../components/Confirm';
 
 const HEALTH: Record<AgentRow['health'], [string, Tone]> = {
   online: ['Online', 'ok'],
-  stale: ['Not seen recently', 'warn'],
+  stale: ['Offline', 'warn'],
   offline: ['Offline > 7 days', 'crit'],
   never: ['Never checked in', ''],
   revoked: ['Revoked', 'crit'],
@@ -43,7 +43,10 @@ export function AgentsPage() {
   const [created, setCreated] = useState<NewEnrollmentToken | null>(null);
   const [newOpen, setNewOpen] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
-  const agents = useApi(() => api.get<AgentRow[]>('/agents'), []);
+  const [live, setLive] = useState(0);
+  // Online / offline changes within seconds (live connections): keep the list current.
+  useEffect(() => { const t = setInterval(() => { if (!document.hidden) setLive((x) => x + 1); }, 10000); return () => clearInterval(t); }, []);
+  const agents = useApi(() => api.get<AgentRow[]>('/agents'), [live]);
   const pkg = useApi(() => api.get<AgentPackage>('/agents/package'), []);
   const tokens = useApi(() => (manage ? api.get<EnrollmentToken[]>('/agents/enrollment-tokens') : Promise.resolve([])), [manage]);
   const all = agents.data ?? [];
@@ -129,7 +132,7 @@ export function AgentsPage() {
 
   return (
     <>
-      <PageHead title="Agents" desc="One lightweight agent for Windows, macOS and Linux — always-on inventory, wherever the device is."
+      <PageHead title="Agents"
         actions={<>
           {pkg.data?.package && <a className="btn" href={pkg.data.package.url} download>Download agent</a>}
           {manage && <button className="btn primary" onClick={() => setNewOpen(true)}>New enrollment code</button>}
@@ -164,7 +167,7 @@ export function AgentsPage() {
       <Kpis items={[
         { label: 'Agents', value: current.length },
         { label: 'Online', value: count('online') },
-        { label: 'Not seen recently', value: count('stale') + count('offline') },
+        { label: 'Offline', value: count('stale') + count('offline') },
         { label: 'Agent port', value: pkg.data ? <span className="mono">{pkg.data.agentPort || 'disabled'}</span> : '—' },
       ]} />
       <div className="tabs" role="tablist">
@@ -186,16 +189,18 @@ export function AgentsPage() {
           <DataTable rows={rows} empty={agents.loading ? 'Loading…' : 'No agents yet. Create an enrollment code and install the agent MSI on a device.'} columns={[
             ...(manage ? [{ key: 'sel', label: <input type="checkbox" aria-label="Select all" checked={rows.length > 0 && picked.length === rows.filter((x) => x.status === 'active').length} onChange={(e) => setPicked(e.target.checked ? rows.filter((x) => x.status === 'active').map((x) => x.id) : [])} />,
               render: (r: AgentRow) => r.status === 'active' ? <input type="checkbox" aria-label={`Select ${r.hostname ?? r.id}`} checked={picked.includes(r.id)} onChange={() => setPicked(picked.includes(r.id) ? picked.filter((x) => x !== r.id) : [...picked, r.id])} /> : null }] : []),
-            { key: 'h', label: 'Device', render: (r) => <>{r.assetId ? <Link to={`/assets/${r.assetId}`}><b>{r.hostname ?? r.id}</b></Link> : <b>{r.hostname ?? r.id}</b>}<div className="faint" style={{ fontSize: 11.5 }}>{[r.osName, r.lastIp].filter(Boolean).join(' · ')}</div></> },
+            { key: 'h', label: 'Device', render: (r) => r.assetId ? <Link to={`/assets/${r.assetId}`}><b>{r.hostname ?? r.id}</b></Link> : <b>{r.hostname ?? r.id}</b> },
+            { key: 'os', label: 'Operating system', className: 'wrap', render: (r) => r.osName ?? <span className="faint">—</span> },
+            { key: 'ip', label: 'IP address', render: (r) => r.lastIp ? <span className="mono">{r.lastIp}</span> : <span className="faint">—</span> },
             { key: 's', label: 'Connection', className: 'wrap', render: (r) => <>
-              {r.health === 'stale' && r.lastCheckinAt ? <Pill tone="warn">No contact · {fmt.ago(r.lastCheckinAt)}</Pill> : <Pill tone={HEALTH[r.health][1]}>{HEALTH[r.health][0]}</Pill>}
+              {r.health === 'stale' && r.lastCheckinAt ? <Pill tone="warn">Offline · {fmt.ago(r.lastCheckinAt)}</Pill> : <Pill tone={HEALTH[r.health][1]}>{HEALTH[r.health][0]}</Pill>}
+              {r.health === 'online' && <div className="faint" style={{ fontSize: 11.5 }} title={r.live ? 'Live connection: online and offline are shown within seconds' : 'This agent version reports at its check-in interval; update it for a live connection'}>{r.live ? 'live connection' : 'by check-in · update agent'}</div>}
               {r.lastOutage && <div className="faint" style={{ fontSize: 11.5 }} title={`Offline ${fmt.date(r.lastOutage.from)} – ${r.lastOutage.to ? fmt.date(r.lastOutage.to) : 'now'}`}>last outage {fmt.ago(r.lastOutage.from)}{r.lastOutage.to ? `, back ${fmt.ago(r.lastOutage.to)}` : ''}</div>}
               {r.uninstallProtected && <div className="faint" style={{ fontSize: 11.5 }}><Icon name="shield" size={11} /> uninstall protected</div>}</> },
             { key: 'sch', label: 'Schedule', render: (r) => r.status === 'active' ? <span className="faint" style={{ fontSize: 12.5 }}>check-in {every(r.checkinMinutes)}<br />inventory {every(r.inventoryMinutes)}</span> : '' },
-            { key: 'c', label: 'Last check-in', render: (r) => <span title={fmt.date(r.lastCheckinAt)}>{fmt.ago(r.lastCheckinAt)}</span> },
-            { key: 'i', label: 'Last inventory', render: (r) => <span title={fmt.date(r.lastInventoryAt)}>{fmt.ago(r.lastInventoryAt)}</span> },
+            { key: 'c', label: 'Last contact', render: (r) => <span className="faint" style={{ fontSize: 12.5 }}><span title={fmt.date(r.lastCheckinAt)}>{r.online ? 'now' : fmt.ago(r.lastCheckinAt)}</span><br /><span title={`Last inventory ${fmt.date(r.lastInventoryAt)}`}>inventory {fmt.ago(r.lastInventoryAt)}</span></span> },
             { key: 'v', label: 'Version', render: (r) => <span title={r.certificateExpires ? `Certificate expires ${fmt.day(r.certificateExpires)}` : ''}>{r.version}<UpdateState r={r} /></span> },
-            { key: 'x', label: '', render: (r) => manage && r.status === 'active' ? <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>{r.status === 'active' && r.updateAvailable && r.canSelfUpdate && !(r.update && ['queued', 'sent', 'running'].includes(r.update.status)) && <button className="btn sm primary" onClick={() => void update([r])}>Update</button>}{r.status === 'active' && r.updateAvailable && !r.canSelfUpdate && <button className="btn sm" onClick={() => void manualUpdate(r)}>Update (manual)</button>}<button className="btn sm" onClick={() => void collect(r)}>Collect now</button><button className="btn sm" title="One-hour code to uninstall the agent on this device" onClick={() => void uninstallCode(r)}><Icon name="key" size={12} /> Uninstall code</button><button className="btn sm danger" onClick={() => void revoke(r)}>Revoke</button></div> : null },
+            { key: 'x', label: '', render: (r) => manage && r.status === 'active' ? <div style={{ display: 'flex', gap: 6, flexWrap: 'nowrap', justifyContent: 'flex-end' }}>{r.status === 'active' && r.updateAvailable && r.canSelfUpdate && !(r.update && ['queued', 'sent', 'running'].includes(r.update.status)) && <button className="btn sm primary" onClick={() => void update([r])}>Update</button>}{r.status === 'active' && r.updateAvailable && !r.canSelfUpdate && <button className="btn sm" onClick={() => void manualUpdate(r)}>Update…</button>}<button className="btn sm" title="Collect inventory now" onClick={() => void collect(r)}>Collect</button><button className="btn sm" title="One-hour code to uninstall the agent on this device" aria-label="Uninstall code" onClick={() => void uninstallCode(r)}><Icon name="key" size={12} /> Code</button><button className="btn sm danger" onClick={() => void revoke(r)}>Revoke</button></div> : null },
           ]} />
         </Panel>
       ) : (

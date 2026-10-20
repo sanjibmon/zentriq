@@ -77,6 +77,7 @@ public static class AssetActionEndpoints
                     else scanId = scan!.Id;
                 }
             }
+            AgentPresence.Instance.Nudge();
             await rc.AuditAsync("asset.collect_requested", body.All == true ? "all assets" : $"{ids.Length} asset(s)", detail: new { agents = agents.Count, agentless = targets.Count, skipped, scanId });
             var parts = new List<string>();
             if (agents.Count > 0) parts.Add($"{agents.Count} agent(s) will send inventory at their next check-in");
@@ -199,6 +200,7 @@ public static class AssetActionEndpoints
                     upd.Parameters.AddWithValue("id", actionId);
                     await upd.ExecuteNonQueryAsync(ct);
                 }
+                AgentPresence.Instance.Nudge();
                 await rc.AuditAsync($"asset.service_{operation}", $"{hostname}: {name}", detail: new { actionId, channel, credentialId = credId, username });
                 return Results.Accepted(value: new
                 {
@@ -302,6 +304,7 @@ public static class AssetActionEndpoints
                 ins.Parameters.Add(new NpgsqlParameter("by", NpgsqlDbType.Uuid) { Value = (object?)rc.UserId ?? DBNull.Value });
                 await ins.ExecuteNonQueryAsync(ct);
             }
+            AgentPresence.Instance.Nudge();
             await rc.AuditAsync("software.uninstall_requested", name, detail: new { version = body.Version, devices = targets.Select(t => t.Host), skippedNoAgent = noAgent, skippedOldAgent = oldAgent });
             var parts = new List<string>();
             if (targets.Count > 0) parts.Add($"Uninstall of {name} sent to {targets.Count} device(s); each agent runs it at its next check-in (set by its check-in interval). Progress is in the Activity log");

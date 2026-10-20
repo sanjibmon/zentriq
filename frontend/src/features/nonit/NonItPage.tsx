@@ -42,7 +42,7 @@ export function NonItPage() {
 
   return (
     <>
-      <PageHead title="Non-IT Asset Inventory" desc="Every chair, vehicle, appliance and tool — tagged, tracked and valued."
+      <PageHead title="Non-IT Asset Inventory"
         actions={<>
           <button className="btn" onClick={() => setScan(true)}><Icon name="search" size={15} /> Scan barcode</button>
           {canEdit && <button className="btn" onClick={() => setUpload(true)}><Icon name="upload" size={15} /> Bulk upload</button>}

@@ -38,7 +38,7 @@ export function ActivityPage() {
 
   return (
     <>
-      <PageHead title="Activity Log" desc={assetId ? <>Device actions on <b>{host ?? 'this device'}</b> · <Link to="/activity">show all devices</Link></> : 'Every action on every device — who did what, where and when.'} />
+      <PageHead title="Activity Log" desc={assetId ? <>Device actions on <b>{host ?? 'this device'}</b> · <Link to="/activity">show all devices</Link></> : undefined} />
       <form className="toolbar-row" onSubmit={(e) => { e.preventDefault(); setPage(1); setSearch(q); }}>
         <input className="in grow" placeholder="Search device, service, software, user or result…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search activity" />
         <select className="in" value={kind} onChange={(e) => { setPage(1); setKind(e.target.value); }} aria-label="Type">

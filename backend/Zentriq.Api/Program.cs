@@ -35,6 +35,7 @@ var httpOnly = builder.Environment.IsDevelopment() || Environment.GetEnvironment
 builder.Services.AddZentriqInfrastructure(options, paths, "Zentriq.Api");
 
 builder.Services.AddSingleton<AgentServer>();
+builder.Services.AddSingleton(AgentPresence.Instance);   // live agent connections (presence long poll)
 if (OperatingSystem.IsWindows()) builder.Services.AddHostedService<AgentDiscovery>(); // LAN discovery for agents (UDP agent port)
 
 // ---- Kestrel / HTTPS -------------------------------------------------------------------

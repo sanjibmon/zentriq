@@ -22,7 +22,7 @@ export function SettingsPage() {
 
   return (
     <>
-      <PageHead title="System Settings" desc="Company profile and logo, sign-in security, e-mail, installation, services, database and backups."
+      <PageHead title="System Settings"
         actions={can('backup.run') && <button className="btn" onClick={() => void backupNow()}>Back up now</button>} />
       {msg && <Callout>{msg}</Callout>}
       <CompanyProfile />

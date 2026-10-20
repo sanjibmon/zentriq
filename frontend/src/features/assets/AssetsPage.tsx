@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import type { Asset, Paged } from '../../api/types';
 import { useAuth } from '../../app/auth';
@@ -73,7 +73,10 @@ export function AssetsPage() {
   const [deploy, setDeploy] = useState(false);
   const [busy, setBusy] = useState(false);
   const pageSize = 50;
-  const data = useApi(() => api.get<Paged<Asset>>('/assets', { q: search, category, deviceType, department, status, agent, inventory, facet: facet?.facet, value: facet?.value, offlineDays: offline, page, pageSize, sort: offline ? 'offline' : 'hostname' }), [search, category, deviceType, department, status, agent, inventory, facet, offline, page]);
+  // Availability (online / no contact) changes within seconds for agents with a live connection.
+  const [refresh, setRefresh] = useState(0);
+  useEffect(() => { const t = setInterval(() => { if (!document.hidden) setRefresh((x) => x + 1); }, 30000); return () => clearInterval(t); }, []);
+  const data = useApi(() => api.get<Paged<Asset>>('/assets', { q: search, category, deviceType, department, status, agent, inventory, facet: facet?.facet, value: facet?.value, offlineDays: offline, page, pageSize, sort: offline ? 'offline' : 'hostname' }), [search, category, deviceType, department, status, agent, inventory, facet, offline, page, refresh]);
   const settings = useApi(() => (can('settings.manage') ? api.get<Record<string, unknown>>('/system/settings') : Promise.resolve(null)), []);
   const rows = data.data?.items ?? [];
   const showV6 = rows.some((r) => r.ipv6 != null) || settings.data?.['display.show_ipv6'] === true;
@@ -103,7 +106,7 @@ export function AssetsPage() {
 
   return (
     <>
-      <PageHead title="IT Asset Inventory" desc="Every device, in one place."
+      <PageHead title="IT Asset Inventory"
         actions={<>
           {can('assets.manage') && <button className="btn" onClick={() => setAdding(true)}>Add device</button>}
           <button className="btn" onClick={() => setShowDups(true)}>Duplicates{dups.data ? ` (${dups.data.devices})` : ''}</button>

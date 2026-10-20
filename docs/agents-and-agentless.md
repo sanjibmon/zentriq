@@ -10,7 +10,7 @@ Devices reported by both are merged into one asset (SMBIOS UUID → serial numbe
 | Network direction | server → device (WinRM 5985/5986, DCOM/RPC 135 + dynamic, SSH 22, SNMP 161/UDP) | device → server (HTTPS 8444, outbound only) |
 | Works off the LAN / over the internet | no | yes (publish port 8444 or a reverse proxy) |
 | Credentials stored in Zentriq | yes (encrypted) | none (per-device certificate) |
-| Freshness | as often as the scan schedule | connectivity check every 5 min – 3 h and inventory every 30 min – 24 h (chosen at installation, changeable per agent), or *Collect now* |
+| Freshness | as often as the scan schedule | live connection (online/offline within seconds), check-in every 5 min – 3 h and inventory every 30 min – 24 h (chosen at installation, changeable per agent), or *Collect now* (seconds) |
 | Platforms | Windows, Linux, macOS, SNMP devices | Windows 10/11, Windows Server 2016+ |
 
 ## Agentless scanning
@@ -168,14 +168,20 @@ Intune command-line arguments, the Configuration Manager install command. Zentri
 
 ### Schedule, connection and last contact
 
-* Each agent **checks its connection** to the server at its check-in interval (and picks up console requests: collect
-  now, service actions, software removal, updates) and **sends its inventory** at its inventory interval. Change them
-  for selected agents or all agents with *Agents › Schedule*; defaults for new codes are in *Agents › Settings*. Console
-  requests run at the next check-in, so a shorter check-in interval makes them faster.
-* An agent counts as **online** until it misses two check-ins (plus 5 minutes). Then *IT Asset Inventory* shows
-  **No contact** with the time of the last contact (later *Offline N days*), and *Agents* shows when the connection was
-  lost. When the agent reaches the server again it reports how long it was offline (*last outage*), and queued
-  inventory is sent.
+* **Live connection** (agents from the October 2026 build 66 release on): the agent keeps one connection to the server open at all times (a
+  request on its mutually authenticated channel that the server holds for about 25 seconds and the agent renews at
+  once). The device shows **Online** as soon as the agent connects, and **Offline** the moment the connection closes
+  (agent stopped, device shut down or restarted, connection reset) — or within 45 seconds when it dies silently
+  (cable pulled, Wi-Fi gone). Each gap is recorded as the device's *last outage*. Console requests (collect now,
+  service actions, software removal, updates, remote support install) reach an online agent **within seconds**.
+  *Agents* refreshes every 10 seconds and shows *live connection* under the state; agents of earlier versions show
+  *by check-in · update agent* and are judged by their check-ins as before (update them from *Agents*).
+* Besides that, each agent **checks in** at its check-in interval (settings, certificate renewal, queued requests) and
+  **sends its inventory** at its inventory interval: *every 5 min, 15 min, 30 min, 1 hour, 2 hours or 3 hours* and
+  *every 30 min, 1, 2, 3, 6, 12 or 24 hours* (chosen at installation, in this order in the installer lists). Change them
+  for selected agents or all agents with *Agents › Schedule*; defaults for new codes are in *Agents › Settings*.
+* *IT Asset Inventory* shows **No contact** with the time of the last contact for an offline agent (later *Offline N
+  days*); it refreshes every 30 seconds. When the agent reaches the server again, queued inventory is sent.
 * **Lost connection**: the agent retries after 1, 2, 4, 8 and then every 15 minutes, and at once when the network
   changes or the device wakes from sleep. If the server does not answer at its usual address it tries the server's
   other names and IP addresses (the server sends them at every check-in) and then **looks for the server on the local

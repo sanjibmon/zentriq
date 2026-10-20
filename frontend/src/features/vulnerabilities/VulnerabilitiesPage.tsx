@@ -22,7 +22,7 @@ export function VulnerabilitiesPage() {
   const go = (t: Tab, extra = '') => navigate(`/vulnerabilities?tab=${t}${extra}`, true);
   return (
     <>
-      <PageHead title="Vulnerability Management" desc="Known vulnerabilities in Windows and installed software, ranked by real-world risk." />
+      <PageHead title="Vulnerability Management" />
       <div className="tabs" role="tablist">
         {TABS.map(([t, l]) => <button key={t} role="tab" aria-selected={tab === t} className={tab === t ? 'on' : ''} onClick={() => go(t)}>{l}</button>)}
       </div>

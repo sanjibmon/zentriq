@@ -51,6 +51,11 @@ internal sealed class CheckinResponse
     [JsonPropertyName("actions")] public List<AgentAction>? Actions { get; set; }
 }
 
+internal sealed class PresenceResponse
+{
+    [JsonPropertyName("wake")] public bool Wake { get; set; }
+}
+
 /// <summary>A device action requested by an administrator in the console (service start/stop/restart).</summary>
 internal sealed class AgentAction
 {
@@ -162,9 +167,13 @@ internal sealed class ServerClient : IDisposable
         PostJsonAsync<CheckinResponse>("api/agent/v1/checkin", new Dictionary<string, object?>
         {
             ["agentVersion"] = Program.Version, ["hostname"] = hostname, ["osName"] = osName, ["lastError"] = lastError,
-            ["capabilities"] = new[] { "service-control", "software-uninstall", "self-update", "remote-support", "schedule", "uninstall-protection" },
+            ["capabilities"] = new[] { "service-control", "software-uninstall", "self-update", "remote-support", "schedule", "uninstall-protection", "presence" },
             ["offlineSince"] = offlineSince?.ToString("o"), ["uninstallProtected"] = uninstallProtected,
         }, ct);
+
+    /// <summary>The live connection (held open by the server for about 25 seconds; see <see cref="Presence"/>).</summary>
+    public Task<PresenceResponse> PresenceAsync(CancellationToken ct) =>
+        PostJsonAsync<PresenceResponse>("api/agent/v1/presence", new Dictionary<string, object?>(), ct);
 
     public async Task ReportActionAsync(string actionId, bool ok, string? state, string message, CancellationToken ct)
     {
