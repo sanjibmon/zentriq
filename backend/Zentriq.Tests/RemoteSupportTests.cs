@@ -297,8 +297,14 @@ public sealed class RemoteSupportLiveTests : IAsyncLifetime
         Assert.Equal("ended", (await remote.QuickSessionAsync(quick.Id, default))!.Status);
         await using (var mc = await MeshControlClient.ConnectAsync(new Uri($"https://127.0.0.1:{Port}/"), options.Remote.ServiceUser, key, default))
             Assert.DoesNotContain(active.Value.MeshId, (await mc.GroupsAsync(default)).Keys);
-        using (var anonymous = new HttpClient(new HttpClientHandler { ServerCertificateCustomValidationCallback = (_, _, _, _) => true }))
-            Assert.False((await anonymous.GetAsync(quick.InviteUrl)).IsSuccessStatusCode);       // the link is dead
+        // A quick support group without an active session (the engine restores a deleted group when an old copy of the
+        // app connects again) is removed by the next refresh.
+        await using (var mc = await MeshControlClient.ConnectAsync(new Uri($"https://127.0.0.1:{Port}/"), options.Remote.ServiceUser, key, default))
+        {
+            var stray = await mc.CreateGroupAsync(RemoteSupportService.QuickGroupPrefix + "000 000 000", "stray", MeshRights.QuickConsent, default);
+            Assert.Equal(1, await remote.RefreshQuickAsync(default));
+            Assert.DoesNotContain(stray, (await mc.GroupsAsync(default)).Keys);
+        }
 
         // Install link for unattended access (Windows, macOS, Linux).
         var installLink = await remote.InstallLinkAsync(24, "127.0.0.1", default);

@@ -22,7 +22,7 @@ Session buttons are the same everywhere: **Remote desktop** (or **Connect**) and
    - **Windows:** a run-only app — nothing is installed; it disconnects when they close it.
    - **macOS / Linux:** the page offers the agent for their system (a small package / install command).
 5. The session shows **Connected** with the device name, OS and address within about 15 seconds. Click **Remote desktop** or **Files**.
-6. Click **End** when done: the group is deleted, the app disconnects and the link stops working.
+6. Click **End** when done: the session's group is deleted and the app disconnects. If someone runs an old copy of the app later, the engine restores the group; Zentriq removes quick support groups that belong to no active session at its next check (within 2 minutes), so nobody can be reached through an ended session.
 
 Sessions end by themselves when nobody joins before the link expires (*Expired*), when the app has been closed for 30 minutes, or after 12 hours. The Worker checks every 2 minutes; the page checks every 15 seconds while sessions are active. Ended sessions stay listed for 7 days and every remote desktop / files / terminal session is in History and the audit log (`remote.quick_create`, `remote.session`, `remote.quick_end`).
 

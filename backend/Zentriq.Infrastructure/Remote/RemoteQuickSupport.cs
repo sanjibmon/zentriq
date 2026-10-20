@@ -190,17 +190,28 @@ public sealed partial class RemoteSupportService
             while (await r.ReadAsync(ct))
                 active.Add((r.GetInt64(0), r.IsDBNull(1) ? null : r.GetString(1), r.GetString(2), r.GetFieldValue<DateTimeOffset>(3), r.GetFieldValue<DateTimeOffset>(4),
                     r.IsDBNull(5) ? null : r.GetFieldValue<DateTimeOffset>(5)));
-        if (active.Count == 0 || !Configured) return 0;
+        if (!Configured) return 0;
 
         Dictionary<string, string> groups;
         List<MeshNode> nodes;
+        var changed = 0;
         await using (var c = await ConnectAsync(ct))
         {
             groups = await c.GroupsAsync(ct);
+            // The engine brings a deleted group back when an agent of it connects again (for example the person runs
+            // an old copy of the support app after the session ended). Remove quick support groups of no active session.
+            var activeMeshes = active.Select(a => a.Mesh).Where(m => m is not null).ToHashSet(StringComparer.Ordinal);
+            foreach (var (id, name) in groups.Where(g => g.Value.StartsWith(QuickGroupPrefix, StringComparison.Ordinal) && !activeMeshes.Contains(g.Key)).ToList())
+            {
+                await c.DeleteGroupAsync(id, ct);
+                groups.Remove(id);
+                logger.LogInformation("Quick support: removed group {Name} of an ended session", name);
+                changed++;
+            }
+            if (active.Count == 0) return changed;
             nodes = await c.NodesAsync(null, ct);
         }
         var now = DateTimeOffset.UtcNow;
-        var changed = 0;
         foreach (var s in active)
         {
             if (s.Mesh is null || !groups.ContainsKey(s.Mesh))

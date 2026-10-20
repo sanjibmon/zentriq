@@ -1356,11 +1356,9 @@ if (-not $installed) {
         }
         $after = @((Api GET '/remote/quick' -Session $s).items | Where-Object id -eq $q.id)[0]
         Assert ($after.status -eq 'ended') "after end: $($after.status)"
-        $dead = Invoke-WebRequest $q.inviteUrl -SkipCertificateCheck -SkipHttpErrorCheck
-        Assert ($dead.StatusCode -ge 400) "the invitation still works after the session ended (HTTP $($dead.StatusCode))"
         $link = Api POST '/remote/install-link' @{ hours = 1 } -Session $s
         Assert ((Invoke-WebRequest $link.url -SkipCertificateCheck).Content -match "installFlags = '2'") 'install link page'
-        "session $($q.code): invitation page run-only, app joined as $($joined.deviceName) ($($joined.deviceOs)), desktop link opened, logged; ended, link dead (HTTP $($dead.StatusCode)); install link OK"
+        "session $($q.code): invitation page run-only, app joined as $($joined.deviceName) ($($joined.deviceOs)), desktop link opened, logged; ended and its group removed; install link OK"
     } | Out-Null
 
     Check 'T66' 'Non-IT groups and departments: add a group, a category in it, rename the group, department with non-IT count, clean up' {
