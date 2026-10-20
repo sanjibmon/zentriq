@@ -8,6 +8,8 @@ MeshServiceARM64.exe
 meshagent_osx-universal-64
 meshagent_osx-arm-64
 meshagent_osx-x86-64
+# The macOS installer package needs its background picture.
+macosinstallerbackground.png
 meshagent_x86-64
 meshagent_aarch64
 meshinstall-linux.sh
