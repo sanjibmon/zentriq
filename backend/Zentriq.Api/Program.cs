@@ -35,6 +35,7 @@ var httpOnly = builder.Environment.IsDevelopment() || Environment.GetEnvironment
 builder.Services.AddZentriqInfrastructure(options, paths, "Zentriq.Api");
 
 builder.Services.AddSingleton<AgentServer>();
+if (OperatingSystem.IsWindows()) builder.Services.AddHostedService<AgentDiscovery>(); // LAN discovery for agents (UDP agent port)
 
 // ---- Kestrel / HTTPS -------------------------------------------------------------------
 // The certificate can be replaced while running (ConsoleCertificateRenewer: new server name or IP address).

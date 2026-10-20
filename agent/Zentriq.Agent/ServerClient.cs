@@ -22,15 +22,29 @@ internal sealed class EnrollResponse
     [JsonPropertyName("agentId")] public string AgentId { get; set; } = "";
     [JsonPropertyName("certificate")] public string Certificate { get; set; } = "";
     [JsonPropertyName("caCertificate")] public string? CaCertificate { get; set; }
-    [JsonPropertyName("checkinSeconds")] public int CheckinSeconds { get; set; }
-    [JsonPropertyName("inventoryHours")] public int InventoryHours { get; set; }
+    [JsonPropertyName("checkinMinutes")] public int CheckinMinutes { get; set; }
+    [JsonPropertyName("inventoryMinutes")] public int InventoryMinutes { get; set; }
     [JsonPropertyName("serverPins")] public List<string>? ServerPins { get; set; }
+    [JsonPropertyName("serverUrls")] public List<string>? ServerUrls { get; set; }
+    [JsonPropertyName("uninstallProtection")] public bool UninstallProtection { get; set; }
+    [JsonPropertyName("uninstallKey")] public string? UninstallKey { get; set; }
+}
+
+/// <summary>Answer to /enroll/hello: the server's key pins and its proof that it knows the enrollment code.</summary>
+internal sealed class HelloResponse
+{
+    [JsonPropertyName("pins")] public List<string>? Pins { get; set; }
+    [JsonPropertyName("proof")] public string Proof { get; set; } = "";
+    [JsonPropertyName("serverUrls")] public List<string>? ServerUrls { get; set; }
 }
 
 internal sealed class CheckinResponse
 {
-    [JsonPropertyName("checkinSeconds")] public int CheckinSeconds { get; set; }
-    [JsonPropertyName("inventoryHours")] public int InventoryHours { get; set; }
+    [JsonPropertyName("checkinMinutes")] public int CheckinMinutes { get; set; }
+    [JsonPropertyName("inventoryMinutes")] public int InventoryMinutes { get; set; }
+    [JsonPropertyName("serverUrls")] public List<string>? ServerUrls { get; set; }
+    [JsonPropertyName("uninstallProtection")] public bool UninstallProtection { get; set; }
+    [JsonPropertyName("uninstallKey")] public string? UninstallKey { get; set; }
     [JsonPropertyName("inventoryDue")] public bool InventoryDue { get; set; }
     [JsonPropertyName("renewCertificate")] public bool RenewCertificate { get; set; }
     [JsonPropertyName("serverPins")] public List<string>? ServerPins { get; set; }
@@ -68,7 +82,16 @@ internal sealed class ServerClient : IDisposable
     private readonly HttpClient _http;
     private readonly Uri _base;
 
-    public ServerClient(string serverUrl, IReadOnlyCollection<string> pins, X509Certificate2? clientCertificate, string? proxyUrl)
+    /// <summary>The key pin of the certificate the server presented (set by the first TLS handshake).</summary>
+    public string? ObservedPin { get; private set; }
+
+    public string BaseUrl => _base.GetLeftPart(UriPartial.Authority);
+
+    /// <param name="trustAnyForHello">Only for <see cref="HelloAsync"/>: accept any certificate and record its pin; the
+    /// caller then checks that the server proved the enrollment code for exactly that pin.</param>
+    /// <param name="timeout">Request timeout (short for connectivity checks, long for inventory uploads).</param>
+    public ServerClient(string serverUrl, IReadOnlyCollection<string> pins, X509Certificate2? clientCertificate, string? proxyUrl,
+        bool trustAnyForHello = false, TimeSpan? timeout = null)
     {
         _base = new Uri(serverUrl.TrimEnd('/') + "/");
         proxyUrl = UsableProxy(proxyUrl, _base);
@@ -76,12 +99,16 @@ internal sealed class ServerClient : IDisposable
         {
             ClientCertificateOptions = ClientCertificateOption.Manual,
             AutomaticDecompression = DecompressionMethods.GZip,
-            ServerCertificateCustomValidationCallback = (_, cert, _, errors) => Validate(cert, errors, pins),
+            ServerCertificateCustomValidationCallback = (_, cert, _, errors) =>
+            {
+                if (cert is not null) try { ObservedPin = AgentProtocol.SpkiSha256(cert.RawData); } catch (FormatException) { }
+                return trustAnyForHello ? cert is not null : Validate(cert, errors, pins);
+            },
             UseProxy = !string.IsNullOrEmpty(proxyUrl),
             Proxy = string.IsNullOrEmpty(proxyUrl) ? null : new WebProxy(proxyUrl) { UseDefaultCredentials = true },
         };
         if (clientCertificate is not null) handler.ClientCertificates.Add(clientCertificate);
-        _http = new HttpClient(handler) { Timeout = TimeSpan.FromMinutes(5) };
+        _http = new HttpClient(handler) { Timeout = timeout ?? TimeSpan.FromMinutes(5) };
         _http.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("ZentriqAgent", Program.Version));
     }
 
@@ -121,17 +148,22 @@ internal sealed class ServerClient : IDisposable
         return false;
     }
 
-    public Task<EnrollResponse> EnrollAsync(string token, string csr, string hostname, string osName, string? smbiosUuid, CancellationToken ct) =>
+    public Task<EnrollResponse> EnrollAsync(string token, string csr, string hostname, string osName, string? smbiosUuid, int? checkinMinutes, int? inventoryMinutes, CancellationToken ct) =>
         PostJsonAsync<EnrollResponse>("api/agent/v1/enroll", new Dictionary<string, object?>
         {
             ["token"] = token, ["csr"] = csr, ["hostname"] = hostname, ["osName"] = osName, ["agentVersion"] = Program.Version, ["smbiosUuid"] = smbiosUuid,
+            ["checkinMinutes"] = checkinMinutes, ["inventoryMinutes"] = inventoryMinutes,
         }, ct);
 
-    public Task<CheckinResponse> CheckinAsync(string hostname, string osName, string? lastError, CancellationToken ct) =>
+    public Task<HelloResponse> HelloAsync(string codeId, string nonce, CancellationToken ct) =>
+        PostJsonAsync<HelloResponse>("api/agent/v1/enroll/hello", new Dictionary<string, object?> { ["codeId"] = codeId, ["nonce"] = nonce }, ct);
+
+    public Task<CheckinResponse> CheckinAsync(string hostname, string osName, string? lastError, DateTime? offlineSince, bool? uninstallProtected, CancellationToken ct) =>
         PostJsonAsync<CheckinResponse>("api/agent/v1/checkin", new Dictionary<string, object?>
         {
             ["agentVersion"] = Program.Version, ["hostname"] = hostname, ["osName"] = osName, ["lastError"] = lastError,
-            ["capabilities"] = new[] { "service-control", "software-uninstall", "self-update", "remote-support" },
+            ["capabilities"] = new[] { "service-control", "software-uninstall", "self-update", "remote-support", "schedule", "uninstall-protection" },
+            ["offlineSince"] = offlineSince?.ToString("o"), ["uninstallProtected"] = uninstallProtected,
         }, ct);
 
     public async Task ReportActionAsync(string actionId, bool ok, string? state, string message, CancellationToken ct)

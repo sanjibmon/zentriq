@@ -42,7 +42,7 @@ public static class OverviewEndpoints
                 ["networkDevices"] = await Scalar($"SELECT count(*) {Active} AND a.category IN ('network_device','printer','iot')"),
                 ["inventoried"] = await Scalar($"SELECT count(*) {Active} AND a.inventory_status = 'success'"),
                 ["withAgent"] = await Scalar($"SELECT count(*) {Active} AND {HasAgent}"),
-                ["agentsOnline"] = await Scalar("SELECT count(*) FROM zentriq.agent_registrations WHERE status = 'active' AND last_checkin_at > now() - interval '45 minutes'"),
+                ["agentsOnline"] = await Scalar("SELECT count(*) FROM zentriq.agent_registrations WHERE status = 'active' AND online_until > now()"),
                 ["agents"] = await Scalar("SELECT count(*) FROM zentriq.agent_registrations WHERE status = 'active'"),
                 ["virtual"] = await Scalar($"SELECT count(*) {Active} AND EXISTS (SELECT 1 FROM zentriq.asset_inventory_documents d WHERE d.asset_id = a.id AND d.document #>> '{{hardware,isVirtual}}' = 'true')"),
                 ["stale"] = await Scalar($"SELECT count(*) {Active} AND a.last_seen_at < now() - interval '30 days'"),

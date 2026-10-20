@@ -27,4 +27,8 @@
   <ItemGroup>
     <Content Include="CustomAction.config" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Enrollment and uninstall code formats, shared with the server and the agent. -->
+    <Compile Include="..\..\backend\Zentriq.Inventory\AgentCodes.cs" Link="AgentCodes.cs" />
+  </ItemGroup>
 </Project>

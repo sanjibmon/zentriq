@@ -55,10 +55,17 @@ internal static class Program
                 }
                 case "--enroll":
                 {
-                    if (args.Length < 2) { Console.Error.WriteLine("Usage: ZentriqAgent.exe --enroll <ZQ1.code>"); return 2; }
-                    if (!Zentriq.Inventory.AgentProtocol.TryParseCode(args[1], out _, out var err)) { Console.Error.WriteLine(err); return 2; }
+                    if (args.Length < 2) { Console.Error.WriteLine("Usage: ZentriqAgent.exe --enroll <code> --server <server address> [--checkin <minutes>] [--inventory <minutes>]"); return 2; }
                     var state = AgentState.Load();
+                    var server = Option(args, "--server");
+                    if (Zentriq.Inventory.AgentCodes.NormalizeEnrollment(args[1]) is null && !Zentriq.Inventory.AgentProtocol.TryParseCode(args[1], out _, out _))
+                    { Console.Error.WriteLine("The enrollment code must have 20 letters and digits (copy it from Agents > Enrollment codes)."); return 2; }
+                    if (Zentriq.Inventory.AgentCodes.NormalizeEnrollment(args[1]) is not null && AgentWorker.NormalizeServer(server ?? state.ServerUrl) is null)
+                    { Console.Error.WriteLine("Give the server address: --server https://<server>:8444"); return 2; }
                     state.EnrollmentCode = args[1].Trim().Trim('"');
+                    if (server is not null) state.EnrollmentServer = AgentWorker.NormalizeServer(server);
+                    if (int.TryParse(Option(args, "--checkin"), out var ci)) WriteInstallInterval("InstallCheckinMinutes", ci);
+                    if (int.TryParse(Option(args, "--inventory"), out var inv)) WriteInstallInterval("InstallInventoryMinutes", inv);
                     state.Save();
                     AgentState.Secure();
                     var r = new AgentWorker().RunOnce(CancellationToken.None);
@@ -72,6 +79,8 @@ internal static class Program
                     Console.WriteLine(r.Message);
                     return r.Ok ? 0 : 1;
                 }
+                case "--uninstall":
+                    return Uninstall(args.Length > 1 ? args[1] : null);
                 case "--run":
                 {
                     using var cts = new CancellationTokenSource();
@@ -82,7 +91,9 @@ internal static class Program
                 default:
                     Console.WriteLine("Zentriq Agent " + Version + "\n" +
                         "  --status             show enrollment and last check-in\n" +
-                        "  --enroll <code>      enroll with a ZQ1. code from the console (Agents page)\n" +
+                        "  --enroll <code> --server <address> [--checkin <min>] [--inventory <min>]\n" +
+                        "                       enroll with an enrollment code from the console (Agents page)\n" +
+                        "  --uninstall <code>   remove the agent (uninstall code from the console, valid for 1 hour)\n" +
                         "  --once               run one check-in cycle now\n" +
                         "  --collect-now        check in and send inventory now\n" +
                         "  --collect <file>     write this device's inventory to a JSON file (nothing is sent)\n" +
@@ -119,6 +130,39 @@ internal static class Program
         return 0;
     }
 
+    private static string? Option(string[] args, string name)
+    {
+        for (var i = 0; i < args.Length - 1; i++) if (string.Equals(args[i], name, StringComparison.OrdinalIgnoreCase)) return args[i + 1];
+        return null;
+    }
+
+    private static void WriteInstallInterval(string name, int minutes)
+    {
+        using var hklm = Microsoft.Win32.RegistryKey.OpenBaseKey(Microsoft.Win32.RegistryHive.LocalMachine, Microsoft.Win32.RegistryView.Registry64);
+        using var k = hklm.CreateSubKey(AgentState.KeyPath, true);
+        k.SetValue(name, minutes, Microsoft.Win32.RegistryValueKind.DWord);
+    }
+
+    /// <summary>Removes the agent with Windows Installer, passing the uninstall code (checked by the package as SYSTEM).</summary>
+    private static int Uninstall(string? code)
+    {
+        string? product = null;
+        using (var hklm = Microsoft.Win32.RegistryKey.OpenBaseKey(Microsoft.Win32.RegistryHive.LocalMachine, Microsoft.Win32.RegistryView.Registry64))
+        using (var un = hklm.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"))
+            if (un is not null)
+                foreach (var name in un.GetSubKeyNames())
+                {
+                    using var k = un.OpenSubKey(name);
+                    if (k?.GetValue("DisplayName") as string == "Zentriq Agent" && name.StartsWith("{")) { product = name; break; }
+                }
+        if (product is null) { Console.Error.WriteLine("The Zentriq Agent is not installed (no Windows Installer product found)."); return 1; }
+        var arguments = $"/x {product} /passive /norestart" + (string.IsNullOrWhiteSpace(code) ? "" : $" UNINSTALLCODE={code!.Trim()}");
+        using var p = Process.Start(new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "msiexec.exe"), arguments) { UseShellExecute = false })!;
+        p.WaitForExit();
+        Console.WriteLine(p.ExitCode == 0 ? "Zentriq Agent removed." : $"Windows Installer exit code {p.ExitCode}. A missing, wrong or expired uninstall code stops the removal (see the Application event log).");
+        return p.ExitCode;
+    }
+
     private static int Status()
     {
         var s = AgentState.Load();
@@ -129,6 +173,11 @@ internal static class Program
         Console.WriteLine($"Certificate:     {s.CertThumbprint ?? "-"}");
         Console.WriteLine($"Last check-in:   {s.LastCheckinUtc?.ToString("u") ?? "never"}");
         Console.WriteLine($"Last inventory:  {s.LastInventoryUtc?.ToString("u") ?? "never"}");
+        Console.WriteLine($"Check-in every:  {s.CheckinMinutes} min");
+        Console.WriteLine($"Inventory every: {s.InventoryMinutes} min");
+        Console.WriteLine($"Other addresses: {(s.ServerUrls.Count == 0 ? "-" : string.Join(", ", s.ServerUrls))}");
+        if (s.OfflineSinceUtc is { } off) Console.WriteLine($"Offline since:   {off:u} (the server has not answered since then)");
+        Console.WriteLine($"Uninstall code:  {(UninstallProtection.Enabled ? "required (get one from the Zentriq console)" : "not required")}");
         Console.WriteLine($"Pending code:    {(string.IsNullOrEmpty(s.EnrollmentCode) ? "no" : "yes")}");
         if (!string.IsNullOrEmpty(s.LastError)) Console.WriteLine($"Last error:      {s.LastError}");
         return s.Enrolled ? 0 : 1;
@@ -145,7 +194,26 @@ internal sealed class AgentService : ServiceBase
         ServiceName = Program.ServiceName;
         CanStop = true;
         CanShutdown = true;
+        CanHandlePowerEvent = true;
         AutoLog = true;
+    }
+
+    /// <summary>Set to run the next cycle early: the network changed or the device woke from sleep.</summary>
+    internal static readonly AutoResetEvent Wake = new AutoResetEvent(false);
+    private static DateTime _lastWake;
+
+    internal static void RequestWake(string why)
+    {
+        if (DateTime.UtcNow - _lastWake < TimeSpan.FromSeconds(30)) return;
+        _lastWake = DateTime.UtcNow;
+        Log.Info($"{why}: checking the connection to the server.");
+        Wake.Set();
+    }
+
+    protected override bool OnPowerEvent(PowerBroadcastStatus powerStatus)
+    {
+        if (powerStatus == PowerBroadcastStatus.ResumeSuspend || powerStatus == PowerBroadcastStatus.ResumeAutomatic) RequestWake("Resumed from sleep");
+        return true;
     }
 
     protected override void OnStart(string[] args)
@@ -156,6 +224,7 @@ internal sealed class AgentService : ServiceBase
         _cts = new CancellationTokenSource();
         var initial = TimeSpan.FromSeconds(new Random().Next(10, 60));
         if (!string.IsNullOrEmpty(AgentState.Load().EnrollmentCode)) initial = TimeSpan.FromSeconds(2); // just installed
+        System.Net.NetworkInformation.NetworkChange.NetworkAddressChanged += (_, _) => RequestWake("Network changed");
         _thread = new Thread(() => Loop(_cts.Token, initial)) { IsBackground = true, Name = "agent" };
         _thread.Start();
     }
@@ -181,7 +250,11 @@ internal sealed class AgentService : ServiceBase
             catch (OperationCanceledException) { return; }
             catch (Exception ex) { Log.Error("Unexpected error", ex); r = new AgentWorker.Outcome { NextRun = TimeSpan.FromMinutes(5) }; }
             Log.Info($"{r.Message} Next run in {(int)r.NextRun.TotalMinutes} min.");
-            if (ct.WaitHandle.WaitOne(r.NextRun)) return;
+            // Wait for the next run, or run early when the network changes / the device resumes (the network needs a
+            // few seconds to settle first).
+            var signalled = WaitHandle.WaitAny(new[] { ct.WaitHandle, Wake }, r.NextRun);
+            if (signalled == 0) return;
+            if (signalled == 1 && ct.WaitHandle.WaitOne(TimeSpan.FromSeconds(20))) return;
         }
     }
 }

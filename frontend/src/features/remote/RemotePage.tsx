@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { api } from '../../api/client';
+import { api, ApiError } from '../../api/client';
 import type { Paged } from '../../api/types';
 import { useAuth } from '../../app/auth';
 import { Link, useRouter } from '../../app/router';
@@ -9,6 +9,7 @@ import { CopyBox } from '../../components/CopyBox';
 import { Icon } from '../../components/Icon';
 import { Modal } from '../../components/Modal';
 import { Callout, DataTable, ErrorBox, fmt, Kpis, PageHead, Pager, Panel, Pill } from '../../components/ui';
+import { InternetSetup } from './InternetSetup';
 import { TrustPanel } from './TrustPanel';
 import {
   formatCode, openQuick, openRemote, VIEW_LABEL,
@@ -118,9 +119,9 @@ function Quick({ status, allowTerminal, creating, setCreating, onMsg, onChanged 
         { label: 'Active sessions', value: active.length.toLocaleString(), sub: `${active.filter((q) => q.status === 'waiting').length} waiting for the user` },
         { label: 'Sessions (30 days)', value: status.quick30d.toLocaleString(), sub: 'on-demand help' },
         { label: 'Unattended devices', value: status.devices.toLocaleString(), sub: `${status.online.toLocaleString()} online now`, to: '/remote?tab=devices' },
-        { label: 'Internet access', value: status.internet ? (status.internet.applied ? 'On' : 'Starting') : 'LAN only', sub: status.internet ? `${status.internet.host}:${status.internet.port}` : 'set it up in Settings', to: can('remote.manage') ? '/remote?tab=setup' : undefined },
+        { label: 'Internet access', value: status.internet?.usable ? (status.internet.applied ? 'On' : 'Starting') : 'Not set up', sub: status.internet ? `${status.internet.host}:${status.internet.port}${status.internet.verified ? ' · verified' : status.internet.confirmed ? ' · confirmed' : ''}` : 'public address needed', to: can('remote.manage') ? '/remote?tab=setup' : undefined },
       ]} />
-      {!status.internet && <Callout tone="info" icon="globe">Quick support works for people on your network now. To help people at home or on the road over the internet, add an internet address under <Link to="/remote?tab=setup">Settings</Link>.</Callout>}
+      {!status.internet?.usable && <Callout tone="info" icon="globe">To help people at home or on the road, remote support needs a public address (domain name or public IP) that reaches this server over HTTPS. Zentriq checks it before creating internet links — set it under <Link to="/remote?tab=setup">Settings › Internet access</Link> or when you create a session. People on the office network can be helped now.</Callout>}
       {list.data?.warning && <Callout tone="warn" icon="alert">{list.data.warning}</Callout>}
       <ErrorBox error={list.error} />
 
@@ -166,7 +167,7 @@ function Quick({ status, allowTerminal, creating, setCreating, onMsg, onChanged 
         ]} />
       </Panel>}
 
-      {creating && <NewSession onClose={() => setCreating(false)} onCreated={(r) => { setCreating(false); setCreated(r); list.reload(); onChanged(); }} />}
+      {creating && <NewSession status={status} onInternetSaved={onChanged} onClose={() => setCreating(false)} onCreated={(r) => { setCreating(false); setCreated(r); list.reload(); onChanged(); }} />}
       {created && <Created result={created} onClose={() => setCreated(null)} />}
     </>
   );
@@ -186,20 +187,42 @@ function InviteButtons({ q }: { q: QuickSession }) {
   );
 }
 
-function NewSession({ onClose, onCreated }: { onClose: () => void; onCreated: (r: { session: QuickSession; email: string | null; invitation: { subject: string; text: string } }) => void }) {
-  const [f, setF] = useState({ customer: '', email: '', note: '', hours: 1, sendEmail: true });
+function NewSession({ status, onClose, onCreated, onInternetSaved }: {
+  status: RemoteStatus; onClose: () => void; onInternetSaved: () => void;
+  onCreated: (r: { session: QuickSession; email: string | null; invitation: { subject: string; text: string } }) => void;
+}) {
+  const { can } = useAuth();
+  const [f, setF] = useState({ customer: '', email: '', note: '', hours: 1, sendEmail: true, lan: false });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [inetOk, setInetOk] = useState(!!status.internet?.usable);
+  const needInternet = !f.lan && !inetOk;
   async function create() {
     setBusy(true); setError(null);
     try { onCreated(await api.post('/remote/quick', { ...f, sendEmail: f.sendEmail && !!f.email.trim() })); }
-    catch (e) { setError(err(e)); } finally { setBusy(false); }
+    catch (e) {
+      if (e instanceof ApiError && e.status === 409) setInetOk(false);
+      setError(err(e));
+    } finally { setBusy(false); }
   }
   return (
     <Modal title="New support session" onClose={onClose}
-      footer={<><button className="btn" onClick={onClose}>Cancel</button><button className="btn primary" disabled={busy} onClick={() => void create()}>{busy ? 'Creating…' : 'Create session'}</button></>}>
+      footer={<><button className="btn" onClick={onClose}>Cancel</button><button className="btn primary" disabled={busy || needInternet} onClick={() => void create()}>{busy ? 'Creating…' : 'Create session'}</button></>}>
       {error && <Callout tone="crit" icon="alert">{error}</Callout>}
       <div className="form-v">
+        <div className="seg rs-where" role="radiogroup" aria-label="Where is the person?">
+          <button type="button" role="radio" aria-checked={!f.lan} className={!f.lan ? 'on' : ''} onClick={() => setF({ ...f, lan: false })}><Icon name="globe" size={13} /> Anywhere (internet)</button>
+          <button type="button" role="radio" aria-checked={f.lan} className={f.lan ? 'on' : ''} onClick={() => setF({ ...f, lan: true })}><Icon name="network" size={13} /> On the office network</button>
+        </div>
+        {!f.lan && (inetOk
+          ? <small className="muted"><Icon name="shield" size={12} /> The link uses <span className="mono">https://{status.internet?.host}:{status.internet?.port}</span> (checked).</small>
+          : can('remote.manage')
+            ? <div className="rs-need">
+                <b>A public address is needed</b>
+                <p>Enter the public domain name or public IP that reaches this server. Zentriq checks it before creating the link.</p>
+                <InternetSetup compact host={status.internet?.host} port={status.internet?.port} enginePort={status.port} onSaved={() => { setInetOk(true); onInternetSaved(); }} />
+              </div>
+            : <Callout tone="warn" icon="alert">Internet access is not set up. Ask an administrator to set a public address under Remote Support › Settings, or choose “On the office network”.</Callout>)}
         <label className="fld"><span>Who needs help?</span><input className="in" autoFocus placeholder="Name (optional)" value={f.customer} onChange={(e) => setF({ ...f, customer: e.target.value })} /></label>
         <label className="fld"><span>E-mail</span><input className="in" type="email" placeholder="name@example.com (optional)" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></label>
         {f.email.trim() && <label className="row-check"><input type="checkbox" checked={f.sendEmail} onChange={(e) => setF({ ...f, sendEmail: e.target.checked })} /> Send the invitation by e-mail now</label>}
@@ -208,7 +231,7 @@ function NewSession({ onClose, onCreated }: { onClose: () => void; onCreated: (r
           <select className="in" value={f.hours} onChange={(e) => setF({ ...f, hours: Number(e.target.value) })}>
             <option value={1}>1 hour</option><option value={4}>4 hours</option><option value={24}>1 day</option><option value={72}>3 days</option>
           </select></label>
-        <small className="muted">The person is asked to allow every request (screen, files, terminal) and sees a bar with a disconnect button. Each session has its own one-time link.</small>
+        <small className="muted">The person is asked to allow every request (screen, files, terminal) and sees a bar with a disconnect button. Each session has its own one-time link. Works on Windows, macOS and Linux.</small>
       </div>
     </Modal>
   );
@@ -339,7 +362,7 @@ function Setup({ status, onChanged }: { status: RemoteStatus; onChanged: () => v
   async function save(text = 'Saved. Changes apply to the next session.') {
     if (!form) return;
     setBusy(true); setMsg(null);
-    try { await api.put('/remote/settings', { ...form, internetHost: form.internetHost?.trim() || null }); setMsg({ tone: 'ok', text }); settings.reload(); onChanged(); }
+    try { await api.put('/remote/settings', form); setMsg({ tone: 'ok', text }); settings.reload(); onChanged(); }
     catch (e) { setMsg({ tone: 'crit', text: err(e) }); } finally { setBusy(false); }
   }
   async function download() {
@@ -357,6 +380,10 @@ function Setup({ status, onChanged }: { status: RemoteStatus; onChanged: () => v
     try { setLink(await api.post('/remote/install-link', { hours: 72 })); } catch (e) { setMsg({ tone: 'crit', text: err(e) }); }
   }
   const inet = status.internet;
+  async function clearInternet() {
+    try { await api.del('/remote/internet'); setMsg({ tone: 'ok', text: 'Internet access removed. Invitation links work on the office network only.' }); onChanged(); }
+    catch (e) { setMsg({ tone: 'crit', text: err(e) }); }
+  }
   return (
     <>
       {msg && <Callout tone={msg.tone} icon={msg.tone === 'crit' ? 'alert' : 'info'}>{msg.text}</Callout>}
@@ -372,23 +399,15 @@ function Setup({ status, onChanged }: { status: RemoteStatus; onChanged: () => v
           </div>}
         </Panel>
 
-        <Panel title="Internet access" sub="Help people outside your network" right={inet ? <Pill tone={inet.applied ? 'ok' : 'info'}>{inet.applied ? 'Active' : 'Applying…'}</Pill> : <Pill>LAN only</Pill>}>
-          {!form ? <p className="muted">Loading…</p> : <div className="form-v">
-            <div className="rs-inet">
-              <label className="fld"><span>Public name</span><input className="in" placeholder="support.example.com" value={form.internetHost ?? ''} onChange={(e) => setForm({ ...form, internetHost: e.target.value })} /></label>
-              <label className="fld"><span>Port</span><input className="in" type="number" min={1} max={65535} placeholder={String(status.port)} value={form.internetPort ?? ''} onChange={(e) => setForm({ ...form, internetPort: e.target.value ? Number(e.target.value) : null })} /></label>
-            </div>
-            <ol className="rs-howto">
-              <li>Create a DNS record for the name pointing to your public IP address (inside the office, let it resolve to this server: <span className="mono">{status.publicUrl?.replace(/^https:\/\/|:\d+\/$/g, '') ?? 'this server'}</span>).</li>
-              <li>On the router or firewall, forward TCP port <b>{form.internetPort ?? status.port}</b> to this server, port <b>{status.port}</b>. Only remote support is published — not the console.</li>
-              <li>So that people outside see no browser warning, give the server a certificate from a public CA that includes this name (import it in Windows and set its thumbprint as the HTTPS certificate in Zentriq Setup, see the installation guide); remote support uses the console's certificate.</li>
-            </ol>
-            <small className="muted">Invitation links and new agents then connect through this name from anywhere; devices already installed keep their current address.</small>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button className="btn primary" disabled={busy} onClick={() => void save(form.internetHost?.trim() ? 'Saved. Remote support restarts with the internet address within a minute.' : 'Internet access turned off.')}>{busy ? 'Saving…' : 'Save'}</button>
-              {form.internetHost && <button className="btn ghost" disabled={busy} onClick={() => setForm({ ...form, internetHost: null, internetPort: null })}>Clear</button>}
-            </div>
+        <Panel title="Internet access" sub="Public address for people outside your network (HTTPS only)"
+          right={inet ? <Pill tone={inet.usable ? (inet.applied ? 'ok' : 'info') : 'warn'}>{inet.usable ? (inet.applied ? (inet.verified ? 'Verified' : 'Confirmed') : 'Applying…') : 'Check failed'}</Pill> : <Pill>Not set up</Pill>}>
+          {inet && <div className="rs-current">
+            <span className="mono">https://{inet.host}:{inet.port}</span>
+            {inet.checkedAt && <small className="muted">checked {fmt.ago(inet.checkedAt)}</small>}
+            <button className="btn sm ghost" onClick={() => void clearInternet()}>Remove</button>
+            {inet.message && <small className="muted" style={{ flexBasis: '100%' }}>{inet.message}</small>}
           </div>}
+          <InternetSetup host={inet?.host} port={inet?.port} enginePort={status.port} onSaved={() => { setMsg({ tone: 'ok', text: 'Internet address checked and saved. Remote support uses it within a minute.' }); onChanged(); }} />
         </Panel>
       </div>
 
@@ -396,7 +415,7 @@ function Setup({ status, onChanged }: { status: RemoteStatus; onChanged: () => v
         <div className="rs-install">
           <div>
             <h4><Icon name="cycle" size={14} /> With the Zentriq Agent</h4>
-            <p>Select devices on <Link to="/remote?tab=devices">Unattended devices</Link> and click <b>Install</b> — done within about 2 minutes.</p>
+            <p>Select devices on <Link to="/remote?tab=devices">Unattended devices</Link> and click <b>Install</b> — done at their next check-in.</p>
           </div>
           <div>
             <h4><Icon name="down" size={14} /> Windows installer</h4>

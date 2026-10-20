@@ -262,7 +262,9 @@ public sealed class RemoteSupportLiveTests : IAsyncLifetime
 
         // Quick support: a session gets its own device group (consent always on) and a public invitation page that runs
         // the agent without installing it; ending the session removes the group and the page.
-        var quick = await remote.CreateQuickAsync(null, "Priya Rao", "Anita Desai", "anita@example.com", "Outlook", 1, "127.0.0.1", default);
+        // Links for people outside the network need a checked public address; on the office network they use the LAN address.
+        await Assert.ThrowsAsync<InternetRequiredException>(() => remote.CreateQuickAsync(null, "Priya Rao", "x", null, null, 1, "127.0.0.1", default));
+        var quick = await remote.CreateQuickAsync(null, "Priya Rao", "Anita Desai", "anita@example.com", "Outlook", 1, "127.0.0.1", default, lan: true);
         Assert.Equal("waiting", quick.Status);
         Assert.Matches("^[0-9]{9}$", quick.Code);
         Assert.StartsWith($"https://127.0.0.1:{Port}/agentinvite?c=", quick.InviteUrl);
@@ -271,8 +273,13 @@ public sealed class RemoteSupportLiveTests : IAsyncLifetime
             var invite = await anonymous.GetAsync(quick.InviteUrl);
             Assert.True(invite.IsSuccessStatusCode, $"invitation page: HTTP {(int)invite.StatusCode}");
             var html = await invite.Content.ReadAsStringAsync();
-            Assert.Contains("installFlags = '1'", html);                                       // run only, nothing installed
-            Assert.Contains("Zentriq", html);
+            Assert.Contains("parseInt('1')", html);                                            // run only, nothing installed
+            Assert.Contains("Zentriq Remote Support", html);
+            // Zentriq's own page: no MeshCentral name, only Windows, macOS and Linux.
+            var visible = System.Text.RegularExpressions.Regex.Replace(html, "<script[\\s\\S]*?</script>", "");
+            Assert.DoesNotContain("MeshCentral", visible);
+            Assert.DoesNotContain("Mesh Agent", html);
+            Assert.DoesNotContain("Android", html);
             // The page's downloads work for Windows, Linux and macOS (the agents Zentriq ships, installer/remote/agents-keep.txt).
             var mid = System.Text.RegularExpressions.Regex.Match(html, "var meshid = '([^']+)'").Groups[1].Value;
             Assert.NotEmpty(mid);
@@ -309,7 +316,7 @@ public sealed class RemoteSupportLiveTests : IAsyncLifetime
         // Install link for unattended access (Windows, macOS, Linux).
         var installLink = await remote.InstallLinkAsync(24, "127.0.0.1", default);
         using (var anonymous = new HttpClient(new HttpClientHandler { ServerCertificateCustomValidationCallback = (_, _, _, _) => true }))
-            Assert.Contains("installFlags = '2'", await (await anonymous.GetAsync(installLink)).Content.ReadAsStringAsync());
+            Assert.Contains("parseInt('2')", await (await anonymous.GetAsync(installLink)).Content.ReadAsStringAsync());
 
         // With an internet address, invitations use it.
         await remote.SaveSettingsAsync(new RemoteSettings { InternetHost = "support.example.com", InternetPort = 443 }, default);

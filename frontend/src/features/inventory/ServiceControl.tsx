@@ -55,7 +55,7 @@ export function ServiceActionDialog({ assetId, host, service, display, operation
           {error && <Callout tone="crit" icon="alert">{error}</Callout>}
           {operation !== 'start' && <Callout tone="warn" icon="alert">{operation === 'stop' ? 'Stopping' : 'Restarting'} a service interrupts whatever depends on it on {host}. The action is recorded in the audit log.</Callout>}
           {agent ? (
-            <p style={{ margin: 0 }}>The Zentriq Agent on {host} will do this at its next check-in (within about 2 minutes){info.agentOnline ? '' : ' — the agent has not checked in recently, so it runs when the device is back online'}. No device credential is needed.</p>
+            <p style={{ margin: 0 }}>The Zentriq Agent on {host} will do this at its next check-in (set by its check-in interval){info.agentOnline ? '' : ' — the agent has not checked in recently, so it runs when the device is back online'}. No device credential is needed.</p>
           ) : (
             <>
               <p style={{ margin: 0 }}>{info.note ?? `${host} has no Zentriq Agent, so Zentriq connects to it over WinRM (TCP 5985) or DCOM/WMI with an administrator account on the device.`}</p>

@@ -10,7 +10,7 @@ Devices reported by both are merged into one asset (SMBIOS UUID → serial numbe
 | Network direction | server → device (WinRM 5985/5986, DCOM/RPC 135 + dynamic, SSH 22, SNMP 161/UDP) | device → server (HTTPS 8444, outbound only) |
 | Works off the LAN / over the internet | no | yes (publish port 8444 or a reverse proxy) |
 | Credentials stored in Zentriq | yes (encrypted) | none (per-device certificate) |
-| Freshness | as often as the scan schedule | check-in every 15 min, full inventory every 12 h, or *Collect now* |
+| Freshness | as often as the scan schedule | connectivity check every 5 min – 3 h and inventory every 30 min – 24 h (chosen at installation, changeable per agent), or *Collect now* |
 | Platforms | Windows, Linux, macOS, SNMP devices | Windows 10/11, Windows Server 2016+ |
 
 ## Agentless scanning
@@ -132,31 +132,71 @@ before this feature need the new MSI installed once (no enrollment code). Detail
 
 ### Deploying
 
-1. *Agents › New enrollment code*: name, validity (1–365 days), optional maximum number of devices and the address
-   agents should use (pre-filled with the address you opened the console with, e.g. `https://192.168.1.8:8444` – it
-   must be reachable from the devices). The code (`ZQ1.…`) contains the server address, a secret and the server
-   certificate's key pin. While it is active you can show it again with *Enrollment codes › Show code* (stored
-   encrypted on the server; viewing is audited). Codes created before this feature was added cannot be shown again; create a new one.
-2. Download the MSI from *Agents* (or `https://<server>/downloads/ZentriqAgent-x64.msi`) and install:
+1. *Agents › New enrollment code*: name, validity (1–365 days), optional maximum number of devices, the address
+   agents should use (pre-filled with the address you opened the console with, e.g. `https://192.168.1.8:8444`; it
+   must be reachable from the devices) and the suggested schedule (*check the connection every* 5 min – 3 h, *send
+   inventory every* 30 min – 24 h). The **code has 20 letters and digits** (`AB12C-DE34F-GH56J-KM78N`; dashes optional,
+   O/I/L are read as 0/1/1). The server address is given separately. While the code is active you can show it again
+   (*Enrollment codes › Show code*, stored encrypted, viewing is audited). Revoked, expired and used-up codes can be
+   deleted one by one or all at once (*Delete old codes*); devices enrolled with them are not affected.
+2. Download the MSI from *Agents* (or `https://<server>/downloads/ZentriqAgent-x64.msi`) and install. The wizard asks for
+   the **server**, the **code** and two drop-downs: *Check the connection every* (5, 15, 30 min, 1, 2, 3 h) and *Send
+   inventory every* (30 min, 1, 2, 3, 6, 12, 24 h). Silently:
    ```
-   msiexec /i ZentriqAgent-x64.msi /qn ENROLLMENTCODE="ZQ1...." [PROXYURL="http://proxy:8080"]
+   msiexec /i ZentriqAgent-x64.msi /qn SERVERURL="https://zentriq.example.com:8444" ENROLLMENTCODE="AB12C-DE34F-GH56J-KM78N" CHECKININTERVAL=30 INVENTORYINTERVAL=180 [PROXYURL="http://proxy:8080"]
    ```
-   Leave `PROXYURL` (wizard: *Proxy*) **empty** unless the device can reach the server only through a web proxy. It
-   must be an `http://` proxy address – never the Zentriq server address. The wizard rejects invalid values; the agent
-   ignores an `https://` proxy or one that points at the server (logged as a warning).
-   Works with Intune (line-of-business app), Configuration Manager, Group Policy or interactively (the wizard asks
-   for the code). Enroll later with `"C:\Program Files\Zentriq Agent\ZentriqAgent.exe" --enroll ZQ1....`.
+   `SERVERURL` accepts `server`, `server:8444` or `https://server:8444` (HTTPS only; port 8444 when none is given).
+   Without the intervals the code's suggestion applies. Leave `PROXYURL` **empty** unless the device can reach the
+   server only through an `http://` web proxy. Enroll later with
+   `"C:\Program Files\Zentriq Agent\ZentriqAgent.exe" --enroll <code> --server <address> [--checkin 30] [--inventory 180]`.
+   Old `ZQ1.…` codes from earlier builds still work until they expire.
 3. The device appears under *Agents* within a minute and its inventory shortly after. If it does not, see
    `C:\ProgramData\Zentriq\Agent\Logs\agent.log` on the device; the *Agents* page lists the common causes.
 
+**Why the code is short and still safe.** The code carries no server key. Before sending it, the agent asks the server
+to prove that it knows the code: the server answers with an HMAC of a random challenge and the key pins it serves, keyed
+with SHA-256 of the code. The agent accepts only if the key it actually saw in the TLS handshake is one of the proven
+pins, so a device in the middle can neither learn the code nor pose as the server. The server stores only SHA-256 of
+the code; 14 of the 20 characters are secret (70 bits) and enrollment requests are rate-limited.
+
 **Mass deployment** with the tools you already use. *Asset Inventory › Deploy agent* lists the assets without an
-agent (CSV for building a collection or group), picks or creates an enrollment code and produces the ready-made
-content: a Group Policy startup script, the Intune command-line arguments, the Configuration Manager install command.
-Zentriq does not push software to computers itself.
-* **Intune**: *Apps › Windows › Line-of-business app*, upload the MSI, command-line arguments `ENROLLMENTCODE="ZQ1…"`.
-* **Configuration Manager**: application with the `msiexec /i … /qn ENROLLMENTCODE="ZQ1…"` command.
-* **Group Policy**: a computer startup script running the same `msiexec` command from a share
-  (GPO software installation cannot pass the code; use a script or an MST transform with `ENROLLMENTCODE`).
+agent, picks or creates an enrollment code and produces the ready-made content: a Group Policy startup script, the
+Intune command-line arguments, the Configuration Manager install command. Zentriq does not push software itself.
+* **Intune**: *Apps › Windows › Line-of-business app*, upload the MSI, arguments `SERVERURL="…" ENROLLMENTCODE="…" CHECKININTERVAL=30 INVENTORYINTERVAL=180`.
+* **Configuration Manager**: application with the `msiexec /i … /qn SERVERURL=… ENROLLMENTCODE=…` command.
+* **Group Policy**: a computer startup script running the same `msiexec` command from a share.
+
+### Schedule, connection and last contact
+
+* Each agent **checks its connection** to the server at its check-in interval (and picks up console requests: collect
+  now, service actions, software removal, updates) and **sends its inventory** at its inventory interval. Change them
+  for selected agents or all agents with *Agents › Schedule*; defaults for new codes are in *Agents › Settings*. Console
+  requests run at the next check-in, so a shorter check-in interval makes them faster.
+* An agent counts as **online** until it misses two check-ins (plus 5 minutes). Then *IT Asset Inventory* shows
+  **No contact** with the time of the last contact (later *Offline N days*), and *Agents* shows when the connection was
+  lost. When the agent reaches the server again it reports how long it was offline (*last outage*), and queued
+  inventory is sent.
+* **Lost connection**: the agent retries after 1, 2, 4, 8 and then every 15 minutes, and at once when the network
+  changes or the device wakes from sleep. If the server does not answer at its usual address it tries the server's
+  other names and IP addresses (the server sends them at every check-in) and then **looks for the server on the local
+  network** (UDP broadcast to port 8444; the server answers with its addresses). It connects only to a server that
+  presents the pinned key, and keeps using the address that answered — so an agent finds the server again after a
+  DHCP change of the server's address. Setup adds the firewall rule for UDP 8444 (local subnet).
+
+### Uninstall protection
+
+* *Agents › Settings › Require an uninstall code to remove the agent* (on by default). Each device receives its own
+  key at its next check-in, stored readable by **SYSTEM only** (`HKLM\SOFTWARE\Zentriq\Agent\Protection`).
+* To remove a protected agent, create a code for that device: *Agents › Uninstall code*. It has 16 characters
+  (`ABCD-EFGH-JKMN-PQRS`), works **only on that device** and **expires after one hour**; creating it is audited. Then on
+  the device, as administrator: `"C:\Program Files\Zentriq Agent\ZentriqAgent.exe" --uninstall <code>`, or
+  *Apps › Zentriq Agent › Modify › Remove* and enter the code, or `msiexec /x {product} UNINSTALLCODE=<code>`.
+* Without a valid code Windows Installer refuses the removal (the code is checked as SYSTEM against the device's key),
+  and while protected administrators cannot stop, reconfigure or delete the agent service. Agent updates from the
+  console keep working. Turning protection off removes the key and the restriction at the next check-in; a revoked
+  agent drops its protection.
+* This protects against users and casual removal. A determined local administrator can still take ownership of the
+  registry or kill the process (the service restarts it); combine with your EDR/tamper protection where required.
 
 ### How it works
 
@@ -165,15 +205,14 @@ Zentriq does not push software to computers itself.
   in *Local Computer › Personal* with a non-exportable key. The enrollment code is deleted from the registry.
 * The server certificate is accepted when it is publicly trusted for the name **or** matches the pinned key; pins are
   refreshed at every check-in (so a renewed self-signed certificate is picked up while the old one is still valid).
-* Every 2 minutes it checks in (and runs any service start/stop/restart requested in the console); every 12 hours (or on *Collect now*) it sends a gzip-compressed inventory. If the
-  server is unreachable the inventory is queued and sent later; retries back off.
 * *Revoke* in the console blocks the agent immediately (its certificate is no longer accepted) and the agent removes
   its certificate. Uninstall removes the certificate and state (logs are kept in `C:\ProgramData\Zentriq\Agent\Logs`).
-* Troubleshooting: `ZentriqAgent.exe --status`, `--once`, `--collect-now`, `--collect inventory.json` (local only).
+* Troubleshooting: `ZentriqAgent.exe --status` (server, other addresses, schedule, offline since, protection), `--once`,
+  `--collect-now`, `--collect inventory.json` (local only).
 
 ### Agent limitations (this release)
 
-* Windows only; no Linux/macOS agent yet. Needs .NET Framework 4.8 (not present by default on Server 2016/2019; Windows 10 1903+/11 have it).
+* The inventory agent runs on Windows (macOS and Linux agents are planned; remote support already works on all three). Needs .NET Framework 4.8 (not present by default on Server 2016/2019; Windows 10 1903+/11 have it).
 * Inventory only – the agent does not deploy software, patch or provide remote control.
 * If the server's self-signed certificate is replaced by a new self-signed one **after** the old one stopped working,
   agents must be re-enrolled; use a CA-issued certificate for internet-facing deployments.

@@ -135,7 +135,7 @@ public static class ReportCatalog
                 new("os", "Operating system", ReportColumnType.Text, "r.os_name", "Agent"),
                 new("agent_version", "Agent version", ReportColumnType.Text, "r.agent_version", "Agent"),
                 new("health", "Health", ReportColumnType.Text,
-                    "CASE WHEN r.last_checkin_at IS NULL THEN 'never' WHEN r.last_checkin_at > now() - interval '6 minutes' THEN 'online' WHEN r.last_checkin_at > now() - interval '7 days' THEN 'not seen recently' ELSE 'offline' END", "Agent"),
+                    "CASE WHEN r.last_checkin_at IS NULL THEN 'never' WHEN r.online_until > now() THEN 'online' WHEN r.last_checkin_at > now() - interval '7 days' THEN 'not seen recently' ELSE 'offline' END", "Agent"),
                 new("last_checkin", "Last check-in", ReportColumnType.Date, "r.last_checkin_at", "Agent"),
                 new("last_inventory", "Last inventory", ReportColumnType.Date, "r.last_inventory_at", "Agent"),
                 new("last_ip", "Last address", ReportColumnType.Text, "host(r.last_ip)", "Agent"),

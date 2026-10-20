@@ -16,13 +16,24 @@ internal sealed class AgentState
     public const string KeyPath = @"SOFTWARE\Zentriq\Agent";
 
     public string? EnrollmentCode { get; set; }
+    /// <summary>Server for a short (20-character) enrollment code, as entered at installation (SERVERURL).</summary>
+    public string? EnrollmentServer { get; set; }
     public string? ServerUrl { get; set; }
+    /// <summary>Other addresses of the server (its names and IP addresses), tried when <see cref="ServerUrl"/> does not answer.</summary>
+    public List<string> ServerUrls { get; set; } = new List<string>();
     public string? AgentId { get; set; }
     public string? CertThumbprint { get; set; }
     public List<string> ServerPins { get; set; } = new List<string>();
     public string? ProxyUrl { get; set; }
-    public int CheckinSeconds { get; set; } = 900;
-    public int InventoryHours { get; set; } = 12;
+    /// <summary>How often the agent checks its connection to the server (and picks up console requests), in minutes.</summary>
+    public int CheckinMinutes { get; set; } = 30;
+    /// <summary>How often the agent sends its inventory, in minutes.</summary>
+    public int InventoryMinutes { get; set; } = 180;
+    /// <summary>Intervals chosen at installation (sent to the server when enrolling), or null.</summary>
+    public int? InstallCheckinMinutes { get; set; }
+    public int? InstallInventoryMinutes { get; set; }
+    /// <summary>Set when the server stopped answering: the last time it was reached. Reported once it answers again.</summary>
+    public DateTime? OfflineSinceUtc { get; set; }
     public DateTime? LastInventoryUtc { get; set; }
     public DateTime? LastCheckinUtc { get; set; }
     /// <summary>pending | enrolled | revoked</summary>
@@ -43,15 +54,20 @@ internal sealed class AgentState
         var s = new AgentState
         {
             EnrollmentCode = Str(k, "EnrollmentCode"),
+            EnrollmentServer = Str(k, "EnrollmentServer"),
             ServerUrl = Str(k, "ServerUrl"),
+            ServerUrls = (k.GetValue("ServerUrls") as string[] ?? new string[0]).Where(u => !string.IsNullOrWhiteSpace(u)).ToList(),
             AgentId = Str(k, "AgentId"),
             CertThumbprint = Str(k, "CertThumbprint"),
             ProxyUrl = Str(k, "ProxyUrl"),
             Status = Str(k, "Status") ?? "pending",
             LastError = Str(k, "LastError"),
             ServerPins = (k.GetValue("ServerPins") as string[] ?? new string[0]).Where(p => !string.IsNullOrWhiteSpace(p)).ToList(),
-            CheckinSeconds = Clamp(k.GetValue("CheckinSeconds") as int?, 60, 86400, 900),
-            InventoryHours = Clamp(k.GetValue("InventoryHours") as int?, 1, 720, 12),
+            CheckinMinutes = Clamp(k.GetValue("CheckinMinutes") as int?, 2, 1440, 30),
+            InventoryMinutes = Clamp(k.GetValue("InventoryMinutes") as int?, 30, 10080, 180),
+            InstallCheckinMinutes = k.GetValue("InstallCheckinMinutes") is int ic && ic >= 2 && ic <= 1440 ? ic : (int?)null,
+            InstallInventoryMinutes = k.GetValue("InstallInventoryMinutes") is int ii && ii >= 30 && ii <= 10080 ? ii : (int?)null,
+            OfflineSinceUtc = Date(Str(k, "OfflineSinceUtc")),
             LastInventoryUtc = Date(Str(k, "LastInventoryUtc")),
             LastCheckinUtc = Date(Str(k, "LastCheckinUtc")),
         };
@@ -69,8 +85,11 @@ internal sealed class AgentState
         Set(k, "LastInventoryUtc", LastInventoryUtc?.ToString("o"));
         Set(k, "LastCheckinUtc", LastCheckinUtc?.ToString("o"));
         k.SetValue("ServerPins", ServerPins.ToArray(), RegistryValueKind.MultiString);
-        k.SetValue("CheckinSeconds", CheckinSeconds, RegistryValueKind.DWord);
-        k.SetValue("InventoryHours", InventoryHours, RegistryValueKind.DWord);
+        k.SetValue("ServerUrls", ServerUrls.ToArray(), RegistryValueKind.MultiString);
+        k.SetValue("CheckinMinutes", CheckinMinutes, RegistryValueKind.DWord);
+        k.SetValue("InventoryMinutes", InventoryMinutes, RegistryValueKind.DWord);
+        Set(k, "OfflineSinceUtc", OfflineSinceUtc?.ToString("o"));
+        Set(k, "EnrollmentServer", EnrollmentServer);
         if (string.IsNullOrEmpty(EnrollmentCode)) { try { k.DeleteValue("EnrollmentCode", false); } catch (UnauthorizedAccessException) { } }
         else k.SetValue("EnrollmentCode", EnrollmentCode, RegistryValueKind.String);
     }
@@ -98,4 +117,90 @@ internal sealed class AgentState
     }
     private static int Clamp(int? v, int min, int max, int fallback) => v is int i ? Math.Max(min, Math.Min(max, i)) : fallback;
     private static DateTime? Date(string? s) => DateTime.TryParse(s, null, System.Globalization.DateTimeStyles.RoundtripKind, out var d) ? d.ToUniversalTime() : (DateTime?)null;
+}
+
+/// <summary>
+/// Uninstall protection: the device's uninstall key (from the server) in HKLM\SOFTWARE\Zentriq\Agent\Protection, readable by
+/// SYSTEM only (not by Administrators), so a code can only come from the console. The Windows Installer package checks a
+/// typed code against it as SYSTEM. "UninstallProtected" in the agent key (readable by administrators) tells the installer
+/// that a code is needed.
+/// </summary>
+internal static class UninstallProtection
+{
+    public const string KeyPath = AgentState.KeyPath + @"\Protection";
+
+    public static byte[]? Key()
+    {
+        try
+        {
+            using var hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
+            using var k = hklm.OpenSubKey(KeyPath, false);
+            return k?.GetValue("UninstallKey") as byte[];
+        }
+        catch (Exception ex) when (ex is System.Security.SecurityException || ex is UnauthorizedAccessException) { return null; } // not SYSTEM
+    }
+
+    /// <summary>Protection is managed by the agent service (SYSTEM) only, not by commands an administrator runs.</summary>
+    public static bool CanManage => WindowsIdentity.GetCurrent().IsSystem;
+
+    public static bool Enabled => Key() is { Length: 32 };
+
+    /// <summary>Stores or removes the key; returns true when something changed.</summary>
+    public static bool Apply(byte[]? key)
+    {
+        var current = Key();
+        if (key is null)
+        {
+            if (current is null) return false;
+            using var hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
+            hklm.DeleteSubKeyTree(KeyPath, false);
+            using (var a = hklm.CreateSubKey(AgentState.KeyPath, true)) a.DeleteValue("UninstallProtected", false);
+            ServiceHardening.Apply(false);
+            Log.Info("Uninstall protection turned off by the server.");
+            return true;
+        }
+        if (current is not null && current.SequenceEqual(key)) { ServiceHardening.Apply(true); return false; }
+        var sec = new RegistrySecurity();
+        sec.SetAccessRuleProtection(true, false);
+        sec.AddAccessRule(new RegistryAccessRule(new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null), RegistryRights.FullControl,
+            InheritanceFlags.ContainerInherit, PropagationFlags.None, AccessControlType.Allow));
+        using (var hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64))
+        {
+            using (var k = hklm.CreateSubKey(KeyPath, RegistryKeyPermissionCheck.ReadWriteSubTree, sec))
+            {
+                k.SetAccessControl(sec);
+                k.SetValue("UninstallKey", key, RegistryValueKind.Binary);
+            }
+            using (var a = hklm.CreateSubKey(AgentState.KeyPath, true)) a.SetValue("UninstallProtected", 1, RegistryValueKind.DWord);
+        }
+        ServiceHardening.Apply(true);
+        Log.Info("Uninstall protection is on: removing the agent needs a one-hour code from the Zentriq console.");
+        return true;
+    }
+}
+
+/// <summary>
+/// While uninstall protection is on, administrators can query and start the agent service but not stop, reconfigure or
+/// delete it (Windows Installer, running as SYSTEM, still can, so updates keep working).
+/// </summary>
+internal static class ServiceHardening
+{
+    private const string Default = "D:(A;;CCLCSWRPWPDTLOCRRC;;;SY)(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;BA)(A;;CCLCSWLOCRRC;;;IU)(A;;CCLCSWLOCRRC;;;SU)";
+    private const string Hardened = "D:(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;SY)(A;;CCLCSWRPLOCRRC;;;BA)(A;;CCLCSWLOCRRC;;;IU)(A;;CCLCSWLOCRRC;;;SU)";
+    private static bool? _applied;
+
+    public static void Apply(bool hardened)
+    {
+        if (_applied == hardened) return;
+        try
+        {
+            var psi = new System.Diagnostics.ProcessStartInfo(System.IO.Path.Combine(Environment.SystemDirectory, "sc.exe"), $"sdset {Program.ServiceName} {(hardened ? Hardened : Default)}")
+            { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
+            using var p = System.Diagnostics.Process.Start(psi)!;
+            p.WaitForExit(15000);
+            if (p.ExitCode == 0) _applied = hardened;
+            else Log.Warn($"Could not {(hardened ? "protect" : "unprotect")} the agent service (sc sdset exit {p.ExitCode}).");
+        }
+        catch (Exception ex) { Log.Warn("Could not change the agent service permissions: " + ex.Message); }
+    }
 }

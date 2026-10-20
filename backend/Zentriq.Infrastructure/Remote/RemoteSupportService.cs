@@ -248,10 +248,11 @@ public sealed partial class RemoteSupportService(NpgsqlDataSource ds, ZentriqOpt
     public async Task<string> InstallLinkAsync(int hours, string? browserHost, CancellationToken ct)
     {
         var settings = await SettingsAsync(ct);
+        var internet = (await InternetCheckAsync(ct))?.Usable == true;
         await using var c = await ConnectAsync(ct);
         var mesh = await EnsureGroupAsync(c, settings, ct);
         var cookie = await c.CreateInviteAsync(mesh, hours, flags: 2, ct); // install only (background service)
-        return InviteBase(settings, browserHost) + "agentinvite?c=" + Uri.EscapeDataString(cookie);
+        return InviteBase(settings, browserHost, lan: !internet) + "agentinvite?c=" + Uri.EscapeDataString(cookie);
     }
 
     // ---- agent installer ----------------------------------------------------------------------------

@@ -1,6 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../../api/client';
-import type { AgentPackage, AgentRow, EnrollmentToken, NewEnrollmentToken } from '../../api/types';
+import type { AgentPackage, AgentRow, AgentSettingsResponse, EnrollmentToken, NewEnrollmentToken } from '../../api/types';
+import { Modal } from '../../components/Modal';
+import { Icon } from '../../components/Icon';
 import { useAuth } from '../../app/auth';
 import { Link } from '../../app/router';
 import { useApi } from '../../app/useApi';
@@ -17,6 +19,11 @@ const HEALTH: Record<AgentRow['health'], [string, Tone]> = {
   replaced: ['Replaced by a newer enrollment', ''],
 };
 
+/** "30 min", "1 hour", "3 hours", "1 day". */
+export const every = (m: number) => m % 1440 === 0 ? `${m / 1440} day${m === 1440 ? '' : 's'}` : m % 60 === 0 ? `${m / 60} hour${m === 60 ? '' : 's'}` : `${m} min`;
+const CHECKIN = [5, 15, 30, 60, 120, 180];
+const INVENTORY = [30, 60, 120, 180, 360, 720, 1440];
+
 /** Agents must reach the server by an address that resolves for them; the address used for this console is the best default. */
 function suggestedUrl(p: AgentPackage | null): string {
   const port = p?.agentPort || 8444;
@@ -29,7 +36,10 @@ export function AgentsPage() {
   const { can } = useAuth();
   const manage = can('agents.manage');
   const confirm = useConfirm();
-  const [tab, setTab] = useState<'agents' | 'codes'>('agents');
+  const [tab, setTab] = useState<'agents' | 'codes' | 'settings'>('agents');
+  const [picked, setPicked] = useState<string[]>([]);
+  const [schedule, setSchedule] = useState<{ ids: string[] | 'all' } | null>(null);
+  const [uninstall, setUninstall] = useState<{ code: string; expiresAt: string; hostname: string; command: string; agentHasKey: boolean } | null>(null);
   const [created, setCreated] = useState<NewEnrollmentToken | null>(null);
   const [newOpen, setNewOpen] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -70,7 +80,7 @@ export function AgentsPage() {
     if (!(await confirm({
       title: list === 'all' ? `Update ${n} agent(s) to ${target}?` : `Update the agent on ${list[0]!.hostname ?? list[0]!.id} to ${target}?`,
       confirmLabel: 'Update agent',
-      message: 'At its next check-in (within about 2 minutes) each agent downloads the package from this server over its secure agent connection, verifies the checksum and installs it silently. The agent service restarts for a few seconds; enrollment, certificate and history are kept. Inventory and device actions continue afterwards.',
+      message: 'At its next check-in (set by the check-in interval) each agent downloads the package from this server over its secure agent connection, verifies the checksum and installs it silently. The agent service restarts for a few seconds; enrollment, certificate and history are kept. Inventory and device actions continue afterwards.',
     }))) return;
     setMsg(null);
     try {
@@ -95,6 +105,21 @@ export function AgentsPage() {
     } catch (err) {
       setMsg(err instanceof Error ? err.message : String(err));
     }
+  }
+  async function uninstallCode(a: AgentRow) {
+    setMsg(null);
+    try { setUninstall(await api.post(`/agents/${a.id}/uninstall-code`)); }
+    catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+  }
+  async function deleteToken(t: EnrollmentToken) {
+    if (!(await confirm({ title: `Delete enrollment code "${t.name}"?`, confirmLabel: 'Delete', danger: true, message: 'The code is removed from the list. Devices enrolled with it are not affected.' }))) return;
+    try { await api.del(`/agents/enrollment-tokens/${t.id}`); tokens.reload(); } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
+  }
+  async function deleteInactive() {
+    const n = (tokens.data ?? []).filter((t) => t.state !== 'active').length;
+    if (!(await confirm({ title: `Delete ${n} old enrollment code(s)?`, confirmLabel: 'Delete', danger: true, message: 'Revoked, expired and used-up codes are removed. Devices enrolled with them are not affected.' }))) return;
+    try { const r = await api.post<{ deleted: number }>('/agents/enrollment-tokens/delete-inactive', {}); setMsg(`${r.deleted} enrollment code(s) deleted.`); tokens.reload(); }
+    catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
   }
   async function revokeToken(t: EnrollmentToken) {
     if (!(await confirm({ title: `Revoke enrollment code "${t.name}"?`, danger: true, confirmLabel: 'Revoke code', message: 'Devices can no longer enroll with this code (deployments that still use it will fail). Agents already enrolled are not affected.' }))) return;
@@ -126,9 +151,13 @@ export function AgentsPage() {
         <Panel title={`Enrollment code “${created.name}”`} sub="You can show it again later from the Enrollment codes tab while it is active" right={<button className="btn sm" onClick={() => setCreated(null)}>Done</button>}>
           <div className="form-v">
             <Callout tone="warn" icon="lock">Anyone with this code can enroll a device until it expires ({fmt.date(created.expiresAt)}){created.maxUses ? ` or is used ${created.maxUses} time(s)` : ''}. Treat it like a password; revoke it if it leaks.</Callout>
-            <label>Enrollment code<CopyBox value={created.code} label="Enrollment code" rows={3} /></label>
-            <label>Silent install (Intune, SCCM, GPO or an elevated prompt)<CopyBox value={created.installCommand} label="Install command" rows={3} /></label>
-            <small className="muted">Agents connect to <span className="mono">{created.serverUrl}</span>. Devices outside your network need that address and port to be reachable (for example published through your firewall or reverse proxy).</small>
+            <div className="code-pair">
+              <label>Server address<CopyBox value={created.serverUrl} label="Server address" /></label>
+              <label>Enrollment code<CopyBox value={created.code} label="Enrollment code" /></label>
+            </div>
+            <small className="muted">In the installer wizard enter both, and choose how often the agent checks its connection and sends inventory (this code suggests every {every(created.checkinMinutes)} and {every(created.inventoryMinutes)}).</small>
+            <label>Silent install (Intune, SCCM, GPO or an elevated prompt)<CopyBox value={created.installCommand} label="Install command" rows={2} /></label>
+            <small className="muted">Devices outside your network need <span className="mono">{created.serverUrl}</span> to be reachable (published through your firewall). If the server&apos;s address changes, agents on the network find it again by themselves.</small>
           </div>
         </Panel>
       )}
@@ -141,27 +170,37 @@ export function AgentsPage() {
       <div className="tabs" role="tablist">
         <button className={tab === 'agents' ? 'on' : ''} onClick={() => setTab('agents')}>Agents<span className="cnt">{current.length}</span></button>
         {manage && <button className={tab === 'codes' ? 'on' : ''} onClick={() => setTab('codes')}>Enrollment codes<span className="cnt">{tokens.data?.length ?? 0}</span></button>}
+        {manage && <button className={tab === 'settings' ? 'on' : ''} onClick={() => setTab('settings')}>Settings</button>}
       </div>
       {tab === 'agents' && hidden > 0 && (
         <label className="row-check" style={{ margin: '0 0 8px', fontSize: 12.5 }}>
           <input type="checkbox" checked={showOld} onChange={(e) => setShowOld(e.target.checked)} /> Show {hidden} older, replaced or revoked registration(s)
         </label>
       )}
-      {tab === 'agents' ? (
-        <Panel flush>
+      {tab === 'settings' ? <SettingsTab onSaved={(t) => setMsg(t)} onAll={() => setSchedule({ ids: 'all' })} /> : tab === 'agents' ? (
+        <Panel flush title="Agents" sub="Each agent checks its connection and sends inventory on its own schedule"
+          right={manage && <div style={{ display: 'flex', gap: 6 }}>
+            {picked.length > 0 && <button className="btn sm primary" onClick={() => setSchedule({ ids: picked })}><Icon name="clock" size={12} /> Schedule ({picked.length})</button>}
+            <button className="btn sm" onClick={() => setSchedule({ ids: 'all' })}><Icon name="clock" size={12} /> Schedule for all</button>
+          </div>}>
           <DataTable rows={rows} empty={agents.loading ? 'Loading…' : 'No agents yet. Create an enrollment code and install the agent MSI on a device.'} columns={[
-            { key: 'h', label: 'Device', render: (r) => <>{r.assetId ? <Link to={`/assets/${r.assetId}`}><b>{r.hostname ?? r.id}</b></Link> : <b>{r.hostname ?? r.id}</b>}<div className="faint" style={{ fontSize: 11.5 }}>{r.osName ?? ''}</div></> },
-            { key: 's', label: 'Health', render: (r) => <Pill tone={HEALTH[r.health][1]}>{HEALTH[r.health][0]}</Pill> },
+            ...(manage ? [{ key: 'sel', label: <input type="checkbox" aria-label="Select all" checked={rows.length > 0 && picked.length === rows.filter((x) => x.status === 'active').length} onChange={(e) => setPicked(e.target.checked ? rows.filter((x) => x.status === 'active').map((x) => x.id) : [])} />,
+              render: (r: AgentRow) => r.status === 'active' ? <input type="checkbox" aria-label={`Select ${r.hostname ?? r.id}`} checked={picked.includes(r.id)} onChange={() => setPicked(picked.includes(r.id) ? picked.filter((x) => x !== r.id) : [...picked, r.id])} /> : null }] : []),
+            { key: 'h', label: 'Device', render: (r) => <>{r.assetId ? <Link to={`/assets/${r.assetId}`}><b>{r.hostname ?? r.id}</b></Link> : <b>{r.hostname ?? r.id}</b>}<div className="faint" style={{ fontSize: 11.5 }}>{[r.osName, r.lastIp].filter(Boolean).join(' · ')}</div></> },
+            { key: 's', label: 'Connection', className: 'wrap', render: (r) => <>
+              {r.health === 'stale' && r.lastCheckinAt ? <Pill tone="warn">No contact · {fmt.ago(r.lastCheckinAt)}</Pill> : <Pill tone={HEALTH[r.health][1]}>{HEALTH[r.health][0]}</Pill>}
+              {r.lastOutage && <div className="faint" style={{ fontSize: 11.5 }} title={`Offline ${fmt.date(r.lastOutage.from)} – ${r.lastOutage.to ? fmt.date(r.lastOutage.to) : 'now'}`}>last outage {fmt.ago(r.lastOutage.from)}{r.lastOutage.to ? `, back ${fmt.ago(r.lastOutage.to)}` : ''}</div>}
+              {r.uninstallProtected && <div className="faint" style={{ fontSize: 11.5 }}><Icon name="shield" size={11} /> uninstall protected</div>}</> },
+            { key: 'sch', label: 'Schedule', render: (r) => r.status === 'active' ? <span className="faint" style={{ fontSize: 12.5 }}>check-in {every(r.checkinMinutes)}<br />inventory {every(r.inventoryMinutes)}</span> : '' },
             { key: 'c', label: 'Last check-in', render: (r) => <span title={fmt.date(r.lastCheckinAt)}>{fmt.ago(r.lastCheckinAt)}</span> },
             { key: 'i', label: 'Last inventory', render: (r) => <span title={fmt.date(r.lastInventoryAt)}>{fmt.ago(r.lastInventoryAt)}</span> },
-            { key: 'ip', label: 'Last address', render: (r) => <span className="mono">{r.lastIp ?? '—'}</span> },
-            { key: 'v', label: 'Version', render: (r) => <>{r.version}<UpdateState r={r} /></> },
-            { key: 'e', label: 'Certificate', render: (r) => r.certificateExpires ? `expires ${fmt.day(r.certificateExpires)}` : '—' },
-            { key: 'x', label: '', render: (r) => manage && r.status === 'active' ? <div style={{ display: 'flex', gap: 6 }}>{r.status === 'active' && r.updateAvailable && r.canSelfUpdate && !(r.update && ['queued', 'sent', 'running'].includes(r.update.status)) && <button className="btn sm primary" onClick={() => void update([r])}>Update</button>}{r.status === 'active' && r.updateAvailable && !r.canSelfUpdate && <button className="btn sm" onClick={() => void manualUpdate(r)}>Update (manual)</button>}<button className="btn sm" onClick={() => void collect(r)}>Collect now</button><button className="btn sm" onClick={() => void revoke(r)}>Revoke</button></div> : null },
+            { key: 'v', label: 'Version', render: (r) => <span title={r.certificateExpires ? `Certificate expires ${fmt.day(r.certificateExpires)}` : ''}>{r.version}<UpdateState r={r} /></span> },
+            { key: 'x', label: '', render: (r) => manage && r.status === 'active' ? <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>{r.status === 'active' && r.updateAvailable && r.canSelfUpdate && !(r.update && ['queued', 'sent', 'running'].includes(r.update.status)) && <button className="btn sm primary" onClick={() => void update([r])}>Update</button>}{r.status === 'active' && r.updateAvailable && !r.canSelfUpdate && <button className="btn sm" onClick={() => void manualUpdate(r)}>Update (manual)</button>}<button className="btn sm" onClick={() => void collect(r)}>Collect now</button><button className="btn sm" title="One-hour code to uninstall the agent on this device" onClick={() => void uninstallCode(r)}><Icon name="key" size={12} /> Uninstall code</button><button className="btn sm danger" onClick={() => void revoke(r)}>Revoke</button></div> : null },
           ]} />
         </Panel>
       ) : (
-        <Panel flush>
+        <Panel flush title="Enrollment codes" sub="20 characters; given with the server address when the agent is installed"
+          right={(tokens.data ?? []).some((t) => t.state !== 'active') && <button className="btn sm" onClick={() => void deleteInactive()}><Icon name="trash" size={12} /> Delete old codes ({(tokens.data ?? []).filter((t) => t.state !== 'active').length})</button>}>
           <ErrorBox error={tokens.error} />
           <DataTable rows={tokens.data ?? []} empty="No enrollment codes." columns={[
             { key: 'n', label: 'Name', render: (t) => <b>{t.name}</b> },
@@ -170,7 +209,9 @@ export function AgentsPage() {
             { key: 'url', label: 'Server address', render: (t) => <span className="mono">{t.serverUrl}</span> },
             { key: 'e', label: 'Expires', render: (t) => fmt.date(t.expiresAt) },
             { key: 'b', label: 'Created', render: (t) => `${fmt.day(t.createdAt)}${t.createdBy ? ` · ${t.createdBy}` : ''}` },
-            { key: 'x', label: '', render: (t) => t.state === 'active' ? <div style={{ display: 'flex', gap: 6 }}><button className="btn sm" onClick={() => void showCode(t)}>Show code</button><button className="btn sm" onClick={() => void revokeToken(t)}>Revoke</button></div> : null },
+            { key: 'x', label: '', render: (t) => t.state === 'active'
+              ? <div style={{ display: 'flex', gap: 6 }}><button className="btn sm" onClick={() => void showCode(t)}>Show code</button><button className="btn sm" onClick={() => void revokeToken(t)}>Revoke</button></div>
+              : <button className="btn sm danger" onClick={() => void deleteToken(t)}><Icon name="trash" size={12} /> Delete</button> },
           ]} />
         </Panel>
       )}
@@ -185,6 +226,16 @@ export function AgentsPage() {
           </ul>
         </Panel>
       )}
+      {schedule && <ScheduleDialog ids={schedule.ids} onClose={() => setSchedule(null)} onDone={(m) => { setSchedule(null); setMsg(m); setPicked([]); agents.reload(); }} />}
+      {uninstall && <Modal title={`Uninstall code for ${uninstall.hostname}`} onClose={() => setUninstall(null)} footer={<button className="btn primary" onClick={() => setUninstall(null)}>Done</button>}>
+        <div className="form-v">
+          <div className="big-code" aria-label="Uninstall code">{uninstall.code}</div>
+          <p style={{ margin: 0 }}>Valid until <b>{fmt.date(uninstall.expiresAt)}</b> (one hour), only on {uninstall.hostname}.</p>
+          {!uninstall.agentHasKey && <Callout tone="info" icon="info">The agent has not confirmed protection yet (it does at its next check-in); until then it can be removed without a code.</Callout>}
+          <label>On the device, as administrator<CopyBox value={uninstall.command} label="Uninstall command" rows={2} /></label>
+          <small className="muted">Or Apps &gt; Zentriq Agent &gt; Modify &gt; Remove, and enter the code. Without a valid code the agent cannot be removed and its service cannot be stopped.</small>
+        </div>
+      </Modal>}
       {newOpen && <NewCodeDialog defaultUrl={suggestedUrl(pkg.data)} onClose={() => setNewOpen(false)} onCreated={(t) => { setNewOpen(false); setCreated(t); setTab('codes'); tokens.reload(); }} />}
     </>
   );
@@ -195,6 +246,8 @@ function NewCodeDialog({ defaultUrl, onClose, onCreated }: { defaultUrl: string;
   const [days, setDays] = useState(30);
   const [maxUses, setMaxUses] = useState('');
   const [url, setUrl] = useState(defaultUrl);
+  const [checkin, setCheckin] = useState(30);
+  const [inventory, setInventory] = useState(180);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -203,7 +256,7 @@ function NewCodeDialog({ defaultUrl, onClose, onCreated }: { defaultUrl: string;
     setBusy(true);
     setError(null);
     try {
-      const t = await api.post<NewEnrollmentToken>('/agents/enrollment-tokens', { name, validDays: days, maxUses: maxUses ? Number(maxUses) : null, serverUrl: url.trim() || null });
+      const t = await api.post<NewEnrollmentToken>('/agents/enrollment-tokens', { name, validDays: days, maxUses: maxUses ? Number(maxUses) : null, serverUrl: url.trim() || null, checkinMinutes: checkin, inventoryMinutes: inventory });
       onCreated(t);
     } catch (err) {
       const body = err instanceof ApiError ? (err.body as { errors?: Record<string, string[]> } | null) : null;
@@ -227,7 +280,12 @@ function NewCodeDialog({ defaultUrl, onClose, onCreated }: { defaultUrl: string;
           <div className="form-grid">
             <label>Valid for (days) <input className="in" type="number" min={1} max={365} value={days} onChange={(e) => setDays(Number(e.target.value))} /></label>
             <label>Maximum devices (optional) <input className="in" type="number" min={1} value={maxUses} onChange={(e) => setMaxUses(e.target.value)} placeholder="Unlimited" /></label>
+            <label>Check the connection every
+              <select className="in" value={checkin} onChange={(e) => setCheckin(Number(e.target.value))}>{CHECKIN.map((m) => <option key={m} value={m}>{every(m)}</option>)}</select></label>
+            <label>Send inventory every
+              <select className="in" value={inventory} onChange={(e) => setInventory(Number(e.target.value))}>{INVENTORY.filter((m) => m >= checkin).map((m) => <option key={m} value={m}>{every(m)}</option>)}</select></label>
           </div>
+          <small className="muted">Suggested in the installer; the person installing can change them, and you can change them later per agent. Console requests (collect now, service actions, updates) run at the next check-in.</small>
         </div>
         <footer>
           <button type="button" className="btn" onClick={onClose} disabled={busy}>Cancel</button>
@@ -263,4 +321,72 @@ function latestPerDevice(rows: AgentRow[]): AgentRow[] {
     if (!cur || newer(r, cur)) best.set(key, r);
   }
   return rows.filter((r) => best.get(r.assetId ?? `host:${(r.hostname ?? r.id).toLowerCase()}`) === r);
+}
+
+/** Check-in and inventory intervals for selected agents (or all), applied at their next check-in. */
+function ScheduleDialog({ ids, onClose, onDone }: { ids: string[] | 'all'; onClose: () => void; onDone: (msg: string) => void }) {
+  const [checkin, setCheckin] = useState(30);
+  const [inventory, setInventory] = useState(180);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  async function save() {
+    setBusy(true); setError(null);
+    try {
+      const r = await api.put<{ message: string }>('/agents/schedule', { ...(ids === 'all' ? { all: true } : { agentIds: ids }), checkinMinutes: checkin, inventoryMinutes: inventory });
+      onDone(r.message);
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(false); }
+  }
+  return (
+    <Modal title={ids === 'all' ? 'Schedule for all agents' : `Schedule for ${ids.length} agent(s)`} onClose={onClose}
+      footer={<><button className="btn" onClick={onClose}>Cancel</button><button className="btn primary" disabled={busy} onClick={() => void save()}>{busy ? 'Saving…' : 'Apply'}</button></>}>
+      {error && <Callout tone="crit" icon="alert">{error}</Callout>}
+      <div className="form-v">
+        <label>Check the connection every
+          <select className="in" value={checkin} onChange={(e) => { const v = Number(e.target.value); setCheckin(v); if (inventory < v) setInventory(INVENTORY.find((m) => m >= v)!); }}>{CHECKIN.map((m) => <option key={m} value={m}>{every(m)}</option>)}</select></label>
+        <label>Send inventory every
+          <select className="in" value={inventory} onChange={(e) => setInventory(Number(e.target.value))}>{INVENTORY.filter((m) => m >= checkin).map((m) => <option key={m} value={m}>{every(m)}</option>)}</select></label>
+        <small className="muted">Applied at each agent&apos;s next check-in. A device counts as offline when it misses two check-ins; its last contact is shown in IT Asset Inventory.</small>
+      </div>
+    </Modal>
+  );
+}
+
+/** Defaults for new agents and uninstall protection. */
+function SettingsTab({ onSaved, onAll }: { onSaved: (msg: string) => void; onAll: () => void }) {
+  const data = useApi(() => api.get<AgentSettingsResponse>('/agents/settings'), []);
+  const [f, setF] = useState<AgentSettingsResponse['settings'] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => { if (data.data) setF(data.data.settings); }, [data.data]);
+  async function save() {
+    if (!f) return;
+    setBusy(true); setError(null);
+    try { await api.put('/agents/settings', f); onSaved('Agent settings saved.'); data.reload(); }
+    catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(false); }
+  }
+  if (!f) return <Panel title="Settings"><p className="muted">Loading…</p></Panel>;
+  return (
+    <div className="grid-2">
+      <Panel title="Schedule for new agents" sub="Suggested in new enrollment codes and the installer">
+        <div className="form-v">
+          {error && <Callout tone="crit" icon="alert">{error}</Callout>}
+          <label>Check the connection every
+            <select className="in" value={f.checkinMinutes} onChange={(e) => setF({ ...f, checkinMinutes: Number(e.target.value) })}>{CHECKIN.map((m) => <option key={m} value={m}>{every(m)}</option>)}</select></label>
+          <label>Send inventory every
+            <select className="in" value={f.inventoryMinutes} onChange={(e) => setF({ ...f, inventoryMinutes: Number(e.target.value) })}>{INVENTORY.filter((m) => m >= f.checkinMinutes).map((m) => <option key={m} value={m}>{every(m)}</option>)}</select></label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn primary" disabled={busy} onClick={() => void save()}>Save</button>
+            <button className="btn" onClick={onAll}>Apply a schedule to all agents…</button>
+          </div>
+        </div>
+      </Panel>
+      <Panel title="Uninstall protection" sub="Stops users and local administrators from removing the agent">
+        <div className="form-v">
+          <label className="row-check"><input type="checkbox" checked={f.uninstallProtection} onChange={(e) => setF({ ...f, uninstallProtection: e.target.checked })} /> Require an uninstall code to remove the agent</label>
+          <p className="muted" style={{ margin: 0, fontSize: 13 }}>Each device gets its own key at its next check-in. To remove an agent, create a code for that device (Agents › Uninstall code); it works for one hour only. While protected, the agent service cannot be stopped or reconfigured by administrators. Updates from the console keep working.</p>
+          <div><button className="btn primary" disabled={busy} onClick={() => void save()}>Save</button></div>
+        </div>
+      </Panel>
+    </div>
+  );
 }

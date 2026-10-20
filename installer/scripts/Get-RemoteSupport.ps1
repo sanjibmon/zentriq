@@ -75,7 +75,7 @@ const missing=need.filter(m=>!fs.existsSync(path.join(base,m,'package.json')));
 if(missing.length){console.error('Missing modules: '+missing.join(', ')+' in '+base);process.exit(1)} console.log('All MeshCentral modules present.');
 "@ (Join-Path $app 'node_modules')
 if ($LASTEXITCODE -ne 0) { throw 'MeshCentral modules are incomplete.' }
-# Keep only the agent files Zentriq uses (Windows agents and their core scripts); see installer/remote/agents-keep.txt.
+# Keep only the agent files Zentriq uses (Windows, macOS and Linux agents and their core scripts); see installer/remote/agents-keep.txt.
 $agentsDir = Join-Path $app 'node_modules\meshcentral\agents'
 $keep = Get-Content (Join-Path $remoteSrc 'agents-keep.txt') | Where-Object { $_ -and -not $_.StartsWith('#') } | ForEach-Object { $_.Trim().TrimEnd('/') }
 $removed = 0
@@ -87,6 +87,10 @@ Get-ChildItem (Join-Path $app 'node_modules') -Recurse -File -Include '*.md', '*
     Where-Object { $_.Name -notmatch '^(LICENSE|LICENCE|NOTICE)' } | Remove-Item -Force
 
 # ---- branding -------------------------------------------------------------------------------------------------
+# Zentriq pages (invitation / download page), product name in the technician pages, English only, Zentriq icon.
+& (Join-Path $OutDir 'node\node.exe') (Join-Path $remoteSrc 'brand.js') $app
+if ($LASTEXITCODE -ne 0) { throw 'Applying the Zentriq branding to the remote support engine failed.' }
+
 $branding = Join-Path $OutDir 'branding'
 New-Item -ItemType Directory -Force -Path $branding | Out-Null
 Copy-Item (Join-Path $remoteSrc 'remote-title.png'), (Join-Path $remoteSrc 'remote-agent.png'), (Join-Path $remoteSrc 'remote-agent.ico') $branding
