@@ -100,7 +100,7 @@ if ($ok -and $withAgent) {
         $s = Login
         $tok = Api POST '/agents/enrollment-tokens' @{ name = 'upgrade-ci'; validDays = 1; maxUses = 1; serverUrl = 'https://localhost:8444' } $s
         $log = Join-Path $OutDir 'agent-old-install.log'
-        $p = Start-Process msiexec.exe -ArgumentList '/i', "`"$OldAgentMsi`"", '/qn', "ENROLLMENTCODE=$($tok.code)", '/l*v', "`"$log`"" -Wait -PassThru
+        $p = Start-Process msiexec.exe -ArgumentList '/i', "`"$OldAgentMsi`"", '/qn', 'SERVERURL=https://localhost:8444', "ENROLLMENTCODE=$($tok.code)", '/l*v', "`"$log`"" -Wait -PassThru   # 20-character codes (build 63+) need the server address
         if ($p.ExitCode -ne 0) { throw "old agent MSI exit $($p.ExitCode)" }
         $deadline = (Get-Date).AddMinutes(4)
         do { Start-Sleep 5; $ag = @(Api GET '/agents' $null $s | ForEach-Object { $_ }) | Where-Object { $_.lastCheckinAt -and $_.status -ne 'revoked' } | Select-Object -First 1 } while (-not $ag -and (Get-Date) -lt $deadline)
