@@ -115,8 +115,8 @@ public static class AgentEndpoints
                 }
                 tokenId = tr.GetGuid(0);
                 // Intervals: chosen at installation, else the code's, else the system defaults.
-                checkin = ValidCheckin(req.CheckinMinutes) ?? (tr.IsDBNull(1) ? null : tr.GetInt32(1)) ?? defaults.CheckinMinutes;
-                inventory = ValidInventory(req.InventoryMinutes) ?? (tr.IsDBNull(2) ? null : tr.GetInt32(2)) ?? defaults.InventoryMinutes;
+                checkin = ValidCheckin(req.CheckinMinutes) ?? (tr.IsDBNull(1) ? (int?)null : tr.GetInt32(1)) ?? defaults.CheckinMinutes;
+                inventory = ValidInventory(req.InventoryMinutes) ?? (tr.IsDBNull(2) ? (int?)null : tr.GetInt32(2)) ?? defaults.InventoryMinutes;
             }
 
             var agentId = Guid.NewGuid();
