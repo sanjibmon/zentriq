@@ -5,15 +5,16 @@ import { useRouter } from '../../app/router';
 import { useApi } from '../../app/useApi';
 import { CategoryChart } from '../../components/charts';
 import { Icon } from '../../components/Icon';
-import { Callout, ErrorBox, Kpis, PageHead, Pager, Panel, Pill } from '../../components/ui';
-import { useDepartments } from '../departments/Departments';
+import { useConfirm } from '../../components/Confirm';
+import { Callout, DataTable, ErrorBox, Kpis, PageHead, Pager, Panel, Pill } from '../../components/ui';
+import { useAddDepartment, useDepartments, type Department } from '../departments/Departments';
 import { AssetDetails, AssetForm, BulkUpload, errText, printLabels, ScanDialog } from './NonItDialogs';
 import {
   daysUntil, day, money, total, STATUSES, statusLabel, statusTone, CONDITIONS,
-  type NonItAsset, type NonItCategory, type NonItField, type NonItSummary,
+  type NonItAsset, type NonItCategory, type NonItField, type NonItGroup, type NonItSummary,
 } from './types';
 
-type Tab = 'assets' | 'categories' | 'fields';
+type Tab = 'assets' | 'categories' | 'departments' | 'fields';
 interface Paged { items: NonItAsset[]; total: number; page: number; pageSize: number }
 const DUE: [string, string][] = [
   ['', 'Any'], ['warranty', 'Warranty ends in 90 days'], ['amc', 'AMC ends in 90 days'], ['insurance', 'Insurance ends in 90 days'],
@@ -24,13 +25,14 @@ export function NonItPage() {
   const { can } = useAuth();
   const { query, navigate } = useRouter();
   const canEdit = can('assets.manage');
-  const [tab, setTabState] = useState<Tab>((['assets', 'categories', 'fields'] as Tab[]).find((t) => t === query.get('tab')) ?? 'assets');
+  const [tab, setTabState] = useState<Tab>((['assets', 'categories', 'departments', 'fields'] as Tab[]).find((t) => t === query.get('tab')) ?? 'assets');
   const setTab = (t: Tab) => { setTabState(t); navigate(`/non-it?tab=${t}`); };
   const [tick, setTick] = useState(0);
   const reload = () => setTick((x) => x + 1);
   const summary = useApi(() => api.get<NonItSummary>('/nonit/summary'), [tick]);
   const cats = useApi(() => api.get<NonItCategory[]>('/nonit/categories'), [tick]);
   const fields = useApi(() => api.get<NonItField[]>('/nonit/fields'), [tick]);
+  const groups = useApi(() => api.get<NonItGroup[]>('/nonit/groups'), [tick]);
   const deps = useDepartments();
   const [form, setForm] = useState<{ asset: NonItAsset | null; initial?: Record<string, string> } | null>(null);
   const [details, setDetails] = useState<string | null>(query.get('id'));
@@ -40,7 +42,7 @@ export function NonItPage() {
 
   return (
     <>
-      <PageHead title="Non-IT Asset Inventory" desc="Furniture, appliances, vehicles, tools and everything else the organisation owns."
+      <PageHead title="Non-IT Asset Inventory" desc="Every chair, vehicle, appliance and tool — tagged, tracked and valued."
         actions={<>
           <button className="btn" onClick={() => setScan(true)}><Icon name="search" size={15} /> Scan barcode</button>
           {canEdit && <button className="btn" onClick={() => setUpload(true)}><Icon name="upload" size={15} /> Bulk upload</button>}
@@ -58,16 +60,19 @@ export function NonItPage() {
       )}
       <div className="tabs" role="tablist">
         <button role="tab" aria-selected={tab === 'assets'} className={tab === 'assets' ? 'on' : ''} onClick={() => setTab('assets')}>Assets</button>
-        <button role="tab" aria-selected={tab === 'categories'} className={tab === 'categories' ? 'on' : ''} onClick={() => setTab('categories')}>Categories<span className="cnt">{cats.data?.length ?? 0}</span></button>
+        <button role="tab" aria-selected={tab === 'categories'} className={tab === 'categories' ? 'on' : ''} onClick={() => setTab('categories')}>Groups &amp; categories<span className="cnt">{cats.data?.length ?? 0}</span></button>
+        <button role="tab" aria-selected={tab === 'departments'} className={tab === 'departments' ? 'on' : ''} onClick={() => setTab('departments')}>Departments<span className="cnt">{deps.data?.items.length ?? 0}</span></button>
         <button role="tab" aria-selected={tab === 'fields'} className={tab === 'fields' ? 'on' : ''} onClick={() => setTab('fields')}>Custom fields<span className="cnt">{fields.data?.length ?? 0}</span></button>
       </div>
       {tab === 'assets' && <AssetsTab tick={tick} summary={s} categories={cats.data ?? []} departments={deps.data?.items ?? []} canEdit={canEdit}
         onOpen={setDetails} onReload={reload} onAdd={() => setForm({ asset: null })} onUpload={() => setUpload(true)} />}
-      {tab === 'categories' && <CategoriesTab list={cats.data ?? []} canEdit={canEdit} onChanged={reload} />}
+      {tab === 'categories' && <CategoriesTab list={cats.data ?? []} groups={groups.data ?? []} canEdit={canEdit} onChanged={reload} />}
+      {tab === 'departments' && <DepartmentsTab list={deps.data?.items ?? []} canEdit={canEdit} onChanged={() => { deps.reload(); reload(); }}
+        onOpen={(id) => { navigate(`/non-it?tab=assets&department=${id}`); setTabState('assets'); }} />}
       {tab === 'fields' && <FieldsTab list={fields.data ?? []} canEdit={canEdit} onChanged={reload} />}
 
-      {form && <AssetForm asset={form.asset} initial={form.initial} categories={cats.data ?? []} departments={deps.data?.items ?? []} fields={fields.data ?? []}
-        onClose={() => setForm(null)} onSaved={(id) => { setForm(null); reload(); setDetails(id); }} />}
+      {form && <AssetForm asset={form.asset} initial={form.initial} categories={cats.data ?? []} groups={(groups.data ?? []).map((g) => g.name)} departments={deps.data?.items ?? []} fields={fields.data ?? []}
+        onListsChanged={() => { deps.reload(); reload(); }} onClose={() => setForm(null)} onSaved={(id) => { setForm(null); reload(); setDetails(id); }} />}
       {details && !form && <AssetDetails key={`${details}:${tick}`} id={details} fields={fields.data ?? []} canEdit={canEdit} onClose={() => setDetails(null)}
         onEdit={(a) => setForm({ asset: a })} onDeleted={() => { setDetails(null); reload(); }} />}
       {upload && <BulkUpload onClose={() => setUpload(false)} onDone={reload} />}
@@ -87,7 +92,7 @@ function AssetsTab({ tick, summary, categories, departments, canEdit, onOpen, on
   const [group, setGroup] = useState('');
   const [category, setCategory] = useState('');
   const [status, setStatus] = useState(query.get('status') ?? 'active');
-  const [department, setDepartment] = useState('');
+  const [department, setDepartment] = useState(query.get('department') ?? '');
   const [due, setDue] = useState(query.get('due') ?? '');
   const [sort, setSort] = useState<{ col: string; dir: 'asc' | 'desc' } | null>(null);
   const [page, setPage] = useState(1);
@@ -268,55 +273,128 @@ function BulkChange({ ids, categories, departments, onClose, onDone }: {
   );
 }
 
-function CategoriesTab({ list, canEdit, onChanged }: { list: NonItCategory[]; canEdit: boolean; onChanged: () => void }) {
+function CategoriesTab({ list, groups, canEdit, onChanged }: { list: NonItCategory[]; groups: NonItGroup[]; canEdit: boolean; onChanged: () => void }) {
+  const confirm = useConfirm();
   const [name, setName] = useState('');
   const [group, setGroup] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const groups = [...new Set(list.map((c) => c.group))];
-  async function add() {
+  const [filter, setFilter] = useState('');
+  async function run(f: () => Promise<unknown>) {
     setError(null);
-    try { await api.post('/nonit/categories', { name, group: group || 'Custom' }); setName(''); onChanged(); } catch (e) { setError(errText(e)); }
+    try { await f(); onChanged(); } catch (e) { setError(errText(e)); }
+  }
+  const ask = (title: string, label: string, defaultValue = '') => confirm({ title, message: '', confirmLabel: defaultValue ? 'Rename' : 'Add', input: { label, type: 'text', defaultValue } });
+  async function addGroup() {
+    const n = await ask('Add a group', 'Group name, e.g. Kitchen & pantry, Medical equipment');
+    if (n) await run(async () => { await api.post('/nonit/groups', { name: n }); setGroup(n); });
+  }
+  async function addCategory(g: string, n = name) {
+    if (!n.trim()) return;
+    await run(async () => { await api.post('/nonit/categories', { name: n.trim(), group: g || 'Custom' }); setName(''); });
+  }
+  async function addInGroup(g: string) {
+    const n = await ask(`Add a category to ${g}`, 'Category name');
+    if (n) await addCategory(g, n);
+  }
+  async function renameGroup(g: NonItGroup) {
+    const n = await ask(`Rename "${g.name}"`, 'Group name', g.name);
+    if (n && n !== g.name) await run(() => api.put(`/nonit/groups/${g.id}`, { name: n }));
+  }
+  async function deleteGroup(g: NonItGroup) {
+    if (await confirm({ title: `Delete the group "${g.name}"?`, message: 'It has no categories.', confirmLabel: 'Delete', danger: true })) await run(() => api.del(`/nonit/groups/${g.id}`));
   }
   async function rename(c: NonItCategory) {
-    const n = window.prompt('Category name', c.name);
-    if (!n || n.trim() === c.name) return;
-    try { await api.put(`/nonit/categories/${c.id}`, { name: n.trim() }); onChanged(); } catch (e) { setError(errText(e)); }
+    const n = await ask(`Rename "${c.name}"`, 'Category name', c.name);
+    if (n && n !== c.name) await run(() => api.put(`/nonit/categories/${c.id}`, { name: n }));
   }
+  async function move(c: NonItCategory, g: string) { if (g && g !== c.group) await run(() => api.put(`/nonit/categories/${c.id}`, { name: c.name, group: g })); }
   async function remove(c: NonItCategory) {
-    if (!window.confirm(`Delete the category "${c.name}"?`)) return;
-    try { await api.del(`/nonit/categories/${c.id}`); onChanged(); } catch (e) { setError(errText(e)); }
+    if (await confirm({ title: `Delete the category "${c.name}"?`, message: 'It has no assets.', confirmLabel: 'Delete', danger: true })) await run(() => api.del(`/nonit/categories/${c.id}`));
   }
+  const f = filter.trim().toLowerCase();
+  const shown = groups.filter((g) => !f || g.name.toLowerCase().includes(f) || list.some((c) => c.group.toLowerCase() === g.name.toLowerCase() && c.name.toLowerCase().includes(f)));
   return (
     <>
-      {canEdit && (
-        <form className="toolbar-row" onSubmit={(e) => { e.preventDefault(); void add(); }}>
+      <div className="toolbar-row">
+        <input className="in" placeholder="Find a group or category…" value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Find" />
+        {canEdit && <form className="inline-add grow" onSubmit={(e) => { e.preventDefault(); void addCategory(group); }}>
           <input className="in grow" placeholder="New category, e.g. Podium, Water cooler, Golf cart" value={name} onChange={(e) => setName(e.target.value)} aria-label="Category name" />
-          <input className="in" list="nonit-groups" placeholder="Group (e.g. Furniture)" value={group} onChange={(e) => setGroup(e.target.value)} aria-label="Group" />
-          <datalist id="nonit-groups">{groups.map((g) => <option key={g} value={g} />)}</datalist>
+          <select className="in" value={group} onChange={(e) => e.target.value === '__add' ? void addGroup() : setGroup(e.target.value)} aria-label="Group">
+            <option value="">Group: Custom</option>
+            {groups.map((g) => <option key={g.id} value={g.name}>{g.name}</option>)}
+            <option value="__add">＋ New group…</option>
+          </select>
           <button className="btn primary" type="submit" disabled={!name.trim()}><Icon name="plus" size={14} /> Add category</button>
-        </form>
-      )}
+        </form>}
+        {canEdit && <button className="btn" onClick={() => void addGroup()}><Icon name="plus" size={14} /> Add group</button>}
+      </div>
       {error && <Callout tone="crit" icon="alert">{error}</Callout>}
       <div className="cat-groups">
-        {groups.map((g) => (
-          <Panel key={g} title={g} sub={`${list.filter((c) => c.group === g).reduce((a, c) => a + c.count, 0)} asset(s)`}>
-            <ul className="cat-list">
-              {list.filter((c) => c.group === g).map((c) => (
-                <li key={c.id}>
-                  <span>{c.name}</span>
-                  <span className="faint">{c.count || ''}</span>
-                  {!c.builtin && <Pill>custom</Pill>}
-                  {canEdit && <span className="acts">
-                    <button className="icon-btn" title="Rename" onClick={() => void rename(c)}><Icon name="edit" size={14} /></button>
-                    {c.count === 0 && <button className="icon-btn" title="Delete" onClick={() => void remove(c)}><Icon name="trash" size={14} /></button>}
-                  </span>}
-                </li>
-              ))}
-            </ul>
-          </Panel>
-        ))}
+        {shown.map((g) => {
+          const cats = list.filter((c) => c.group.toLowerCase() === g.name.toLowerCase() && (!f || g.name.toLowerCase().includes(f) || c.name.toLowerCase().includes(f)));
+          return (
+            <Panel key={g.id} title={g.name} sub={`${g.categories} categor${g.categories === 1 ? 'y' : 'ies'} · ${g.count} asset(s)`}
+              right={canEdit && <span className="acts">
+                <button className="icon-btn" title={`Add a category to ${g.name}`} aria-label={`Add a category to ${g.name}`} onClick={() => void addInGroup(g.name)}><Icon name="plus" size={14} /></button>
+                <button className="icon-btn" title="Rename group" aria-label={`Rename ${g.name}`} onClick={() => void renameGroup(g)}><Icon name="edit" size={14} /></button>
+                {g.categories === 0 && <button className="icon-btn" title="Delete group" aria-label={`Delete ${g.name}`} onClick={() => void deleteGroup(g)}><Icon name="trash" size={14} /></button>}
+              </span>}>
+              {cats.length === 0 ? <p className="faint" style={{ margin: 0, fontSize: 13 }}>No categories yet{canEdit && <> — <button className="link-btn" onClick={() => void addInGroup(g.name)}>add one</button></>}.</p> : (
+                <ul className="cat-list">
+                  {cats.map((c) => (
+                    <li key={c.id}>
+                      <span>{c.name}</span>
+                      <span className="faint">{c.count || ''}</span>
+                      {!c.builtin && <Pill>custom</Pill>}
+                      {canEdit && <span className="acts">
+                        <select className="in sm move" value="" onChange={(e) => void move(c, e.target.value)} aria-label={`Move ${c.name} to another group`} title="Move to another group">
+                          <option value="">Move…</option>{groups.filter((x) => x.id !== g.id).map((x) => <option key={x.id} value={x.name}>{x.name}</option>)}
+                        </select>
+                        <button className="icon-btn" title="Rename" aria-label={`Rename ${c.name}`} onClick={() => void rename(c)}><Icon name="edit" size={14} /></button>
+                        {c.count === 0 && <button className="icon-btn" title="Delete" aria-label={`Delete ${c.name}`} onClick={() => void remove(c)}><Icon name="trash" size={14} /></button>}
+                      </span>}
+                    </li>
+                  ))}
+                </ul>)}
+            </Panel>
+          );
+        })}
       </div>
     </>
+  );
+}
+
+/** Departments for non-IT assets (the same list IT assets use). */
+function DepartmentsTab({ list, canEdit, onChanged, onOpen }: { list: Department[]; canEdit: boolean; onChanged: () => void; onOpen: (id: string) => void }) {
+  const confirm = useConfirm();
+  const add = useAddDepartment();
+  const [error, setError] = useState<string | null>(null);
+  async function run(f: () => Promise<unknown>) {
+    setError(null);
+    try { await f(); onChanged(); } catch (e) { setError(errText(e)); }
+  }
+  async function rename(d: Department) {
+    const name = await confirm({ title: `Rename "${d.name}"`, message: '', confirmLabel: 'Rename', input: { label: 'Name', type: 'text', defaultValue: d.name } });
+    if (name && name !== d.name) await run(() => api.put(`/departments/${d.id}`, { name, code: d.code, description: d.description }));
+  }
+  async function remove(d: Department) {
+    const n = (d.nonItAssets ?? 0) + d.assets;
+    if (!(await confirm({ title: `Delete "${d.name}"?`, message: n ? `${n} asset(s) become unassigned.` : 'Nothing is assigned to it.', confirmLabel: 'Delete', danger: true }))) return;
+    await run(() => api.del(`/departments/${d.id}`));
+  }
+  return (
+    <Panel flush title="Departments" sub="Shared with IT Asset Inventory" right={canEdit && <button className="btn sm primary" onClick={() => void run(add)}><Icon name="plus" size={13} /> Add department</button>}>
+      {error && <div style={{ padding: '0 18px' }}><Callout tone="crit" icon="alert">{error}</Callout></div>}
+      <DataTable rows={list} empty="No departments yet. Add the departments, units or cost centres your assets belong to." columns={[
+        { key: 'n', label: 'Department', render: (d) => <b>{d.name}</b> },
+        { key: 'x', label: 'Non-IT assets', render: (d) => (d.nonItAssets ?? 0) > 0 ? <button className="link-btn" onClick={() => onOpen(d.id)}>{(d.nonItAssets ?? 0).toLocaleString()}</button> : <span className="faint">0</span> },
+        { key: 'i', label: 'IT assets', render: (d) => d.assets.toLocaleString() },
+        { key: 'a', label: '', render: (d) => canEdit ? <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+          <button className="btn sm" onClick={() => void rename(d)}>Rename</button>
+          <button className="btn sm danger" onClick={() => void remove(d)}>Delete</button>
+        </div> : null },
+      ]} />
+    </Panel>
   );
 }
 

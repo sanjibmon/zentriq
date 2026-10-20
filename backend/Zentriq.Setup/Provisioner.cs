@@ -328,6 +328,7 @@ public sealed class Provisioner(ProvisionInput input, ZentriqPaths paths, Report
                     Zentriq.Infrastructure.Remote.RemoteServerConfig.Origins(host,
                         Zentriq.Infrastructure.Remote.RemoteServerConfig.ReadLines(Path.Combine(paths.RemoteCertificateDir, Zentriq.Infrastructure.Remote.RemoteServerConfig.OriginsFile)))));
                 File.WriteAllText(Path.Combine(data, "config.json"), config.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+                File.WriteAllText(Path.Combine(data, Zentriq.Infrastructure.Remote.RemoteServerConfig.LanHostFile), host);
             }
             foreach (var f in new[] { Zentriq.Infrastructure.Remote.RemoteServerConfig.TitlePicture, Zentriq.Infrastructure.Remote.RemoteServerConfig.AgentImage, Zentriq.Infrastructure.Remote.RemoteServerConfig.AgentIcon })
             {

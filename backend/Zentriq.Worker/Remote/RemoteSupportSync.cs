@@ -2,7 +2,7 @@ using Zentriq.Infrastructure.Remote;
 
 namespace Zentriq.Worker.Remote;
 
-/// <summary>Every 2 minutes: reads the remote support agents (online state, names) and maps them to assets.</summary>
+/// <summary>Every 2 minutes: reads the remote support agents (online state, names), maps them to assets and updates quick support sessions.</summary>
 public sealed class RemoteSupportSync(RemoteSupportService remote, ILogger<RemoteSupportSync> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -16,6 +16,7 @@ public sealed class RemoteSupportSync(RemoteSupportService remote, ILogger<Remot
                 try
                 {
                     var r = await remote.SyncAsync(stoppingToken);
+                    await remote.RefreshQuickAsync(stoppingToken); // quick support sessions: joined, closed, expired
                     if (lastError is not null) logger.LogInformation("Remote support reachable again: {Nodes} device(s), {Online} online", r.Nodes, r.Connected);
                     lastError = null;
                 }

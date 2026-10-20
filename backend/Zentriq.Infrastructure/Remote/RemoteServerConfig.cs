@@ -57,6 +57,57 @@ public static class RemoteServerConfig
         return true;
     }
 
+    /// <summary>The internet address of remote support (written by the API, applied by ZentriqRemote).</summary>
+    public const string InternetFile = "internet.txt";
+    /// <summary>The host name the engine was configured with by Setup (its LAN address); kept in the engine's data folder.</summary>
+    public const string LanHostFile = "zentriq-host.txt";
+
+    /// <summary>A public address devices and browsers outside the network use: DNS name (preferred) or IPv4 address, and port.</summary>
+    public sealed record Internet(string Host, int Port)
+    {
+        public override string ToString() => $"{Host}:{Port}";
+    }
+
+    public static Internet? ParseInternet(string? line)
+    {
+        if (string.IsNullOrWhiteSpace(line)) return null;
+        var parts = line.Trim().Split(':');
+        if (parts.Length != 2 || NormalizeHost(parts[0]) is not { } h || !int.TryParse(parts[1], out var port) || port is < 1 or > 65535) return null;
+        return new Internet(h, port);
+    }
+
+    public static Internet? ReadInternet(string dir) => ParseInternet(ReadLines(Path.Combine(dir, InternetFile)).FirstOrDefault());
+
+    /// <summary>Records the internet address (null removes it); ZentriqRemote applies it within a minute.</summary>
+    public static void WriteInternet(string dir, Internet? i)
+    {
+        if (!Directory.Exists(dir)) return;
+        var file = Path.Combine(dir, InternetFile);
+        if (i is null) { if (File.Exists(file)) File.Delete(file); }
+        else File.WriteAllText(file, i + Environment.NewLine);
+    }
+
+    /// <summary>
+    /// Applies the internet address to the engine settings: agents and invitation links then use it (agentAliasDNS,
+    /// agentAliasPort); without one they use the LAN host name. Browser pages keep the engine's own port, so publishing
+    /// the same port (8446) on the router is simplest. Returns true when something changed.
+    /// </summary>
+    public static bool ApplyInternet(JsonObject settings, string lanHost, Internet? internet)
+    {
+        var changed = false;
+        var port = settings["port"]?.GetValue<int>() ?? 8446;
+        var wantHost = internet?.Host ?? lanHost;
+        int? wantPort = internet is { } i && i.Port != port ? i.Port : null;
+        if (settings["agentAliasDNS"]?.GetValue<string>() != wantHost) { settings["agentAliasDNS"] = wantHost; changed = true; }
+        var have = settings["agentAliasPort"] is JsonValue v && v.TryGetValue<int>(out var p) ? p : (int?)null;
+        if (have != wantPort)
+        {
+            if (wantPort is null) settings.Remove("agentAliasPort"); else settings["agentAliasPort"] = wantPort.Value;
+            changed = true;
+        }
+        return changed;
+    }
+
     public static IReadOnlyList<string> ReadLines(string file) =>
         File.Exists(file) ? File.ReadAllLines(file).Select(l => l.Trim()).Where(l => l.Length > 0).ToArray() : [];
 

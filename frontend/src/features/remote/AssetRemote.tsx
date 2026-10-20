@@ -17,8 +17,7 @@ export function AssetRemoteButtons({ assetId, onError }: { assetId: string; onEr
   return (
     <span className="btn-group" title={s.online ? 'Zentriq Remote Support' : 'The device is offline'}>
       <button className="btn" disabled={!s.online || busy} onClick={() => void go('desktop')}><Icon name="remote" size={13} /> Remote desktop</button>
-      <button className="btn" disabled={!s.online || busy} onClick={() => void go('terminal')}>Terminal</button>
-      <button className="btn" disabled={!s.online || busy} onClick={() => void go('files')}>Files</button>
+      <button className="btn" disabled={!s.online || busy} onClick={() => void go('files')}><Icon name="folder" size={13} /> Files</button>
     </span>
   );
 }

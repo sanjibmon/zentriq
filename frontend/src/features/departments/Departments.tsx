@@ -5,7 +5,7 @@ import { useConfirm } from '../../components/Confirm';
 import { Icon } from '../../components/Icon';
 import { Callout, DataTable } from '../../components/ui';
 
-export interface Department { id: string; name: string; code: string | null; description: string | null; createdAt: string; assets: number }
+export interface Department { id: string; name: string; code: string | null; description: string | null; createdAt: string; assets: number; nonItAssets?: number }
 export interface DepartmentList { items: Department[]; unassigned: number }
 
 const errText = (e: unknown) => {

@@ -18,6 +18,7 @@ public static class NonItEndpoints
     public sealed record IdsBody(Guid[]? Ids);
     public sealed record BulkBody(Guid[]? Ids, string? Status, string? Location, Guid? DepartmentId, bool ClearDepartment, string? AssignedTo, string? Condition, Guid? CategoryId);
     public sealed record CategoryBody(string? Name, string? Group);
+    public sealed record GroupBody(string? Name);
     public sealed record FieldBody(string? Key, string? Label, string? Type, string[]? Options, int? Sort);
 
     private const string Select = $"""
@@ -198,10 +199,20 @@ public static class NonItEndpoints
             var name = Blank(b.Name);
             if (name is null || name.Length > 100) return Validation.Problem("name", "Enter a category name (up to 100 characters).");
             var group = Blank(b.Group) ?? "Custom";
-            await using var cmd = ds.CreateCommand("INSERT INTO zentriq.nonit_categories (name, group_name) VALUES (@n, @g) ON CONFLICT DO NOTHING RETURNING id");
+            await using var cmd = ds.CreateCommand("""
+                INSERT INTO zentriq.nonit_categories (name, group_name)
+                VALUES (@n, COALESCE((SELECT g.name FROM zentriq.nonit_groups g WHERE lower(g.name) = lower(@g)), @g))
+                ON CONFLICT DO NOTHING RETURNING id, group_name
+                """);
             cmd.Parameters.AddWithValue("n", name);
             cmd.Parameters.AddWithValue("g", group.Length > 60 ? group[..60] : group);
-            if (await cmd.ExecuteScalarAsync(ct) is not Guid id) return Validation.Problem("name", $"A category named \"{name}\" already exists.");
+            Guid id;
+            await using (var r = await cmd.ExecuteReaderAsync(ct))
+            {
+                if (!await r.ReadAsync(ct)) return Validation.Problem("name", $"A category named \"{name}\" already exists.");
+                id = r.GetGuid(0);
+                group = r.GetString(1);
+            }
             await rc.AuditAsync("nonit.category.create", name, detail: new { group }, ct: ct);
             return Results.Ok(new { id, name, group, builtin = false, count = 0 });
         }).RequireAuthorization(Permissions.AssetsManage);
@@ -229,6 +240,74 @@ public static class NonItEndpoints
             if (await cmd.ExecuteScalarAsync(ct) is not string name)
                 return Results.Problem(statusCode: 409, title: "The category is in use. Move its assets to another category first.");
             await rc.AuditAsync("nonit.category.delete", name, ct: ct);
+            return Results.NoContent();
+        }).RequireAuthorization(Permissions.AssetsManage);
+
+        // Groups: the top level of categories (Furniture, Vehicles, …). A group can exist before it has categories.
+        g.MapGet("/groups", async (NpgsqlDataSource ds, CancellationToken ct) => await Json(ds, """
+            SELECT COALESCE(jsonb_agg(jsonb_build_object('id', g.id, 'name', g.name, 'builtin', g.builtin,
+                   'categories', (SELECT count(*) FROM zentriq.nonit_categories c WHERE lower(c.group_name) = lower(g.name)),
+                   'count', (SELECT count(*) FROM zentriq.nonit_assets n JOIN zentriq.nonit_categories c ON c.id = n.category_id WHERE lower(c.group_name) = lower(g.name)))
+                   ORDER BY lower(g.name)), '[]')::text
+              FROM zentriq.nonit_groups g
+            """, null, ct)).RequireAuthorization(Permissions.AssetsView);
+
+        g.MapPost("/groups", async (GroupBody b, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
+        {
+            var name = Blank(b.Name);
+            if (name is null || name.Length > 60) return Validation.Problem("name", "Enter a group name (up to 60 characters).");
+            await using var cmd = ds.CreateCommand("INSERT INTO zentriq.nonit_groups (name) VALUES (@n) ON CONFLICT DO NOTHING RETURNING id");
+            cmd.Parameters.AddWithValue("n", name);
+            if (await cmd.ExecuteScalarAsync(ct) is not Guid id) return Validation.Problem("name", $"A group named \"{name}\" already exists.");
+            await rc.AuditAsync("nonit.group.create", name, ct: ct);
+            return Results.Ok(new { id, name, builtin = false, categories = 0, count = 0 });
+        }).RequireAuthorization(Permissions.AssetsManage);
+
+        // Rename a group: its categories move with it.
+        g.MapPut("/groups/{id:guid}", async (Guid id, GroupBody b, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
+        {
+            var name = Blank(b.Name);
+            if (name is null || name.Length > 60) return Validation.Problem("name", "Enter a group name (up to 60 characters).");
+            await using var conn = await ds.OpenConnectionAsync(ct);
+            await using var tx = await conn.BeginTransactionAsync(ct);
+            string? old;
+            await using (var q = new NpgsqlCommand("SELECT name FROM zentriq.nonit_groups WHERE id = @id FOR UPDATE", conn, tx))
+            {
+                q.Parameters.AddWithValue("id", id);
+                old = await q.ExecuteScalarAsync(ct) as string;
+            }
+            if (old is null) return Results.NotFound();
+            try
+            {
+                await using (var u = new NpgsqlCommand("UPDATE zentriq.nonit_groups SET name = @n WHERE id = @id", conn, tx))
+                {
+                    u.Parameters.AddWithValue("id", id);
+                    u.Parameters.AddWithValue("n", name);
+                    await u.ExecuteNonQueryAsync(ct);
+                }
+            }
+            catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation) { return Validation.Problem("name", $"A group named \"{name}\" already exists."); }
+            await using (var c = new NpgsqlCommand("UPDATE zentriq.nonit_categories SET group_name = @n WHERE lower(group_name) = lower(@o)", conn, tx))
+            {
+                c.Parameters.AddWithValue("n", name);
+                c.Parameters.AddWithValue("o", old);
+                await c.ExecuteNonQueryAsync(ct);
+            }
+            await tx.CommitAsync(ct);
+            await rc.AuditAsync("nonit.group.update", name, detail: new { from = old }, ct: ct);
+            return Results.NoContent();
+        }).RequireAuthorization(Permissions.AssetsManage);
+
+        g.MapDelete("/groups/{id:guid}", async (Guid id, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
+        {
+            await using var cmd = ds.CreateCommand("""
+                DELETE FROM zentriq.nonit_groups g WHERE g.id = @id
+                   AND NOT EXISTS (SELECT 1 FROM zentriq.nonit_categories c WHERE lower(c.group_name) = lower(g.name)) RETURNING name
+                """);
+            cmd.Parameters.AddWithValue("id", id);
+            if (await cmd.ExecuteScalarAsync(ct) is not string name)
+                return Results.Problem(statusCode: 409, title: "The group still has categories. Move or delete them first.");
+            await rc.AuditAsync("nonit.group.delete", name, ct: ct);
             return Results.NoContent();
         }).RequireAuthorization(Permissions.AssetsManage);
 

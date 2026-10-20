@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { api, ApiError } from '../../api/client';
 import { Callout, fmt, Pill } from '../../components/ui';
 import { Icon } from '../../components/Icon';
-import type { Department } from '../departments/Departments';
+import { Modal } from '../../components/Modal';
+import { DepartmentSelect, type Department } from '../departments/Departments';
 import { code128Svg } from './code128';
 import {
   CONDITIONS, day, daysUntil, money, STATUSES, statusLabel, statusTone,
@@ -17,23 +18,6 @@ const fieldErrors = (e: unknown): Record<string, string> => {
   const b = e instanceof ApiError ? (e.body as { errors?: Record<string, string[]> } | null) : null;
   return Object.fromEntries(Object.entries(b?.errors ?? {}).map(([k, v]) => [k, v.join(' ')]));
 };
-
-function Modal({ title, wide, onClose, children, footer }: { title: string; wide?: boolean; onClose: () => void; children: ReactNode; footer?: ReactNode }) {
-  useEffect(() => {
-    const esc = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
-    window.addEventListener('keydown', esc);
-    return () => window.removeEventListener('keydown', esc);
-  }, [onClose]);
-  return (
-    <div className="modal-scrim" role="dialog" aria-modal="true" aria-label={title} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className={`modal-card${wide ? ' wide' : ''}`}>
-        <header><h2>{title}</h2><button className="icon-btn" style={{ marginLeft: 'auto' }} onClick={onClose} aria-label="Close"><Icon name="x" /></button></header>
-        <div className="body">{children}</div>
-        {footer && <footer>{footer}</footer>}
-      </div>
-    </div>
-  );
-}
 
 // ---- Add / edit ---------------------------------------------------------------------------------------------------------
 
@@ -65,9 +49,9 @@ function toBody(v: Values, rowVersion?: number) {
   };
 }
 
-export function AssetForm({ asset, initial, categories, departments, fields, onClose, onSaved }: {
-  asset: NonItAsset | null; initial?: Values; categories: NonItCategory[]; departments: Department[]; fields: NonItField[];
-  onClose: () => void; onSaved: (id: string) => void;
+export function AssetForm({ asset, initial, categories, groups: groupList, departments, fields, onClose, onSaved, onListsChanged }: {
+  asset: NonItAsset | null; initial?: Values; categories: NonItCategory[]; groups: string[]; departments: Department[]; fields: NonItField[];
+  onClose: () => void; onSaved: (id: string) => void; onListsChanged: () => void;
 }) {
   const [v, setV] = useState<Values>(() => (asset ? toValues(asset) : { ...EMPTY, ...initial }));
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -76,6 +60,17 @@ export function AssetForm({ asset, initial, categories, departments, fields, onC
   const set = (k: string) => (e: { target: { value: string } }) => setV((x) => ({ ...x, [k]: e.target.value }));
   const groups = useMemo(() => [...new Set(categories.map((c) => c.group))], [categories]);
   const err = (k: string) => errors[k] && <span className="field-err">{errors[k]}</span>;
+  // "Add new category…" in the category list: a small inline form (name + group, existing or new).
+  const [newCat, setNewCat] = useState<{ name: string; group: string; error?: string } | null>(null);
+  async function addCategory() {
+    if (!newCat?.name.trim()) return;
+    try {
+      const c = await api.post<NonItCategory>('/nonit/categories', { name: newCat.name.trim(), group: newCat.group.trim() || 'Custom' });
+      setNewCat(null);
+      onListsChanged();
+      setV((x) => ({ ...x, categoryId: c.id }));
+    } catch (e) { setNewCat({ ...newCat, error: errText(e) }); }
+  }
 
   async function save() {
     setBusy(true); setErrors({}); setMsg(null);
@@ -107,11 +102,23 @@ export function AssetForm({ asset, initial, categories, departments, fields, onC
           <div className="form-grid">
             {F({ k: 'name', label: 'Name *', full: true, placeholder: 'e.g. Ergonomic chair, Split AC 1.5 ton' })}
             <label className="f">Category *
-              <select className={`in${errors.category ? ' err' : ''}`} value={v.categoryId ?? ''} onChange={set('categoryId')}>
+              <select className={`in${errors.category ? ' err' : ''}`} value={v.categoryId ?? ''}
+                onChange={(e) => e.target.value === '__add' ? setNewCat({ name: '', group: categories.find((c) => c.id === v.categoryId)?.group ?? '' }) : set('categoryId')(e)}>
                 <option value="">Choose…</option>
                 {groups.map((g) => <optgroup key={g} label={g}>{categories.filter((c) => c.group === g).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</optgroup>)}
+                <option value="__add">＋ Add new category…</option>
               </select>{err('category')}
             </label>
+            {newCat && <div className="inline-add full">
+              <b>New category</b>
+              <input className="in" autoFocus placeholder="Category name, e.g. Podium" value={newCat.name} onChange={(e) => setNewCat({ ...newCat, name: e.target.value })}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void addCategory(); } }} aria-label="New category name" />
+              <input className="in" list="nonit-form-groups" placeholder="Group — pick or type a new one" value={newCat.group} onChange={(e) => setNewCat({ ...newCat, group: e.target.value })} aria-label="Group" />
+              <datalist id="nonit-form-groups">{[...new Set([...groupList, ...groups])].map((g) => <option key={g} value={g} />)}</datalist>
+              <button type="button" className="btn sm primary" disabled={!newCat.name.trim()} onClick={() => void addCategory()}>Add</button>
+              <button type="button" className="btn sm ghost" onClick={() => setNewCat(null)}>Cancel</button>
+              {newCat.error && <span className="field-err" style={{ flexBasis: '100%' }}>{newCat.error}</span>}
+            </div>}
             <label className="f">Status
               <select className="in" value={v.status ?? 'in_use'} onChange={set('status')}>{STATUSES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
             </label>
@@ -131,7 +138,7 @@ export function AssetForm({ asset, initial, categories, departments, fields, onC
           <div className="form-grid">
             {F({ k: 'location', label: 'Location', placeholder: 'Site / building / floor / room' })}
             <label className="f">Department
-              <select className="in" value={v.departmentId ?? ''} onChange={set('departmentId')}><option value="">Not assigned</option>{departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select>
+              <DepartmentSelect value={v.departmentId ?? ''} onChange={(id) => setV((x) => ({ ...x, departmentId: id }))} list={departments} onAdded={onListsChanged} canAdd noneLabel="Not assigned" />
               {err('department')}
             </label>
             {F({ k: 'assignedTo', label: 'Assigned to', placeholder: 'Person or team' })}
