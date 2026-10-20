@@ -216,6 +216,8 @@ input.in:focus, select.in:focus, textarea.in:focus { outline: none; border-color
 .t thead th { background: var(--surface-2); border-bottom: 1px solid var(--line); }
 .t tbody tr td { border-bottom-color: color-mix(in srgb, var(--line) 70%, transparent); }
 .panel-h .sub { color: var(--faint); }
+.panel-h { flex-wrap: wrap; row-gap: 6px; }
+.panel-h h3 { white-space: nowrap; }
 .link-btn { border: 0; background: none; padding: 0; color: var(--accent); font: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
 .btn.danger { background: var(--surface); }
 .btn.danger:hover:not(:disabled) { background: var(--crit-soft); }
@@ -271,6 +273,7 @@ details.rs-advanced[open] summary { margin-bottom: 12px; }
 .rs-howto { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: 13px; color: var(--muted); }
 .rs-install { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
 .rs-install > div { display: grid; gap: 8px; align-content: start; }
+.rs-install > div > .btn { justify-self: start; }
 .rs-install h4 { margin: 0; display: flex; gap: 8px; align-items: center; font-size: 14px; }
 .rs-install h4 svg { color: var(--accent); }
 .rs-install p { margin: 0; font-size: 13px; color: var(--muted); }

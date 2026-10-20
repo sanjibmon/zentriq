@@ -72,7 +72,15 @@ public sealed partial class RemoteSupportService
         cmd.Parameters.Add(new NpgsqlParameter("by", NpgsqlDbType.Uuid) { Value = (object?)userId ?? DBNull.Value });
         cmd.Parameters.AddWithValue("byn", userName);
         cmd.Parameters.AddWithValue("h", hours);
-        var id = (long)(await cmd.ExecuteScalarAsync(ct))!;
+        long id;
+        try { id = (long)(await cmd.ExecuteScalarAsync(ct))!; }
+        catch
+        {
+            // Do not leave a group without a session behind.
+            try { await using var c = await ConnectAsync(CancellationToken.None); await c.DeleteGroupAsync(mesh, CancellationToken.None); }
+            catch (Exception ex) when (ex is MeshException or System.Net.WebSockets.WebSocketException) { }
+            throw;
+        }
         logger.LogInformation("Quick support session {Code} created by {User}", code, userName);
         return (await QuickSessionAsync(id, ct))!;
     }

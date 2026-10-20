@@ -1,10 +1,18 @@
 # Files of node_modules/meshcentral/agents that Zentriq ships (everything else there is removed when the
-# installer is built). Zentriq deploys only the Windows agent, so the Linux/macOS/Android agents, MeshCmd,
-# MeshCentral Router/Assistant/Satellite and helper scripts are left out; they are not used and some
-# antivirus products flag remote-access tools by name.
+# installer is built). Windows agents, plus the macOS and Linux (x64, ARM64) agents for quick support and
+# install links (build 62). Android agents, MeshCmd, MeshCentral Router/Satellite and other helpers are left
+# out; they are not used and some antivirus products flag remote-access tools by name.
 MeshService.exe
 MeshService64.exe
 MeshServiceARM64.exe
+meshagent_osx-universal-64
+meshagent_osx-arm-64
+meshagent_osx-x86-64
+meshagent_x86-64
+meshagent_aarch64
+meshinstall-linux.sh
+meshinstall-linux.js
+meshinstall-initd.sh
 # Required: the engine reads it at start (not offered for download in Zentriq).
 MeshCentralAssistant.exe
 agent-translations.json

@@ -262,7 +262,7 @@ public sealed class RemoteSupportLiveTests : IAsyncLifetime
 
         // Quick support: a session gets its own device group (consent always on) and a public invitation page that runs
         // the agent without installing it; ending the session removes the group and the page.
-        var quick = await remote.CreateQuickAsync(uid, "Priya Rao", "Anita Desai", "anita@example.com", "Outlook", 1, "127.0.0.1", default);
+        var quick = await remote.CreateQuickAsync(null, "Priya Rao", "Anita Desai", "anita@example.com", "Outlook", 1, "127.0.0.1", default);
         Assert.Equal("waiting", quick.Status);
         Assert.Matches("^[0-9]{9}$", quick.Code);
         Assert.StartsWith($"https://127.0.0.1:{Port}/agentinvite?c=", quick.InviteUrl);
@@ -273,6 +273,16 @@ public sealed class RemoteSupportLiveTests : IAsyncLifetime
             var html = await invite.Content.ReadAsStringAsync();
             Assert.Contains("installFlags = '1'", html);                                       // run only, nothing installed
             Assert.Contains("Zentriq", html);
+            // The page's downloads work for Windows, Linux and macOS (the agents Zentriq ships, installer/remote/agents-keep.txt).
+            var mid = System.Text.RegularExpressions.Regex.Match(html, "var meshid = '([^']+)'").Groups[1].Value;
+            Assert.NotEmpty(mid);
+            var origin = new Uri(quick.InviteUrl).GetLeftPart(UriPartial.Authority);
+            var win = await anonymous.GetByteArrayAsync($"{origin}/meshagents?id=4&meshid={mid}&installflags=1");
+            Assert.Equal((byte)'M', win[0]);
+            var linux = await anonymous.GetByteArrayAsync($"{origin}/meshagents?id=6&meshid={mid}&installflags=1");
+            Assert.Equal(new byte[] { 0x7F, (byte)'E', (byte)'L', (byte)'F' }, linux[..4]);
+            var mac = await anonymous.GetByteArrayAsync($"{origin}/meshosxagent?id=10005&meshid={mid}");
+            Assert.Equal(new byte[] { (byte)'P', (byte)'K' }, mac[..2]);
         }
         var active = await remote.ActiveQuickAsync(quick.Id, default);
         Assert.NotNull(active);

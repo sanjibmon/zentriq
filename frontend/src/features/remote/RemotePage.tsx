@@ -126,7 +126,7 @@ function Quick({ status, allowTerminal, creating, setCreating, onMsg, onChanged 
 
       <div className="rs-steps">
         <div><span>1</span><b>Create a session</b><p>Give it the person's name; e-mail the invitation or copy the link into chat.</p></div>
-        <div><span>2</span><b>They open the link</b><p>They run the small support app — nothing is installed. Windows, macOS and Linux.</p></div>
+        <div><span>2</span><b>They open the link</b><p>They run the small support app on Windows (nothing is installed), macOS or Linux.</p></div>
         <div><span>3</span><b>They approve, you help</b><p>Screen, control and files only after they click Allow. They can disconnect at any time.</p></div>
       </div>
 
@@ -270,7 +270,7 @@ function Devices({ status, allowTerminal, onMsg, onChanged }: { status: RemoteSt
         { label: 'Ready to install', value: status.readyToInstall.toLocaleString(), sub: 'Zentriq Agent can install it' },
         { label: 'Sessions (24 h)', value: status.sessions24h.toLocaleString(), sub: status.lastSync ? `synced ${fmt.ago(status.lastSync)}` : 'not synced yet', to: '/remote?tab=sessions' },
       ]} />
-      <Panel flush title="Unattended devices" sub="The agent runs as a service: connect even when nobody is signed in, to standard and administrator accounts, including Windows UAC prompts" right={<div className="rs-toolbar">
+      <Panel flush title="Unattended devices" sub="Installed agent — connect any time, signed out or in, standard or admin users, UAC prompts included" right={<div className="rs-toolbar">
         <input className="in" placeholder="Name or IP…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search devices" />
         <select className="in" value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Show">
           <option value="">All</option><option value="online">Online</option><option value="installed">Remote support installed</option>
