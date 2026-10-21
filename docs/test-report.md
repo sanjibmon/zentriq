@@ -1,203 +1,18 @@
 # Test report
 
-Latest: GitHub Actions run 39615114165, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
-10.0.20348** VM. Release: `v1.1.1-build.76` (pre-release, **unsigned**), package version **1.1.1.76**. Results: unit +
-PostgreSQL integration tests **228 PASS, 2 skipped** (the live MeshCentral and live SNMP tests run in ci-quick: PASS, 230/230);
-installer acceptance **59 passed, 0 failed, 0 blocked, 10 not run**; in-place updates PASS (database migration V0021).
+Latest: GitHub Actions run 39642523078, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
+10.0.20348** VM. Release: `v1.1.1-build.78` (pre-release, **unsigned**), package version **1.1.1.78**. Results: unit +
+PostgreSQL integration tests **236 PASS, 2 skipped** (the live MeshCentral and live SNMP tests run in ci-quick: PASS, 238/238);
+installer acceptance **60 passed, 0 failed**; in-place updates PASS (database migration V0022).
 
-New in build 76 (locations, IT Accessories, department and location in Hardware Inventory, columns and filters on every
-inventory table):
-
-| ID | Test | Result | Detail |
-|---|---|---|---|
-| T69 | Locations and IT accessories end to end | **PASS** | duplicate location name refused; location assigned to a device and filtered in IT Asset and Hardware Inventory; accessory received 10, issued 6 to a person (stock 4, below reorder level 5), issue of 5 refused ("Only 4"), holdings 6, returned 1 faulty, transferred 2 to another location; 4 movements; location with stock and accessory with history cannot be deleted |
-| — | PostgreSQL tests | **PASS** | stock follows receive / issue / return / transfer / write-off / stock count; no negative stock; returns limited to what a person holds; low-stock flag set and cleared; serial-tracked units (count must match, duplicates refused case-insensitively, issued unit not issued twice, returned by serial, no stock count) |
-| — | Unit tests | **PASS** | every report column key unique (device location column `asset_location`); every dashboard widget accepted by the API (assets.location, accessories.stock, accessories.low) |
-| — | Console (ci-quick build, screenshots) | **PASS** | IT Accessories stock / issued / movements / catalogue, issue and receive (serial numbers) dialogs, column chooser, department and location dialogs, Hardware Inventory filters |
-| — | Build 75 | FAIL → fixed | T69 read the 400 response as bytes (test fix) |
-
-New in build 74 (device details stay in Hardware / Software Inventory, no last-action banner on Services, IPv4 in the
-Agents and Remote Support device lists, chart types in Network Inventory):
+New in build 78 (manufacturer, model and serial number entered manually, remembered by SMBIOS UUID and MAC):
 
 | ID | Test | Result | Detail |
 |---|---|---|---|
-| — | PostgreSQL test | **PASS** | `zentriq.asset_ipv4`: IPv4 primary address used; IPv6 primary address → IPv4 of the adapter with a gateway (link-local skipped); IPv6-only device → none |
-| — | Console (ci-quick build, screenshots) | **PASS** | device opened from Hardware Inventory stays there (`/hardware/<id>`, breadcrumb, *All hardware*); network charts switch between share bar, bar, column and pie |
-| all | Acceptance suite (re-run) | **PASS** | 58 passed |
+| T70 | Manual hardware details | **PASS** | saved and linked to 2 fixed identities of the test server; its detected serial number kept priority; device found by the entered serial; 201 characters refused; removed |
+| — | PostgreSQL / unit tests | **PASS** | firmware placeholders ("To be filled by O.E.M.", "Default string", "0000000000") are not values; entered values come back on a new record with the same SMBIOS UUID and MAC; not applied when only the MAC matches and the UUID differs; clearing removes the profile |
 
-New in build 73 (one uninstall code for all agents, Online / Offline connection state, IPv4 addresses, OS column in
-hardware inventory):
-
-| ID | Test | Result | Detail |
-|---|---|---|---|
-| T67 | Uninstall protection with one code for all agents | **PASS** | no code and wrong code refused (1603); service stop refused; two codes created in a row — the current one removed the agent, the **replaced one was refused**; code shown again while valid; reinstalled; protection switched off |
-| T68 | Live agent connection (re-run) | **PASS** | offline 1 s after the service stopped, online 1 s after it started; collect now in 2 s |
-| — | Unit test | **PASS** | code for all agents: 16 random characters, hash only, valid one hour, wrong / replaced / expired / missing code refused |
-| — | Build 72 | FAIL → fixed | T67: a code created right after another reached the agent only when its live request ended (up to 25 s), so the replaced code still worked briefly; agents now report the code they hold and the server answers at once |
-
-New in build 71 (live agent connection, dashboard layout saving, installer interval order, device / OS / IP columns,
-section taglines removed):
-
-| ID | Test | Result | Detail |
-|---|---|---|---|
-| T68 | Live agent connection | **PASS** | online over the live connection; **offline 1 s** after the agent service stopped; **online again 1 s** after it started (gap recorded as last outage); *collect now* picked up in 2 s; installer lists in order (check-in 5/15/30/60/120/180 min, MSI Control table *Sorted*) |
-| T26, T47, T67 | Agent install, update, uninstall protection (re-run) | **PASS** | 1.1.1.71 → 1.1.2.71 in place |
-| S05 | New features after an in-place update | **PASS** | dashboard layout saved and read back |
-| — | Unit test | **PASS** | every dashboard widget the console offers is accepted by the API (network and Non-IT widgets were refused, so no layout could be saved) |
-| — | Builds 66–70 | FAIL → fixed | the upgrade test enrolled the build-65 agent without the server address and with uninstall protection on (test fixes); T68: the live connection started up to 30 s after enrollment and check-ins kept a stopped agent online for 45 s (product fixes: online now means connected, goodbye on stop); runner `Get-NetIPConfiguration` failure (test uses the default route) |
-
-New in build 65 (agent schedule and reconnection, 20-character enrollment codes, uninstall protection codes, deleting old
-codes, internet check for remote support links, Zentriq-branded remote pages for Windows, macOS and Linux only):
-
-| ID | Test | Result | Detail |
-|---|---|---|---|
-| T26 | Agent install with the new codes and intervals | **PASS** | 20-character enrollment code; installed with `SERVERURL`, `CHECKININTERVAL=2`, `INVENTORYINTERVAL=30`; the console shows check-in every 2 min and inventory every 30 min |
-| T67 | Agent uninstall protection | **PASS** | removal without a code refused (1603); wrong code refused (1603); uninstall key not readable by administrators; `Stop-Service` refused; one-hour code from the console removed the agent (`ZentriqAgent.exe --uninstall <code>`); reinstalled; protection switched off from Agents › Settings |
-| T33 | Enrollment codes: show again, delete old/revoked | **PASS** | code shown again; revoked code refused (410); active code not deletable (409); revoked codes deleted (bulk: 2) |
-| T65 | Remote quick support (re-run) | **PASS** | internet link refused without a checked public address (409 `internet-required`); private IP refused (400); office-network session works end to end |
-| T29, T47 | Agent revoke/uninstall, agent update from the console (re-run) | **PASS** | 1.1.1.65 → 1.1.2.65 in place |
-| — | Live MeshCentral (ci-quick) | **PASS** | Zentriq invitation page (no MeshCentral / Mesh Agent / Android text); run-only and install modes; Windows, Linux and macOS downloads |
-| — | Unit tests | **PASS** | enrollment codes (format, typing mistakes O/I/L), enrollment proof bound to the server key, uninstall codes valid one hour on one device only, public/private address checks, internet address input checks |
-| — | Builds 63–64 | FAIL → fixed | T67: `--uninstall` ran from the agent folder and Windows Installer closed it while removing the files; it now runs the removal from a temporary copy |
-
-New in build 62 (Remote Support quick support over the internet, simpler remote UI, Non-IT groups and departments, section headers):
-
-| ID | Test | Result | Detail |
-|---|---|---|---|
-| T65 | Remote quick support end to end | **PASS** | session created; invitation page is run-only; the support app (`connect`, nothing installed) joined the session's own consent group as the runner; technician desktop link opened signed in; logged in History; ended and its group removed; install link page (install-only) |
-| T66 | Non-IT groups and departments | **PASS** | group added on its own; category joined it (case-insensitive); group rename moved the category; department counted 1 non-IT asset; cleaned up |
-| T59, T60, T64 | Remote support, remote agent via Zentriq Agent, Non-IT (re-run) | **PASS** | unchanged behaviour |
-| — | Live MeshCentral (ci-quick) | **PASS** | quick session group + invitation; Windows, Linux (ELF) and macOS (pkg zip) downloads from the invitation page; technician link; end removes group; stray quick group removed by refresh; install link; internet address used for invitations |
-| — | Unit / DB tests | **PASS** | technician rights (terminal on/off, chat, no AMT); quick codes and invitation text; internet address parse/apply (agentAliasDNS/Port); Non-IT groups table and trigger |
-
-Build 61 (modern console look, share bars instead of donuts, deeper network inventory, Non-IT Asset Inventory):
-
-| ID | Test | Result | Detail |
-|---|---|---|---|
-| T64 | Non-IT assets end to end | **PASS** | 61 categories (+1 custom); add with custom field; lookup by barcode; Excel form downloaded; CSV upload checked (unknown category reported in row 4) and applied (3 new, 1 new category); bulk change with history; Excel export; 7 built-in reports ran; delete |
-| T63 | Network inventory (re-run) | **PASS** | 10 built-in network reports ran (2 new: device health, busiest ports) |
-| — | Unit tests | **PASS** | port counters, discards, spanning-tree state, LAG membership, memory, ENTITY-SENSOR (temperature, optical dBm), Cisco fan / power-supply alarms, BGP / OSPF peers, transceivers; traffic rate from two collections (counter reset ignored); xlsx written and read back; CSV with quotes and semicolons; dates and amounts; Excel form drop-downs |
-| — | PostgreSQL tests | **PASS** | non-IT save: automatic tags, history of changes, duplicate tag and stale edit refused; bulk upload: check reports row errors, file with errors never applied, new categories, update by tag changes only filled cells |
-
-New in build 60 (Network Inventory):
-
-| ID | Test | Result | Detail |
-|---|---|---|---|
-| T63 | Network inventory API, built-in reports, follow-neighbours scan | **PASS** | summary, devices, port search, topology, VLANs, unmanaged, firmware and device network view answer; 8 built-in network reports run; a scan with "follow neighbours" completes |
-| T62 | Devices without an agent (re-run) | **PASS** | the inventoried computer kept its type: a scanned address is now matched to any adapter of an inventoried computer and to its short host name |
-| — | Unit tests | **PASS** | SNMP switch mapping: ports, speed/duplex/errors, access VLAN, trunk, Q-BRIDGE MAC table, ARP, LLDP (management address, capabilities, chassis-id subtypes) and CDP neighbours merged, PoE, CPU, stack, spanning-tree root; access point / switch / router typing; hex octet strings |
-| — | PostgreSQL tests | **PASS** | port links: uplink by LLDP neighbour, PC on its port, unmanaged switch inferred (3 devices, no neighbour, no trunk), printer found behind it; MAC table kept out of the document; re-collection replaces rows |
-| — | Live SNMP test (ci-quick, snmpsim) | **PASS** | the real collector (SNMP v2c GET + GETBULK) reads a simulated access switch end to end |
-| — | Builds 58–59 | FAIL → fixed | T62: a scan of the runner matched a discovered-only record instead of the inventoried computer (product fix in discovery matching) |
-
-New in build 57 (IT Asset Inventory: devices without an agent, device types, duplicates, navigation):
-
-| ID | Test | Result | Detail |
-|---|---|---|---|
-| T62 | Devices without an agent; add, device type, duplicates, delete | **PASS** | a printer web page on port 8080 of the runner was recognised by a scan ("Printer, HP LaserJet Pro M404dn"); the inventoried computer kept its own type (virtual); added a multifunction printer with MAC; duplicate found and merged keeping the newest address 10.250.0.10; device type manual then automatic; automatic merge switched off/on; delete removed 2 records |
-| — | Unit tests | **PASS** | 20 product families from web interface text; port guesses; evidence order; model from page title; SNMP switch / router / firewall / printer (ports, supplies, page count, model); device type → category; record kept in a duplicate group |
-| — | PostgreSQL tests | **PASS** | duplicate groups by name, serial and MAC (locally administered MACs and same-name/different-serial excluded), merge keeps newest address, delete removes merged records; manual device type survives inventory |
-| — | Build 56 | FAIL → fixed | acceptance script defects: T61 did not wait while the remote support engine restarted; T62 read the device-type list as one item |
-
-New in build 55 (remote session "Invalid origin", antivirus):
-
-| ID | Test | Result | Detail |
-|---|---|---|---|
-| T59 (extended) | Control channel opened from the page by IP address | **PASS** | origin https://10.1.0.13:8446 accepted; a foreign origin refused |
-| — | Live MeshCentral test (ci-quick) | **PASS** | control channel with the browser's session cookie: by IP accepted, foreign origin refused (reproduced the reported error before the fix) |
-| — | Unit tests | **PASS** | accepted origins cover server names, addresses and aliases; remote service adds new ones and stays quiet otherwise |
-| — | Installer contents | changed | MeshCentral agents folder: kept 13 files (Windows agents and their core scripts), removed 58 unused items (Linux/macOS agents, MeshCmd, Router, Satellite, Android) |
-| — | Build 54 | FAIL → fixed | acceptance script used a PowerShell certificate callback on a background thread (test defect, not product) |
-
-New in build 53 (nothing tied to a fixed server address):
-
-| ID | Test | Result | Detail |
-|---|---|---|---|
-| T61 | Server certificate follows the server | **PASS** | Zentriq Local CA trusted on the server and downloadable without sign-in; certificate covers every IPv4 address (172.26.48.1, 10.1.0.157), each validated by IP without skipping checks; after a host-name change the API re-issued the certificate by itself with the same key, and remote support switched to it |
-| T59 / T60 / T47 / T13 | Remote support, agent update, upgrade | **PASS** | with the CA-issued certificate; agents kept connecting (same key) |
-| — | Unit tests | **PASS** | CA issue/chain, coverage of names and addresses, re-issue keeps the agent key pin, PFX round trip and PEM export for remote support |
-| — | Build 53 first attempt | FAIL → fixed | a certificate issued right after the CA was created started before the CA's validity |
-
-New in build 52 (remote session opening):
-
-| ID | Test | Result | Detail |
-|---|---|---|---|
-| T59 | Remote support (extended) | **PASS** | port 8446 serves the same certificate as the console; session and installer checks as before |
-| — | Live MeshCentral test, second start | **PASS** | engine presents the console certificate, stays in WAN mode, signed-in link works; session address follows the browser's host (e.g. 192.168.1.8) |
-| — | Reported issue | fixed | session tab opened on the server's computer name with a separate certificate; browsers with HSTS for that name offered no way to continue |
-
-New in build 51 (Remote Management › Remote Support, MeshCentral 1.2.5 engine with Zentriq branding):
-
-| ID | Test | Result | Detail |
-|---|---|---|---|
-| T59 | Remote support: engine running, branded installer, remote agent connects, signed-in session | **PASS** | ZentriqRemote service and health.ashx OK; installer 3.5 MB, version info "Zentriq Remote Support Agent"; the runner came online in Remote Support; the desktop session link opened the signed-in device view; a forged link was refused; session in history |
-| T60 | Remote agent removed and reinstalled through the Zentriq Agent from the console | **PASS** | both actions succeeded and appear in the Activity log; device online again |
-| — | Live test against a real MeshCentral (ci-quick) | **PASS** | control channel; group, user and consent management; sign-in link; agent installer; agent settings point to `wss://host:port/agent.ashx` (WAN mode, also for dotless host names); sync |
-| — | Unit / DB tests | **PASS** | sign-in cookie format, server config, rights/consent flags, certificate name; NUL characters removed from inventory |
-| — | Builds 49–50 | FAIL → fixed | MeshCentral 1.2.6 not on npm (pinned 1.2.5); packaging module check path; engine ran in LAN-only mode for a dotless host name (agents could not find it); the remote agent's uninstall entry contains a NUL character, which broke inventory upload (now stripped) |
-| — | New console screens (Remote Support devices, session history, deployment & settings; device page buttons; navigation) | checked | rendered from the built console against a mock API |
-
-New in build 48 (departments, change history, console options):
-
-| ID | Test | Result | Detail |
-|---|---|---|---|
-| T56 | Departments: create, assign, filter, dashboard, reports, rename, delete | **PASS** | duplicate name refused; deleting leaves devices unassigned |
-| T57 | Change history on the runner: software installed → updated → uninstalled | **PASS** | 1.0.0 → 2.0.0 → removed, all recorded; shown device-wise; change report rows |
-| T58 | Company logo | **PASS** | PNG stored and served without sign-in; SVG refused; removal |
-| — | Unit / DB tests | **PASS** | hardware/software diff (memory, disks, CPU, BIOS, replaced board, adapters, KBs, OS upgrade), false-change guards, department report columns |
-| — | Build 47 | FAIL → fixed | acceptance T53/T57 script issues (strict mode; collect-now fallback), not product defects |
-
-New in build 46 (Security Configuration, Integrations & Automation):
-
-| ID | Test | Result | Detail |
-|---|---|---|---|
-| T53 | Security configuration: settings collected (agentless WinRM), 30 checks, score, baseline, exception, report | **PASS** | runner: score 60; 12 passed, 11 failed (SC-05, SC-09, SC-11, SC-16, SC-19, SC-21, SC-22, SC-25, SC-27, SC-28, SC-29 — a default, unhardened Azure image), 1 unknown; server-only baseline with SC-07 = 7 days; out-of-range parameter refused; exception shows as "Exception"; security report and built-in reports run |
-| T54 | Integrations: webhook + syslog channels, test messages, alert rule, failure logging | **PASS** | HMAC-SHA256 signature verified by the receiver; CEF line `<134>1 … Zentriq - test - CEF:0\|Zentriq\|Zentriq\|1.1.1\|test\|…`; rule delivered `asset.discovered` to both channels within a minute; stored channel credentials never returned by the API; http:// Slack URL refused; unreachable channel reports the connection error |
-| T55 | API tokens | **PASS** | report data as CSV and JSON with a bearer token; 403 for a permission the token lacks; POST refused (401); last use recorded; revoked token → 401; write permissions cannot be given to a token |
-| — | Unit / DB tests | **PASS** | 30-check catalogue, hardened vs. weak devices, unknown and scope rules, Windows lifecycle (Win10 22H2, Win11 23H2 Pro/Enterprise, LTSC, Server 2012 R2–2025), scoring, baselines, exceptions, registry reading (policy first, Windows defaults); webhook signature, Slack/Teams/CEF/ServiceNow/Jira formats; end-to-end evaluation on PostgreSQL; alert rule → signed webhook to a local listener, retries; every built-in report runs |
-| — | New console screens (security overview, checks, check detail, baseline editor, devices, exceptions; integrations overview, channels, channel dialog, alert rule, delivery log, API access) | checked | rendered from the built console against a mock API |
-| — | ServiceNow, Jira, Slack and Teams against the real services | **NOT RUN** | no accounts on CI; request formats covered by unit tests — use **Send test** after configuring |
-
-New in build 45 (Reports & Analytics, Vulnerability Management):
-
-| ID | Test | Result | Detail |
-|---|---|---|---|
-| T48 | Reports: run, group, export (XLSX/CSV), injection-safe filters, save, schedule and deliver | **PASS** | 9 data sources, 22 built-in reports; delivery recorded as failed only because SMTP is not configured on the runner (file kept) |
-| T49 | Vulnerabilities: NVD file import, CPE mapping, evaluation, risk acceptance | **PASS** | 3 findings; P2, risk 69; acceptance and re-open |
-| T50 | Windows vulnerabilities from a Microsoft (CVRF) file, workflow, remediation plan | **PASS** | matched against the runner's real build 10.0.20348.5622; KB and fixed build; Microsoft "exploited" → P1; start / ticket / note with history; survives re-evaluation; plan line "Install the latest cumulative update for Windows Server 2022 (KB… or later)" |
-| T51 | Live Microsoft data from api.msrc.microsoft.com | **PASS** | 3 months loaded online: 2,063 Windows CVEs with fixed builds; the (not fully patched) runner shows 978 real open Windows findings, e.g. fixed by KB5126655 (build 10.0.20348.5761 vs. runner 5622) |
-| T52 | Report analytics | **PASS** | distinct count / average / maximum per group, month buckets, software titles / discovery / audit data sources, PDF (32 pages, header on every page, page numbers; checked by rendering), saved report on the dashboard, invalid report widget refused |
-| T47 | Agent update from the console | **PASS** | 1.1.1.45 → 1.1.2.45 in place |
-| — | New console screens (vulnerability overview, findings, finding history, remediation plan, CVE detail with Windows updates, report designer with calculations, dashboard with report and vulnerability widgets) | checked | rendered from the built console against a mock API |
-| — | Windows vulnerability matching on Windows 10/11 clients, Server 2016/2019 and Server Core | **NOT RUN** | product mapping covered by unit tests; only Server 2022 runs in CI |
-
-Build 37:
-
-| ID | Test | Result | Detail |
-|---|---|---|---|
-| H01 | Install published `v1.1.1-build.27` | **PASS** | schema 6 |
-| H06 | Install published `v1.1.1-build.29` over it | **PASS** | reproduces the half-updated server: new console pages, old server (`/activity` 404) |
-| H03 | Enroll the build-27 agent | **PASS** | |
-| H02 | Run build 37 Setup over the half-updated server | **PASS** | updated in place to 1.1.1.37, schema 8, data/sign-in/trial kept, one 'Zentriq' entry |
-| H05 | New features answer after the update | **PASS** | Activity log, software uninstall, agent update, dashboard overview; a customised dashboard layout is saved and read back |
-| H04 | Build-27 agent: new MSI installed over it once, no enrollment code | **PASS** | same registration and certificate; now reports the self-update capability |
-| S01–S05 | Same as above from published build 33 | **PASS** | |
-| U01, U02, U05 | Upgrade from published 1.0.2 | **PASS** | |
-| T47 | Agent update from the console | **PASS** | 1.1.1.37 → 1.1.2.37: agent downloaded the package over mTLS, verified SHA-256, updated in place; same registration and certificate; Activity log "Updated to 1.1.2.37"; an up-to-date agent is not queued again |
-| — | Dashboard layout save on an existing dashboard | fixed | returned 409 before (found by H05/S05/U05) |
-| — | Interactive wizard pages and the Agents/Dashboard screens on a live server | **NOT RUN** | CI installs silently; screens checked in a browser against a mock API |
-
-Build 29: T45 software uninstall through the agent (protected software refused, item removed from inventory, Activity log); T46 dashboard drill-down matches the charts, offline fields. Build 27: T41 VM shown as
-virtual machine, IPv4 (not IPv4-mapped IPv6) address, IPv6 display toggle, dashboard overview; T42 collect inventory
-now for all assets; T43 service restart through the agent (protected service refused); T44 service restart agentlessly
-over WinRM with a stored credential (credential prompt enforced). Earlier: T33–T37 (enrollment code, scan deletion,
-MFA, password reset, AD connection). NOT RUN: AD sync against a real domain, reset e-mail delivery, Server 2012 R2
-refusal, install on Server 2016, SSH/SNMP devices, agent over the internet, reboot persistence, interactive wizard.
-Web console screens (sign-in artwork, dashboard charts, asset list, deploy-agent helper, service dialog) were checked
-in a browser against a mock API, not against a live server.
-Raw logs: branch `ci-logs` of this repository.
-
-The detailed sections below are from the earlier run 38208536699 (`v1.1.0-build.19`).
+Build 77 (run 39633522889): console start page sent with `Cache-Control: no-cache, no-store`, hashed assets `immutable` (T23 checks the headers) - all tests PASS.
 
 ## Build and packaging
 
@@ -216,11 +31,11 @@ replaced) and the trial's 30-device total cap.
 ## Release artifacts (SHA-256)
 
 ```
-4d6bc007c1dcac6b00d3a91a6c4e349eed8783536edfa3faebca6a891255aaa1  Zentriq-1.1.0-docs.zip
-2462536db1386b63759534ad941a84f198c2e386712ea40f2ce0088de6cca89a  Zentriq-1.1.0-msi-offline-kit.zip
-5058560bb93a143f8de38c7877d5470967a77d0d291bb2ad5ae148d3f80efcef  Zentriq-Setup-x64.exe
-ff2fd7a906eaea9eacee75416208d9f0ad09c5a73e11489a7cf0ccf09f633ff8  Zentriq.msi
-8df2d0e27dbf24d7d29ea4c580c679e3c901fc3a7982442e2c2d29dc38e9febb  ZentriqAgent-x64.msi
+27362db47c4cc8db3c5d72bf13e18fde1a71f6ebf4c5b1087eb7a009b8546e60  Zentriq-1.1.1-docs.zip
+6bab32f2d73db4613fb7d59c4860ed87036b6fb01f35372a96b8acda044d7d80  Zentriq-1.1.1-msi-offline-kit.zip
+986d51a1e679eac0869dac6d0f1bf8feac71bbd883fdca3084015cca6b293fe8  Zentriq-Setup-x64.exe
+ab431eb46b0e2977e22c1ce9e1bf41363a62730b41f085edc06acbccdab1331e  Zentriq.msi
+5e74edbf13b2b5b9fa2273cf2e1c3f4cf2355c220eaa7476939ce49af7a4c1ff  ZentriqAgent-x64.msi
 ```
 
 ## Installer acceptance (tests/installer/Invoke-InstallerAcceptance.ps1)
