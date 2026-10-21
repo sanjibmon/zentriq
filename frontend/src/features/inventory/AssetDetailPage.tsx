@@ -29,12 +29,16 @@ function KV({ items }: { items: [string, ReactNode][] }) {
 
 type Tab = 'overview' | 'hardware' | 'software' | 'network' | 'updates' | 'security' | 'services' | 'vulnerabilities' | 'changes';
 
-export function AssetDetailPage({ id }: { id: string }) {
+/** Where the device was opened from: its details stay in that section (IT Asset, Hardware or Software Inventory). */
+export interface DetailSection { path: string; label: string; tab?: 'hardware' | 'software' }
+const ASSETS_SECTION: DetailSection = { path: '/assets', label: 'All assets' };
+
+export function AssetDetailPage({ id, section = ASSETS_SECTION }: { id: string; section?: DetailSection }) {
   const asset = useApi(() => api.get<Asset>(`/assets/${id}`), [id]);
   const inv = useApi(() => api.get<AssetInventory>(`/assets/${id}/inventory`), [id]);
   const { query, navigate } = useRouter();
   const deleteDevices = useDeleteDevices();
-  const [tab, setTab] = useState<Tab>((['overview', 'hardware', 'software', 'network', 'updates', 'security', 'services', 'vulnerabilities', 'changes'] as Tab[]).find((t) => t === query.get('tab')) ?? 'overview');
+  const [tab, setTab] = useState<Tab>((['overview', 'hardware', 'software', 'network', 'updates', 'security', 'services', 'vulnerabilities', 'changes'] as Tab[]).find((t) => t === query.get('tab')) ?? section.tab ?? 'overview');
   const [filter, setFilter] = useState('');
   const { can } = useAuth();
   const control = useApi(() => (can('assets.control') ? api.get<ControlInfo>(`/assets/${id}/control`) : Promise.resolve(null)), [id]);
@@ -74,10 +78,10 @@ export function AssetDetailPage({ id }: { id: string }) {
           {can('remote.start') && <AssetRemoteButtons assetId={id} onError={(m) => setNote({ tone: 'crit', text: m })} />}
           {can('scans.run') && <button className="btn primary" onClick={() => void collectNow()}>Collect inventory now</button>}
           {can('assets.manage') && <button className="btn danger" onClick={() => void (async () => {
-            try { if (await deleteDevices([id], a.hostname ?? a.ip ?? undefined)) navigate('/assets'); }
+            try { if (await deleteDevices([id], a.hostname ?? a.ip ?? undefined)) navigate(section.path); }
             catch (e) { setNote({ tone: 'crit', text: e instanceof Error ? e.message : String(e) }); }
           })()}>Delete</button>}
-          <Link className="btn" to="/assets">All assets</Link>
+          <Link className="btn" to={section.path}>{section.label}</Link>
         </>} />
       {note && <Callout tone={note.tone} icon={note.tone === 'crit' ? 'alert' : 'info'}>{note.text}</Callout>}
       <ErrorBox error={inv.error} />
@@ -249,15 +253,6 @@ export function AssetDetailPage({ id }: { id: string }) {
       {tab === 'services' && (
         <>
           {control.data?.note && <Callout tone="warn" icon="alert">{control.data.note}</Callout>}
-          {(() => {
-            const last = (actions.data ?? [])[0];
-            return last ? (
-              <Callout icon={last.status === 'failed' ? 'alert' : 'info'} tone={last.status === 'failed' ? 'crit' : last.status === 'succeeded' ? 'ok' : 'info'}>
-                Last action: <b>{fmt.label(last.operation)}</b> <span className="mono">{last.target}</span> — {fmt.label(last.status)}{last.detail ? `: ${last.detail}` : ''} ({fmt.ago(last.requestedAt)}).{' '}
-                <Link to={`/activity?assetId=${id}`}>Service activity log</Link>
-              </Callout>
-            ) : null;
-          })()}
           <Panel flush right={<input className="in" placeholder="Filter…" value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Filter services" />} title="Services"
             sub={<>{control.data ? (control.data.channel === 'agent' ? 'Start, stop and restart run through the Zentriq Agent · ' : 'Start, stop and restart run over WinRM/WMI with an administrator account · ') : ''}<Link to={`/activity?assetId=${id}`}>Activity log</Link></>}>
             <DataTable rows={(d?.services ?? []).filter((s) => !f || s.name.toLowerCase().includes(f) || (s.displayName ?? '').toLowerCase().includes(f)).map((x, i) => ({ ...x, id: i }))} empty="No services collected." columns={[

@@ -2,7 +2,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { api } from '../../api/client';
 import { Link, useRouter } from '../../app/router';
 import { useApi } from '../../app/useApi';
-import { CategoryChart } from '../../components/charts';
+import { CategoryChart, ChartKindPicker, useChartKind } from '../../components/charts';
 import { Callout, DataTable, ErrorBox, fmt, Kpis, Loading, PageHead, Panel, Pill } from '../../components/ui';
 import { deviceTypeLabel } from '../assets/deviceTypes';
 import { TopologyMap } from './Topology';
@@ -110,18 +110,22 @@ function DevicesTab({ summary }: { summary: NetworkSummary | null }) {
   const [search, setSearch] = useState('');
   const data = useApi(() => api.get<NetworkDevice[]>('/network/devices', { type, management: mgmt, q: search }), [type, mgmt, search]);
   const rows = data.data ?? [];
+  // Chart type per tile (share bar, bar, column, pie), remembered in this browser.
+  const [typeKind, setTypeKind] = useChartKind('network.types', 'bar');
+  const [mgmtKind, setMgmtKind] = useChartKind('network.management', 'share');
+  const [vendorKind, setVendorKind] = useChartKind('network.vendors', 'bar');
   return (
     <>
       {summary && summary.devices > 0 && (
         <div className="grid-3">
-          <Panel title="By type">
-            <CategoryChart kind="bar" centerLabel="devices" data={Object.entries(summary.byType).map(([k, v]) => ({ key: k, label: typeName(k), value: v }))} onSelect={(x) => setType(x.key)} />
+          <Panel title="By type" right={<ChartKindPicker value={typeKind} onChange={setTypeKind} />}>
+            <CategoryChart kind={typeKind} centerLabel="devices" data={Object.entries(summary.byType).map(([k, v]) => ({ key: k, label: typeName(k), value: v }))} onSelect={(x) => setType(x.key)} />
           </Panel>
-          <Panel title="By management" sub="How each device can be inventoried">
-            <CategoryChart kind="share" centerLabel="devices" data={(['snmp', 'web', 'none'] as Management[]).map((k) => ({ key: k, label: MANAGEMENT[k][0], value: summary.byManagement[k] ?? 0, color: k === 'snmp' ? 'var(--ok)' : k === 'web' ? 'var(--warn)' : 'var(--line-strong)' }))} onSelect={(x) => setMgmt(x.key)} />
+          <Panel title="By management" sub="How each device can be inventoried" right={<ChartKindPicker value={mgmtKind} onChange={setMgmtKind} />}>
+            <CategoryChart kind={mgmtKind} centerLabel="devices" data={(['snmp', 'web', 'none'] as Management[]).map((k) => ({ key: k, label: MANAGEMENT[k][0], value: summary.byManagement[k] ?? 0, color: k === 'snmp' ? 'var(--ok)' : k === 'web' ? 'var(--warn)' : 'var(--line-strong)' }))} onSelect={(x) => setMgmt(x.key)} />
           </Panel>
-          <Panel title="By manufacturer">
-            <CategoryChart kind="bar" centerLabel="devices" data={summary.byManufacturer.map((m) => ({ key: m.name, label: m.name, value: m.count }))} onSelect={(x) => { setQ(x.key === 'Unknown' ? '' : x.key); setSearch(x.key === 'Unknown' ? '' : x.key); }} />
+          <Panel title="By manufacturer" right={<ChartKindPicker value={vendorKind} onChange={setVendorKind} />}>
+            <CategoryChart kind={vendorKind} centerLabel="devices" data={summary.byManufacturer.map((m) => ({ key: m.name, label: m.name, value: m.count }))} onSelect={(x) => { setQ(x.key === 'Unknown' ? '' : x.key); setSearch(x.key === 'Unknown' ? '' : x.key); }} />
           </Panel>
         </div>
       )}

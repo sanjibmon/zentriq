@@ -71,7 +71,8 @@ public static class RemoteEndpoints
             await using var cmd = ds.CreateCommand("""
                 SELECT n.node_id, n.name, n.os, n.ip, n.connected, n.last_connected_at, n.asset_id, a.hostname, a.category, d.name, a.os_name,
                        ag.id IS NOT NULL, COALESCE('remote-support' = ANY(ag.capabilities), false),
-                       (SELECT x.status || '|' || COALESCE(x.detail, '') FROM zentriq.asset_actions x WHERE x.asset_id = COALESCE(n.asset_id, a.id) AND x.kind = 'remote-support' ORDER BY x.requested_at DESC LIMIT 1)
+                       (SELECT x.status || '|' || COALESCE(x.detail, '') FROM zentriq.asset_actions x WHERE x.asset_id = COALESCE(n.asset_id, a.id) AND x.kind = 'remote-support' ORDER BY x.requested_at DESC LIMIT 1),
+                       zentriq.asset_ipv4(n.asset_id)
                   FROM (SELECT node_id, name, os, ip, connected, last_connected_at, asset_id FROM zentriq.remote_nodes
                         UNION ALL
                         SELECT NULL, COALESCE(a2.hostname, host(a2.primary_ip)), a2.os_name, host(a2.primary_ip), false, NULL, a2.id
@@ -96,7 +97,7 @@ public static class RemoteEndpoints
                 var last = S(13)?.Split('|', 2);
                 list.Add(new
                 {
-                    id = S(0) ?? "asset:" + r.GetGuid(6), nodeId = S(0), name = r.GetString(1), os = S(2) ?? S(10), ip = S(3), online = r.GetBoolean(4),
+                    id = S(0) ?? "asset:" + r.GetGuid(6), nodeId = S(0), name = r.GetString(1), os = S(2) ?? S(10), ip = AgentEndpoints.Ipv4(S(14), S(3)), online = r.GetBoolean(4),
                     lastConnectedAt = r.IsDBNull(5) ? (DateTimeOffset?)null : r.GetFieldValue<DateTimeOffset>(5),
                     assetId = r.IsDBNull(6) ? (Guid?)null : r.GetGuid(6), hostname = S(7), category = S(8), department = S(9),
                     hasAgent = r.GetBoolean(11), canInstall = r.GetBoolean(12),
