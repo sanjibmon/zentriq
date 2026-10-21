@@ -86,14 +86,14 @@ CREATE TABLE accessory_units (
     person_key   text,
     department_id uuid REFERENCES departments(id) ON DELETE SET NULL,
     asset_id     uuid REFERENCES assets(id) ON DELETE SET NULL,
-    updated_at   timestamptz NOT NULL DEFAULT now(),
-    UNIQUE (item_id, serial)
+    updated_at   timestamptz NOT NULL DEFAULT now()
 );
+CREATE UNIQUE INDEX ux_accessory_units_serial ON accessory_units (item_id, lower(serial));
 
 -- ---- reports -----------------------------------------------------------------------------------------------------
 INSERT INTO report_definitions (name, dataset, shared, system, description, definition) VALUES
  ('Assets by location', 'assets', true, true, 'Number of devices per location.',
-  '{"columns":["location"],"groupBy":["location"],"filters":[],"sort":[{"column":"count","dir":"desc"}],"chart":"bar"}'),
+  '{"columns":["asset_location"],"groupBy":["asset_location"],"filters":[],"sort":[{"column":"count","dir":"desc"}],"chart":"bar"}'),
  ('Accessory stock on hand', 'accessory_stock', true, true, 'Quantity and value of every accessory in every location, with the reorder level.',
   '{"columns":["location","category","item","quantity","faulty","reorder_level","stock_value","below_reorder"],"filters":[],"sort":[{"column":"location","dir":"asc"},{"column":"item","dir":"asc"}]}'),
  ('Accessories below reorder level', 'accessory_stock', true, true, 'Accessories to order: stock at or below the reorder level.',

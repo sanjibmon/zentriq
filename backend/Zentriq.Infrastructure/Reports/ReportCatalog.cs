@@ -43,7 +43,7 @@ public static class ReportCatalog
         new("criticality", "Criticality", ReportColumnType.Text, "a.criticality", "Device"),
         new("owner", "Owner", ReportColumnType.Text, "a.owner_name", "Device"),
         new("department", "Department / unit", ReportColumnType.Text, "(SELECT dp.name FROM zentriq.departments dp WHERE dp.id = a.department_id)", "Device"),
-        new("location", "Location", ReportColumnType.Text, "(SELECT lo.name FROM zentriq.locations lo WHERE lo.id = a.location_id)", "Device"),
+        new("asset_location", "Location (site / office)", ReportColumnType.Text, "(SELECT lo.name FROM zentriq.locations lo WHERE lo.id = a.location_id)", "Device"),
     ];
 
     public static readonly IReadOnlyList<ReportDataset> Datasets =

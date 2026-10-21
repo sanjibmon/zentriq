@@ -140,6 +140,12 @@ export interface Column<T> {
   label: ReactNode;
   render: (row: T) => ReactNode;
   className?: string;
+  /** Column chooser: not shown until the viewer adds it. */
+  optional?: boolean;
+  /** Column chooser: always shown (selection boxes, actions). */
+  fixed?: boolean;
+  /** Name in the column chooser when the label is not plain text. */
+  title?: string;
 }
 
 export function DataTable<T extends { id: string | number }>({ columns, rows, empty = 'No records.' }: { columns: Column<T>[]; rows: T[]; empty?: string }) {

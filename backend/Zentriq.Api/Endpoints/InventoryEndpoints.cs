@@ -83,14 +83,17 @@ public static class InventoryEndpoints
 
         var g = api.MapGroup("/inventory").WithTags("Inventory");
 
-        g.MapGet("/software", async (NpgsqlDataSource ds, string? q, int? page, int? pageSize, CancellationToken ct) =>
+        g.MapGet("/software", async (NpgsqlDataSource ds, string? q, string? department, string? location, string? os, int? page, int? pageSize, CancellationToken ct) =>
         {
             var (p, size) = Paging.Normalize(page, pageSize);
             await using var cmd = ds.CreateCommand("""
                 WITH s AS (
                   SELECT s.name, s.publisher, s.version, s.asset_id
                     FROM zentriq.software_inventory s JOIN zentriq.assets a ON a.id = s.asset_id AND a.status = 'active'
-                   WHERE @q IS NULL OR s.name ILIKE @q OR s.publisher ILIKE @q
+                   WHERE (@q::text IS NULL OR s.name ILIKE @q OR s.publisher ILIKE @q)
+                     AND (@dep::text IS NULL OR (@dep = 'none' AND a.department_id IS NULL) OR a.department_id::text = @dep)
+                     AND (@loc::text IS NULL OR (@loc = 'none' AND a.location_id IS NULL) OR a.location_id::text = @loc)
+                     AND (@os::text IS NULL OR a.os_family = @os)
                 )
                 SELECT name, max(publisher), count(DISTINCT asset_id) AS installs, count(DISTINCT version) AS versions,
                        (array_agg(DISTINCT version ORDER BY version DESC) FILTER (WHERE version IS NOT NULL))[1:5],
@@ -99,6 +102,9 @@ public static class InventoryEndpoints
                  LIMIT @l OFFSET @o
                 """);
             cmd.Parameters.Add(new NpgsqlParameter("q", NpgsqlDbType.Text) { Value = string.IsNullOrWhiteSpace(q) ? DBNull.Value : "%" + Escape(q.Trim()) + "%" });
+            cmd.Parameters.Add(new NpgsqlParameter("dep", NpgsqlDbType.Text) { Value = string.IsNullOrWhiteSpace(department) ? DBNull.Value : department.Trim() });
+            cmd.Parameters.Add(new NpgsqlParameter("loc", NpgsqlDbType.Text) { Value = string.IsNullOrWhiteSpace(location) ? DBNull.Value : location.Trim() });
+            cmd.Parameters.Add(new NpgsqlParameter("os", NpgsqlDbType.Text) { Value = os is "windows" or "linux" or "macos" ? os : DBNull.Value });
             cmd.Parameters.AddWithValue("l", size);
             cmd.Parameters.AddWithValue("o", (p - 1) * size);
             var items = new List<object>();
@@ -119,7 +125,9 @@ public static class InventoryEndpoints
                        (SELECT CASE WHEN 'software-uninstall' = ANY(r.capabilities) THEN 'ready' ELSE 'old' END FROM zentriq.agent_registrations r
                          WHERE r.asset_id = a.id AND r.status = 'active' ORDER BY r.last_checkin_at DESC NULLS LAST LIMIT 1),
                        (SELECT x.status || '|' || COALESCE(x.detail, '') FROM zentriq.asset_actions x
-                         WHERE x.asset_id = a.id AND x.kind = 'uninstall' AND lower(x.target) = lower(s.name) ORDER BY x.requested_at DESC LIMIT 1)
+                         WHERE x.asset_id = a.id AND x.kind = 'uninstall' AND lower(x.target) = lower(s.name) ORDER BY x.requested_at DESC LIMIT 1),
+                       (SELECT dp.name FROM zentriq.departments dp WHERE dp.id = a.department_id), (SELECT lo.name FROM zentriq.locations lo WHERE lo.id = a.location_id),
+                       s.publisher
                   FROM zentriq.software_inventory s JOIN zentriq.assets a ON a.id = s.asset_id AND a.status = 'active'
                  WHERE s.name = @n ORDER BY lower(a.hostname) LIMIT 2000
                 """);
@@ -133,6 +141,7 @@ public static class InventoryEndpoints
                     version = r.IsDBNull(4) ? null : r.GetString(4), installedOn = r.IsDBNull(5) ? (DateOnly?)null : r.GetFieldValue<DateOnly>(5), source = r.GetString(6),
                     agent = r.IsDBNull(7) ? "none" : r.GetString(7),
                     lastUninstall = r.IsDBNull(8) ? null : r.GetString(8).Split('|', 2) is var u ? new { status = u[0], detail = u.Length > 1 ? u[1] : null } : null,
+                    department = r.IsDBNull(9) ? null : r.GetString(9), location = r.IsDBNull(10) ? null : r.GetString(10), publisher = r.IsDBNull(11) ? null : r.GetString(11),
                 });
             return Results.Ok(list);
         }).RequireAuthorization(Permissions.AssetsView);

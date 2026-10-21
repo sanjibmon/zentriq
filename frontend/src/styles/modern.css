@@ -294,3 +294,25 @@ details.rs-advanced[open] summary { margin-bottom: 12px; }
 .rs-where { display: flex; width: 100%; }
 .rs-where button { flex: 1; display: inline-flex; gap: 6px; align-items: center; justify-content: center; }
 .rs-current { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); }
+
+/* ---- build 75: column chooser, filter bar, IT accessories ---------------------------------------------------- */
+.col-chooser { position: relative; display: inline-flex; }
+.col-chooser .cnt { margin-left: 6px; font-size: 11px; background: var(--surface-3); border-radius: 999px; padding: 0 6px; line-height: 17px; }
+.col-pop { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; min-width: 230px; max-height: 360px; overflow: auto;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 32px rgba(15, 23, 42, .16); padding: 10px 12px; display: grid; gap: 6px; }
+.col-pop-head { display: flex; justify-content: space-between; align-items: center; padding-bottom: 6px; border-bottom: 1px solid var(--line); margin-bottom: 2px; }
+.col-pop .row-check { font-size: 13px; white-space: nowrap; }
+.linkish { background: none; border: 0; color: var(--accent); cursor: pointer; font: inherit; font-size: 12.5px; padding: 0; }
+.filter-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+.filter-bar .in { min-width: 0; }
+.filter-bar .grow { flex: 1 1 240px; }
+.stock-qty { font-variant-numeric: tabular-nums; font-weight: 600; }
+.stock-qty.low { color: var(--warn-ink, #b45309); }
+.stock-qty.out { color: var(--crit); }
+.line-grid { display: grid; gap: 8px; }
+.line-row { display: grid; grid-template-columns: minmax(0, 1fr) 96px 110px 34px; gap: 8px; align-items: start; }
+.line-row.no-cost { grid-template-columns: minmax(0, 1fr) 96px 34px; }
+.line-row textarea { grid-column: 1 / -1; }
+@media (max-width: 640px) { .line-row, .line-row.no-cost { grid-template-columns: 1fr 80px 34px; } .line-row .cost { display: none; } }
+.tbl-tools { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+.tbl-tools .btn { padding-top: 4px; padding-bottom: 4px; }

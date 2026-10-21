@@ -218,7 +218,7 @@ public static class AccessoryStore
             if (s.Length > 100) throw new AccessoryValidationException("serials", "A serial number can have at most 100 characters.");
             await using var cmd = new NpgsqlCommand("""
                 INSERT INTO zentriq.accessory_units (item_id, serial, location_id, status) VALUES (@i, @s, @l, 'in_stock')
-                ON CONFLICT (item_id, serial) DO UPDATE SET location_id = EXCLUDED.location_id, status = 'in_stock', person = NULL, person_key = NULL,
+                ON CONFLICT (item_id, lower(serial)) DO UPDATE SET location_id = EXCLUDED.location_id, status = 'in_stock', person = NULL, person_key = NULL,
                     department_id = NULL, asset_id = NULL, updated_at = now()
                  WHERE zentriq.accessory_units.status = 'written_off'
                 """, conn, tx);

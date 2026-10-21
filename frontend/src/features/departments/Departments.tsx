@@ -30,8 +30,9 @@ export function useAddDepartment() {
 /**
  * Dropdown of departments with "Add new…" at the end. value = department id, '' = none.
  */
-export function DepartmentSelect({ value, onChange, list, onAdded, allowNone = true, noneLabel = '— Not assigned —', canAdd, id }: {
+export function DepartmentSelect({ value, onChange, list, onAdded, allowNone = true, noneLabel = '— Not assigned —', canAdd, id, extra }: {
   value: string; onChange: (id: string) => void; list: Department[]; onAdded: () => void; allowNone?: boolean; noneLabel?: string; canAdd: boolean; id?: string;
+  extra?: [string, string][];
 }) {
   const add = useAddDepartment();
   const [error, setError] = useState<string | null>(null);
@@ -46,6 +47,7 @@ export function DepartmentSelect({ value, onChange, list, onAdded, allowNone = t
   return (
     <>
       <select id={id} className="in" value={value} onChange={(e) => void pick(e.target.value)} aria-label="Department">
+        {extra?.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         {allowNone && <option value="">{noneLabel}</option>}
         {list.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
         {canAdd && <option value="__add">＋ Add new department…</option>}

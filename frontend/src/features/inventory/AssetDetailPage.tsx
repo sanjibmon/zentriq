@@ -10,6 +10,7 @@ import { AssetSecurity } from '../security/AssetSecurity';
 import { AssetRemoteButtons } from '../remote/AssetRemote';
 import { ChangesView } from './Changes';
 import { DepartmentSelect, useDepartments } from '../departments/Departments';
+import { LocationSelect, useLocations } from '../locations/Locations';
 import { AssetVulnerabilities } from '../vulnerabilities/AssetVulnerabilities';
 import { DeviceTypeField, useDeleteDevices } from '../assets/DeviceManagement';
 import { AssetNetwork } from '../network/AssetNetwork';
@@ -106,6 +107,7 @@ export function AssetDetailPage({ id, section = ASSETS_SECTION }: { id: string; 
               ...(a.identifiedBy && a.identifiedBy.length > 0 ? [['Recognised by', <span className="faint" style={{ fontSize: 12.5 }}>{a.identifiedBy.join('; ')}</span>] as [string, ReactNode]] : []),
               ...(d?.device.location || d?.device.contact ? [['Location / contact', [d?.device.location, d?.device.contact].filter(Boolean).join(' · ')] as [string, ReactNode]] : []),
               ['Department / unit', <DepartmentField asset={a} onSaved={asset.reload} />],
+              ['Location', <LocationField asset={a} onSaved={asset.reload} />],
               ['Logged-on user', d?.users.loggedOn], ['Owner', a.ownerName], ['Criticality', a.criticality],
             ]} />
           </Panel>
@@ -300,6 +302,25 @@ function DepartmentField({ asset, onSaved }: { asset: Asset; onSaved: () => void
   return (
     <span style={{ display: 'inline-grid', gap: 2, minWidth: 220 }}>
       <DepartmentSelect value={asset.departmentId ?? ''} onChange={(v) => void set(v)} list={deps.data?.items ?? []} onAdded={deps.reload} canAdd />
+      {error && <small style={{ color: 'var(--crit)' }}>{error}</small>}
+    </span>
+  );
+}
+
+/** Location of the device; editable in place by asset managers. */
+function LocationField({ asset, onSaved }: { asset: Asset; onSaved: () => void }) {
+  const { can } = useAuth();
+  const locs = useLocations();
+  const [error, setError] = useState<string | null>(null);
+  if (!can('assets.manage')) return <>{asset.location ?? '—'}</>;
+  async function set(id: string) {
+    setError(null);
+    try { await api.post('/assets/location', { assetIds: [asset.id], locationId: id || null }); onSaved(); locs.reload(); }
+    catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+  }
+  return (
+    <span style={{ display: 'inline-grid', gap: 2, minWidth: 220 }}>
+      <LocationSelect value={asset.locationId ?? ''} onChange={(v) => void set(v)} list={locs.data?.items ?? []} onAdded={locs.reload} canAdd />
       {error && <small style={{ color: 'var(--crit)' }}>{error}</small>}
     </span>
   );

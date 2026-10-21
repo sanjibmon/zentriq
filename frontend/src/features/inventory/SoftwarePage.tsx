@@ -6,17 +6,25 @@ import { useAuth } from '../../app/auth';
 import { useConfirm } from '../../components/Confirm';
 import { useApi } from '../../app/useApi';
 import { ChangesTab } from './Changes';
-import { Callout, DataTable, ErrorBox, fmt, PageHead, Pager, Panel, Pill } from '../../components/ui';
+import { Callout, ErrorBox, fmt, PageHead, Pager, Panel, Pill } from '../../components/ui';
+import { ChoosableTable } from '../../components/columns';
+import { useDepartments } from '../departments/Departments';
+import { useLocations } from '../locations/Locations';
 
 export function SoftwarePage() {
   const initialQ = new URLSearchParams(window.location.search).get('q') ?? '';
   const [q, setQ] = useState(initialQ);
   const [search, setSearch] = useState(initialQ);
   const [page, setPage] = useState(1);
+  const [department, setDepartment] = useState('');
+  const [location, setLocation] = useState('');
+  const [os, setOs] = useState('');
+  const deps = useDepartments();
+  const locs = useLocations();
   const [selected, setSelected] = useState<string | null>(null);
   const [tab, setTab] = useState<'all' | 'changes'>(new URLSearchParams(window.location.search).get('tab') === 'changes' ? 'changes' : 'all');
   const pageSize = 50;
-  const data = useApi(() => api.get<Paged<SoftwareRow>>('/inventory/software', { q: search, page, pageSize }), [search, page]);
+  const data = useApi(() => api.get<Paged<SoftwareRow>>('/inventory/software', { q: search, department, location, os, page, pageSize }), [search, department, location, os, page]);
   const installs = useApi(() => (selected ? api.get<SoftwareInstall[]>('/inventory/software/installs', { name: selected }) : Promise.resolve(null)), [selected]);
   const { can } = useAuth();
   const confirm = useConfirm();
@@ -44,7 +52,7 @@ export function SoftwarePage() {
       danger: true, confirmLabel: 'Uninstall',
       typeToConfirm: all && n > 1 ? 'UNINSTALL' : undefined,
       message: <>
-        <p style={{ marginTop: 0 }}>The Zentriq Agent on each device removes the application silently at its next check-in (set by its check-in interval). Users may lose unsaved work in that application, and some uninstallers restart services.</p>
+        <p style={{ marginTop: 0 }}>The Zentriq Agent on each device removes the application silently — within seconds when the device is online, otherwise when it next connects. Users may lose unsaved work in that application, and some uninstallers restart services.</p>
         {noAgent > 0 && <p style={{ marginBottom: 0 }}>{noAgent} of these device(s) have no agent (or an outdated one) and will be skipped.</p>}
       </>,
     });
@@ -67,12 +75,28 @@ export function SoftwarePage() {
       {tab === 'changes' ? <ChangesTab kind="software" /> : <>
       <form className="toolbar-row" onSubmit={(e) => { e.preventDefault(); setPage(1); setSearch(q); }}>
         <input className="in grow" placeholder="Search product or publisher…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search software" />
+        <select className="in" value={os} onChange={(e) => { setPage(1); setOs(e.target.value); }} aria-label="Operating system">
+          <option value="">All operating systems</option>
+          <option value="windows">Windows</option>
+          <option value="macos">macOS</option>
+          <option value="linux">Linux</option>
+        </select>
+        <select className="in" value={department} onChange={(e) => { setPage(1); setDepartment(e.target.value); }} aria-label="Department">
+          <option value="">All departments</option>
+          <option value="none">Not assigned</option>
+          {(deps.data?.items ?? []).map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+        </select>
+        <select className="in" value={location} onChange={(e) => { setPage(1); setLocation(e.target.value); }} aria-label="Location">
+          <option value="">All locations</option>
+          <option value="none">No location</option>
+          {(locs.data?.items ?? []).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+        </select>
         <button className="btn" type="submit">Search</button>
       </form>
       <ErrorBox error={data.error} />
       <div className="grid-2" style={{ gridTemplateColumns: selected ? 'minmax(0,2fr) minmax(0,3fr)' : '1fr' }}>
         <Panel flush>
-          <DataTable rows={(data.data?.items ?? []).map((r) => ({ ...r, id: r.name }))} empty={data.loading ? 'Loading…' : 'No software inventory yet. Install agents or run a scan with credentials.'} columns={[
+          <ChoosableTable tableId="software" rows={(data.data?.items ?? []).map((r) => ({ ...r, id: r.name }))} empty={data.loading ? 'Loading…' : 'No software inventory yet. Install agents or run a scan with credentials.'} columns={[
             { key: 'n', label: 'Product', render: (r) => <button className="linkish" onClick={() => setSelected(r.name)}><b>{r.name}</b></button> },
             { key: 'p', label: 'Publisher', render: (r) => r.publisher ?? '—' },
             { key: 'i', label: 'Installs', render: (r) => r.installs.toLocaleString() },
@@ -89,14 +113,18 @@ export function SoftwarePage() {
             </div>}>
             {msg && <div style={{ padding: '10px 12px 0' }}><Callout tone={msg.tone} icon={msg.tone === 'crit' ? 'alert' : 'info'}>{msg.text} <Link to="/activity?kind=uninstall">Activity log</Link></Callout></div>}
             <ErrorBox error={installs.error} />
-            <DataTable rows={list.map((r, i) => ({ ...r, id: `${r.assetId}-${i}` }))} empty={installs.loading ? 'Loading…' : 'None.'} columns={[
+            <ChoosableTable tableId="software.devices" rows={list.map((r, i) => ({ ...r, id: `${r.assetId}-${i}` }))} empty={installs.loading ? 'Loading…' : 'None.'} columns={[
               ...(canUninstall ? [{
                 key: 'sel', label: <input type="checkbox" className="row-sel" aria-label="Select all devices that can be uninstalled" checked={ready.length > 0 && ready.every((r) => picked.includes(r.assetId))} onChange={(e) => setPicked(e.target.checked ? ready.map((r) => r.assetId) : [])} />,
                 render: (r: SoftwareInstall) => r.agent === 'ready'
                   ? <input type="checkbox" className="row-sel" aria-label={`Select ${r.hostname ?? r.ip}`} checked={picked.includes(r.assetId)} onChange={(e) => setPicked((p) => e.target.checked ? [...p, r.assetId] : p.filter((x) => x !== r.assetId))} />
                   : null,
               }] : []),
-              { key: 'h', label: 'Device', render: (r) => <><Link to={`/software/devices/${r.assetId}`}>{r.hostname ?? r.ip ?? r.assetId}</Link><div className="faint" style={{ fontSize: 11.5 }}>{r.osName ?? ''}</div></> },
+              { key: 'h', label: 'Device', render: (r) => <Link to={`/software/devices/${r.assetId}`}>{r.hostname ?? r.ip ?? r.assetId}</Link> },
+              { key: 'os', label: 'Operating system', className: 'wrap', render: (r) => r.osName ?? '—' },
+              { key: 'dep', label: 'Department', optional: true, render: (r) => r.department ?? '—' },
+              { key: 'loc', label: 'Location', optional: true, render: (r) => r.location ?? '—' },
+              { key: 'ip', label: 'IP address', optional: true, render: (r) => r.ip ? <span className="mono">{r.ip}</span> : '—' },
               { key: 'v', label: 'Version', render: (r) => r.version ?? '—' },
               { key: 'd', label: 'Installed', render: (r) => fmt.day(r.installedOn) },
               { key: 'a', label: 'Remote uninstall', render: (r) => r.lastUninstall
