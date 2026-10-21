@@ -152,7 +152,10 @@ app.UseMiddleware<AgentPortMiddleware>();
 if (!httpOnly) app.UseHsts();
 
 app.UseDefaultFiles();
-app.UseStaticFiles();
+// The console's start page must never come from the browser cache: after an upgrade the browser would keep running the
+// previous console. Its scripts and styles have content hashes in their names, so they can be cached for good.
+var consoleFiles = new StaticFileOptions { OnPrepareResponse = c => ConsoleCache.Apply(c.Context) };
+app.UseStaticFiles(consoleFiles);
 
 app.UseRateLimiter();
 app.UseAuthentication();
@@ -197,7 +200,7 @@ app.MapOpenApi("/api/openapi/{documentName}.json").RequireAuthorization(Permissi
 
 // Unknown /api paths are 404 JSON; everything else is the single-page app.
 app.MapFallback("/api/{**rest}", () => Results.Problem(statusCode: 404, title: "Not found"));
-app.MapFallbackToFile("index.html");
+app.MapFallbackToFile("index.html", consoleFiles);
 
 app.Run();
 

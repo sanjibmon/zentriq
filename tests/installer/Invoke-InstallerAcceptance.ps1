@@ -190,7 +190,11 @@ if (-not $installed) {
         Assert $js 'no application script referenced by index.html'
         $bundle = Invoke-WebRequest "$base$js" -SkipCertificateCheck
         Assert ($bundle.Content -match 'Sign in') 'application bundle has no sign-in page'
-        "index + $js ($([int]($bundle.RawContentLength/1KB)) KB)"
+        # After an upgrade the browser must load the new console: the start page is never cached, hashed assets are.
+        $deep = Invoke-WebRequest "$base/agents" -SkipCertificateCheck
+        foreach ($page in @($r, $deep)) { Assert ("$($page.Headers['Cache-Control'])" -match 'no-cache' -and "$($page.Headers['Cache-Control'])" -match 'no-store') "start page may be cached: $($page.Headers['Cache-Control'])" }
+        Assert ("$($bundle.Headers['Cache-Control'])" -match 'immutable') "assets not cacheable: $($bundle.Headers['Cache-Control'])"
+        "index + $js ($([int]($bundle.RawContentLength/1KB)) KB); start page not cached, assets immutable"
     } | Out-Null
     Check 'T08' 'zentriqctl verify (end-to-end health)' { & $ctl verify | Out-Host; Assert ($LASTEXITCODE -eq 0) "exit $LASTEXITCODE"; 'all checks passed' } | Out-Null
 
