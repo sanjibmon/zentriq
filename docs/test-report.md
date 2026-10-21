@@ -1,9 +1,18 @@
 # Test report
 
-Latest: GitHub Actions run 39547140552, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
-10.0.20348** VM. Release: `v1.1.1-build.73` (pre-release, **unsigned**), package version **1.1.1.73**. Results: unit +
-PostgreSQL integration tests **225 PASS, 2 skipped** (the live MeshCentral and live SNMP tests run in ci-quick: PASS, 227/227);
-installer acceptance **58 passed, 0 failed, 0 blocked, 10 not run**; in-place updates PASS.
+Latest: GitHub Actions run 39592489854, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
+10.0.20348** VM. Release: `v1.1.1-build.74` (pre-release, **unsigned**), package version **1.1.1.74**. Results: unit +
+PostgreSQL integration tests **226 PASS, 2 skipped** (the live MeshCentral and live SNMP tests run in ci-quick: PASS, 228/228);
+installer acceptance **58 passed, 0 failed, 0 blocked, 10 not run**; in-place updates PASS (database migration V0020).
+
+New in build 74 (device details stay in Hardware / Software Inventory, no last-action banner on Services, IPv4 in the
+Agents and Remote Support device lists, chart types in Network Inventory):
+
+| ID | Test | Result | Detail |
+|---|---|---|---|
+| — | PostgreSQL test | **PASS** | `zentriq.asset_ipv4`: IPv4 primary address used; IPv6 primary address → IPv4 of the adapter with a gateway (link-local skipped); IPv6-only device → none |
+| — | Console (ci-quick build, screenshots) | **PASS** | device opened from Hardware Inventory stays there (`/hardware/<id>`, breadcrumb, *All hardware*); network charts switch between share bar, bar, column and pie |
+| all | Acceptance suite (re-run) | **PASS** | 58 passed |
 
 New in build 73 (one uninstall code for all agents, Online / Offline connection state, IPv4 addresses, OS column in
 hardware inventory):
