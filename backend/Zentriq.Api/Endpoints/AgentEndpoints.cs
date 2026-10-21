@@ -467,7 +467,7 @@ public static class AgentEndpoints
                        r.cert_not_after, r.asset_id, a.hostname, r.revoked_at, t.name, r.capabilities,
                        u.status, u.target, u.detail, u.requested_at, u.completed_at,
                        r.checkin_minutes, r.inventory_minutes, COALESCE(r.online_until > now(), false), r.last_outage_from, r.last_outage_to, r.uninstall_protected,
-                       host(a.primary_ip)
+                       zentriq.asset_ipv4(r.asset_id)
                   FROM zentriq.agent_registrations r
                   LEFT JOIN LATERAL (SELECT x.status, x.target, x.detail, x.requested_at, x.completed_at FROM zentriq.asset_actions x
                                       WHERE x.agent_id = r.id AND x.kind = 'agent-update' ORDER BY x.requested_at DESC LIMIT 1) u ON true
@@ -917,14 +917,26 @@ public static class AgentEndpoints
     /// <summary>What an agent receives: the hash and expiry (null when there is no code or protection is off).</summary>
     private static object? CodeForAgents(CodeForAll? c, bool protection) => protection && c is not null ? new { hash = c.Hash, expiresAt = c.ExpiresAt } : null;
 
-    /// <summary>The device's IPv4 address: its inventoried address, else the address it connects from (IPv4-mapped shown as IPv4).</summary>
-    internal static string? Ipv4(string? assetIp, string? lastIp)
+    /// <summary>
+    /// The device's IPv4 address for lists: the inventoried one (<paramref name="assetIpv4"/>), else the address it
+    /// connects from when that is IPv4 (IPv4-mapped IPv6 shown as IPv4, "[addr]:port" and "addr:port" accepted); only
+    /// when the device has no IPv4 address at all, the other address as it is.
+    /// </summary>
+    public static string? Ipv4(string? assetIpv4, string? other)
     {
-        static string? V4(string? ip) =>
-            System.Net.IPAddress.TryParse(ip, out var a)
-                ? a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork ? a.ToString() : a.IsIPv4MappedToIPv6 ? a.MapToIPv4().ToString() : null
-                : null;
-        return V4(assetIp) ?? V4(lastIp) ?? (System.Net.IPAddress.TryParse(lastIp, out var x) && System.Net.IPAddress.IsLoopback(x) ? "127.0.0.1" : lastIp);
+        static System.Net.IPAddress? Parse(string? s)
+        {
+            if (string.IsNullOrWhiteSpace(s)) return null;
+            s = s.Trim();
+            if (System.Net.IPAddress.TryParse(s, out var a)) return a;
+            if (s.StartsWith('[') && s.IndexOf(']') is > 0 and var e && System.Net.IPAddress.TryParse(s[1..e], out a)) return a;   // [v6]:port
+            var c = s.LastIndexOf(':');
+            return c > 0 && s.IndexOf(':') == c && System.Net.IPAddress.TryParse(s[..c], out a) ? a : null;                    // v4:port
+        }
+        static string? V4(System.Net.IPAddress? a) =>
+            a is null ? null : a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork ? a.ToString() : a.IsIPv4MappedToIPv6 ? a.MapToIPv4().ToString() : null;
+        var o = Parse(other);
+        return V4(Parse(assetIpv4)) ?? V4(o) ?? (o is not null && System.Net.IPAddress.IsLoopback(o) ? "127.0.0.1" : o?.ToString() ?? other);
     }
 
     private static System.Net.IPAddress? ClientIp(HttpContext http) =>

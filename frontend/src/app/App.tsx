@@ -34,6 +34,11 @@ function Routes() {
   if (path === '/assets') return <AssetsPage />;
   const assetMatch = /^\/assets\/([0-9a-f-]{36})$/i.exec(path);
   if (assetMatch) return <AssetDetailPage id={assetMatch[1]!} />;
+  // Devices opened from Hardware / Software Inventory stay in that section.
+  const hwMatch = /^\/hardware\/([0-9a-f-]{36})$/i.exec(path);
+  if (hwMatch) return <AssetDetailPage id={hwMatch[1]!} section={{ path: '/hardware', label: 'All hardware', tab: 'hardware' }} />;
+  const swMatch = /^\/software\/devices\/([0-9a-f-]{36})$/i.exec(path);
+  if (swMatch) return <AssetDetailPage id={swMatch[1]!} section={{ path: '/software', label: 'All software', tab: 'software' }} />;
   if (path === '/software') return <SoftwarePage />;
   if (path === '/hardware') return <HardwarePage />;
   if (path === '/network') return <NetworkPage />;
