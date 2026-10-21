@@ -1,9 +1,20 @@
 # Test report
 
-Latest: GitHub Actions run 39592489854, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
-10.0.20348** VM. Release: `v1.1.1-build.74` (pre-release, **unsigned**), package version **1.1.1.74**. Results: unit +
-PostgreSQL integration tests **226 PASS, 2 skipped** (the live MeshCentral and live SNMP tests run in ci-quick: PASS, 228/228);
-installer acceptance **58 passed, 0 failed, 0 blocked, 10 not run**; in-place updates PASS (database migration V0020).
+Latest: GitHub Actions run 39615114165, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
+10.0.20348** VM. Release: `v1.1.1-build.76` (pre-release, **unsigned**), package version **1.1.1.76**. Results: unit +
+PostgreSQL integration tests **228 PASS, 2 skipped** (the live MeshCentral and live SNMP tests run in ci-quick: PASS, 230/230);
+installer acceptance **59 passed, 0 failed, 0 blocked, 10 not run**; in-place updates PASS (database migration V0021).
+
+New in build 76 (locations, IT Accessories, department and location in Hardware Inventory, columns and filters on every
+inventory table):
+
+| ID | Test | Result | Detail |
+|---|---|---|---|
+| T69 | Locations and IT accessories end to end | **PASS** | duplicate location name refused; location assigned to a device and filtered in IT Asset and Hardware Inventory; accessory received 10, issued 6 to a person (stock 4, below reorder level 5), issue of 5 refused ("Only 4"), holdings 6, returned 1 faulty, transferred 2 to another location; 4 movements; location with stock and accessory with history cannot be deleted |
+| — | PostgreSQL tests | **PASS** | stock follows receive / issue / return / transfer / write-off / stock count; no negative stock; returns limited to what a person holds; low-stock flag set and cleared; serial-tracked units (count must match, duplicates refused case-insensitively, issued unit not issued twice, returned by serial, no stock count) |
+| — | Unit tests | **PASS** | every report column key unique (device location column `asset_location`); every dashboard widget accepted by the API (assets.location, accessories.stock, accessories.low) |
+| — | Console (ci-quick build, screenshots) | **PASS** | IT Accessories stock / issued / movements / catalogue, issue and receive (serial numbers) dialogs, column chooser, department and location dialogs, Hardware Inventory filters |
+| — | Build 75 | FAIL → fixed | T69 read the 400 response as bytes (test fix) |
 
 New in build 74 (device details stay in Hardware / Software Inventory, no last-action banner on Services, IPv4 in the
 Agents and Remote Support device lists, chart types in Network Inventory):
