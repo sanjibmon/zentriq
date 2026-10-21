@@ -37,7 +37,7 @@ export function HardwarePage() {
           { key: 'r', label: 'Memory', render: (r) => (r.ramGb != null ? `${r.ramGb} GB` : '—') },
           { key: 'd', label: 'Disk', render: (r) => (r.diskGb ? `${r.diskGb} GB` : '—') },
           { key: 't', label: 'Type', render: (r) => fmt.label(r.chassis) },
-          { key: 'u', label: 'Collected', render: (r) => <span title={fmt.date(r.collectedAt)}>{fmt.ago(r.collectedAt)} · {fmt.label(r.source)}</span> },
+          { key: 'u', label: 'Collected', render: (r) => <span title={fmt.date(r.collectedAt)}>{fmt.ago(r.collectedAt)}<div className="faint" style={{ fontSize: 11.5 }}>{fmt.label(r.source)}</div></span> },
         ]} />
         {data.data && <Pager page={page} pageSize={pageSize} total={data.data.total} onPage={setPage} />}
       </Panel>
