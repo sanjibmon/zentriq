@@ -46,7 +46,11 @@ internal static class Presence
                 }
                 try
                 {
-                    var r = client.PresenceAsync(ct).GetAwaiter().GetResult();
+                    // Tell the server which uninstall code this device holds, so a new or replaced one arrives at once.
+                    string? held = null;
+                    if (UninstallProtection.CanManage) try { held = UninstallProtection.Enabled ? UninstallProtection.CodeForAllHash() : ""; } catch (Exception) { }
+                    var started = DateTime.UtcNow;
+                    var r = client.PresenceAsync(held, ct).GetAwaiter().GetResult();
                     if (!Connected)
                     {
                         Log.Info(lostAt is { } since
@@ -58,9 +62,11 @@ internal static class Presence
                     Connected = true;
                     failures = 0;
                     // A new or cancelled uninstall code reaches the device within seconds.
-                    if (r.UninstallProtection == true && UninstallProtection.CanManage)
-                        try { UninstallProtection.ApplyCodeForAll(r.UninstallCode); } catch (Exception ex) { Log.Warn("Could not store the uninstall code: " + ex.Message); }
+                    if (r.UninstallProtection.HasValue && UninstallProtection.CanManage)
+                        try { UninstallProtection.ApplyCodeForAll(r.UninstallProtection == true ? r.UninstallCode : null); } catch (Exception ex) { Log.Warn("Could not store the uninstall code: " + ex.Message); }
                     lostAt = null;
+                    // An early answer only to deliver a code: never ask again more often than every 2 seconds.
+                    if (!r.Wake && DateTime.UtcNow - started < TimeSpan.FromSeconds(1) && WaitAny(ct, TimeSpan.FromSeconds(2))) return;
                     if (r.Wake)
                     {
                         AgentService.RequestServerWake();

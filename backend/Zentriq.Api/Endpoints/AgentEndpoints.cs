@@ -36,6 +36,8 @@ public static class AgentEndpoints
     public sealed record EnrollRequest(string Token, string Csr, string? Hostname, string? OsName, string? AgentVersion, string? SmbiosUuid,
         int? CheckinMinutes = null, int? InventoryMinutes = null);
     public sealed record HelloRequest(string? CodeId, string? Nonce);
+    /// <summary>Presence: the hash of the uninstall code the agent holds ("" none; null = agent does not report it).</summary>
+    public sealed record PresenceRequest(string? UninstallCodeHash = null);
     public sealed record RenewRequest(string Csr);
     public sealed record CheckinRequest(string? AgentVersion, string? Hostname, string? OsName, string? LastError, string[]? Capabilities = null,
         DateTimeOffset? OfflineSince = null, bool? UninstallProtected = null);
@@ -175,7 +177,7 @@ public static class AgentEndpoints
         // arrives; offline the moment it is closed (agent stopped, device shut down, connection reset) or, when it dies
         // silently, once it has not been renewed for AgentPresence.OnlineGrace. Returns early with wake = true when work
         // was queued for the agent (it then checks in at once).
-        g.MapPost("/presence", async (HttpContext http, NpgsqlDataSource ds, AgentServer server, AgentPresence presence,
+        g.MapPost("/presence", async (PresenceRequest? req, HttpContext http, NpgsqlDataSource ds, AgentServer server, AgentPresence presence,
             IHostApplicationLifetime life, ILoggerFactory lf, CancellationToken ct) =>
         {
             var (agent, error) = await AuthenticateAsync(http, ds, server, ct);
@@ -185,22 +187,26 @@ public static class AgentEndpoints
             try
             {
                 var deadline = DateTime.UtcNow + AgentPresence.Hold;
+                var nudged = presence.Nudged;   // taken before reading the state, so no change in between is missed
                 var (wake, wasOffline) = await PresenceSeenAsync(ds, agent.Id, ClientIp(http), ct);
                 var code = await LoadCodeForAllAsync(ds, ct);
                 if (wasOffline) lf.CreateLogger("Zentriq.Agents").LogInformation("Agent {AgentId} connected (live)", agent.Id);
-                while (!wake)
+                var protection = (await LoadSettingsAsync(ds, ct)).UninstallProtection;
+                // The agent holds another uninstall code than the current one (new, replaced, cancelled or expired): answer now.
+                bool Stale(CodeForAll? c) => req?.UninstallCodeHash is { } held && !string.Equals(held, protection ? c?.Hash ?? "" : "", StringComparison.OrdinalIgnoreCase);
+                var deliver = Stale(code);
+                while (!wake && !deliver)
                 {
                     var left = deadline - DateTime.UtcNow;
                     if (left <= TimeSpan.Zero) break;
-                    var nudged = presence.Nudged;
                     var done = await Task.WhenAny(nudged, Task.Delay(left, ct));
                     ct.ThrowIfCancellationRequested();
                     if (done != nudged) break;
+                    nudged = presence.Nudged;
                     wake = await PendingWorkAsync(ds, agent.Id, ct);
                     var now = await LoadCodeForAllAsync(ds, ct);
                     if (now?.Hash != code?.Hash) { code = now; break; }   // a new (or cancelled) uninstall code: deliver it now
                 }
-                var protection = (await LoadSettingsAsync(ds, ct)).UninstallProtection;
                 return Results.Ok(new { wake, uninstallCode = CodeForAgents(code, protection), uninstallProtection = protection, holdSeconds = (int)AgentPresence.Hold.TotalSeconds, onlineSeconds = (int)AgentPresence.OnlineGrace.TotalSeconds });
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)

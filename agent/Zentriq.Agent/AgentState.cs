@@ -149,6 +149,21 @@ internal static class UninstallProtection
     /// The uninstall code for all agents (hash and expiry, SYSTEM-only like the key); checked by the agent package when
     /// someone removes the agent. Null removes it.
     /// </summary>
+    /// <summary>Hash of the uninstall code this device holds ("" none); null when it cannot be read (not SYSTEM).</summary>
+    public static string? CodeForAllHash()
+    {
+        try
+        {
+            using var hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
+            using var k = hklm.OpenSubKey(KeyPath, false);
+            if (k is null) return "";
+            if (!(k.GetValue("AllCodeExpires") is string e) || !DateTime.TryParse(e, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AdjustToUniversal, out var until) || until < DateTime.UtcNow)
+                return "";   // none, or expired (the server then sends no code; the stale values are removed)
+            return k.GetValue("AllCodeHash") as string ?? "";
+        }
+        catch (Exception ex) when (ex is System.Security.SecurityException || ex is UnauthorizedAccessException) { return null; }
+    }
+
     public static void ApplyCodeForAll(UninstallCodeInfo? code)
     {
         if (!Enabled) return;

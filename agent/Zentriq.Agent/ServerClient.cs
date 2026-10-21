@@ -182,8 +182,8 @@ internal sealed class ServerClient : IDisposable
         }, ct);
 
     /// <summary>The live connection (held open by the server for about 25 seconds; see <see cref="Presence"/>).</summary>
-    public Task<PresenceResponse> PresenceAsync(CancellationToken ct) =>
-        PostJsonAsync<PresenceResponse>("api/agent/v1/presence", new Dictionary<string, object?>(), ct);
+    public Task<PresenceResponse> PresenceAsync(string? uninstallCodeHash, CancellationToken ct) =>
+        PostJsonAsync<PresenceResponse>("api/agent/v1/presence", uninstallCodeHash is null ? new Dictionary<string, object?>() : new Dictionary<string, object?> { ["uninstallCodeHash"] = uninstallCodeHash }, ct);
 
     /// <summary>The agent is stopping: the server shows it offline at once.</summary>
     public async Task LeaveAsync()
