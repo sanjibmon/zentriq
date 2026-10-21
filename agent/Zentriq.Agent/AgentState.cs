@@ -145,6 +145,32 @@ internal static class UninstallProtection
 
     public static bool Enabled => Key() is { Length: 32 };
 
+    /// <summary>
+    /// The uninstall code for all agents (hash and expiry, SYSTEM-only like the key); checked by the agent package when
+    /// someone removes the agent. Null removes it.
+    /// </summary>
+    public static void ApplyCodeForAll(UninstallCodeInfo? code)
+    {
+        if (!Enabled) return;
+        using var hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
+        using var k = hklm.OpenSubKey(KeyPath, true);
+        if (k is null) return;
+        var hash = code?.Hash?.Trim().ToLowerInvariant();
+        var expires = code?.ExpiresAt.UtcDateTime.ToString("o");
+        if (string.IsNullOrEmpty(hash) || hash!.Length != 64)
+        {
+            if (k.GetValue("AllCodeHash") is null) return;
+            k.DeleteValue("AllCodeHash", false);
+            k.DeleteValue("AllCodeExpires", false);
+            Log.Info("Uninstall code removed (expired or cancelled in the console).");
+            return;
+        }
+        if (k.GetValue("AllCodeHash") as string == hash && k.GetValue("AllCodeExpires") as string == expires) return;
+        k.SetValue("AllCodeHash", hash, RegistryValueKind.String);
+        k.SetValue("AllCodeExpires", expires!, RegistryValueKind.String);
+        Log.Info($"New uninstall code from the console received (valid until {code!.ExpiresAt.UtcDateTime:yyyy-MM-dd HH:mm} UTC).");
+    }
+
     /// <summary>Stores or removes the key; returns true when something changed.</summary>
     public static bool Apply(byte[]? key)
     {

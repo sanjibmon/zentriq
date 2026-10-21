@@ -253,6 +253,7 @@ internal sealed class AgentWorker
         {
             if (!resp.UninstallProtection) UninstallProtection.Apply(null);
             else if (!string.IsNullOrEmpty(resp.UninstallKey)) UninstallProtection.Apply(Convert.FromBase64String(resp.UninstallKey));
+            if (resp.UninstallProtection) UninstallProtection.ApplyCodeForAll(resp.UninstallCode);
         }
         catch (Exception ex) { Log.Warn("Could not update uninstall protection: " + ex.Message); }
     }

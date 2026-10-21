@@ -520,8 +520,15 @@ if (-not $installed) {
             Assert ($p1.ExitCode -ne 0 -and (Get-Service ZentriqAgent -ErrorAction SilentlyContinue)) "uninstall without a code was not refused (exit $($p1.ExitCode))"
             $p2 = Start-Process msiexec.exe -ArgumentList '/x', $product, '/qn', 'UNINSTALLCODE=ABCD-EFGH-JKMN-PQRS', '/l*v', "`"$(Join-Path $OutDir 'agent-uninstall-badcode.log')`"" -Wait -PassThru
             Assert ($p2.ExitCode -ne 0 -and (Get-Service ZentriqAgent -ErrorAction SilentlyContinue)) "uninstall with a wrong code was not refused (exit $($p2.ExitCode))"
-            $code = Api POST "/agents/$($script:agentId)/uninstall-code" @{} -Session $s
-            Assert ($code.code -match '^[0-9A-Z]{4}(-[0-9A-Z]{4}){3}$' -and ([datetime]$code.expiresAt) -lt (Get-Date).ToUniversalTime().AddMinutes(61)) "uninstall code: $($code | ConvertTo-Json -Compress)"
+            # One random code for all agents, valid for one hour; online agents receive it over their live connection.
+            $first = Api POST '/agents/uninstall-code' @{} -Session $s
+            $code = Api POST '/agents/uninstall-code' @{} -Session $s
+            Assert ($code.code -match '^[0-9A-Z]{4}(-[0-9A-Z]{4}){3}$' -and $code.code -ne $first.code -and ([datetime]$code.expiresAt).ToUniversalTime() -lt (Get-Date).ToUniversalTime().AddMinutes(61)) "uninstall code: $($code | ConvertTo-Json -Compress)"
+            $shown = Api GET '/agents/uninstall-code' -Session $s
+            Assert ($shown.active -and $shown.code -eq $code.code) "current code not shown: $($shown | ConvertTo-Json -Compress)"
+            Start-Sleep 10
+            $p2b = Start-Process msiexec.exe -ArgumentList '/x', $product, '/qn', "UNINSTALLCODE=$($first.code)", '/l*v', "`"$(Join-Path $OutDir 'agent-uninstall-oldcode.log')`"" -Wait -PassThru
+            Assert ($p2b.ExitCode -ne 0 -and (Get-Service ZentriqAgent -ErrorAction SilentlyContinue)) "the replaced code still removed the agent (exit $($p2b.ExitCode))"
             $p3 = Start-Process $exe -ArgumentList '--uninstall', $code.code -Wait -PassThru
             Assert ($p3.ExitCode -eq 0) "--uninstall did not start the removal (exit $($p3.ExitCode))"
             $deadline = (Get-Date).AddMinutes(3)
@@ -544,7 +551,7 @@ if (-not $installed) {
             do { Start-Sleep 10 } while ((Get-ItemProperty 'HKLM:\SOFTWARE\Zentriq\Agent').PSObject.Properties['UninstallProtected'] -and (Get-Date) -lt $deadline)
             Assert (-not (Get-ItemProperty 'HKLM:\SOFTWARE\Zentriq\Agent').PSObject.Properties['UninstallProtected']) 'protection still on after switching it off'
             Stop-Service ZentriqAgent; Start-Service ZentriqAgent   # stoppable again
-            "no code: exit $($p1.ExitCode); wrong code: exit $($p2.ExitCode); service stop refused; console code $($code.code) (valid until $($code.expiresAt)) removed the agent; reinstalled and protection switched off"
+            "no code: exit $($p1.ExitCode); wrong code: exit $($p2.ExitCode); service stop refused; code for all agents $($code.code) (valid until $($code.expiresAt)) removed the agent, the replaced code did not; reinstalled and protection switched off"
         } | Out-Null
     } else { Record 'T67' 'Agent uninstall protection' 'BLOCKED' 'agent install failed' }
 

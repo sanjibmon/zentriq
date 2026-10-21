@@ -153,11 +153,16 @@ namespace Zentriq.CustomActions
         public static ActionResult CheckUninstallCode(Session session)
         {
             byte[] key;
+            string allHash = null, allExpires = null;
             try
             {
                 using (var hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64))
                 using (var k = hklm.OpenSubKey(ProtectionPath, false))
+                {
                     key = k == null ? null : k.GetValue("UninstallKey") as byte[];
+                    allHash = k == null ? null : k.GetValue("AllCodeHash") as string;
+                    allExpires = k == null ? null : k.GetValue("AllCodeExpires") as string;
+                }
             }
             catch (Exception ex)
             {
@@ -169,8 +174,13 @@ namespace Zentriq.CustomActions
                 session.Log("The Zentriq Agent is not protected on this device; no uninstall code needed.");
                 return ActionResult.Success;
             }
+            var typed = session["CustomActionData"];
+            DateTime expires;
+            DateTime? until = DateTime.TryParse(allExpires, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal, out expires) ? expires : (DateTime?)null;
             string error;
-            if (AgentCodes.VerifyUninstallCode(key, session["CustomActionData"], DateTime.UtcNow, out error))
+            // The code for all agents (Agents › Uninstall code); codes made for this one device by earlier versions also work.
+            if (AgentCodes.VerifyUninstallCodeForAll(allHash, until, typed, DateTime.UtcNow, out error)
+                || AgentCodes.VerifyUninstallCode(key, typed, DateTime.UtcNow, out _))
             {
                 session.Log("Uninstall code accepted.");
                 return ActionResult.Success;

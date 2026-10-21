@@ -114,6 +114,32 @@ namespace Zentriq.Inventory
             return true;
         }
 
+        // ---- one uninstall code for all agents ------------------------------------------------------------------
+
+        /// <summary>A random 16-character code that removes the agent on any device until it expires (one hour).</summary>
+        public static string NewUninstallCodeForAll() => Random(UninstallLength);
+
+        /// <summary>What the agents store (readable by SYSTEM only): SHA-256 of the code, hex.</summary>
+        public static string UninstallCodeHash(string normalizedCode)
+        {
+            var h = Sha256("zentriq-uninstall-all\n" + normalizedCode);
+            var sb = new StringBuilder(64);
+            foreach (var b in h) sb.Append(b.ToString("x2"));
+            return sb.ToString();
+        }
+
+        /// <summary>Checks a typed code against the code for all agents the device received from the server.</summary>
+        public static bool VerifyUninstallCodeForAll(string? storedHash, DateTime? expiresUtc, string? code, DateTime nowUtc, out string error)
+        {
+            var c = Normalize(code, UninstallLength);
+            if (c is null) { error = "The uninstall code must have 16 letters and digits (for example ABCD-EFGH-JKMN-PQRS)."; return false; }
+            if (string.IsNullOrEmpty(storedHash) || expiresUtc is null) { error = "This device has not received an uninstall code yet. Create one in the Zentriq console (Agents › Uninstall code) and try again once the device is online."; return false; }
+            if (!FixedEquals(storedHash!.ToLowerInvariant(), UninstallCodeHash(c))) { error = "The uninstall code is not valid. Use the current code from the Zentriq console (Agents › Uninstall code)."; return false; }
+            if (nowUtc.ToUniversalTime() > expiresUtc.Value.ToUniversalTime()) { error = $"The uninstall code expired at {expiresUtc.Value.ToUniversalTime():yyyy-MM-dd HH:mm} UTC. Codes are valid for one hour; create a new one in the Zentriq console."; return false; }
+            error = "";
+            return true;
+        }
+
         private static string Mac(byte[] key, long minutes)
         {
             using (var h = new HMACSHA256(key))

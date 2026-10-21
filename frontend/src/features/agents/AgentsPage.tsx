@@ -20,6 +20,15 @@ const HEALTH: Record<AgentRow['health'], [string, Tone]> = {
 };
 
 /** "30 min", "1 hour", "3 hours", "1 day". */
+/** How long ago, as a duration: "4 min", "2 h 15 min", "3 d 4 h". */
+const duration = (iso: string) => {
+  const m = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60000));
+  if (m < 1) return 'less than 1 min';
+  if (m < 60) return `${m} min`;
+  if (m < 1440) return `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ''}`;
+  return `${Math.floor(m / 1440)} d${Math.floor((m % 1440) / 60) ? ` ${Math.floor((m % 1440) / 60)} h` : ''}`;
+};
+
 export const every = (m: number) => m % 1440 === 0 ? `${m / 1440} day${m === 1440 ? '' : 's'}` : m % 60 === 0 ? `${m / 60} hour${m === 60 ? '' : 's'}` : `${m} min`;
 const CHECKIN = [5, 15, 30, 60, 120, 180];
 const INVENTORY = [30, 60, 120, 180, 360, 720, 1440];
@@ -39,7 +48,7 @@ export function AgentsPage() {
   const [tab, setTab] = useState<'agents' | 'codes' | 'settings'>('agents');
   const [picked, setPicked] = useState<string[]>([]);
   const [schedule, setSchedule] = useState<{ ids: string[] | 'all' } | null>(null);
-  const [uninstall, setUninstall] = useState<{ code: string; expiresAt: string; hostname: string; command: string; agentHasKey: boolean } | null>(null);
+  const [uninstallOpen, setUninstallOpen] = useState(false);
   const [created, setCreated] = useState<NewEnrollmentToken | null>(null);
   const [newOpen, setNewOpen] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -109,11 +118,6 @@ export function AgentsPage() {
       setMsg(err instanceof Error ? err.message : String(err));
     }
   }
-  async function uninstallCode(a: AgentRow) {
-    setMsg(null);
-    try { setUninstall(await api.post(`/agents/${a.id}/uninstall-code`)); }
-    catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
-  }
   async function deleteToken(t: EnrollmentToken) {
     if (!(await confirm({ title: `Delete enrollment code "${t.name}"?`, confirmLabel: 'Delete', danger: true, message: 'The code is removed from the list. Devices enrolled with it are not affected.' }))) return;
     try { await api.del(`/agents/enrollment-tokens/${t.id}`); tokens.reload(); } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
@@ -135,6 +139,7 @@ export function AgentsPage() {
       <PageHead title="Agents"
         actions={<>
           {pkg.data?.package && <a className="btn" href={pkg.data.package.url} download>Download agent</a>}
+          {manage && <button className="btn" onClick={() => setUninstallOpen(true)}><Icon name="key" size={13} /> Uninstall code</button>}
           {manage && <button className="btn primary" onClick={() => setNewOpen(true)}>New enrollment code</button>}
         </>} />
       {msg && <Callout>{msg}</Callout>}
@@ -192,15 +197,15 @@ export function AgentsPage() {
             { key: 'h', label: 'Device', render: (r) => r.assetId ? <Link to={`/assets/${r.assetId}`}><b>{r.hostname ?? r.id}</b></Link> : <b>{r.hostname ?? r.id}</b> },
             { key: 'os', label: 'Operating system', className: 'wrap', render: (r) => r.osName ?? <span className="faint">—</span> },
             { key: 'ip', label: 'IP address', render: (r) => r.lastIp ? <span className="mono">{r.lastIp}</span> : <span className="faint">—</span> },
-            { key: 's', label: 'Connection', className: 'wrap', render: (r) => <>
-              {r.health === 'stale' && r.lastCheckinAt ? <Pill tone="warn">Offline · {fmt.ago(r.lastCheckinAt)}</Pill> : <Pill tone={HEALTH[r.health][1]}>{HEALTH[r.health][0]}</Pill>}
-              {r.health === 'online' && <div className="faint" style={{ fontSize: 11.5 }} title={r.live ? 'Live connection: online and offline are shown within seconds' : 'This agent version reports at its check-in interval; update it for a live connection'}>{r.live ? (r.connected ? 'live connection' : 'connecting…') : 'by check-in · update agent'}</div>}
-              {r.lastOutage && <div className="faint" style={{ fontSize: 11.5 }} title={`Offline ${fmt.date(r.lastOutage.from)} – ${r.lastOutage.to ? fmt.date(r.lastOutage.to) : 'now'}`}>last outage {fmt.ago(r.lastOutage.from)}{r.lastOutage.to ? `, back ${fmt.ago(r.lastOutage.to)}` : ''}</div>}
-              {r.uninstallProtected && <div className="faint" style={{ fontSize: 11.5 }}><Icon name="shield" size={11} /> uninstall protected</div>}</> },
+            { key: 's', label: 'Connection', render: (r) => r.health === 'online'
+              ? <Pill tone="ok">Online</Pill>
+              : (r.health === 'stale' || r.health === 'offline') && r.lastCheckinAt
+                ? <span title={`Last contact ${fmt.date(r.lastCheckinAt)}`}><Pill tone={r.health === 'offline' ? 'crit' : 'warn'}>Offline · {duration(r.lastCheckinAt)}</Pill></span>
+                : <Pill tone={HEALTH[r.health][1]}>{HEALTH[r.health][0]}</Pill> },
             { key: 'sch', label: 'Schedule', render: (r) => r.status === 'active' ? <span className="faint" style={{ fontSize: 12.5 }}>check-in {every(r.checkinMinutes)}<br />inventory {every(r.inventoryMinutes)}</span> : '' },
             { key: 'c', label: 'Last contact', render: (r) => <span className="faint" style={{ fontSize: 12.5 }}><span title={fmt.date(r.lastCheckinAt)}>{r.online ? 'now' : fmt.ago(r.lastCheckinAt)}</span><br /><span title={`Last inventory ${fmt.date(r.lastInventoryAt)}`}>inventory {fmt.ago(r.lastInventoryAt)}</span></span> },
             { key: 'v', label: 'Version', render: (r) => <span title={r.certificateExpires ? `Certificate expires ${fmt.day(r.certificateExpires)}` : ''}>{r.version}<UpdateState r={r} /></span> },
-            { key: 'x', label: '', render: (r) => manage && r.status === 'active' ? <div style={{ display: 'flex', gap: 6, flexWrap: 'nowrap', justifyContent: 'flex-end' }}>{r.status === 'active' && r.updateAvailable && r.canSelfUpdate && !(r.update && ['queued', 'sent', 'running'].includes(r.update.status)) && <button className="btn sm primary" onClick={() => void update([r])}>Update</button>}{r.status === 'active' && r.updateAvailable && !r.canSelfUpdate && <button className="btn sm" onClick={() => void manualUpdate(r)}>Update…</button>}<button className="btn sm" title="Collect inventory now" onClick={() => void collect(r)}>Collect</button><button className="btn sm" title="One-hour code to uninstall the agent on this device" aria-label="Uninstall code" onClick={() => void uninstallCode(r)}><Icon name="key" size={12} /> Code</button><button className="btn sm danger" onClick={() => void revoke(r)}>Revoke</button></div> : null },
+            { key: 'x', label: '', render: (r) => manage && r.status === 'active' ? <div style={{ display: 'flex', gap: 6, flexWrap: 'nowrap', justifyContent: 'flex-end' }}>{r.status === 'active' && r.updateAvailable && r.canSelfUpdate && !(r.update && ['queued', 'sent', 'running'].includes(r.update.status)) && <button className="btn sm primary" onClick={() => void update([r])}>Update</button>}{r.status === 'active' && r.updateAvailable && !r.canSelfUpdate && <button className="btn sm" onClick={() => void manualUpdate(r)}>Update…</button>}<button className="btn sm" title="Collect inventory now" onClick={() => void collect(r)}>Collect</button><button className="btn sm danger" onClick={() => void revoke(r)}>Revoke</button></div> : null },
           ]} />
         </Panel>
       ) : (
@@ -232,15 +237,7 @@ export function AgentsPage() {
         </Panel>
       )}
       {schedule && <ScheduleDialog ids={schedule.ids} onClose={() => setSchedule(null)} onDone={(m) => { setSchedule(null); setMsg(m); setPicked([]); agents.reload(); }} />}
-      {uninstall && <Modal title={`Uninstall code for ${uninstall.hostname}`} onClose={() => setUninstall(null)} footer={<button className="btn primary" onClick={() => setUninstall(null)}>Done</button>}>
-        <div className="form-v">
-          <div className="big-code" aria-label="Uninstall code">{uninstall.code}</div>
-          <p style={{ margin: 0 }}>Valid until <b>{fmt.date(uninstall.expiresAt)}</b> (one hour), only on {uninstall.hostname}.</p>
-          {!uninstall.agentHasKey && <Callout tone="info" icon="info">The agent has not confirmed protection yet (it does at its next check-in); until then it can be removed without a code.</Callout>}
-          <label>On the device, as administrator<CopyBox value={uninstall.command} label="Uninstall command" rows={2} /></label>
-          <small className="muted">Or Apps &gt; Zentriq Agent &gt; Modify &gt; Remove, and enter the code. Without a valid code the agent cannot be removed and its service cannot be stopped.</small>
-        </div>
-      </Modal>}
+      {uninstallOpen && <UninstallCodeDialog onClose={() => setUninstallOpen(false)} />}
       {newOpen && <NewCodeDialog defaultUrl={suggestedUrl(pkg.data)} onClose={() => setNewOpen(false)} onCreated={(t) => { setNewOpen(false); setCreated(t); setTab('codes'); tokens.reload(); }} />}
     </>
   );
@@ -356,6 +353,47 @@ function ScheduleDialog({ ids, onClose, onDone }: { ids: string[] | 'all'; onClo
   );
 }
 
+interface UninstallCodeState { protection?: boolean; active: boolean; code: string | null; expiresAt: string | null; createdBy: string | null; createdAt: string | null }
+const UNINSTALL_EXE = '"C:\\Program Files\\Zentriq Agent\\ZentriqAgent.exe"';
+
+/** One random code that removes the agent on any device, valid for one hour. */
+function UninstallCodeDialog({ onClose }: { onClose: () => void }) {
+  const confirm = useConfirm();
+  const state = useApi(() => api.get<UninstallCodeState>('/agents/uninstall-code'), []);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const c = state.data;
+  async function create() {
+    if (c?.active && !(await confirm({ title: 'Create a new uninstall code?', confirmLabel: 'Create new code', message: 'The current code stops working on all devices.' }))) return;
+    setBusy(true); setErr(null);
+    try { await api.post('/agents/uninstall-code'); state.reload(); } catch (e) { setErr(e instanceof Error ? e.message : String(e)); } finally { setBusy(false); }
+  }
+  async function cancel() {
+    if (!(await confirm({ title: 'Cancel the uninstall code?', confirmLabel: 'Cancel code', danger: true, message: 'The code stops working on all devices.' }))) return;
+    setBusy(true); setErr(null);
+    try { await api.del('/agents/uninstall-code'); state.reload(); } catch (e) { setErr(e instanceof Error ? e.message : String(e)); } finally { setBusy(false); }
+  }
+  return (
+    <Modal title="Uninstall code" onClose={onClose} footer={<>
+      {c?.active && <button className="btn danger" style={{ marginRight: 'auto' }} disabled={busy} onClick={() => void cancel()}>Cancel code</button>}
+      <button className="btn" onClick={onClose}>Close</button>
+      <button className="btn primary" disabled={busy || !c} onClick={() => void create()}>{c?.active ? 'Create new code' : 'Create code'}</button>
+    </>}>
+      <div className="form-v">
+        <ErrorBox error={state.error} />
+        {err && <Callout tone="crit" icon="alert">{err}</Callout>}
+        {c && c.protection === false && <Callout tone="info" icon="info">Uninstall protection is off (Agents › Settings): agents can be removed without a code.</Callout>}
+        {c && (c.active && c.code ? <>
+          <div className="big-code" aria-label="Uninstall code">{c.code}</div>
+          <p style={{ margin: 0 }}>Works on <b>all devices</b> until <b>{fmt.date(c.expiresAt)}</b> (one hour){c.createdBy ? ` · created by ${c.createdBy}` : ''}.</p>
+          <label>On the device, as administrator<CopyBox value={`${UNINSTALL_EXE} --uninstall ${c.code}`} label="Uninstall command" rows={2} /></label>
+          <small className="muted">Or Apps &gt; Zentriq Agent &gt; Modify &gt; Remove, and enter the code. Online devices receive the code within seconds, others when they next connect. Agents of earlier versions need updating first (Update in the agents list).</small>
+        </> : <p className="muted" style={{ margin: 0 }}>No uninstall code is active. Create one to remove the agent from devices: a random 16-character code that works on every device for one hour, then expires.</p>)}
+      </div>
+    </Modal>
+  );
+}
+
 /** Defaults for new agents and uninstall protection. */
 function SettingsTab({ onSaved, onAll }: { onSaved: (msg: string) => void; onAll: () => void }) {
   const data = useApi(() => api.get<AgentSettingsResponse>('/agents/settings'), []);
@@ -388,7 +426,7 @@ function SettingsTab({ onSaved, onAll }: { onSaved: (msg: string) => void; onAll
       <Panel title="Uninstall protection" sub="Stops users and local administrators from removing the agent">
         <div className="form-v">
           <label className="row-check"><input type="checkbox" checked={f.uninstallProtection} onChange={(e) => setF({ ...f, uninstallProtection: e.target.checked })} /> Require an uninstall code to remove the agent</label>
-          <p className="muted" style={{ margin: 0, fontSize: 13 }}>Each device gets its own key at its next check-in. To remove an agent, create a code for that device (Agents › Uninstall code); it works for one hour only. While protected, the agent service cannot be stopped or reconfigured by administrators. Updates from the console keep working.</p>
+          <p className="muted" style={{ margin: 0, fontSize: 13 }}>To remove agents, create an uninstall code (Agents › Uninstall code): one random code for all devices, valid for one hour. While protected, the agent service cannot be stopped or reconfigured by administrators. Updates from the console keep working.</p>
           <div><button className="btn primary" disabled={busy} onClick={() => void save()}>Save</button></div>
         </div>
       </Panel>
