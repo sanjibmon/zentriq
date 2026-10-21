@@ -49,11 +49,21 @@ internal sealed class CheckinResponse
     [JsonPropertyName("renewCertificate")] public bool RenewCertificate { get; set; }
     [JsonPropertyName("serverPins")] public List<string>? ServerPins { get; set; }
     [JsonPropertyName("actions")] public List<AgentAction>? Actions { get; set; }
+    [JsonPropertyName("uninstallCode")] public UninstallCodeInfo? UninstallCode { get; set; }
+}
+
+/// <summary>The uninstall code for all agents: its hash and expiry (the code itself never reaches the agents).</summary>
+internal sealed class UninstallCodeInfo
+{
+    [JsonPropertyName("hash")] public string Hash { get; set; } = "";
+    [JsonPropertyName("expiresAt")] public DateTimeOffset ExpiresAt { get; set; }
 }
 
 internal sealed class PresenceResponse
 {
     [JsonPropertyName("wake")] public bool Wake { get; set; }
+    [JsonPropertyName("uninstallProtection")] public bool? UninstallProtection { get; set; }
+    [JsonPropertyName("uninstallCode")] public UninstallCodeInfo? UninstallCode { get; set; }
 }
 
 /// <summary>A device action requested by an administrator in the console (service start/stop/restart).</summary>

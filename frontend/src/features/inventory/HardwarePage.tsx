@@ -29,7 +29,8 @@ export function HardwarePage() {
       <ErrorBox error={data.error} />
       <Panel flush>
         <DataTable rows={(data.data?.items ?? []).map((r) => ({ ...r, id: r.assetId }))} empty={data.loading ? 'Loading…' : 'No hardware inventory yet. Install agents or run a scan with credentials.'} columns={[
-          { key: 'h', label: 'Device', render: (r) => <><Link to={`/assets/${r.assetId}`}><b>{r.hostname ?? r.assetId}</b></Link><div className="faint" style={{ fontSize: 11.5 }}>{r.osName ?? fmt.label(r.category)}</div></> },
+          { key: 'h', label: 'Device', render: (r) => <Link to={`/assets/${r.assetId}`}><b>{r.hostname ?? r.assetId}</b></Link> },
+          { key: 'os', label: 'Operating system', className: 'wrap', render: (r) => r.osName ?? <span className="faint">{fmt.label(r.category)}</span> },
           { key: 'm', label: 'Manufacturer / model', className: 'wrap', render: (r) => [r.vendor, r.model].filter(Boolean).join(' ') || '—' },
           { key: 's', label: 'Serial number', render: (r) => <span className="mono">{r.serialNumber ?? '—'}</span> },
           { key: 'c', label: 'Processor', className: 'wrap', render: (r) => <>{r.cpu ?? '—'}{r.cpuCores ? <span className="faint"> · {r.cpuCores} cores</span> : null}</> },

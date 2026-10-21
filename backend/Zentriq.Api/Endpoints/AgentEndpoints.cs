@@ -142,7 +142,7 @@ public static class AgentEndpoints
                     ins.Parameters.AddWithValue("na", cert.NotAfter.ToUniversalTime());
                     ins.Parameters.Add(Text("h", Trunc(req.Hostname, 255)));
                     ins.Parameters.Add(Text("os", Trunc(req.OsName, 200)));
-                    ins.Parameters.Add(new NpgsqlParameter("ip", NpgsqlDbType.Inet) { Value = (object?)http.Connection.RemoteIpAddress ?? DBNull.Value });
+                    ins.Parameters.Add(new NpgsqlParameter("ip", NpgsqlDbType.Inet) { Value = (object?)ClientIp(http) ?? DBNull.Value });
                     ins.Parameters.AddWithValue("tok", tokenId);
                     await ins.ExecuteNonQueryAsync(ct);
                 }
@@ -185,7 +185,8 @@ public static class AgentEndpoints
             try
             {
                 var deadline = DateTime.UtcNow + AgentPresence.Hold;
-                var (wake, wasOffline) = await PresenceSeenAsync(ds, agent.Id, http.Connection.RemoteIpAddress, ct);
+                var (wake, wasOffline) = await PresenceSeenAsync(ds, agent.Id, ClientIp(http), ct);
+                var code = await LoadCodeForAllAsync(ds, ct);
                 if (wasOffline) lf.CreateLogger("Zentriq.Agents").LogInformation("Agent {AgentId} connected (live)", agent.Id);
                 while (!wake)
                 {
@@ -196,8 +197,11 @@ public static class AgentEndpoints
                     ct.ThrowIfCancellationRequested();
                     if (done != nudged) break;
                     wake = await PendingWorkAsync(ds, agent.Id, ct);
+                    var now = await LoadCodeForAllAsync(ds, ct);
+                    if (now?.Hash != code?.Hash) { code = now; break; }   // a new (or cancelled) uninstall code: deliver it now
                 }
-                return Results.Ok(new { wake, holdSeconds = (int)AgentPresence.Hold.TotalSeconds, onlineSeconds = (int)AgentPresence.OnlineGrace.TotalSeconds });
+                var protection = (await LoadSettingsAsync(ds, ct)).UninstallProtection;
+                return Results.Ok(new { wake, uninstallCode = CodeForAgents(code, protection), uninstallProtection = protection, holdSeconds = (int)AgentPresence.Hold.TotalSeconds, onlineSeconds = (int)AgentPresence.OnlineGrace.TotalSeconds });
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
@@ -255,7 +259,7 @@ public static class AgentEndpoints
             cmd.Parameters.Add(new NpgsqlParameter("off", NpgsqlDbType.TimestampTz) { Value = (object?)outageFrom ?? DBNull.Value });
             cmd.Parameters.Add(new NpgsqlParameter("up", NpgsqlDbType.Boolean) { Value = (object?)req.UninstallProtected ?? DBNull.Value });
             cmd.Parameters.AddWithValue("id", agent.Id);
-            cmd.Parameters.Add(new NpgsqlParameter("ip", NpgsqlDbType.Inet) { Value = (object?)http.Connection.RemoteIpAddress ?? DBNull.Value });
+            cmd.Parameters.Add(new NpgsqlParameter("ip", NpgsqlDbType.Inet) { Value = (object?)ClientIp(http) ?? DBNull.Value });
             cmd.Parameters.Add(Text("v", Trunc(req.AgentVersion, 40)));
             cmd.Parameters.Add(Text("h", Trunc(req.Hostname, 255)));
             cmd.Parameters.Add(Text("os", Trunc(req.OsName, 200)));
@@ -328,6 +332,7 @@ public static class AgentEndpoints
                 // Always sent while protection is on (mutually authenticated channel only), so a key that was re-created
                 // reaches the agent; the agent stores it readable by SYSTEM only.
                 uninstallKey = settings.UninstallProtection && uninstallKey is not null ? Convert.ToBase64String(uninstallKey) : null,
+                uninstallCode = CodeForAgents(await LoadCodeForAllAsync(ds, ct), settings.UninstallProtection),
             });
         }).AllowAnonymous();
 
@@ -455,7 +460,8 @@ public static class AgentEndpoints
                 SELECT r.id, r.status, r.agent_version, r.hostname, r.os_name, host(r.last_ip), r.enrolled_at, r.last_checkin_at, r.last_inventory_at,
                        r.cert_not_after, r.asset_id, a.hostname, r.revoked_at, t.name, r.capabilities,
                        u.status, u.target, u.detail, u.requested_at, u.completed_at,
-                       r.checkin_minutes, r.inventory_minutes, COALESCE(r.online_until > now(), false), r.last_outage_from, r.last_outage_to, r.uninstall_protected
+                       r.checkin_minutes, r.inventory_minutes, COALESCE(r.online_until > now(), false), r.last_outage_from, r.last_outage_to, r.uninstall_protected,
+                       host(a.primary_ip)
                   FROM zentriq.agent_registrations r
                   LEFT JOIN LATERAL (SELECT x.status, x.target, x.detail, x.requested_at, x.completed_at FROM zentriq.asset_actions x
                                       WHERE x.agent_id = r.id AND x.kind = 'agent-update' ORDER BY x.requested_at DESC LIMIT 1) u ON true
@@ -477,7 +483,7 @@ public static class AgentEndpoints
                     : lastCheckin > DateTimeOffset.UtcNow.AddDays(-7) ? "stale" : "offline";
                 list.Add(new
                 {
-                    id = r.GetGuid(0), status, health, version = r.GetString(2), hostname = S(3) ?? S(11), osName = S(4), lastIp = S(5),
+                    id = r.GetGuid(0), status, health, version = r.GetString(2), hostname = S(3) ?? S(11), osName = S(4), lastIp = Ipv4(S(26), S(5)),
                     enrolledAt = r.GetFieldValue<DateTimeOffset>(6), lastCheckinAt = lastCheckin, lastInventoryAt = D(8), certificateExpires = D(9),
                     assetId = r.IsDBNull(10) ? (Guid?)null : r.GetGuid(10), revokedAt = D(12), enrollmentCode = S(13),
                     canSelfUpdate = !r.IsDBNull(14) && r.GetFieldValue<string[]>(14).Contains("self-update"),
@@ -616,29 +622,41 @@ public static class AgentEndpoints
         }).RequireAuthorization(Permissions.AgentsManage);
 
         // A one-hour code that allows uninstalling the agent on one device (uninstall protection).
-        g.MapPost("/{id:guid}/uninstall-code", async (Guid id, NpgsqlDataSource ds, RequestContext rc, Zentriq.Infrastructure.Secrets.CredentialProtector protector, CancellationToken ct) =>
+        // One uninstall code for all agents: random, valid for one hour, sent to every agent (live connection: within
+        // seconds; others when they next connect). The agents keep only its hash, readable by SYSTEM.
+        g.MapGet("/uninstall-code", async (NpgsqlDataSource ds, Zentriq.Infrastructure.Secrets.CredentialProtector protector, CancellationToken ct) =>
         {
-            await using var cmd = ds.CreateCommand("""
-                SELECT COALESCE(r.hostname, a.hostname, r.id::text), r.uninstall_key_protected, r.uninstall_protected, r.status
-                  FROM zentriq.agent_registrations r LEFT JOIN zentriq.assets a ON a.id = r.asset_id WHERE r.id = @id
-                """);
-            cmd.Parameters.AddWithValue("id", id);
-            string host; string? keyProtected; bool holds; string status;
-            await using (var r = await cmd.ExecuteReaderAsync(ct))
+            var c = await LoadCodeForAllAsync(ds, ct);
+            var settings = await LoadSettingsAsync(ds, ct);
+            return Results.Ok(new { protection = settings.UninstallProtection, active = c is not null, code = c is null ? null : ShowCode(protector, c), expiresAt = c?.ExpiresAt, createdBy = c?.CreatedBy, createdAt = c?.CreatedAt });
+        }).RequireAuthorization(Permissions.AgentsManage);
+
+        g.MapPost("/uninstall-code", async (NpgsqlDataSource ds, RequestContext rc, Zentriq.Infrastructure.Secrets.CredentialProtector protector, CancellationToken ct) =>
+        {
+            var code = AgentCodes.NewUninstallCodeForAll();
+            var c = new CodeForAll(AgentCodes.UninstallCodeHash(code), DateTimeOffset.UtcNow.Add(AgentCodes.UninstallValidity),
+                protector.Protect(UninstallCodeAad, new Zentriq.Infrastructure.Secrets.CredentialSecret { Password = code }), rc.UserName, DateTimeOffset.UtcNow);
+            await using (var cmd = ds.CreateCommand("""
+                INSERT INTO zentriq.system_settings (key, value) VALUES ('agents.uninstall_code', @v::jsonb)
+                ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()
+                """))
             {
-                if (!await r.ReadAsync(ct)) return Results.NotFound();
-                host = r.GetString(0); keyProtected = r.IsDBNull(1) ? null : r.GetString(1); holds = r.GetBoolean(2); status = r.GetString(3);
+                cmd.Parameters.AddWithValue("v", JsonSerializer.Serialize(c, JsonWeb));
+                await cmd.ExecuteNonQueryAsync(ct);
             }
-            var key = keyProtected is null ? null : UnprotectKey(protector, id, keyProtected);
-            if (key is null) return Results.Problem(statusCode: 409, title: $"{host} has no uninstall key yet: its agent has not checked in since uninstall protection was turned on, so it can be uninstalled without a code.");
-            var expires = DateTime.UtcNow.Add(AgentCodes.UninstallValidity);
-            var code = AgentCodes.Group(AgentCodes.UninstallCode(key, expires), 4);
-            await rc.AuditAsync("agent.uninstall_code", host, detail: new { agentId = id, expires });
-            return Results.Ok(new
-            {
-                code, expiresAt = new DateTimeOffset(expires, TimeSpan.Zero), hostname = host, agentHasKey = holds, status,
-                command = $"\"C:\\Program Files\\Zentriq Agent\\ZentriqAgent.exe\" --uninstall {code}",
-            });
+            AgentPresence.Instance.Nudge();   // online agents receive it within seconds
+            await rc.AuditAsync("agent.uninstall_code", "all agents", detail: new { expires = c.ExpiresAt });
+            var shown = AgentCodes.Group(code, 4);
+            return Results.Ok(new { active = true, code = shown, expiresAt = c.ExpiresAt, createdBy = c.CreatedBy, createdAt = c.CreatedAt });
+        }).RequireAuthorization(Permissions.AgentsManage);
+
+        g.MapDelete("/uninstall-code", async (NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
+        {
+            await using var cmd = ds.CreateCommand("DELETE FROM zentriq.system_settings WHERE key = 'agents.uninstall_code'");
+            await cmd.ExecuteNonQueryAsync(ct);
+            AgentPresence.Instance.Nudge();
+            await rc.AuditAsync("agent.uninstall_code_cancel", "all agents");
+            return Results.NoContent();
         }).RequireAuthorization(Permissions.AgentsManage);
 
         g.MapGet("/enrollment-tokens", async (NpgsqlDataSource ds, CancellationToken ct) =>
@@ -864,6 +882,47 @@ public static class AgentEndpoints
         }
         catch (Exception ex) when (ex is CryptographicException or FormatException or InvalidOperationException) { return null; }
     }
+
+    private static readonly Guid UninstallCodeAad = new("6c1d9e2a-47b3-4f0e-8a6d-2f5b9c3e7a41");
+    private static readonly JsonSerializerOptions JsonWeb = new(JsonSerializerDefaults.Web);
+
+    /// <summary>The current uninstall code for all agents (only its hash goes to the agents).</summary>
+    internal sealed record CodeForAll(string Hash, DateTimeOffset ExpiresAt, string CodeProtected, string? CreatedBy, DateTimeOffset CreatedAt);
+
+    /// <summary>The current code, or null when there is none or it has expired.</summary>
+    internal static async Task<CodeForAll?> LoadCodeForAllAsync(NpgsqlDataSource ds, CancellationToken ct)
+    {
+        await using var cmd = ds.CreateCommand("SELECT value::text FROM zentriq.system_settings WHERE key = 'agents.uninstall_code'");
+        if (await cmd.ExecuteScalarAsync(ct) is not string json) return null;
+        try
+        {
+            var c = JsonSerializer.Deserialize<CodeForAll>(json, JsonWeb);
+            return c is not null && c.ExpiresAt > DateTimeOffset.UtcNow ? c : null;
+        }
+        catch (JsonException) { return null; }
+    }
+
+    private static string? ShowCode(Zentriq.Infrastructure.Secrets.CredentialProtector protector, CodeForAll c)
+    {
+        try { return AgentCodes.Group(protector.Unprotect(UninstallCodeAad, c.CodeProtected).Password ?? "", 4); }
+        catch (Exception ex) when (ex is CryptographicException or FormatException or InvalidOperationException) { return null; }
+    }
+
+    /// <summary>What an agent receives: the hash and expiry (null when there is no code or protection is off).</summary>
+    private static object? CodeForAgents(CodeForAll? c, bool protection) => protection && c is not null ? new { hash = c.Hash, expiresAt = c.ExpiresAt } : null;
+
+    /// <summary>The device's IPv4 address: its inventoried address, else the address it connects from (IPv4-mapped shown as IPv4).</summary>
+    internal static string? Ipv4(string? assetIp, string? lastIp)
+    {
+        static string? V4(string? ip) =>
+            System.Net.IPAddress.TryParse(ip, out var a)
+                ? a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork ? a.ToString() : a.IsIPv4MappedToIPv6 ? a.MapToIPv4().ToString() : null
+                : null;
+        return V4(assetIp) ?? V4(lastIp) ?? (System.Net.IPAddress.TryParse(lastIp, out var x) && System.Net.IPAddress.IsLoopback(x) ? "127.0.0.1" : lastIp);
+    }
+
+    private static System.Net.IPAddress? ClientIp(HttpContext http) =>
+        http.Connection.RemoteIpAddress is { IsIPv4MappedToIPv6: true } m ? m.MapToIPv4() : http.Connection.RemoteIpAddress;
 
     internal static string RequestKey(Guid agentId) => "agent.collect." + agentId.ToString("N");
 

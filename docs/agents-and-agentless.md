@@ -174,8 +174,9 @@ Intune command-line arguments, the Configuration Manager install command. Zentri
   (agent stopped, device shut down or restarted, connection reset) — or within 45 seconds when it dies silently
   (cable pulled, Wi-Fi gone). Each gap is recorded as the device's *last outage*. Console requests (collect now,
   service actions, software removal, updates, remote support install) reach an online agent **within seconds**.
-  *Agents* refreshes every 10 seconds and shows *live connection* under the state; agents of earlier versions show
-  *by check-in · update agent* and are judged by their check-ins as before (update them from *Agents*).
+  *Agents* refreshes every 10 seconds and shows **Online**, or **Offline · how long** (time since the last contact).
+  Agents of earlier versions are judged by their check-ins as before (update them from *Agents*). The IP address shown
+  is the device's IPv4 address.
 * Besides that, each agent **checks in** at its check-in interval (settings, certificate renewal, queued requests) and
   **sends its inventory** at its inventory interval: *every 5 min, 15 min, 30 min, 1 hour, 2 hours or 3 hours* and
   *every 30 min, 1, 2, 3, 6, 12 or 24 hours* (chosen at installation, in this order in the installer lists). Change them
@@ -191,11 +192,13 @@ Intune command-line arguments, the Configuration Manager install command. Zentri
 
 ### Uninstall protection
 
-* *Agents › Settings › Require an uninstall code to remove the agent* (on by default). Each device receives its own
-  key at its next check-in, stored readable by **SYSTEM only** (`HKLM\SOFTWARE\Zentriq\Agent\Protection`).
-* To remove a protected agent, create a code for that device: *Agents › Uninstall code*. It has 16 characters
-  (`ABCD-EFGH-JKMN-PQRS`), works **only on that device** and **expires after one hour**; creating it is audited. Then on
-  the device, as administrator: `"C:\Program Files\Zentriq Agent\ZentriqAgent.exe" --uninstall <code>`, or
+* *Agents › Settings › Require an uninstall code to remove the agent* (on by default). Each device then keeps its
+  protection data readable by **SYSTEM only** (`HKLM\SOFTWARE\Zentriq\Agent\Protection`).
+* To remove protected agents, create the **uninstall code**: *Agents › Uninstall code*. It is **one random code for all
+  devices** (16 characters, `ABCD-EFGH-JKMN-PQRS`), valid for **one hour**; creating a new one replaces the previous
+  code, and *Cancel code* withdraws it. Creating it is audited. Online agents receive it within seconds over their live
+  connection (only its hash, readable by SYSTEM), others when they next connect; agents of earlier versions need
+  updating first. Then on the device, as administrator: `"C:\Program Files\Zentriq Agent\ZentriqAgent.exe" --uninstall <code>`, or
   *Apps › Zentriq Agent › Modify › Remove* and enter the code, or `msiexec /x {product} UNINSTALLCODE=<code>`.
   (`--uninstall` starts the removal from a temporary copy and returns at once; Windows Installer shows the progress and
   the result is logged in `%TEMP%\ZentriqAgent-uninstall.log`.)

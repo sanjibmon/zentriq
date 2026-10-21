@@ -57,6 +57,9 @@ internal static class Presence
                     }
                     Connected = true;
                     failures = 0;
+                    // A new or cancelled uninstall code reaches the device within seconds.
+                    if (r.UninstallProtection == true && UninstallProtection.CanManage)
+                        try { UninstallProtection.ApplyCodeForAll(r.UninstallCode); } catch (Exception ex) { Log.Warn("Could not store the uninstall code: " + ex.Message); }
                     lostAt = null;
                     if (r.Wake)
                     {

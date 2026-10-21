@@ -61,6 +61,26 @@ public sealed class AgentCodesTests
         Assert.False(AgentCodes.VerifyUninstallCode(key, "ABCD-EFGH-JKMN-PQRS", now, out _));
     }
 
+    [Fact]
+    public void One_uninstall_code_for_all_agents_is_random_and_works_for_one_hour()
+    {
+        var now = new DateTime(2026, 10, 21, 9, 0, 0, DateTimeKind.Utc);
+        var code = AgentCodes.NewUninstallCodeForAll();
+        Assert.Matches("^[0-9A-HJKMNP-TV-Z]{16}$", code);
+        Assert.NotEqual(code, AgentCodes.NewUninstallCodeForAll());
+        var hash = AgentCodes.UninstallCodeHash(code);
+        Assert.Matches("^[0-9a-f]{64}$", hash);
+        var expires = now.Add(AgentCodes.UninstallValidity);
+        Assert.True(AgentCodes.VerifyUninstallCodeForAll(hash, expires, AgentCodes.Group(code, 4).ToLowerInvariant(), now.AddMinutes(59), out _));
+        Assert.False(AgentCodes.VerifyUninstallCodeForAll(hash, expires, code, now.AddMinutes(61), out var expired));
+        Assert.Contains("expired", expired);
+        Assert.False(AgentCodes.VerifyUninstallCodeForAll(hash, expires, AgentCodes.NewUninstallCodeForAll(), now, out var wrong));
+        Assert.Contains("not valid", wrong);
+        Assert.False(AgentCodes.VerifyUninstallCodeForAll(null, null, code, now, out var none));
+        Assert.Contains("not received", none);
+        Assert.False(AgentCodes.VerifyUninstallCodeForAll(hash, expires, "", now, out _));
+    }
+
     [Theory]
     [InlineData("8.8.8.8", true)]
     [InlineData("49.36.112.18", true)]
