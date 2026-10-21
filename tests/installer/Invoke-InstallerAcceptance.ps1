@@ -1521,7 +1521,10 @@ if (-not $installed) {
         function Raw([string] $Method, [string] $Path, $Body) {
             $p = @{ Uri = "$base/api/v1$Path"; Method = $Method; WebSession = $s; Headers = @{ 'X-Zentriq-Request' = '1' }; ContentType = 'application/json'; SkipHttpErrorCheck = $true }
             if ($null -ne $Body) { $p.Body = ($Body | ConvertTo-Json -Depth 6) }
-            Invoke-WebRequest @p
+            $resp = Invoke-WebRequest @p
+            # application/problem+json comes back as bytes: return the text as well.
+            $text = if ($resp.Content -is [byte[]]) { [Text.Encoding]::UTF8.GetString($resp.Content) } else { [string]$resp.Content }
+            [pscustomobject]@{ StatusCode = [int]$resp.StatusCode; Content = $text }
         }
         $hq = Api POST '/locations' @{ name = 'CI head office store' } -Session $s
         $br = Api POST '/locations' @{ name = 'CI branch' } -Session $s
