@@ -1,4 +1,4 @@
-# Departments, change history and console options (build 47)
+# Departments, locations, change history and console options
 
 ## Departments / units
 
@@ -6,9 +6,9 @@ After discovery, administrators group devices by department, business unit, loca
 
 **Where to assign**
 
-- **Asset Inventory:** tick devices and click **Assign department (n)**. Choose a department, or **＋ Add new department…** at the end of the list, or *None* to clear it.
+- **IT Asset Inventory** and **Hardware Inventory:** tick devices and click **Department / location (n)**. Choose a department (and / or a location), or **＋ Add new…** at the end of the list, *None* to clear it, or *Keep as it is* to change only the other one.
 - **Device page:** the **Overview** tab has a *Department / unit* dropdown that also offers *Add new…*.
-- **Asset Inventory › Departments:** see every department with its device count, and add, rename or delete them. Deleting a department leaves its devices unassigned.
+- **Departments & locations** (IT Asset, Hardware and IT Accessories pages): see every department and location with its device count, and add, rename or delete them. Deleting a department leaves its devices unassigned.
 
 **Where the department shows up**
 
@@ -18,6 +18,29 @@ After discovery, administrators group devices by department, business unit, loca
 - **Built-in reports:** *Assets by department* and *Asset register by department*.
 
 **Permissions:** assigning and editing need the `assets.manage` permission. Viewing needs `assets.view`.
+
+## Locations
+
+Locations work like departments: an office, site, floor or store that devices belong to (build 75).
+
+- **Assign:** with departments, see above (*Department / location (n)*), or on the device page (*Overview › Location*).
+- **Where it shows:** a *Location* column and filter in IT Asset Inventory, Hardware Inventory and Software Inventory;
+  the *Assets by location* dashboard chart (click a bar to list the devices); the **Location (site / office)** column in
+  every device report and the built-in report *Assets by location*.
+- **IT accessories** are stocked per location (see *IT accessories*). A location that holds accessory stock or stock
+  history cannot be deleted; transfer the stock first.
+- Network devices keep their SNMP *location* text (sysLocation) as before; non-IT assets keep their own location text.
+
+## Columns and filters in the inventory tables
+
+Every inventory table (IT Asset, Hardware, Software, Network devices and ports, Non-IT assets and IT accessories) has a
+**Columns** button: tick columns to show or hide them, or add columns that are not shown by default (for example serial
+number, manufacturer, model, owner, criticality or first seen in IT Asset Inventory; IP address in Hardware Inventory;
+vendor, purchase date, current value or notes for Non-IT assets). The choice is remembered per table in your browser;
+*Reset* restores the default. Filters: IT Asset Inventory (category, type, department, location, agent, inventory,
+last contact, status), Hardware Inventory (department, location, type, manufacturer, operating system), Software
+Inventory (operating system, department, location), Network Inventory, Non-IT assets and IT accessories (location,
+category, below reorder level; movement type, location, department and period for the history).
 
 ## Hardware and software change history
 
