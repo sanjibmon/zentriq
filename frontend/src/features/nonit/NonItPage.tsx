@@ -228,7 +228,7 @@ function AssetsTab({ tick, summary, categories, departments, canEdit, onOpen, on
               <tr>
                 <th style={{ width: 32 }}><input type="checkbox" className="row-sel" checked={allOn} aria-label="Select all"
                   onChange={(e) => setSel(e.target.checked ? [...new Set([...sel, ...rows.map((r) => r.id)])] : sel.filter((id) => !rows.some((r) => r.id === id)))} /></th>
-                {columns.map((c) => c.sort ? <th key={c.key} className="sort" onClick={() => setSort((x) => ({ col: c.sort!, dir: x?.col === c.sort && x.dir === 'asc' ? 'desc' : 'asc' }))}>
+                {columns.map((c) => c.sort ? <th key={c.key} className="sort" onClick={() => setSort((x) => ({ col: c.sort!, dir: x?.col === c.sort && x?.dir === 'asc' ? 'desc' : 'asc' }))}>
                   {c.title}{sort?.col === c.sort ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}</th> : <th key={c.key}>{c.title}</th>)}
               </tr>
             </thead>
