@@ -3,8 +3,6 @@ import { api } from '../../api/client';
 import type { Asset } from '../../api/types';
 import { Callout, Pill } from '../../components/ui';
 
-type Field = 'manufacturer' | 'model' | 'serialNumber';
-
 export type HwField = 'manufacturer' | 'model' | 'serialNumber';
 type Field = HwField;
 
