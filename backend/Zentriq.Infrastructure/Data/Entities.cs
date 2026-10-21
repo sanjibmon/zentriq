@@ -123,6 +123,9 @@ public sealed class Asset
     public Guid? SiteId { get; set; }
     public Guid? DepartmentId { get; set; }
     public Guid? LocationId { get; set; }
+    public string? ManualManufacturer { get; set; }
+    public string? ManualModel { get; set; }
+    public string? ManualSerial { get; set; }
     public string Criticality { get; set; } = "Medium";
     public string? OwnerName { get; set; }
     public string Source { get; set; } = "manual";

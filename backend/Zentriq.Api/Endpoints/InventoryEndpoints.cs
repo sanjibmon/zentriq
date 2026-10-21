@@ -150,20 +150,27 @@ public static class InventoryEndpoints
         {
             var (p, size) = Paging.Normalize(page, pageSize);
             await using var cmd = ds.CreateCommand("""
-                SELECT a.id, a.hostname, a.category, a.os_name, h.vendor, h.model, h.serial_number, h.cpu, h.cpu_cores, h.ram_gb, h.chassis,
+                SELECT a.id, a.hostname, a.category, a.os_name, hw.vendor, hw.model, hw.serial, h.cpu, h.cpu_cores, h.ram_gb, h.chassis,
                        (SELECT COALESCE(round(sum((d->>'sizeBytes')::numeric) / 1073741824, 1), 0)
                           FROM jsonb_array_elements(CASE WHEN jsonb_typeof(h.disks) = 'object' THEN COALESCE(h.disks->'disks', '[]'::jsonb) ELSE h.disks END) d
                          WHERE d ? 'sizeBytes' AND jsonb_typeof(d->'sizeBytes') = 'number') AS disk_gb,
                        h.source, h.collected_at, count(*) OVER () AS total,
-                       a.department_id, dp.name, a.location_id, lo.name, host(a.primary_ip)
+                       a.department_id, dp.name, a.location_id, lo.name, host(a.primary_ip), hw.manual
                   FROM zentriq.hardware_inventory h JOIN zentriq.assets a ON a.id = h.asset_id AND a.status = 'active'
+                  CROSS JOIN LATERAL (SELECT COALESCE(zentriq.hw_value(h.vendor), zentriq.hw_value(a.manufacturer)) AS dv, zentriq.hw_value(h.model) AS dm,
+                                             COALESCE(zentriq.hw_value(h.serial_number), zentriq.hw_value(a.serial_number)) AS ds) det
+                  CROSS JOIN LATERAL (SELECT COALESCE(det.dv, a.manual_manufacturer) AS vendor, COALESCE(det.dm, zentriq.hw_value(a.model), a.manual_model) AS model,
+                                             COALESCE(det.ds, a.manual_serial) AS serial,
+                                             array_remove(ARRAY[CASE WHEN det.dv IS NULL AND a.manual_manufacturer IS NOT NULL THEN 'manufacturer' END,
+                                                                CASE WHEN det.dm IS NULL AND zentriq.hw_value(a.model) IS NULL AND a.manual_model IS NOT NULL THEN 'model' END,
+                                                                CASE WHEN det.ds IS NULL AND a.manual_serial IS NOT NULL THEN 'serialNumber' END], NULL) AS manual) hw
                   LEFT JOIN zentriq.departments dp ON dp.id = a.department_id
                   LEFT JOIN zentriq.locations lo ON lo.id = a.location_id
-                 WHERE (@q::text IS NULL OR a.hostname ILIKE @q OR h.vendor ILIKE @q OR h.model ILIKE @q OR h.serial_number ILIKE @q OR h.cpu ILIKE @q)
+                 WHERE (@q::text IS NULL OR a.hostname ILIKE @q OR hw.vendor ILIKE @q OR hw.model ILIKE @q OR hw.serial ILIKE @q OR h.cpu ILIKE @q)
                    AND (@dep::text IS NULL OR (@dep = 'none' AND a.department_id IS NULL) OR a.department_id::text = @dep)
                    AND (@loc::text IS NULL OR (@loc = 'none' AND a.location_id IS NULL) OR a.location_id::text = @loc)
                    AND (@type::text IS NULL OR lower(h.chassis) = lower(@type))
-                   AND (@vendor::text IS NULL OR h.vendor ILIKE @vendor)
+                   AND (@vendor::text IS NULL OR hw.vendor ILIKE @vendor)
                    AND (@os::text IS NULL OR a.os_name ILIKE @os)
                  ORDER BY lower(a.hostname) NULLS LAST
                  LIMIT @l OFFSET @o
@@ -189,6 +196,7 @@ public static class InventoryEndpoints
                     diskGb = r.GetDecimal(11), source = S(12), collectedAt = r.GetFieldValue<DateTimeOffset>(13),
                     departmentId = r.IsDBNull(15) ? (Guid?)null : r.GetGuid(15), department = S(16),
                     locationId = r.IsDBNull(17) ? (Guid?)null : r.GetGuid(17), location = S(18), ip = S(19),
+                    enteredManually = r.IsDBNull(20) ? Array.Empty<string>() : r.GetFieldValue<string[]>(20),
                 });
                 total = r.GetInt64(14);
             }
@@ -210,7 +218,7 @@ public static class InventoryEndpoints
             return Results.Ok(new
             {
                 types = await Distinct($"SELECT DISTINCT lower(h.chassis) {From} WHERE h.chassis IS NOT NULL ORDER BY 1"),
-                vendors = await Distinct($"SELECT h.vendor {From} WHERE h.vendor IS NOT NULL GROUP BY h.vendor ORDER BY count(*) DESC, 1 LIMIT 50"),
+                vendors = await Distinct($"SELECT v {From} CROSS JOIN LATERAL (SELECT COALESCE(zentriq.hw_value(h.vendor), zentriq.hw_value(a.manufacturer), a.manual_manufacturer) AS v) x WHERE v IS NOT NULL GROUP BY v ORDER BY count(*) DESC, 1 LIMIT 50"),
                 os = await Distinct($"SELECT a.os_name {From} WHERE a.os_name IS NOT NULL GROUP BY a.os_name ORDER BY count(*) DESC, 1 LIMIT 50"),
             });
         }).RequireAuthorization(Permissions.AssetsView);

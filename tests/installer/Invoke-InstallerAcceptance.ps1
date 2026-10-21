@@ -119,7 +119,7 @@ Remove-Item $answer -Force   # contains the administrator password
 
 if (-not $installed) {
     foreach ($t in 'T02 PostgreSQL provisioning', 'T03 Database migration', 'T04 Administrator sign-in', 'T05 API and worker services', 'T06 Trial initialization',
-                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection', 'T68 Live agent connection', 'T69 Locations and IT accessories') {
+                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection', 'T68 Live agent connection', 'T69 Locations and IT accessories', 'T70 Manual hardware details') {
         Record $t.Substring(0, 3) $t.Substring(4) 'BLOCKED' 'installation failed'
     }
 } else {
@@ -1569,6 +1569,31 @@ if (-not $installed) {
         Assert ($delItem.StatusCode -eq 409) "accessory with history deleted ($($delItem.StatusCode))"
         Api POST '/assets/location' @{ assetIds = @($asset.id); locationId = $null } -Session $s | Out-Null
         "location assigned and filtered ($hwNote); received 10, issued 6 to CI Person (stock 4, below reorder 5), issue of 5 refused (Only 4), returned 1 faulty, transferred 2; $moves movements; location and accessory with history protected"
+    } | Out-Null
+
+    Check 'T70' 'Manual hardware details: entered where not detected, linked to the fixed identities, searchable, detected values keep priority, removable' {
+        $s = Login
+        $agentDev = @(Api GET '/agents' -Session $s | ForEach-Object { $_ }) | Where-Object { $_.status -eq 'active' -and $_.assetId } | Select-Object -First 1
+        $id = if ($agentDev) { $agentDev.assetId } else { ((Api GET '/assets' -Session $s).items | Select-Object -First 1).id }
+        Assert $id 'no device'
+        $before = Api GET "/assets/$id" -Session $s
+        $r = Api PUT "/assets/$id/hardware-identity" @{ manufacturer = 'CI Maker'; model = 'CI Model 70'; serialNumber = 'CI-MANUAL-SN-70' } -Session $s
+        if ($agentDev) { Assert ($r.identities -ge 1) "not linked to any fixed identity: $($r | ConvertTo-Json -Compress)" }
+        $a = Api GET "/assets/$id" -Session $s
+        Assert ($a.manualSerial -eq 'CI-MANUAL-SN-70' -and $a.manualModel -eq 'CI Model 70') "manual values not stored: $($a | ConvertTo-Json -Compress -Depth 3)"
+        # A value the device reports stays; a missing one is filled from what was entered.
+        if ($before.serialNumber) { Assert ($a.serialNumber -eq $before.serialNumber -and 'serialNumber' -notin @($a.enteredManually)) "detected serial replaced: $($a.serialNumber)" }
+        else { Assert ($a.serialNumber -eq 'CI-MANUAL-SN-70' -and 'serialNumber' -in @($a.enteredManually)) "missing serial not filled: $($a.serialNumber)" }
+        $found = (Api GET '/assets?q=CI-MANUAL-SN-70' -Session $s).items
+        Assert (@($found | Where-Object id -eq $id).Count -eq 1) 'device not found by the entered serial number'
+        $long = Invoke-WebRequest -Uri "$base/api/v1/assets/$id/hardware-identity" -Method PUT -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } -ContentType 'application/json' -Body (@{ model = ('x' * 201) } | ConvertTo-Json) -SkipHttpErrorCheck
+        Assert ([int]$long.StatusCode -eq 400) "201-character model accepted ($([int]$long.StatusCode))"
+        $hw = (Api GET '/inventory/hardware?q=CI-MANUAL-SN-70' -Session $s).items
+        $hwNote = if (@($hw).Count -gt 0) { "hardware inventory shows it (manual: $(@($hw[0].enteredManually) -join ', '))" } else { 'serial detected, so hardware inventory keeps the detected one' }
+        $c = Api PUT "/assets/$id/hardware-identity" @{ manufacturer = $null; model = $null; serialNumber = $null } -Session $s
+        $a = Api GET "/assets/$id" -Session $s
+        Assert (-not $a.manualSerial -and -not $a.manualModel -and -not $a.manualManufacturer) 'entered values not removed'
+        "saved and linked to $($r.identities) identit(y/ies); $hwNote; 201 characters refused; removed"
     } | Out-Null
 
     if ($UpgradeBundle) {

@@ -12,6 +12,10 @@ import { AssignOrgDialog, ManageOrgDialog, useLocations } from '../locations/Loc
 
 type Row = HardwareRow & { id: string };
 
+/** A small marker when the value was entered manually (the device does not report it). */
+const manualOf = (r: HardwareRow, ...fields: string[]) =>
+  fields.some((f) => r.enteredManually?.includes(f)) ? <span className="faint" title="Entered manually in Zentriq — the device does not report it" style={{ fontSize: 11.5, marginLeft: 6 }}>✎ manual</span> : null;
+
 export function HardwarePage() {
   const { can } = useAuth();
   const params = new URLSearchParams(window.location.search);
@@ -48,8 +52,8 @@ export function HardwarePage() {
     { key: 'os', label: 'Operating system', className: 'wrap', render: (r) => r.osName ?? <span className="faint">{fmt.label(r.category)}</span> },
     { key: 'dep', label: 'Department', render: (r) => r.department ?? <span className="muted">—</span> },
     { key: 'loc', label: 'Location', render: (r) => r.location ?? <span className="muted">—</span> },
-    { key: 'm', label: 'Manufacturer / model', className: 'wrap', render: (r) => [r.vendor, r.model].filter(Boolean).join(' ') || '—' },
-    { key: 's', label: 'Serial number', render: (r) => <span className="mono">{r.serialNumber ?? '—'}</span> },
+    { key: 'm', label: 'Manufacturer / model', className: 'wrap', render: (r) => <>{[r.vendor, r.model].filter(Boolean).join(' ') || <span className="muted">Not detected</span>}{manualOf(r, 'manufacturer', 'model')}</> },
+    { key: 's', label: 'Serial number', render: (r) => <>{r.serialNumber ? <span className="mono">{r.serialNumber}</span> : <span className="muted">Not detected</span>}{manualOf(r, 'serialNumber')}</> },
     { key: 'c', label: 'Processor', className: 'wrap', render: (r) => <>{r.cpu ?? '—'}{r.cpuCores ? <span className="faint"> · {r.cpuCores} cores</span> : null}</> },
     { key: 'r', label: 'Memory', render: (r) => (r.ramGb != null ? `${r.ramGb} GB` : '—') },
     { key: 'd', label: 'Disk', render: (r) => (r.diskGb ? `${r.diskGb} GB` : '—') },

@@ -43,6 +43,7 @@ public static class ReportCatalog
         new("criticality", "Criticality", ReportColumnType.Text, "a.criticality", "Device"),
         new("owner", "Owner", ReportColumnType.Text, "a.owner_name", "Device"),
         new("department", "Department / unit", ReportColumnType.Text, "(SELECT dp.name FROM zentriq.departments dp WHERE dp.id = a.department_id)", "Device"),
+        new("hw_entered", "Hardware details entered manually", ReportColumnType.YesNo, "CASE WHEN a.manual_manufacturer IS NOT NULL OR a.manual_model IS NOT NULL OR a.manual_serial IS NOT NULL THEN 'yes' ELSE 'no' END", "Device"),
         new("asset_location", "Location (site / office)", ReportColumnType.Text, "(SELECT lo.name FROM zentriq.locations lo WHERE lo.id = a.location_id)", "Device"),
     ];
 
@@ -58,9 +59,9 @@ public static class ReportCatalog
              """,
             [
                 .. DeviceColumns,
-                new("manufacturer", "Manufacturer", ReportColumnType.Text, "h.vendor", "Hardware"),
-                new("model", "Model", ReportColumnType.Text, "h.model", "Hardware"),
-                new("serial", "Serial number", ReportColumnType.Text, "COALESCE(h.serial_number, a.serial_number)", "Hardware"),
+                new("manufacturer", "Manufacturer", ReportColumnType.Text, "COALESCE(zentriq.hw_value(h.vendor), zentriq.hw_value(a.manufacturer), a.manual_manufacturer)", "Hardware"),
+                new("model", "Model", ReportColumnType.Text, "COALESCE(zentriq.hw_value(h.model), zentriq.hw_value(a.model), a.manual_model)", "Hardware"),
+                new("serial", "Serial number", ReportColumnType.Text, "COALESCE(zentriq.hw_value(h.serial_number), zentriq.hw_value(a.serial_number), a.manual_serial)", "Hardware"),
                 new("agent", "Agent installed", ReportColumnType.YesNo, "CASE WHEN ag.id IS NOT NULL THEN 'yes' ELSE 'no' END", "Coverage"),
                 new("agent_version", "Agent version", ReportColumnType.Text, "ag.agent_version", "Coverage"),
                 new("inventory_status", "Inventory status", ReportColumnType.Text, "a.inventory_status", "Coverage"),
@@ -89,9 +90,9 @@ public static class ReportCatalog
             """,
             [
                 .. DeviceColumns,
-                new("manufacturer", "Manufacturer", ReportColumnType.Text, "h.vendor", "Hardware"),
-                new("model", "Model", ReportColumnType.Text, "h.model", "Hardware"),
-                new("serial", "Serial number", ReportColumnType.Text, "COALESCE(h.serial_number, a.serial_number)", "Hardware"),
+                new("manufacturer", "Manufacturer", ReportColumnType.Text, "COALESCE(zentriq.hw_value(h.vendor), zentriq.hw_value(a.manufacturer), a.manual_manufacturer)", "Hardware"),
+                new("model", "Model", ReportColumnType.Text, "COALESCE(zentriq.hw_value(h.model), zentriq.hw_value(a.model), a.manual_model)", "Hardware"),
+                new("serial", "Serial number", ReportColumnType.Text, "COALESCE(zentriq.hw_value(h.serial_number), zentriq.hw_value(a.serial_number), a.manual_serial)", "Hardware"),
                 new("cpu", "Processor", ReportColumnType.Text, "h.cpu", "Hardware"),
                 new("cores", "CPU cores", ReportColumnType.Number, "h.cpu_cores", "Hardware"),
                 new("threads", "CPU threads", ReportColumnType.Number, "h.cpu_threads", "Hardware"),
@@ -288,7 +289,7 @@ public static class ReportCatalog
             [
                 new("manufacturer", "Manufacturer", ReportColumnType.Text, "COALESCE(a.manufacturer, h.vendor)", "Network device"),
                 new("model", "Model", ReportColumnType.Text, "COALESCE(a.model, h.model)", "Network device"),
-                new("serial", "Serial number", ReportColumnType.Text, "COALESCE(h.serial_number, a.serial_number)", "Network device"),
+                new("serial", "Serial number", ReportColumnType.Text, "COALESCE(zentriq.hw_value(h.serial_number), zentriq.hw_value(a.serial_number), a.manual_serial)", "Network device"),
                 new("firmware", "Firmware / software version", ReportColumnType.Text, "d.document #>> '{os,version}'", "Network device"),
                 new("management", "Management", ReportColumnType.Text, Inventory.NetworkStore.ManagementExpr, "Network device"),
                 new("snmp_version", "SNMP version", ReportColumnType.Text, "nd.snmp_version", "Network device"),

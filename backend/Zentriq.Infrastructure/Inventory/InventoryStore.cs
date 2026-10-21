@@ -64,6 +64,8 @@ public sealed class InventoryStore(LicensingService licensing)
         await ReplaceSoftwareAsync(conn, tx, assetId.Value, doc, ct);
         await UpsertDocumentAsync(conn, tx, assetId.Value, doc, ct);
         await AddIdentifiersAsync(conn, tx, assetId.Value, doc, hints, ct);
+        // Manufacturer / model / serial entered by hand earlier for this machine (agent or OS reinstalled, device re-created).
+        await HardwareProfiles.RestoreAsync(conn, tx, assetId.Value, doc, ct);
         if (doc.NetworkDevice is { } net)
         {
             await NetworkStore.SaveAsync(conn, tx, assetId.Value, net, ct);
@@ -119,7 +121,7 @@ public sealed class InventoryStore(LicensingService licensing)
         var ids = new List<(string Kind, string Value)>();
         if (hints.AgentId is { } agent) ids.Add(("agent_id", agent.ToString("D")));
         if (doc.Device.SmbiosUuid is { } uuid) ids.Add(("smbios_uuid", uuid));
-        if (doc.Device.SerialNumber is { } serial && serial.Length >= 4) ids.Add(("serial", Key(doc.Device.Manufacturer, serial)));
+        if (HardwareProfiles.Clean(doc.Device.SerialNumber) is { } serial && serial.Length >= 4) ids.Add(("serial", Key(doc.Device.Manufacturer, serial)));
         foreach (var mac in doc.Network.Select(n => n.Mac).Where(m => m is not null).Distinct()) ids.Add(("mac", mac!));
         foreach (var (kind, value) in ids)
         {
@@ -183,14 +185,14 @@ public sealed class InventoryStore(LicensingService licensing)
         cmd.Parameters.Add(Text("f", doc.Device.Fqdn));
         cmd.Parameters.Add(new NpgsqlParameter("ip", NpgsqlDbType.Inet) { Value = (object?)ip ?? DBNull.Value });
         cmd.Parameters.Add(Text("mac", mac));
-        cmd.Parameters.Add(Text("sn", doc.Device.SerialNumber));
+        cmd.Parameters.Add(Text("sn", HardwareProfiles.Clean(doc.Device.SerialNumber)));
         cmd.Parameters.Add(Text("of", doc.Os.Family is "windows" or "linux" or "macos" or "network" or "other" ? doc.Os.Family : null));
         cmd.Parameters.Add(Text("on", Trunc(doc.Os.Name, 200)));
         cmd.Parameters.Add(Text("c", doc.Device.Category is null ? null : NormalizeCategory(doc.Device.Category)));
         cmd.Parameters.AddWithValue("src", doc.Source);
         cmd.Parameters.Add(Text("dt", DeviceTypeOf(doc)));
-        cmd.Parameters.Add(Text("mf", Trunc(doc.Device.Manufacturer, 200)));
-        cmd.Parameters.Add(Text("md", Trunc(doc.Device.Model, 200)));
+        cmd.Parameters.Add(Text("mf", HardwareProfiles.Clean(doc.Device.Manufacturer)));
+        cmd.Parameters.Add(Text("md", HardwareProfiles.Clean(doc.Device.Model)));
         cmd.Parameters.Add(Text("ib", doc.Device.IdentifiedBy is { Count: > 0 } ib ? JsonSerializer.Serialize(ib) : null));
         await cmd.ExecuteNonQueryAsync(ct);
     }
@@ -222,15 +224,15 @@ public sealed class InventoryStore(LicensingService licensing)
                 serial_number = EXCLUDED.serial_number, smbios_uuid = EXCLUDED.smbios_uuid, chassis = EXCLUDED.chassis, source = EXCLUDED.source, collected_at = now()
             """, conn, tx);
         cmd.Parameters.AddWithValue("id", id);
-        cmd.Parameters.Add(Text("v", Trunc(doc.Device.Manufacturer, 200)));
-        cmd.Parameters.Add(Text("m", Trunc(doc.Device.Model, 200)));
+        cmd.Parameters.Add(Text("v", HardwareProfiles.Clean(doc.Device.Manufacturer)));
+        cmd.Parameters.Add(Text("m", HardwareProfiles.Clean(doc.Device.Model)));
         cmd.Parameters.Add(Text("cpu", Trunc(h.CpuName, 200)));
         cmd.Parameters.Add(new NpgsqlParameter("cores", NpgsqlDbType.Integer) { Value = (object?)h.CpuCores ?? DBNull.Value });
         cmd.Parameters.Add(new NpgsqlParameter("thr", NpgsqlDbType.Integer) { Value = (object?)h.CpuThreads ?? DBNull.Value });
         cmd.Parameters.Add(new NpgsqlParameter("ram", NpgsqlDbType.Numeric) { Value = h.MemoryBytes is { } b ? (object)Math.Round(b / 1073741824m, 2) : DBNull.Value });
         cmd.Parameters.Add(new NpgsqlParameter("fw", NpgsqlDbType.Jsonb) { Value = JsonSerializer.Serialize(new { h.BiosVendor, h.BiosVersion, h.BiosDate, h.TpmPresent, h.TpmVersion, h.IsVirtual }, Json) });
         cmd.Parameters.Add(new NpgsqlParameter("disks", NpgsqlDbType.Jsonb) { Value = JsonSerializer.Serialize(new { h.Disks, h.Volumes }, Json) });
-        cmd.Parameters.Add(Text("sn", doc.Device.SerialNumber));
+        cmd.Parameters.Add(Text("sn", HardwareProfiles.Clean(doc.Device.SerialNumber)));
         cmd.Parameters.Add(Text("uuid", doc.Device.SmbiosUuid));
         cmd.Parameters.Add(Text("ch", doc.Device.Chassis));
         cmd.Parameters.AddWithValue("src", doc.Source);
@@ -283,7 +285,7 @@ public sealed class InventoryStore(LicensingService licensing)
         var ids = new List<(string, string)>();
         if (hints.AgentId is { } a) ids.Add(("agent_id", a.ToString("D")));
         if (doc.Device.SmbiosUuid is { } u) ids.Add(("smbios_uuid", u));
-        if (doc.Device.SerialNumber is { } s && s.Length >= 4) ids.Add(("serial", Key(doc.Device.Manufacturer, s)));
+        if (HardwareProfiles.Clean(doc.Device.SerialNumber) is { } s && s.Length >= 4) ids.Add(("serial", Key(doc.Device.Manufacturer, s)));
         foreach (var m in doc.Network.Select(n => n.Mac).Where(m => m is not null).Distinct().Take(16)) ids.Add(("mac", m!));
         if (doc.Device.Fqdn is { } f) ids.Add(("hostname_fqdn", f.ToLowerInvariant()));
         foreach (var (kind, value) in ids)

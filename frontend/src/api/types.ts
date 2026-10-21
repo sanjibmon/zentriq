@@ -106,6 +106,12 @@ export interface Asset {
   model?: string | null;
   /** How the device was recognised without credentials (web interface, SNMP, ports). */
   identifiedBy?: string[] | null;
+  /** Hardware details typed in by an administrator; used where the device does not report a value. */
+  manualManufacturer?: string | null;
+  manualModel?: string | null;
+  manualSerial?: string | null;
+  /** Which of manufacturer / model / serialNumber come from the manually entered values. */
+  enteredManually?: ('manufacturer' | 'model' | 'serialNumber')[] | null;
 }
 
 export interface KeyCount {
@@ -381,6 +387,8 @@ export interface HardwareRow {
   vendor: string | null;
   model: string | null;
   serialNumber: string | null;
+  /** Which of manufacturer (vendor) / model / serialNumber were entered manually. */
+  enteredManually?: string[];
   cpu: string | null;
   cpuCores: number | null;
   ramGb: number | null;

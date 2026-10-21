@@ -69,6 +69,18 @@ Two active records are the same device when they share a **host name**, a **seri
 
 **Manual:** **IT Asset Inventory › Duplicates (n)** lists each group with the reason (same name, same serial, same adapter) and which record is kept. You can **Merge these** for one group or **Merge all**.
 
+## Manufacturer, model and serial number entered manually (build 78)
+
+Some devices do not report these values. White-box PCs and some boards report placeholders such as "To be filled by O.E.M.", "Default string", "System Serial Number" or "0000000". Zentriq treats placeholders as **not detected**.
+
+- **Detected values always win.** A value the device reports is shown as it is and cannot be overwritten.
+- **Missing values can be typed in.** Open the device. On **Overview**, a missing Manufacturer, Model or Serial number shows **Not detected · Add manually**, for users with *assets.manage*. A typed value is marked **Entered manually**, and **Edit** changes it. **Remove entered values** clears all three.
+- **Where the entered values appear:** the device page, the IT Asset Inventory search, Hardware Inventory (marked "✎ manual", searchable, and in the manufacturer filter) and Reports. Reports have a column for whether the details were entered manually.
+- **Remembered by the machine, not the record.** What you enter is also saved as a hardware profile, keyed by the device's fixed identities: the **SMBIOS UUID** from the motherboard and the **MAC addresses** of its network adapters. If the agent or Windows is reinstalled, or the device is deleted and found again, the next inventory recognises the identities and fills the values in again automatically.
+  - **Safeguards:** the profile is not applied when the device reports a *different* SMBIOS UUID, for example a USB network adapter moved to another machine. Placeholder or shared UUIDs (cloned VMs) are not used as an identity.
+  - **Merges:** a duplicate merge keeps the entered values.
+  - **Audit:** each change is in the audit log as `asset.hardware_identity`.
+
 ## API
 
 | Method | Path | |
@@ -76,6 +88,7 @@ Two active records are the same device when they share a **host name**, a **seri
 | GET | `/api/v1/assets?deviceType=firewall` | filter by type (`unknown` = not detected) |
 | GET | `/api/v1/assets/device-types` | the list above with categories |
 | POST | `/api/v1/assets` | add (`deviceType`, `macAddress`, `manufacturer`, `model`, `departmentId` …) |
+| PUT | `/api/v1/assets/{id}/hardware-identity` | `{ manufacturer, model, serialNumber }`; `null` clears; returns the number of identities linked |
 | PUT | `/api/v1/assets/{id}/device-type` | `{ "deviceType": "mfp" }`, or `null` for automatic |
 | DELETE | `/api/v1/assets/{id}` · POST `/api/v1/assets/delete` `{ids}` | permanent deletion |
 | GET | `/api/v1/assets/duplicates` | groups, reasons, automatic setting |
@@ -100,3 +113,7 @@ Two active records are the same device when they share a **host name**, a **seri
   - Device type set manually, then back to automatic.
   - The automatic setting is turned off and on.
   - Delete (2 records).
+- **Manual hardware details (build 78):**
+  - **Unit test:** placeholders are not values.
+  - **PostgreSQL test:** entered values come back on a new record with the same SMBIOS UUID/MAC; not applied when only the MAC matches but the UUID differs; clearing removes the profile.
+  - **Windows acceptance test T70:** save, identities linked, detected values keep priority, search by the entered serial, 201 characters refused, removed.

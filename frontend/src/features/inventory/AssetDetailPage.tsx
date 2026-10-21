@@ -14,6 +14,7 @@ import { LocationSelect, useLocations } from '../locations/Locations';
 import { AssetVulnerabilities } from '../vulnerabilities/AssetVulnerabilities';
 import { DeviceTypeField, useDeleteDevices } from '../assets/DeviceManagement';
 import { AssetNetwork } from '../network/AssetNetwork';
+import { HardwareIdentityDialog, hardwareIdentityRows } from './HardwareIdentity';
 import { Callout, DataTable, ErrorBox, fmt, Loading, PageHead, Panel, Pill, statusTone } from '../../components/ui';
 
 const yesNo = (b: boolean | null | undefined) => (b == null ? '—' : b ? 'Yes' : 'No');
@@ -46,6 +47,7 @@ export function AssetDetailPage({ id, section = ASSETS_SECTION }: { id: string; 
   const actions = useApi(() => api.get<ServiceActionRow[]>(`/assets/${id}/actions`), [id]);
   const [pending, setPending] = useState<{ name: string; display: string; op: string } | null>(null);
   const [note, setNote] = useState<{ tone: 'info' | 'crit'; text: string } | null>(null);
+  const [editHw, setEditHw] = useState(false);
   const open = (actions.data ?? []).some((x) => ['queued', 'sent', 'running'].includes(x.status));
   useEffect(() => {
     if (!open) return;
@@ -71,6 +73,8 @@ export function AssetDetailPage({ id, section = ASSETS_SECTION }: { id: string; 
     ['changes', 'Changes'],
   ];
   const f = filter.trim().toLowerCase();
+  const hw = hardwareIdentityRows(a, { manufacturer: d?.device.manufacturer ?? inv.data?.hardware?.vendor, model: d?.device.model ?? inv.data?.hardware?.model, serialNumber: d?.device.serialNumber },
+    can('assets.manage'), () => setEditHw(true));
 
   return (
     <>
@@ -101,8 +105,7 @@ export function AssetDetailPage({ id, section = ASSETS_SECTION }: { id: string; 
             <KV items={[
               ['Hostname', a.hostname], ['FQDN', d?.device.fqdn ?? a.fqdn], ['Domain / workgroup', d?.device.domain], ['IPv4 address', <span className="mono">{(a.ipv4 && a.ipv4.length ? a.ipv4 : a.ip ? [a.ip] : []).join(', ') || '—'}</span>],
               ...(a.ipv6 ? [['IPv6 address', <span className="mono">{a.ipv6.join(', ') || '—'}</span>] as [string, ReactNode]] : []),
-              ['Manufacturer', d?.device.manufacturer ?? inv.data?.hardware?.vendor ?? a.manufacturer], ['Model', d?.device.model ?? inv.data?.hardware?.model ?? a.model],
-              ['Serial number', <span className="mono">{d?.device.serialNumber ?? a.serialNumber ?? '—'}</span>],
+              ...hw.rows,
               ['Device type', <DeviceTypeField asset={a} canEdit={can('assets.manage')} onSaved={asset.reload} />],
               ...(a.identifiedBy && a.identifiedBy.length > 0 ? [['Recognised by', <span className="faint" style={{ fontSize: 12.5 }}>{a.identifiedBy.join('; ')}</span>] as [string, ReactNode]] : []),
               ...(d?.device.location || d?.device.contact ? [['Location / contact', [d?.device.location, d?.device.contact].filter(Boolean).join(' · ')] as [string, ReactNode]] : []),
@@ -284,6 +287,8 @@ export function AssetDetailPage({ id, section = ASSETS_SECTION }: { id: string; 
         <ServiceActionDialog assetId={id} host={a.hostname ?? a.ip ?? 'device'} service={pending.name} display={pending.display} operation={pending.op} info={control.data}
           onClose={() => setPending(null)} onDone={(m) => { setPending(null); setNote({ tone: 'info', text: m }); actions.reload(); }} />
       )}
+      {editHw && <HardwareIdentityDialog asset={a} detected={hw.detected} onClose={() => setEditHw(false)}
+        onSaved={(m) => { setEditHw(false); setNote({ tone: 'info', text: m }); asset.reload(); }} />}
     </>
   );
 }

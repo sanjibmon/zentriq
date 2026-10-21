@@ -1,3 +1,4 @@
+using Zentriq.Infrastructure.Inventory;
 using System.Net;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -19,7 +20,9 @@ public static class AssetEndpoints
         DateTimeOffset? AgentLastCheckinAt = null, DateTimeOffset? LastContactAt = null, int? OfflineDays = null, bool? Online = null, int? AgentCheckinMinutes = null,
         Guid? DepartmentId = null, string? Department = null, string? DeviceType = null, bool DeviceTypeManual = false,
         string? Manufacturer = null, string? Model = null, IReadOnlyList<string>? IdentifiedBy = null,
-        Guid? LocationId = null, string? Location = null);
+        Guid? LocationId = null, string? Location = null,
+        string? ManualManufacturer = null, string? ManualModel = null, string? ManualSerial = null, IReadOnlyList<string>? EnteredManually = null);
+    public sealed record HardwareIdentityBody(string? Manufacturer, string? Model, string? SerialNumber);
 
     public sealed record AssetBody(string? Hostname, string? Ip, string? SerialNumber, string? Category, string? OsFamily,
         string? OsName, string? Criticality, string? OwnerName, int? RowVersion, string? DeviceType = null, string? MacAddress = null,
@@ -32,10 +35,26 @@ public static class AssetEndpoints
     private static readonly string[] Criticalities = ["Critical", "High", "Medium", "Low"];
     private static readonly string[] OsFamilies = ["windows", "linux", "macos", "network", "other"];
 
-    public static AssetDto ToDto(Asset a) => new(a.Id, a.Hostname, a.Fqdn, Display(a.PrimaryIp), a.SerialNumber, a.Category,
+    /// <summary>
+    /// Manufacturer, model and serial number as shown: the detected value (firmware placeholders ignored), else what was
+    /// entered by hand (see HardwareProfiles). EnteredManually names the fields that come from the manual values.
+    /// </summary>
+    private static (string? Mf, string? Md, string? Sn, List<string> Manual) Hardware(Asset a)
+    {
+        var mf = HardwareProfiles.Clean(a.Manufacturer); var md = HardwareProfiles.Clean(a.Model); var sn = HardwareProfiles.Clean(a.SerialNumber);
+        var manual = new List<string>();
+        if (mf is null && a.ManualManufacturer is { } m1) { mf = m1; manual.Add("manufacturer"); }
+        if (md is null && a.ManualModel is { } m2) { md = m2; manual.Add("model"); }
+        if (sn is null && a.ManualSerial is { } m3) { sn = m3; manual.Add("serialNumber"); }
+        return (mf, md, sn, manual);
+    }
+
+    public static AssetDto ToDto(Asset a) => DtoOf(a, Hardware(a));
+    private static AssetDto DtoOf(Asset a, (string? Mf, string? Md, string? Sn, List<string> Manual) hw) => new(a.Id, a.Hostname, a.Fqdn, Display(a.PrimaryIp), hw.Sn, a.Category,
         Workloads.FromAssetCategory(a.Category), a.OsFamily, a.OsName, a.Status, a.Criticality, a.OwnerName, a.Source,
         a.InventoryStatus, a.FirstSeenAt, a.LastSeenAt, a.LastInventoryAt, a.RowVersion, DepartmentId: a.DepartmentId, LocationId: a.LocationId,
-        DeviceType: a.DeviceType, DeviceTypeManual: a.DeviceTypeManual, Manufacturer: a.Manufacturer, Model: a.Model,
+        DeviceType: a.DeviceType, DeviceTypeManual: a.DeviceTypeManual, Manufacturer: hw.Mf, Model: hw.Md,
+        ManualManufacturer: a.ManualManufacturer, ManualModel: a.ManualModel, ManualSerial: a.ManualSerial, EnteredManually: hw.Manual,
         IdentifiedBy: a.IdentifiedBy is { } ib ? System.Text.Json.JsonSerializer.Deserialize<List<string>>(ib) : null);
 
     public static void MapAssetEndpoints(this RouteGroupBuilder api)
@@ -58,6 +77,9 @@ public static class AssetEndpoints
                     """).ToListAsync(ct);
                 query = query.Where(a => (a.Hostname != null && a.Hostname.ToLower().Contains(term)) ||
                                          (a.SerialNumber != null && a.SerialNumber.ToLower().Contains(term)) ||
+                                         (a.ManualSerial != null && a.ManualSerial.ToLower().Contains(term)) ||
+                                         (a.ManualManufacturer != null && a.ManualManufacturer.ToLower().Contains(term)) ||
+                                         (a.ManualModel != null && a.ManualModel.ToLower().Contains(term)) ||
                                          (a.Manufacturer != null && a.Manufacturer.ToLower().Contains(term)) ||
                                          (a.Model != null && a.Model.ToLower().Contains(term)) ||
                                          (a.OsName != null && a.OsName.ToLower().Contains(term)) ||
@@ -167,6 +189,35 @@ public static class AssetEndpoints
             await tx.CommitAsync(ct);
             await rc.AuditAsync("asset.update", a.Hostname, detail: new { a.Id });
             return Results.Ok(ToDto(a));
+        }).RequireAuthorization(Permissions.AssetsManage);
+
+        // Manufacturer, model and serial number entered by hand (used where the device does not report them), remembered
+        // by the device's fixed identities so they come back after the agent or the OS is reinstalled.
+        g.MapPut("/{id:guid}/hardware-identity", async (Guid id, HardwareIdentityBody body, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
+        {
+            if (body.Manufacturer is { Length: > 200 } || body.Model is { Length: > 200 } || body.SerialNumber is { Length: > 200 })
+                return Validation.Problem("manufacturer", "Manufacturer, model and serial number can have at most 200 characters.");
+            await using var conn = await ds.OpenConnectionAsync(ct);
+            await using var tx = await conn.BeginTransactionAsync(ct);
+            string? host;
+            await using (var chk = new NpgsqlCommand("SELECT COALESCE(hostname, host(primary_ip)) FROM zentriq.assets WHERE id = @id FOR UPDATE", conn, tx))
+            {
+                chk.Parameters.AddWithValue("id", id);
+                var v = await chk.ExecuteScalarAsync(ct);
+                if (v is null) return Results.NotFound();
+                host = v as string;
+            }
+            var linked = await HardwareProfiles.SaveAsync(conn, tx, id, body.Manufacturer, body.Model, body.SerialNumber, rc.UserName, ct);
+            await tx.CommitAsync(ct);
+            await rc.AuditAsync("asset.hardware_identity", host, detail: new { id, body.Manufacturer, body.Model, body.SerialNumber, identities = linked });
+            var cleared = string.IsNullOrWhiteSpace(body.Manufacturer) && string.IsNullOrWhiteSpace(body.Model) && string.IsNullOrWhiteSpace(body.SerialNumber);
+            return Results.Ok(new
+            {
+                identities = linked,
+                message = cleared ? "Manually entered hardware details removed."
+                    : linked > 0 ? $"Saved. Linked to {linked} fixed identit{(linked == 1 ? "y" : "ies")} of the device (SMBIOS UUID / network adapters), so the details come back after the agent or Windows is reinstalled."
+                    : "Saved on this device. It has no fixed identities yet (no inventory from an agent or scan); they are linked after its first inventory.",
+            });
         }).RequireAuthorization(Permissions.AssetsManage);
 
         g.MapPost("/{id:guid}/retire", async (Guid id, ZentriqDbContext db, RequestContext rc, CancellationToken ct) =>
