@@ -1,9 +1,19 @@
 # Test report
 
-Latest: GitHub Actions run 39475167689, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
-10.0.20348** VM. Release: `v1.1.1-build.71` (pre-release, **unsigned**), package version **1.1.1.71**. Results: unit +
-PostgreSQL integration tests **224 PASS, 2 skipped** (the live MeshCentral and live SNMP tests run in ci-quick: PASS, 226/226);
+Latest: GitHub Actions run 39547140552, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
+10.0.20348** VM. Release: `v1.1.1-build.73` (pre-release, **unsigned**), package version **1.1.1.73**. Results: unit +
+PostgreSQL integration tests **225 PASS, 2 skipped** (the live MeshCentral and live SNMP tests run in ci-quick: PASS, 227/227);
 installer acceptance **58 passed, 0 failed, 0 blocked, 10 not run**; in-place updates PASS.
+
+New in build 73 (one uninstall code for all agents, Online / Offline connection state, IPv4 addresses, OS column in
+hardware inventory):
+
+| ID | Test | Result | Detail |
+|---|---|---|---|
+| T67 | Uninstall protection with one code for all agents | **PASS** | no code and wrong code refused (1603); service stop refused; two codes created in a row — the current one removed the agent, the **replaced one was refused**; code shown again while valid; reinstalled; protection switched off |
+| T68 | Live agent connection (re-run) | **PASS** | offline 1 s after the service stopped, online 1 s after it started; collect now in 2 s |
+| — | Unit test | **PASS** | code for all agents: 16 random characters, hash only, valid one hour, wrong / replaced / expired / missing code refused |
+| — | Build 72 | FAIL → fixed | T67: a code created right after another reached the agent only when its live request ended (up to 25 s), so the replaced code still worked briefly; agents now report the code they hold and the server answers at once |
 
 New in build 71 (live agent connection, dashboard layout saving, installer interval order, device / OS / IP columns,
 section taglines removed):
