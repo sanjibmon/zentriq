@@ -19,7 +19,8 @@ public static class DashboardEndpoints
          "report", "vuln.severity", "vuln.aging", "security.score", "security.failing", "assets.department", "changes.hardware", "changes.software",
          // Network inventory (build 60) and Non-IT assets (build 61). Keep in step with WIDGETS in DashboardPage.tsx
          // (DashboardWidgetTests checks it): a type missing here made every layout save fail.
-         "network.types", "network.management", "network.ports", "network.attention", "nonit.groups", "nonit.value", "nonit.due"];
+         "network.types", "network.management", "network.ports", "network.attention", "nonit.groups", "nonit.value", "nonit.due",
+         "assets.location", "accessories.stock", "accessories.low"];
 
     public static void MapDashboardEndpoints(this RouteGroupBuilder api)
     {

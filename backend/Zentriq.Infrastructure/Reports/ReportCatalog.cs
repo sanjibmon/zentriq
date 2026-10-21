@@ -43,6 +43,7 @@ public static class ReportCatalog
         new("criticality", "Criticality", ReportColumnType.Text, "a.criticality", "Device"),
         new("owner", "Owner", ReportColumnType.Text, "a.owner_name", "Device"),
         new("department", "Department / unit", ReportColumnType.Text, "(SELECT dp.name FROM zentriq.departments dp WHERE dp.id = a.department_id)", "Device"),
+        new("location", "Location", ReportColumnType.Text, "(SELECT lo.name FROM zentriq.locations lo WHERE lo.id = a.location_id)", "Device"),
     ];
 
     public static readonly IReadOnlyList<ReportDataset> Datasets =
@@ -419,6 +420,61 @@ public static class ReportCatalog
                 new("notes", "Notes", ReportColumnType.Text, "left(n.notes, 500)", "Asset"),
                 new("added", "Added", ReportColumnType.Date, "n.created_at", "Asset"),
                 new("updated", "Last changed", ReportColumnType.Date, "n.updated_at", "Asset"),
+            ]),
+
+        new("accessory_stock", "IT accessory stock", "One row per IT accessory and location: quantity on hand, faulty units, reorder level and value.",
+            """
+            zentriq.accessory_stock s
+            JOIN zentriq.accessory_items i ON i.id = s.item_id
+            JOIN zentriq.locations lo ON lo.id = s.location_id
+            """,
+            [
+                new("location", "Location", ReportColumnType.Text, "lo.name", "Where"),
+                new("item", "Accessory", ReportColumnType.Text, "i.name", "Accessory"),
+                new("category", "Category", ReportColumnType.Text, "i.category", "Accessory"),
+                new("brand", "Brand", ReportColumnType.Text, "i.brand", "Accessory"),
+                new("model", "Model", ReportColumnType.Text, "i.model", "Accessory"),
+                new("sku", "SKU / part number", ReportColumnType.Text, "i.sku", "Accessory"),
+                new("returnable", "Returnable", ReportColumnType.YesNo, "CASE WHEN i.returnable THEN 'yes' ELSE 'no' END", "Accessory"),
+                new("quantity", "In stock", ReportColumnType.Number, "s.quantity", "Stock"),
+                new("faulty", "Faulty", ReportColumnType.Number, "s.faulty", "Stock"),
+                new("reorder_level", "Reorder level", ReportColumnType.Number, "i.reorder_level", "Stock"),
+                new("below_reorder", "At or below reorder level", ReportColumnType.YesNo, "CASE WHEN i.reorder_level > 0 AND s.quantity <= i.reorder_level THEN 'yes' ELSE 'no' END", "Stock"),
+                new("unit_cost", "Unit cost", ReportColumnType.Number, "i.unit_cost", "Stock"),
+                new("stock_value", "Stock value", ReportColumnType.Number, "s.quantity * COALESCE(i.unit_cost, 0)", "Stock"),
+                new("updated", "Last change", ReportColumnType.Date, "s.updated_at", "Stock"),
+            ]),
+
+        new("accessory_movements", "IT accessory movements", "One row per stock movement: received, issued, returned, transferred, written off or counted.",
+            """
+            zentriq.accessory_movements m
+            JOIN zentriq.accessory_items i ON i.id = m.item_id
+            JOIN zentriq.locations lo ON lo.id = m.location_id
+            LEFT JOIN zentriq.locations lt ON lt.id = m.to_location_id
+            LEFT JOIN zentriq.departments dp ON dp.id = m.department_id
+            LEFT JOIN zentriq.assets a ON a.id = m.asset_id
+            """,
+            [
+                new("occurred", "Date", ReportColumnType.Date, "m.occurred_at", "Movement"),
+                new("kind", "Movement", ReportColumnType.Text, "m.kind", "Movement"),
+                new("item", "Accessory", ReportColumnType.Text, "i.name", "Accessory"),
+                new("category", "Category", ReportColumnType.Text, "i.category", "Accessory"),
+                new("quantity", "Quantity change", ReportColumnType.Number, "m.quantity + m.faulty_change", "Movement"),
+                new("quantity_abs", "Quantity", ReportColumnType.Number, "abs(m.quantity + m.faulty_change)", "Movement"),
+                new("location", "Location", ReportColumnType.Text, "lo.name", "Where"),
+                new("to_location", "To location", ReportColumnType.Text, "lt.name", "Where"),
+                new("person", "Person", ReportColumnType.Text, "m.person", "Who"),
+                new("department", "Department / unit", ReportColumnType.Text, "dp.name", "Who"),
+                new("device", "Device", ReportColumnType.Text, "COALESCE(a.hostname, host(a.primary_ip))", "Who"),
+                new("condition", "Condition", ReportColumnType.Text, "m.condition", "Movement"),
+                new("reason", "Reason", ReportColumnType.Text, "m.reason", "Movement"),
+                new("reference", "Reference (invoice / PO / ticket)", ReportColumnType.Text, "m.reference", "Movement"),
+                new("vendor", "Vendor", ReportColumnType.Text, "m.vendor", "Movement"),
+                new("unit_cost", "Unit cost", ReportColumnType.Number, "m.unit_cost", "Movement"),
+                new("value", "Value", ReportColumnType.Number, "abs(m.quantity + m.faulty_change) * COALESCE(m.unit_cost, i.unit_cost, 0)", "Movement"),
+                new("serials", "Serial numbers", ReportColumnType.Text, "array_to_string(m.serials, ', ')", "Movement"),
+                new("by", "Recorded by", ReportColumnType.Text, "m.by_name", "Movement"),
+                new("note", "Note", ReportColumnType.Text, "left(m.note, 500)", "Movement"),
             ]),
 
         new("discovery", "Discovery results", "One row per address checked by a discovery scan.",

@@ -20,6 +20,7 @@ public static class EventTypes
         new("agent.offline", "Agent not checking in", "An agent has not checked in for the configured number of hours.", true),
         new("scan.completed", "Discovery scan finished", "A discovery scan finished (with or without errors).", false),
         new("scan.failed", "Discovery scan failed", "A discovery scan failed or was cancelled.", false),
+        new("accessory.low", "IT accessory stock low", "An IT accessory fell to or below its reorder level at a location (out of stock = medium).", false),
         new("job.failed", "Background job failed", "A background job (report delivery, feed update, inventory...) failed.", false),
     ];
 

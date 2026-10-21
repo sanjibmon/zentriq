@@ -145,6 +145,16 @@ public sealed class IntegrationStore(NpgsqlDataSource ds, CredentialProtector pr
               FROM zentriq.discovery_scans s
              WHERE s.finished_at > @from AND s.finished_at <= @to AND s.status IN ('completed','completed_errors','failed','cancelled')
             """),
+        new("accessory.low", """
+            SELECT 'accessory.low', CASE WHEN s.quantity = 0 THEN 'medium' ELSE 'low' END,
+                   'accessory.low:' || s.item_id || ':' || s.location_id || ':' || extract(epoch FROM s.low_since)::bigint,
+                   i.name || CASE WHEN s.quantity = 0 THEN ' is out of stock at ' ELSE ' is low at ' END || lo.name || ' (' || s.quantity || ' left)',
+                   concat_ws(E'\n', 'Reorder level: ' || i.reorder_level, 'In stock: ' || s.quantity, 'Faulty: ' || NULLIF(s.faulty, 0), 'Category: ' || i.category),
+                   NULL::uuid, jsonb_build_object('itemId', s.item_id, 'locationId', s.location_id, 'quantity', s.quantity, 'reorderLevel', i.reorder_level),
+                   '/accessories?tab=stock&low=1'
+              FROM zentriq.accessory_stock s JOIN zentriq.accessory_items i ON i.id = s.item_id JOIN zentriq.locations lo ON lo.id = s.location_id
+             WHERE s.low_since > @from AND s.low_since <= @to AND i.active
+            """),
         new("job.failed", """
             SELECT 'job.failed', 'medium', 'job.failed:' || j.id,
                    'Background job failed: ' || j.job_type,

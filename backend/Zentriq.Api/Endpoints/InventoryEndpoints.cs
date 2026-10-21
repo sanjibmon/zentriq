@@ -137,7 +137,7 @@ public static class InventoryEndpoints
             return Results.Ok(list);
         }).RequireAuthorization(Permissions.AssetsView);
 
-        g.MapGet("/hardware", async (NpgsqlDataSource ds, string? q, int? page, int? pageSize, CancellationToken ct) =>
+        g.MapGet("/hardware", async (NpgsqlDataSource ds, string? q, string? department, string? location, string? type, string? vendor, string? os, int? page, int? pageSize, CancellationToken ct) =>
         {
             var (p, size) = Paging.Normalize(page, pageSize);
             await using var cmd = ds.CreateCommand("""
@@ -145,13 +145,26 @@ public static class InventoryEndpoints
                        (SELECT COALESCE(round(sum((d->>'sizeBytes')::numeric) / 1073741824, 1), 0)
                           FROM jsonb_array_elements(CASE WHEN jsonb_typeof(h.disks) = 'object' THEN COALESCE(h.disks->'disks', '[]'::jsonb) ELSE h.disks END) d
                          WHERE d ? 'sizeBytes' AND jsonb_typeof(d->'sizeBytes') = 'number') AS disk_gb,
-                       h.source, h.collected_at, count(*) OVER () AS total
+                       h.source, h.collected_at, count(*) OVER () AS total,
+                       a.department_id, dp.name, a.location_id, lo.name, host(a.primary_ip)
                   FROM zentriq.hardware_inventory h JOIN zentriq.assets a ON a.id = h.asset_id AND a.status = 'active'
-                 WHERE @q IS NULL OR a.hostname ILIKE @q OR h.vendor ILIKE @q OR h.model ILIKE @q OR h.serial_number ILIKE @q OR h.cpu ILIKE @q
+                  LEFT JOIN zentriq.departments dp ON dp.id = a.department_id
+                  LEFT JOIN zentriq.locations lo ON lo.id = a.location_id
+                 WHERE (@q::text IS NULL OR a.hostname ILIKE @q OR h.vendor ILIKE @q OR h.model ILIKE @q OR h.serial_number ILIKE @q OR h.cpu ILIKE @q)
+                   AND (@dep::text IS NULL OR (@dep = 'none' AND a.department_id IS NULL) OR a.department_id::text = @dep)
+                   AND (@loc::text IS NULL OR (@loc = 'none' AND a.location_id IS NULL) OR a.location_id::text = @loc)
+                   AND (@type::text IS NULL OR lower(h.chassis) = lower(@type))
+                   AND (@vendor::text IS NULL OR h.vendor ILIKE @vendor)
+                   AND (@os::text IS NULL OR a.os_name ILIKE @os)
                  ORDER BY lower(a.hostname) NULLS LAST
                  LIMIT @l OFFSET @o
                 """);
             cmd.Parameters.Add(new NpgsqlParameter("q", NpgsqlDbType.Text) { Value = string.IsNullOrWhiteSpace(q) ? DBNull.Value : "%" + Escape(q.Trim()) + "%" });
+            cmd.Parameters.Add(new NpgsqlParameter("dep", NpgsqlDbType.Text) { Value = string.IsNullOrWhiteSpace(department) ? DBNull.Value : department.Trim() });
+            cmd.Parameters.Add(new NpgsqlParameter("loc", NpgsqlDbType.Text) { Value = string.IsNullOrWhiteSpace(location) ? DBNull.Value : location.Trim() });
+            cmd.Parameters.Add(new NpgsqlParameter("type", NpgsqlDbType.Text) { Value = string.IsNullOrWhiteSpace(type) ? DBNull.Value : type.Trim() });
+            cmd.Parameters.Add(new NpgsqlParameter("vendor", NpgsqlDbType.Text) { Value = string.IsNullOrWhiteSpace(vendor) ? DBNull.Value : "%" + Escape(vendor.Trim()) + "%" });
+            cmd.Parameters.Add(new NpgsqlParameter("os", NpgsqlDbType.Text) { Value = string.IsNullOrWhiteSpace(os) ? DBNull.Value : "%" + Escape(os.Trim()) + "%" });
             cmd.Parameters.AddWithValue("l", size);
             cmd.Parameters.AddWithValue("o", (p - 1) * size);
             var items = new List<object>();
@@ -165,10 +178,32 @@ public static class InventoryEndpoints
                     assetId = r.GetGuid(0), hostname = S(1), category = r.GetString(2), osName = S(3), vendor = S(4), model = S(5), serialNumber = S(6), cpu = S(7),
                     cpuCores = r.IsDBNull(8) ? (int?)null : r.GetInt32(8), ramGb = r.IsDBNull(9) ? (decimal?)null : r.GetDecimal(9), chassis = S(10),
                     diskGb = r.GetDecimal(11), source = S(12), collectedAt = r.GetFieldValue<DateTimeOffset>(13),
+                    departmentId = r.IsDBNull(15) ? (Guid?)null : r.GetGuid(15), department = S(16),
+                    locationId = r.IsDBNull(17) ? (Guid?)null : r.GetGuid(17), location = S(18), ip = S(19),
                 });
                 total = r.GetInt64(14);
             }
             return Results.Ok(new { items, total, page = p, pageSize = size });
+        }).RequireAuthorization(Permissions.AssetsView);
+
+        // Values for the Hardware Inventory filters.
+        g.MapGet("/hardware/filters", async (NpgsqlDataSource ds, CancellationToken ct) =>
+        {
+            async Task<List<string>> Distinct(string sql)
+            {
+                var list = new List<string>();
+                await using var cmd = ds.CreateCommand(sql);
+                await using var r = await cmd.ExecuteReaderAsync(ct);
+                while (await r.ReadAsync(ct)) list.Add(r.GetString(0));
+                return list;
+            }
+            const string From = "FROM zentriq.hardware_inventory h JOIN zentriq.assets a ON a.id = h.asset_id AND a.status = 'active'";
+            return Results.Ok(new
+            {
+                types = await Distinct($"SELECT DISTINCT lower(h.chassis) {From} WHERE h.chassis IS NOT NULL ORDER BY 1"),
+                vendors = await Distinct($"SELECT h.vendor {From} WHERE h.vendor IS NOT NULL GROUP BY h.vendor ORDER BY count(*) DESC, 1 LIMIT 50"),
+                os = await Distinct($"SELECT a.os_name {From} WHERE a.os_name IS NOT NULL GROUP BY a.os_name ORDER BY count(*) DESC, 1 LIMIT 50"),
+            });
         }).RequireAuthorization(Permissions.AssetsView);
 
         // ---- change history (hardware replaced, software installed / uninstalled / updated) -----------------

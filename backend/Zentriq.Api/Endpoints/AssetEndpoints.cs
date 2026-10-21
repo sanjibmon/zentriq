@@ -18,11 +18,12 @@ public static class AssetEndpoints
         bool? IsVirtual = null, Guid? AgentId = null, string? AgentHealth = null, string? InventorySource = null,
         DateTimeOffset? AgentLastCheckinAt = null, DateTimeOffset? LastContactAt = null, int? OfflineDays = null, bool? Online = null, int? AgentCheckinMinutes = null,
         Guid? DepartmentId = null, string? Department = null, string? DeviceType = null, bool DeviceTypeManual = false,
-        string? Manufacturer = null, string? Model = null, IReadOnlyList<string>? IdentifiedBy = null);
+        string? Manufacturer = null, string? Model = null, IReadOnlyList<string>? IdentifiedBy = null,
+        Guid? LocationId = null, string? Location = null);
 
     public sealed record AssetBody(string? Hostname, string? Ip, string? SerialNumber, string? Category, string? OsFamily,
         string? OsName, string? Criticality, string? OwnerName, int? RowVersion, string? DeviceType = null, string? MacAddress = null,
-        string? Manufacturer = null, string? Model = null, Guid? DepartmentId = null);
+        string? Manufacturer = null, string? Model = null, Guid? DepartmentId = null, Guid? LocationId = null);
     public sealed record DeviceTypeBody(string? DeviceType);
     public sealed record IdsBody(Guid[]? Ids);
     public sealed record MergeDuplicatesBody(Guid[]? KeepIds);
@@ -33,7 +34,7 @@ public static class AssetEndpoints
 
     public static AssetDto ToDto(Asset a) => new(a.Id, a.Hostname, a.Fqdn, Display(a.PrimaryIp), a.SerialNumber, a.Category,
         Workloads.FromAssetCategory(a.Category), a.OsFamily, a.OsName, a.Status, a.Criticality, a.OwnerName, a.Source,
-        a.InventoryStatus, a.FirstSeenAt, a.LastSeenAt, a.LastInventoryAt, a.RowVersion, DepartmentId: a.DepartmentId,
+        a.InventoryStatus, a.FirstSeenAt, a.LastSeenAt, a.LastInventoryAt, a.RowVersion, DepartmentId: a.DepartmentId, LocationId: a.LocationId,
         DeviceType: a.DeviceType, DeviceTypeManual: a.DeviceTypeManual, Manufacturer: a.Manufacturer, Model: a.Model,
         IdentifiedBy: a.IdentifiedBy is { } ib ? System.Text.Json.JsonSerializer.Deserialize<List<string>>(ib) : null);
 
@@ -41,7 +42,7 @@ public static class AssetEndpoints
     {
         var g = api.MapGroup("/assets").WithTags("Assets").RequireModule(Modules.Inventory);
 
-        g.MapGet("", async (ZentriqDbContext db, NpgsqlDataSource ds, string? q, string? category, string? deviceType, string? department, string? status, string? agent, string? inventory, string? facet, string? value, int? offlineDays, string? sort, string? dir, int? page, int? pageSize, CancellationToken ct) =>
+        g.MapGet("", async (ZentriqDbContext db, NpgsqlDataSource ds, string? q, string? category, string? deviceType, string? department, string? location, string? status, string? agent, string? inventory, string? facet, string? value, int? offlineDays, string? sort, string? dir, int? page, int? pageSize, CancellationToken ct) =>
         {
             var (p, ps) = Paging.Normalize(page, pageSize);
             var query = db.Assets.AsNoTracking().AsQueryable();
@@ -71,7 +72,7 @@ public static class AssetEndpoints
             if (!string.IsNullOrEmpty(facet) && AssetFacets.Expr.TryGetValue(facet, out var fexpr) && value is not null)
             {
                 // Same expression as the dashboard chart that was clicked; "Other" is the remainder of a top-N chart.
-                var sql = value == "Other" && facet is "os" or "vendor" or "cpu" or "department"
+                var sql = value == "Other" && facet is "os" or "vendor" or "cpu" or "department" or "location"
                     ? $"SELECT a.id AS \"Value\" {AssetFacets.From} WHERE {fexpr} IS NOT NULL AND {fexpr} NOT IN (SELECT k FROM (SELECT {fexpr} AS k, count(*) AS n {AssetFacets.From} WHERE a.status = 'active' AND {fexpr} IS NOT NULL GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 7) t)"
                     : $"SELECT a.id AS \"Value\" {AssetFacets.From} WHERE {fexpr} = @v";
                 var facetIds = await IdsAsync(ds, sql, ct, new NpgsqlParameter("v", value));
@@ -88,6 +89,8 @@ public static class AssetEndpoints
             if (!string.IsNullOrEmpty(deviceType)) query = deviceType == "unknown" ? query.Where(a => a.DeviceType == null) : query.Where(a => a.DeviceType == deviceType);
             if (department == "none") query = query.Where(a => a.DepartmentId == null);
             else if (Guid.TryParse(department, out var depId)) query = query.Where(a => a.DepartmentId == depId);
+            if (location == "none") query = query.Where(a => a.LocationId == null);
+            else if (Guid.TryParse(location, out var locId)) query = query.Where(a => a.LocationId == locId);
             query = string.IsNullOrEmpty(status) ? query.Where(a => a.Status == "active") : status == "all" ? query : query.Where(a => a.Status == status);
             var desc = dir == "desc";
             query = sort switch
@@ -97,6 +100,7 @@ public static class AssetEndpoints
                 "offline" => desc ? query.OrderBy(a => a.LastSeenAt) : query.OrderByDescending(a => a.LastSeenAt),
                 "criticality" => desc ? query.OrderByDescending(a => a.Criticality) : query.OrderBy(a => a.Criticality),
                 "department" => desc ? query.OrderByDescending(a => a.DepartmentId) : query.OrderBy(a => a.DepartmentId),
+                "location" => desc ? query.OrderByDescending(a => a.LocationId) : query.OrderBy(a => a.LocationId),
                 _ => desc ? query.OrderByDescending(a => a.Hostname) : query.OrderBy(a => a.Hostname),
             };
             var total = await query.CountAsync(ct);
@@ -119,7 +123,7 @@ public static class AssetEndpoints
                 Category = CategoryOf(body), OsFamily = body.OsFamily, OsName = body.OsName?.Trim(), Criticality = body.Criticality ?? "Medium",
                 OwnerName = body.OwnerName?.Trim(), Source = "manual", FirstSeenAt = now, LastSeenAt = now, CreatedAt = now, UpdatedAt = now,
                 DeviceType = body.DeviceType, DeviceTypeManual = body.DeviceType is not null, Manufacturer = Clean(body.Manufacturer), Model = Clean(body.Model),
-                DepartmentId = body.DepartmentId,
+                DepartmentId = body.DepartmentId, LocationId = body.LocationId,
             };
 
             // Licensing: count + insert under one transaction and advisory lock (concurrent enrolment safe).
@@ -304,7 +308,8 @@ public static class AssetEndpoints
             SELECT x.id, d.document #>> '{users,loggedOn}', d.document -> 'network', COALESCE(d.document #>> '{device,chassis}', h.chassis),
                    (d.document #>> '{hardware,isVirtual}')::boolean, d.source, ag.id, ag.last_checkin_at,
                    (SELECT dp.name FROM zentriq.assets aa JOIN zentriq.departments dp ON dp.id = aa.department_id WHERE aa.id = x.id),
-                   ag.online, ag.checkin_minutes
+                   ag.online, ag.checkin_minutes,
+                   (SELECT l.name FROM zentriq.assets aa JOIN zentriq.locations l ON l.id = aa.location_id WHERE aa.id = x.id)
               FROM unnest(@ids) AS x(id)
               LEFT JOIN zentriq.asset_inventory_documents d ON d.asset_id = x.id
               LEFT JOIN zentriq.hardware_inventory h ON h.asset_id = x.id
@@ -346,6 +351,7 @@ public static class AssetEndpoints
                     Online = r.IsDBNull(6) ? null : agentOnline,
                     AgentCheckinMinutes = r.IsDBNull(10) ? null : r.GetInt32(10),
                     Department = r.IsDBNull(8) ? null : r.GetString(8),
+                    Location = r.IsDBNull(11) ? null : r.GetString(11),
                 };
             }
         return items.Select(i => extra.TryGetValue(i.Id, out var e) ? e : i).ToList();
