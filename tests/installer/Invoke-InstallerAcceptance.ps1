@@ -119,7 +119,7 @@ Remove-Item $answer -Force   # contains the administrator password
 
 if (-not $installed) {
     foreach ($t in 'T02 PostgreSQL provisioning', 'T03 Database migration', 'T04 Administrator sign-in', 'T05 API and worker services', 'T06 Trial initialization',
-                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection', 'T68 Live agent connection') {
+                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection', 'T68 Live agent connection', 'T69 Locations and IT accessories') {
         Record $t.Substring(0, 3) $t.Substring(4) 'BLOCKED' 'installation failed'
     }
 } else {
@@ -1514,6 +1514,54 @@ if (-not $installed) {
         Api DELETE "/departments/$($dep.id)" -Session $s | Out-Null
         Assert (-not (@(Api GET '/nonit/groups' -Session $s | ForEach-Object { $_ }) | Where-Object id -eq $g.id)) 'group not deleted'
         "group added, category joined it (case-insensitive), rename followed, department counted 1 non-IT asset; cleaned up"
+    } | Out-Null
+
+    Check 'T69' 'Locations and IT accessories: location on devices and hardware inventory; receive, issue, return, transfer; no negative stock; holdings; reorder alert' {
+        $s = Login
+        function Raw([string] $Method, [string] $Path, $Body) {
+            $p = @{ Uri = "$base/api/v1$Path"; Method = $Method; WebSession = $s; Headers = @{ 'X-Zentriq-Request' = '1' }; ContentType = 'application/json'; SkipHttpErrorCheck = $true }
+            if ($null -ne $Body) { $p.Body = ($Body | ConvertTo-Json -Depth 6) }
+            Invoke-WebRequest @p
+        }
+        $hq = Api POST '/locations' @{ name = 'CI head office store' } -Session $s
+        $br = Api POST '/locations' @{ name = 'CI branch' } -Session $s
+        $dup = Raw POST '/locations' @{ name = 'ci HEAD office store' }
+        Assert ($dup.StatusCode -eq 400) "duplicate location name accepted ($($dup.StatusCode))"
+        # Devices: location like the department, filterable in IT Asset and Hardware Inventory.
+        $asset = (Api GET '/assets' -Session $s).items | Select-Object -First 1
+        Assert $asset 'no device to assign a location to'
+        $set = Api POST '/assets/location' @{ assetIds = @($asset.id); locationId = $hq.id } -Session $s
+        Assert ($set.location -eq 'CI head office store') "assign location: $($set | ConvertTo-Json -Compress)"
+        $listed = (Api GET "/assets?location=$($hq.id)" -Session $s).items
+        Assert (@($listed).Count -eq 1 -and $listed[0].location -eq 'CI head office store') "asset list by location: $(@($listed).Count)"
+        $hw = (Api GET "/inventory/hardware?location=$($hq.id)" -Session $s).items
+        $hwNote = if (@($hw).Count -gt 0) { "hardware inventory filter: $(@($hw).Count) device(s), location $($hw[0].location)" } else { 'device has no hardware inventory' }
+
+        # Accessories.
+        $item = Api POST '/accessories/items' @{ name = 'CI USB mouse'; category = 'Mouse'; reorderLevel = 5; unitCost = 400 } -Session $s
+        $r = Api POST '/accessories/movements' @{ kind = 'receive'; locationId = $hq.id; vendor = 'CI vendor'; reference = 'INV-CI-1'; lines = @(@{ itemId = $item.id; quantity = 10 }) } -Session $s
+        $r = Api POST '/accessories/movements' @{ kind = 'issue'; locationId = $hq.id; person = 'CI Person'; reason = 'New joiner'; lines = @(@{ itemId = $item.id; quantity = 6 }) } -Session $s
+        $stock = @(Api GET "/accessories/stock?locationId=$($hq.id)" -Session $s | ForEach-Object { $_ }) | Where-Object itemId -eq $item.id
+        Assert ($stock.quantity -eq 4 -and $stock.low) "stock after receive 10 / issue 6: $($stock | ConvertTo-Json -Compress)"
+        $over = Raw POST '/accessories/movements' @{ kind = 'issue'; locationId = $hq.id; person = 'Someone else'; lines = @(@{ itemId = $item.id; quantity = 5 }) }
+        Assert ($over.StatusCode -eq 400 -and $over.Content -match 'Only 4') "issue of more than the stock: $($over.StatusCode) $($over.Content)"
+        $held = @(Api GET '/accessories/holdings?q=CI%20Person' -Session $s | ForEach-Object { $_ }) | Where-Object itemId -eq $item.id
+        Assert ($held.quantity -eq 6) "holdings: $($held | ConvertTo-Json -Compress)"
+        Api POST '/accessories/movements' @{ kind = 'return'; locationId = $hq.id; person = 'ci person'; condition = 'faulty'; lines = @(@{ itemId = $item.id; quantity = 1 }) } -Session $s | Out-Null
+        Api POST '/accessories/movements' @{ kind = 'transfer'; locationId = $hq.id; toLocationId = $br.id; lines = @(@{ itemId = $item.id; quantity = 2 }) } -Session $s | Out-Null
+        $all = @(Api GET '/accessories/stock' -Session $s | ForEach-Object { $_ }) | Where-Object itemId -eq $item.id
+        $atHq = $all | Where-Object locationId -eq $hq.id; $atBr = $all | Where-Object locationId -eq $br.id
+        Assert ($atHq.quantity -eq 2 -and $atHq.faulty -eq 1 -and $atBr.quantity -eq 2) "stock after return and transfer: $($all | ConvertTo-Json -Compress)"
+        $moves = (Api GET "/accessories/movements?itemId=$($item.id)" -Session $s).total
+        Assert ($moves -eq 4) "movements recorded: $moves"
+        $sum = Api GET '/accessories/summary' -Session $s
+        Assert ($sum.lowStock -ge 1) "low stock not counted: $($sum | ConvertTo-Json -Compress)"
+        $del = Raw DELETE "/locations/$($hq.id)" $null
+        Assert ($del.StatusCode -eq 409) "location with stock deleted ($($del.StatusCode))"
+        $delItem = Raw DELETE "/accessories/items/$($item.id)" $null
+        Assert ($delItem.StatusCode -eq 409) "accessory with history deleted ($($delItem.StatusCode))"
+        Api POST '/assets/location' @{ assetIds = @($asset.id); locationId = $null } -Session $s | Out-Null
+        "location assigned and filtered ($hwNote); received 10, issued 6 to CI Person (stock 4, below reorder 5), issue of 5 refused (Only 4), returned 1 faulty, transferred 2; $moves movements; location and accessory with history protected"
     } | Out-Null
 
     if ($UpgradeBundle) {
