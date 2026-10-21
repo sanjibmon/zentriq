@@ -58,6 +58,8 @@ function Hero({ label, value, sub, to, meter, tone }: { label: string; value: st
 }
 
 interface SecuritySummary { distribution: { bucket: string; count: number }[]; topFailing: { rule: string; title: string; failing: number }[]; kpi: { avgScore: number | null } }
+interface AccSummary { items: number; inStock: number; stockValue: number; lowStock: number; issued30d: number }
+interface AccStockRow { id: string; item: string; category: string; location: string; quantity: number; reorderLevel: number; low: boolean }
 interface VulnSummary { bySeverity: KC[]; aging: { bucket: string; critical: number; high: number; medium: number; low: number }[] }
 
 // ---- Widget registry ---------------------------------------------------------------------------------------
@@ -69,6 +71,9 @@ const WIDGETS: WidgetDef[] = [
   { id: 'assets.coverage', chart: 'share', title: 'How assets are inventoried', defaultOn: true, description: 'Agent, agentless or discovered only' },
   { id: 'assets.trend', title: 'Asset growth', wide: true, defaultOn: true, description: 'Active assets per day, last 30 days' },
   { id: 'assets.department', chart: 'bar', title: 'Assets by department', defaultOn: true, description: 'Devices per department / unit · click to list them' },
+  { id: 'assets.location', chart: 'bar', title: 'Assets by location', defaultOn: true, description: 'Devices per office, site or floor · click to list them' },
+  { id: 'accessories.stock', chart: 'bar', title: 'IT accessories in stock', defaultOn: true, description: 'Mouse, keyboard, headset… on hand by category, stock value' },
+  { id: 'accessories.low', title: 'IT accessories to reorder', defaultOn: true, description: 'Accessories at or below their reorder level' },
   { id: 'changes.hardware', title: 'Hardware changes', wide: true, defaultOn: true, description: 'Devices whose hardware changed in the last 30 days (memory, disks, CPU, serial…)' },
   { id: 'changes.software', title: 'Software changes', wide: true, defaultOn: true, description: 'Devices with software installed, uninstalled or updated in the last 30 days' },
   { id: 'network.types', chart: 'bar', title: 'Network devices', defaultOn: true, description: 'Switches, routers, firewalls, access points · click to list them' },
@@ -113,7 +118,7 @@ const toBody = (layout: Layout) => layout.map((w) => ({
   settings: { ...(w.chart ? { chart: w.chart } : {}), ...(w.reportId ? { reportId: w.reportId } : {}) },
 }));
 /** Widgets added in later releases: shown once on a saved dashboard until the user saves their layout. */
-const NEW_WIDGETS = ['assets.department', 'changes.hardware', 'changes.software', 'network.types', 'network.management', 'network.ports', 'nonit.groups', 'nonit.value', 'nonit.due'];
+const NEW_WIDGETS = ['assets.department', 'changes.hardware', 'changes.software', 'network.types', 'network.management', 'network.ports', 'nonit.groups', 'nonit.value', 'nonit.due', 'assets.location', 'accessories.stock', 'accessories.low'];
 const withNew = (layout: Layout, d: DashboardDto | null): Layout => {
   const seen = d?.filters?.seenWidgets ?? [];
   const add = NEW_WIDGETS.filter((id) => !seen.includes(id) && !layout.some((w) => w.id === id));
@@ -168,6 +173,8 @@ export function DashboardPage() {
   const wantsNetwork = layout.some((w) => w.id.startsWith('network.'));
   const net = useApi(() => (wantsNetwork ? api.get<NetworkSummary>('/network/summary') : Promise.resolve(null)), [tick, wantsNetwork]);
   const wantsNonIt = layout.some((w) => w.id.startsWith('nonit.'));
+  const wantsAcc = layout.some((w) => w.id.startsWith('accessories.'));
+  const acc = useApi(() => (wantsAcc ? Promise.all([api.get<AccSummary>('/accessories/summary'), api.get<AccStockRow[]>('/accessories/stock')]) : Promise.resolve(null)), [tick, wantsAcc]);
   const nonit = useApi(() => (wantsNonIt ? api.get<NonItSummary>('/nonit/summary') : Promise.resolve(null)), [tick, wantsNonIt]);
   const wantsSecurity = layout.some((w) => w.id.startsWith('security.') && w.id !== 'security.posture') && can('security.view');
   const sec = useApi(() => (wantsSecurity ? api.get<SecuritySummary>('/security/overview') : Promise.resolve(null)), [tick, wantsSecurity]);
@@ -261,6 +268,39 @@ export function DashboardPage() {
           ['Switches without SNMP management', v.switchesWebOnly + v.switchesNoManagement, 'tab=unmanaged', 'var(--info)'],
         ];
         return <HBars data={items.map(([label, n, , color]) => ({ key: label, label, value: n, color }))} onSelect={(sl) => toNet(items.find((x) => x[0] === sl.key)![2])()} />;
+      }
+      case 'assets.location': {
+        const rows = o.byLocation ?? [];
+        if (rows.length === 0 || (rows.length === 1 && rows[0]!.key === 'Unassigned'))
+          return <div className="chart-empty">No locations assigned yet. Select devices in IT Asset Inventory and choose <b>Department / location</b>.</div>;
+        return C(slices(rows, (k) => k), (s) => go('location', s.key, `Location: ${s.label}`), { centerLabel: 'assets' });
+      }
+      case 'accessories.stock':
+      case 'accessories.low': {
+        if (!acc.data) return <div className="chart-empty">{acc.error ? acc.error.message : 'Loading…'}</div>;
+        const [sum, stock] = acc.data;
+        if (sum.items === 0) return <div className="chart-empty">No IT accessories yet. <Link to="/accessories">Add accessories and receive stock</Link>.</div>;
+        if (id === 'accessories.stock') {
+          const byCat = new Map<string, number>();
+          for (const r of stock) byCat.set(r.category, (byCat.get(r.category) ?? 0) + r.quantity);
+          return (
+            <div className="stack-v">
+              <div className="big-stat"><b>{sum.inStock.toLocaleString()}</b> <span className="muted">in stock · {total(sum.stockValue)} value · {sum.issued30d.toLocaleString()} issued in 30 days</span></div>
+              {C([...byCat.entries()].sort((a, b) => b[1] - a[1]).map(([k, n]) => ({ key: k, label: k, value: n })), () => navigate('/accessories'), { centerLabel: 'in stock' })}
+            </div>
+          );
+        }
+        const low = stock.filter((r) => r.low).sort((a, b) => a.quantity - b.quantity);
+        return low.length === 0 ? <div className="chart-empty">Nothing to reorder: every accessory is above its reorder level.</div> : (
+          <div className="mini-list">
+            {low.slice(0, 8).map((r) => (
+              <div key={r.id} className="mi" onClick={() => navigate('/accessories?tab=stock&low=1')}>
+                <span><b>{r.item}</b> <span className="faint">{r.location}</span></span>
+                <span className="r"><span className={`stock-qty ${r.quantity === 0 ? 'out' : 'low'}`}>{r.quantity}</span> <span className="faint">/ {r.reorderLevel}</span></span>
+              </div>
+            ))}
+          </div>
+        );
       }
       case 'nonit.groups':
       case 'nonit.value':
@@ -411,6 +451,7 @@ export function DashboardPage() {
     'agents.health': <Link to="/agents" className="btn sm">Agents</Link>, 'software.top': <Link to="/software" className="btn sm">All software</Link>,
     'scans.results': <Link to="/discovery" className="btn sm">Scans</Link>, 'license.usage': <Link to="/licensing" className="btn sm">Details</Link>,
     'scans.recent': <Link to="/discovery" className="btn sm">All scans</Link>,
+    'accessories.stock': <Link to="/accessories" className="btn sm">Open</Link>, 'accessories.low': <Link to="/accessories?tab=stock&low=1" className="btn sm">All</Link>,
     'nonit.groups': <Link to="/non-it" className="btn sm">Open</Link>, 'nonit.due': <Link to="/non-it?tab=assets&due=maintenance" className="btn sm">All</Link>,
     'network.types': <Link to="/network" className="btn sm">Network Inventory</Link>, 'network.ports': <Link to="/network?tab=ports" className="btn sm">Port map</Link>,
     'network.management': <Link to="/network?tab=unmanaged" className="btn sm">Unmanaged</Link>, 'network.attention': <Link to="/network" className="btn sm">Open</Link>,

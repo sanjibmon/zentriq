@@ -26,6 +26,7 @@ public static class AssetFacets
         ["os"] = "COALESCE(a.os_name, initcap(a.os_family), 'Unknown')",
         ["criticality"] = "a.criticality",
         ["department"] = "COALESCE((SELECT dp.name FROM zentriq.departments dp WHERE dp.id = a.department_id), 'Unassigned')",
+        ["location"] = "COALESCE((SELECT lo.name FROM zentriq.locations lo WHERE lo.id = a.location_id), 'Unassigned')",
         ["inventory"] = "a.inventory_status",
         ["type"] = "COALESCE(a.device_type, d.document #>> '{device,chassis}', h.chassis, CASE WHEN a.category IN ('network_device','printer','iot') THEN a.category ELSE 'not inventoried' END)",
         ["coverage"] = "CASE WHEN ag.id IS NOT NULL THEN 'agent' WHEN a.inventory_status = 'success' THEN 'agentless' ELSE 'discovered only' END",

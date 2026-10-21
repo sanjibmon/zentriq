@@ -4,6 +4,7 @@ import { Link, useRouter } from '../../app/router';
 import { useApi } from '../../app/useApi';
 import { CategoryChart, ChartKindPicker, useChartKind } from '../../components/charts';
 import { Callout, DataTable, ErrorBox, fmt, Kpis, Loading, PageHead, Panel, Pill } from '../../components/ui';
+import { ChoosableTable } from '../../components/columns';
 import { deviceTypeLabel } from '../assets/deviceTypes';
 import { TopologyMap } from './Topology';
 import {
@@ -143,8 +144,9 @@ function DevicesTab({ summary }: { summary: NetworkSummary | null }) {
       </form>
       <ErrorBox error={data.error} />
       <Panel flush>
-        <DataTable rows={rows} empty={data.loading ? 'Loading…' : 'No network devices match.'} columns={[
-          { key: 'n', label: 'Device', render: (d) => <><Link to={`/assets/${d.id}?tab=network`}><b>{d.hostname ?? d.ip}</b></Link><div className="faint mono" style={{ fontSize: 11.5 }}>{d.ip}</div></> },
+        <ChoosableTable tableId="network.devices" rows={rows} empty={data.loading ? 'Loading…' : 'No network devices match.'} columns={[
+          { key: 'n', label: 'Device', render: (d) => <Link to={`/assets/${d.id}?tab=network`}><b>{d.hostname ?? d.ip}</b></Link> },
+          { key: 'ip', label: 'IP address', render: (d) => d.ip ? <span className="mono">{d.ip}</span> : '—' },
           { key: 't', label: 'Type', render: (d) => <>{typeName(d.deviceType)}{d.stackMembers && d.stackMembers > 1 ? <div className="faint" style={{ fontSize: 11.5 }}>stack of {d.stackMembers}</div> : null}</> },
           { key: 'm', label: 'Manufacturer / model', className: 'wrap', render: (d) => [d.manufacturer, d.model].filter(Boolean).join(' ') || '—' },
           { key: 'f', label: 'Firmware', className: 'wrap', render: (d) => <span className="mono" style={{ fontSize: 12 }}>{d.firmware ?? '—'}</span> },
@@ -243,7 +245,7 @@ export function PortsTab({ assetId }: { assetId?: string }) {
       </form>
       <ErrorBox error={data.error} />
       <Panel flush>
-        <DataTable rows={rows} empty={data.loading ? 'Loading…' : search || filter ? 'No ports match.' : 'No port data yet. Ports are collected from switches and routers over SNMP.'} columns={[
+        <ChoosableTable tableId="network.ports" rows={rows} empty={data.loading ? 'Loading…' : search || filter ? 'No ports match.' : 'No port data yet. Ports are collected from switches and routers over SNMP.'} columns={[
           ...(assetId ? [] : [{ key: 'd', label: 'Switch', render: (p: NetworkPort) => <Link to={`/assets/${p.assetId}?tab=network`}><b>{p.deviceName}</b></Link> }]),
           { key: 'p', label: 'Port', render: (p) => <><b className="mono">{p.name ?? p.ifIndex}</b>{(p.alias || (p.description && p.description !== p.name)) && <div className="faint" style={{ fontSize: 11.5 }}>{p.alias || p.description}</div>}</> },
           { key: 's', label: 'Status', render: (p) => { const [l, t] = portState(p); return <Pill tone={t}>{l}</Pill>; } },

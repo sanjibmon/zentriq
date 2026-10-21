@@ -65,6 +65,8 @@ export interface Asset {
   id: string;
   departmentId?: string | null;
   department?: string | null;
+  locationId?: string | null;
+  location?: string | null;
   hostname: string | null;
   fqdn: string | null;
   ip: string | null;
@@ -351,6 +353,9 @@ export interface SoftwareRow {
 }
 
 export interface SoftwareInstall {
+  department?: string | null;
+  location?: string | null;
+  publisher?: string | null;
   assetId: string;
   hostname: string | null;
   ip: string | null;
@@ -365,6 +370,11 @@ export interface SoftwareInstall {
 
 export interface HardwareRow {
   assetId: string;
+  departmentId?: string | null;
+  department?: string | null;
+  locationId?: string | null;
+  location?: string | null;
+  ip?: string | null;
   hostname: string | null;
   category: string;
   osName: string | null;
@@ -487,7 +497,7 @@ export interface KC { key: string; count: number }
 export interface Overview {
   kpi: Record<'assets' | 'servers' | 'endpoints' | 'networkDevices' | 'inventoried' | 'withAgent' | 'agentsOnline' | 'agents' | 'virtual' | 'stale' | 'newLast7' | 'retired' | 'softwareTitles' | 'softwareInstalls' | 'scans30' | 'lowDisk', number> & { offline7?: number };
   byCategory: KC[]; byOs: KC[]; byInventory: KC[]; byCriticality: KC[]; byType: KC[]; byManufacturer: KC[]; coverage: KC[]; agentHealth: KC[];
-  ram: KC[]; topSoftware: KC[]; scanResults: KC[]; seen: KC[]; cores: KC[]; cpu: KC[]; disk: KC[]; free: KC[]; byDepartment?: KC[];
+  ram: KC[]; topSoftware: KC[]; scanResults: KC[]; seen: KC[]; cores: KC[]; cpu: KC[]; disk: KC[]; free: KC[]; byDepartment?: KC[]; byLocation?: KC[];
   posture: { key: string; yes: number; no: number; unknown: number }[];
   trend: { day: string; new: number; total: number }[];
   generatedAt: string;

@@ -122,6 +122,7 @@ public sealed class Asset
     public Guid? MergedInto { get; set; }
     public Guid? SiteId { get; set; }
     public Guid? DepartmentId { get; set; }
+    public Guid? LocationId { get; set; }
     public string Criticality { get; set; } = "Medium";
     public string? OwnerName { get; set; }
     public string Source { get; set; } = "manual";

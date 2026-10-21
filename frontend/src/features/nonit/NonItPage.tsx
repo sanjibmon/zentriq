@@ -6,7 +6,8 @@ import { useApi } from '../../app/useApi';
 import { CategoryChart } from '../../components/charts';
 import { Icon } from '../../components/Icon';
 import { useConfirm } from '../../components/Confirm';
-import { Callout, DataTable, ErrorBox, Kpis, PageHead, Pager, Panel, Pill } from '../../components/ui';
+import { Callout, DataTable, ErrorBox, Kpis, PageHead, Pager, Panel, Pill, type Column } from '../../components/ui';
+import { useColumns } from '../../components/columns';
 import { useAddDepartment, useDepartments, type Department } from '../departments/Departments';
 import { AssetDetails, AssetForm, BulkUpload, errText, printLabels, ScanDialog } from './NonItDialogs';
 import {
@@ -105,11 +106,36 @@ function AssetsTab({ tick, summary, categories, departments, canEdit, onOpen, on
   const rows = data.data?.items ?? [];
   const groups = useMemo(() => [...new Set(categories.map((c) => c.group))], [categories]);
   const exportUrl = (format: string) => `/api/v1/nonit/export?${new URLSearchParams(Object.entries({ ...filters, format }).filter(([, v]) => v)).toString()}`;
-  const head = (col: string, label: string) => (
-    <th className="sort" onClick={() => setSort((s) => ({ col, dir: s?.col === col && s.dir === 'asc' ? 'desc' : 'asc' }))}>
-      {label}{sort?.col === col ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}
-    </th>
-  );
+  const specs: (Column<NonItAsset> & { sort?: string; title: string })[] = [
+    { key: 'tag', title: 'Asset tag', label: 'Asset tag', sort: 'tag', className: 'mono', render: (r) => r.assetTag },
+    { key: 'name', title: 'Name', label: 'Name', sort: 'name', className: 'wrap', render: (r) => <><b>{r.name}</b>{(r.manufacturer || r.model) && <div className="faint" style={{ fontSize: 12 }}>{[r.manufacturer, r.model].filter(Boolean).join(' ')}</div>}</> },
+    { key: 'category', title: 'Category', label: 'Category', sort: 'category', render: (r) => <>{r.category ?? '—'}<div className="faint" style={{ fontSize: 12 }}>{r.group}</div></> },
+    { key: 'status', title: 'Status', label: 'Status', sort: 'status', render: (r) => <><Pill tone={statusTone(r.status)}>{statusLabel(r.status)}</Pill>{r.quantity !== 1 && <span className="faint"> ×{r.quantity}</span>}</> },
+    { key: 'location', title: 'Location', label: 'Location', sort: 'location', render: (r) => r.location ?? '—' },
+    { key: 'department', title: 'Department', label: 'Department', render: (r) => r.department ?? '—' },
+    { key: 'assigned', title: 'Assigned to', label: 'Assigned to', render: (r) => r.assignedTo ?? '—' },
+    { key: 'cost', title: 'Cost', label: 'Cost', sort: 'cost', className: 'num', render: (r) => money(r.purchaseCost) },
+    { key: 'due', title: 'Warranty / maintenance', label: 'Warranty / maintenance', sort: 'maintenance', render: (r) => {
+      const w = daysUntil(r.warrantyUntil), m = daysUntil(r.nextMaintenance);
+      return <span style={{ fontSize: 12.5 }}>
+        {r.warrantyUntil && <div><span className="faint">Warranty</span> <span style={w != null && w < 0 ? { color: 'var(--muted)' } : w != null && w <= 90 ? { color: 'var(--warn)', fontWeight: 600 } : undefined}>{day(r.warrantyUntil)}</span></div>}
+        {r.nextMaintenance && <div><span className="faint">Service</span> <span style={m != null && m < 0 ? { color: 'var(--crit)', fontWeight: 600 } : m != null && m <= 30 ? { color: 'var(--warn)', fontWeight: 600 } : undefined}>{day(r.nextMaintenance)}</span></div>}
+        {!r.warrantyUntil && !r.nextMaintenance && '—'}
+      </span>;
+    } },
+    { key: 'serial', title: 'Serial number', label: 'Serial number', optional: true, className: 'mono', render: (r) => r.serialNumber ?? '—' },
+    { key: 'barcode', title: 'Barcode', label: 'Barcode', optional: true, className: 'mono', render: (r) => r.barcode ?? '—' },
+    { key: 'condition', title: 'Condition', label: 'Condition', optional: true, render: (r) => r.condition ? r.condition[0]!.toUpperCase() + r.condition.slice(1) : '—' },
+    { key: 'vendor', title: 'Vendor', label: 'Vendor', optional: true, render: (r) => r.vendor ?? '—' },
+    { key: 'purchased', title: 'Purchase date', label: 'Purchase date', optional: true, render: (r) => day(r.purchaseDate) },
+    { key: 'invoice', title: 'Invoice / PO', label: 'Invoice / PO', optional: true, render: (r) => [r.invoiceNumber, r.poNumber].filter(Boolean).join(' · ') || '—' },
+    { key: 'value', title: 'Current value', label: 'Current value', optional: true, className: 'num', render: (r) => money(r.currentValue) },
+    { key: 'amc', title: 'AMC until', label: 'AMC until', optional: true, render: (r) => day(r.amcUntil) },
+    { key: 'insurance', title: 'Insurance until', label: 'Insurance until', optional: true, render: (r) => day(r.insuranceUntil) },
+    { key: 'notes', title: 'Notes', label: 'Notes', optional: true, className: 'wrap', render: (r) => r.notes ?? '—' },
+  ];
+  const { columns: chosen, chooser } = useColumns('nonit', specs);
+  const columns = chosen as typeof specs;
   const allOn = rows.length > 0 && rows.every((r) => sel.includes(r.id));
 
   async function remove() {
@@ -178,6 +204,7 @@ function AssetsTab({ tick, summary, categories, departments, canEdit, onOpen, on
         <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
           <a className="btn sm" href={exportUrl('xlsx')} download><Icon name="down" size={13} /> Excel</a>
           <a className="btn sm" href={exportUrl('csv')} download><Icon name="down" size={13} /> CSV</a>
+          {chooser}
         </span>
       </div>
       {msg && <Callout tone={msg.tone} icon={msg.tone === 'ok' ? 'info' : 'alert'}>{msg.text}</Callout>}
@@ -201,32 +228,18 @@ function AssetsTab({ tick, summary, categories, departments, canEdit, onOpen, on
               <tr>
                 <th style={{ width: 32 }}><input type="checkbox" className="row-sel" checked={allOn} aria-label="Select all"
                   onChange={(e) => setSel(e.target.checked ? [...new Set([...sel, ...rows.map((r) => r.id)])] : sel.filter((id) => !rows.some((r) => r.id === id)))} /></th>
-                {head('tag', 'Asset tag')}{head('name', 'Name')}{head('category', 'Category')}{head('status', 'Status')}
-                {head('location', 'Location / department')}<th>Assigned to</th>{head('cost', 'Cost')}{head('maintenance', 'Warranty / maintenance')}
+                {columns.map((c) => c.sort ? <th key={c.key} className="sort" onClick={() => setSort((x) => ({ col: c.sort!, dir: x?.col === c.sort && x?.dir === 'asc' ? 'desc' : 'asc' }))}>
+                  {c.title}{sort?.col === c.sort ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : ''}</th> : <th key={c.key}>{c.title}</th>)}
               </tr>
             </thead>
             <tbody>
-              {rows.length === 0 ? <tr><td colSpan={9} className="empty-cell">{data.loading ? 'Loading…' : 'No assets match.'}</td></tr> : rows.map((r) => {
-                const w = daysUntil(r.warrantyUntil), m = daysUntil(r.nextMaintenance);
-                return (
-                  <tr key={r.id} className="click" onClick={() => onOpen(r.id)}>
-                    <td onClick={(e) => e.stopPropagation()}><input type="checkbox" className="row-sel" checked={sel.includes(r.id)} aria-label={`Select ${r.assetTag}`}
-                      onChange={(e) => setSel((x) => (e.target.checked ? [...x, r.id] : x.filter((id) => id !== r.id)))} /></td>
-                    <td className="mono">{r.assetTag}</td>
-                    <td className="wrap"><b>{r.name}</b>{(r.manufacturer || r.model) && <div className="faint" style={{ fontSize: 12 }}>{[r.manufacturer, r.model].filter(Boolean).join(' ')}</div>}</td>
-                    <td>{r.category ?? '—'}<div className="faint" style={{ fontSize: 12 }}>{r.group}</div></td>
-                    <td><Pill tone={statusTone(r.status)}>{statusLabel(r.status)}</Pill>{r.quantity !== 1 && <span className="faint"> ×{r.quantity}</span>}</td>
-                    <td>{r.location ?? '—'}{r.department && <div className="faint" style={{ fontSize: 12 }}>{r.department}</div>}</td>
-                    <td>{r.assignedTo ?? '—'}</td>
-                    <td className="num">{money(r.purchaseCost)}</td>
-                    <td style={{ fontSize: 12.5 }}>
-                      {r.warrantyUntil && <div><span className="faint">Warranty</span> <span style={w != null && w < 0 ? { color: 'var(--muted)' } : w != null && w <= 90 ? { color: 'var(--warn)', fontWeight: 600 } : undefined}>{day(r.warrantyUntil)}</span></div>}
-                      {r.nextMaintenance && <div><span className="faint">Service</span> <span style={m != null && m < 0 ? { color: 'var(--crit)', fontWeight: 600 } : m != null && m <= 30 ? { color: 'var(--warn)', fontWeight: 600 } : undefined}>{day(r.nextMaintenance)}</span></div>}
-                      {!r.warrantyUntil && !r.nextMaintenance && '—'}
-                    </td>
-                  </tr>
-                );
-              })}
+              {rows.length === 0 ? <tr><td colSpan={columns.length + 1} className="empty-cell">{data.loading ? 'Loading…' : 'No assets match.'}</td></tr> : rows.map((r) => (
+                <tr key={r.id} className="click" onClick={() => onOpen(r.id)}>
+                  <td onClick={(e) => e.stopPropagation()}><input type="checkbox" className="row-sel" checked={sel.includes(r.id)} aria-label={`Select ${r.assetTag}`}
+                    onChange={(e) => setSel((x) => (e.target.checked ? [...x, r.id] : x.filter((id) => id !== r.id)))} /></td>
+                  {columns.map((c) => <td key={c.key} className={c.className}>{c.render(r)}</td>)}
+                </tr>
+              ))}
             </tbody>
           </table>
           {data.data && data.data.total > 50 && <Pager page={page} pageSize={50} total={data.data.total} onPage={setPage} />}

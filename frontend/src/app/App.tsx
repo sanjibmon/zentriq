@@ -11,6 +11,7 @@ import { HardwarePage } from '../features/inventory/HardwarePage';
 import { NetworkPage } from '../features/network/NetworkPage';
 import { NonItPage } from '../features/nonit/NonItPage';
 import { AssetDetailPage } from '../features/inventory/AssetDetailPage';
+import { AccessoriesPage } from '../features/accessories/AccessoriesPage';
 import { ModulePage } from '../features/placeholder/ModulePage';
 import { ReportsPage } from '../features/reports/ReportsPage';
 import { ReportBuilder } from '../features/reports/ReportBuilder';
@@ -41,6 +42,7 @@ function Routes() {
   if (swMatch) return <AssetDetailPage id={swMatch[1]!} section={{ path: '/software', label: 'All software', tab: 'software' }} />;
   if (path === '/software') return <SoftwarePage />;
   if (path === '/hardware') return <HardwarePage />;
+  if (path === '/accessories') return <AccessoriesPage />;
   if (path === '/network') return <NetworkPage />;
   if (path === '/non-it') return <NonItPage />;
   if (path === '/agents') return <AgentsPage />;
