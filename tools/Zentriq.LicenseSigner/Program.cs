@@ -12,7 +12,8 @@ using Zentriq.Domain.Licensing;
 //
 //   sign    --key <private.pem> --key-id <id> --request <activation-request.json>
 //           --customer <name> --expires <yyyy-mm-dd> [--not-before <yyyy-mm-dd>] [--grace <days>]
-//           --entitle endpoint=500 --entitle server=50 [--modules *|inventory,discovery,...]
+//           --entitle endpoint=500 --entitle server=50 [--edition standard|advanced] [--modules *|inventory,discovery,...]
+//           (--edition alone licenses that edition's modules; --modules adds more; without either: all modules)
 //           [--license-id <id>] --out <license.zlic>
 //           Licensee details (schema 2, shown to the customer): [--company <legal name>] [--contact-name ..]
 //           [--contact-email ..] [--contact-phone ..] [--address ..] [--country ..] [--tax-id ..]
@@ -79,7 +80,9 @@ internal static class Signer
         }
         if (entitlements.Count == 0) throw new ArgumentException("At least one --entitle is required.");
 
-        var modules = (Opt(o, "modules") ?? "*").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+        var edition = Opt(o, "edition")?.Trim().ToLowerInvariant();
+        if (edition is not null && Editions.ModulesOf(edition).Count == 0) throw new ArgumentException($"Unknown edition '{edition}' (standard or advanced).");
+        var modules = (Opt(o, "modules") ?? (edition is null ? "*" : "")).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
         foreach (var m in modules) if (m != "*" && !Modules.All.Contains(m)) throw new ArgumentException($"Unknown module '{m}'.");
 
         var now = DateTimeOffset.UtcNow;
@@ -98,7 +101,8 @@ internal static class Signer
             Modules: modules,
             Entitlements: entitlements,
             RequestId: request.RequestId,
-            Licensee: licensee);
+            Licensee: licensee,
+            Edition: edition);
 
         var payloadBytes = JsonSerializer.SerializeToUtf8Bytes(payload);
         using var key = ECDsa.Create();

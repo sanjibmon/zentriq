@@ -87,7 +87,8 @@ public static class AuthEndpoints
                 mfaEnrollmentRequired = rc.Principal.HasClaim(c => c.Type == ZentriqClaims.MfaPending),
                 roles = u.Roles.Select(r => new { id = r.RoleId, name = r.Role!.Name }),
                 permissions = rc.Principal.FindAll(ZentriqClaims.Permission).Select(c => c.Value).OrderBy(x => x),
-                license = new { mode = lic.Mode.ToString(), lic.Summary, lic.ExpiresAt, lic.DaysRemaining, featuresEnabled = lic.FeaturesEnabled, lic.Modules },
+                license = new { mode = lic.Mode.ToString(), lic.Summary, lic.ExpiresAt, lic.DaysRemaining, featuresEnabled = lic.FeaturesEnabled, lic.Modules, edition = lic.Edition,
+                    sections = Zentriq.Domain.ProductSections.All.Select(x => new { id = x, title = Zentriq.Domain.ProductSections.Titles[x], installed = lic.InstalledSections.Contains(x), enabled = lic.SectionEnabled(x), standard = Zentriq.Domain.ProductSections.Standard.Contains(x) }) },
             });
         }).RequireAuthorization();
 

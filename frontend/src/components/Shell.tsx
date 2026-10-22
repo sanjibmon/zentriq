@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useAuth } from '../app/auth';
-import { NAV } from '../app/nav';
+import { NAV, SECTION_OF_GROUP } from '../app/nav';
 import { Link, useRouter } from '../app/router';
 import { Icon } from './Icon';
 import { LogoMark, PRODUCT } from './Logo';
@@ -38,19 +38,25 @@ export function Shell({ children }: { children: ReactNode }) {
           </div>
         </div>
         <nav className="nav" aria-label="Primary">
-          {NAV.map(([group, items]) => (
-            <div key={group}>
-              <div className="nav-group">{group}</div>
-              {items
-                .filter((i) => !i.permission || can(i.permission))
-                .map((i) => (
-                  <Link key={i.id} to={i.path} className={active(i.path) ? 'active' : ''} title={i.label}>
+          {NAV.map(([group, items]) => {
+            const sec = lic.sections?.find((x) => x.id === SECTION_OF_GROUP[group]);
+            if (sec && !sec.installed && !items.some((i) => i.admin)) return null;   // not installed on this server
+            const locked = !!sec && lic.featuresEnabled && !sec.enabled;
+            const shown = items.filter((i) => (!i.permission || can(i.permission)) && (i.admin || !sec || sec.installed));
+            if (shown.length === 0) return null;
+            return (
+              <div key={group}>
+                <div className="nav-group">{group}{locked && <span className="nav-lock" title="Not included in your license">Advanced</span>}</div>
+                {shown.map((i) => (
+                  <Link key={i.id} to={i.path} className={`${active(i.path) ? 'active' : ''}${locked && !i.admin ? ' locked' : ''}`} title={locked && !i.admin ? `${i.label} — requires the Advanced edition` : i.label}>
                     <Icon name={i.icon} />
                     <span>{i.label}</span>
+                    {locked && !i.admin && <Icon name="lock" size={12} className="nav-lock-ico" />}
                   </Link>
                 ))}
-            </div>
-          ))}
+              </div>
+            );
+          })}
         </nav>
         <div className="rail-foot">
           <Icon name="lock" size={14} />

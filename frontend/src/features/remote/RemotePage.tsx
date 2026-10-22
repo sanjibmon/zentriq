@@ -151,7 +151,7 @@ function Quick({ status, allowTerminal, creating, setCreating, onMsg, onChanged 
           </footer>
         </article>))}
       </div> : !list.loading && <div className="rs-empty">
-        <Icon name="remote" size={28} />
+        <span className="ico-tile xl"><Icon name="remote" size={30} /></span>
         <b>No active sessions</b>
         <p>Start one when someone asks for help — they get a link, you get their screen once they allow it.</p>
         <button className="btn primary" disabled={!status.running} onClick={() => setCreating(true)}><Icon name="plus" size={13} /> New support session</button>
@@ -416,17 +416,17 @@ function Setup({ status, onChanged }: { status: RemoteStatus; onChanged: () => v
       <Panel title="Install for unattended access">
         <div className="rs-install">
           <div>
-            <h4><Icon name="cycle" size={14} /> With the Zentriq Agent</h4>
+            <h4><span className="ico-tile"><Icon name="cycle" size={16} /></span> With the Zentriq Agent</h4>
             <p>Select devices on <Link to="/remote?tab=devices">Unattended devices</Link> and click <b>Install</b> — done at their next check-in.</p>
           </div>
           <div>
-            <h4><Icon name="down" size={14} /> Windows installer</h4>
+            <h4><span className="ico-tile"><Icon name="down" size={16} /></span> Windows installer</h4>
             <p>Run as administrator, or deploy with Group Policy or Intune.</p>
             <button className="btn sm" disabled={!status.running} onClick={() => void download()}>Download ZentriqRemoteSupport.exe</button>
             <CopyBox label="Silent install command" value="ZentriqRemoteSupport.exe -fullinstall" />
           </div>
           <div>
-            <h4><Icon name="link" size={14} /> Install link — Windows, macOS, Linux</h4>
+            <h4><span className="ico-tile"><Icon name="link" size={16} /></span> Install link — Windows, macOS, Linux</h4>
             <p>A page where the user picks their system and installs the agent; valid for 3 days. Good for laptops outside the office.</p>
             {link ? <CopyBox label="Install link" value={link.url} rows={2} /> : <button className="btn sm" disabled={!status.running} onClick={() => void installLink()}>Create install link</button>}
           </div>
@@ -441,7 +441,6 @@ function Setup({ status, onChanged }: { status: RemoteStatus; onChanged: () => v
           <div><dt>Status</dt><dd>{status.running ? <Pill tone="ok">Running</Pill> : status.installed ? <Pill tone="crit">Not running</Pill> : <Pill>Not installed</Pill>}</dd></div>
           <div><dt>Address (LAN)</dt><dd className="mono">{status.publicUrl ?? '—'}</dd></div>
           <div><dt>Windows service</dt><dd className="mono">ZentriqRemote</dd></div>
-          <div><dt>Engine</dt><dd>MeshCentral (open source, Apache-2.0), bundled and configured by Zentriq</dd></div>
         </dl>
         <p className="faint" style={{ fontSize: 12 }}>Technicians sign in through Zentriq with a link valid for 2 minutes; there is no separate password. Permissions: <span className="mono">remote.start</span> (sessions), <span className="mono">remote.manage</span> (install, settings), <span className="mono">remote.unattended</span> (full remote console).</p>
         {can('remote.unattended') && status.running && <button className="btn sm" onClick={() => openRemote({}, 'console').catch((e) => setMsg({ tone: 'crit', text: err(e) }))}><Icon name="remote" size={13} /> Open full remote console</button>}

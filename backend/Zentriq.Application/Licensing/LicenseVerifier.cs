@@ -124,7 +124,8 @@ public sealed class LicenseVerifier(ILicensePublicKeyStore keys)
         if (p.ExpiresAt <= p.NotBefore) return "License validity window is empty.";
         if (p.IssuedAt > p.ExpiresAt) return "License issue date is after its expiry.";
         if (p.GraceDays is < 0 or > 60) return "Grace period is out of range.";
-        if (p.Modules is null || p.Modules.Count == 0) return "License lists no modules.";
+        if (p.Edition is { } ed && Editions.ModulesOf(ed).Count == 0) return $"Unknown edition '{ed}'.";
+        if (p.Modules is null || (p.Modules.Count == 0 && p.Edition is null)) return "License lists no modules.";
         foreach (var m in p.Modules)
             if (m != "*" && !Modules.All.Contains(m)) return $"Unknown module '{m}'.";
         if (p.Entitlements is null || p.Entitlements.Count == 0) return "License lists no workload entitlements.";

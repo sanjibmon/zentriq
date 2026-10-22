@@ -22,7 +22,9 @@ public sealed record LicensePayload(
     [property: JsonPropertyName("modules")] IReadOnlyList<string> Modules,
     [property: JsonPropertyName("entitlements")] IReadOnlyDictionary<string, int> Entitlements,
     [property: JsonPropertyName("requestId")] Guid? RequestId = null,
-    [property: JsonPropertyName("licensee")] Licensee? Licensee = null);
+    [property: JsonPropertyName("licensee")] Licensee? Licensee = null,
+    // "standard" or "advanced" (see Zentriq.Domain.Editions): the edition's modules are added to "modules".
+    [property: JsonPropertyName("edition")] string? Edition = null);
 
 /// <summary>Customer details carried by schema-2 licenses and shown in the console (signed, so read-only).</summary>
 public sealed record Licensee(

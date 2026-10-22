@@ -22,8 +22,31 @@ public sealed record LicenseStatus(
     IReadOnlyList<string> Modules,
     IReadOnlyDictionary<string, int> Limits,
     string? LicenseId,
-    string? Customer)
+    string? Customer,
+    string? Edition = null,
+    IReadOnlyList<string>? Sections = null)
 {
+    /// <summary>Installed product sections (all when not recorded).</summary>
+    public IReadOnlyList<string> InstalledSections => Sections ?? Zentriq.Domain.ProductSections.All;
+
+    /// <summary>A section is usable when it is installed and the trial or license covers at least one of its modules.</summary>
+    public bool SectionEnabled(string section) =>
+        InstalledSections.Contains(section) && Zentriq.Domain.ProductSections.ModulesOf.TryGetValue(section, out var m) && m.Any(ModuleEnabled);
+
+    /// <summary>
+    /// The same status limited to the sections installed on this server: a module of a section that was not installed is
+    /// not available, whatever the license says.
+    /// </summary>
+    public LicenseStatus RestrictTo(IReadOnlyList<string> installed)
+    {
+        var all = Zentriq.Domain.ProductSections.All;
+        var allowed = Zentriq.Domain.ProductSections.ModulesFor(installed);
+        IReadOnlyList<string> modules = Modules.Contains("*")
+            ? (all.All(installed.Contains) ? Modules : allowed)
+            : Modules.Where(allowed.Contains).ToList();
+        return this with { Modules = modules, Sections = installed };
+    }
+
     /// <summary>Feature APIs (scans, inventory changes, reports...) are usable.</summary>
     public bool FeaturesEnabled => Mode is LicenseMode.Trial or LicenseMode.Licensed or LicenseMode.LicensedGrace;
 
@@ -61,18 +84,18 @@ public static class LicenseEvaluator
             var p = lic.Payload;
             var limits = p.Entitlements;
             if (effectiveNow < p.ExpiresAt)
-                return new(LicenseMode.Licensed, $"Licensed to {p.Customer}.", p.ExpiresAt, DaysLeft(p.ExpiresAt, effectiveNow), p.Modules, limits, p.LicenseId, p.Customer);
+                return new(LicenseMode.Licensed, $"Licensed to {p.Customer} ({Zentriq.Domain.Editions.Title(p.Edition)} edition).", p.ExpiresAt, DaysLeft(p.ExpiresAt, effectiveNow), Zentriq.Domain.Editions.Expand(p.Edition, p.Modules), limits, p.LicenseId, p.Customer, p.Edition?.ToLowerInvariant());
             var graceEnd = p.ExpiresAt.AddDays(p.GraceDays);
             if (effectiveNow < graceEnd)
-                return new(LicenseMode.LicensedGrace, $"License expired; grace period ends {graceEnd:yyyy-MM-dd}.", graceEnd, DaysLeft(graceEnd, effectiveNow), p.Modules, limits, p.LicenseId, p.Customer);
-            return new(LicenseMode.LicenseExpired, "The commercial license has expired. Import a renewed license to continue.", p.ExpiresAt, 0, [], limits, p.LicenseId, p.Customer);
+                return new(LicenseMode.LicensedGrace, $"License expired; grace period ends {graceEnd:yyyy-MM-dd}.", graceEnd, DaysLeft(graceEnd, effectiveNow), Zentriq.Domain.Editions.Expand(p.Edition, p.Modules), limits, p.LicenseId, p.Customer, p.Edition?.ToLowerInvariant());
+            return new(LicenseMode.LicenseExpired, "The commercial license has expired. Import a renewed license to continue.", p.ExpiresAt, 0, [], limits, p.LicenseId, p.Customer, p.Edition?.ToLowerInvariant());
         }
 
         var t = i.Trial;
         if (!t.IntegrityValid)
             return new(LicenseMode.TrialExpired, "Trial record failed its integrity check. Import a license to continue.", t.ExpiresAt, 0, [], t.Policy.Limits, null, null);
         if (effectiveNow < t.ExpiresAt)
-            return new(LicenseMode.Trial, $"Trial: {DaysLeft(t.ExpiresAt, effectiveNow)} day(s) remaining.", t.ExpiresAt, DaysLeft(t.ExpiresAt, effectiveNow), t.Policy.Modules, t.Policy.Limits, null, null);
+            return new(LicenseMode.Trial, $"Trial: {DaysLeft(t.ExpiresAt, effectiveNow)} day(s) remaining.", t.ExpiresAt, DaysLeft(t.ExpiresAt, effectiveNow), t.Policy.Modules, t.Policy.Limits, null, null, "trial");
         return new(LicenseMode.TrialExpired, "The 14-day trial has ended. Import a license to continue. Your data is retained.", t.ExpiresAt, 0, [], t.Policy.Limits, null, null);
     }
 

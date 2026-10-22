@@ -12,7 +12,8 @@ import { NetworkPage } from '../features/network/NetworkPage';
 import { NonItPage } from '../features/nonit/NonItPage';
 import { AssetDetailPage } from '../features/inventory/AssetDetailPage';
 import { AccessoriesPage } from '../features/accessories/AccessoriesPage';
-import { ModulePage } from '../features/placeholder/ModulePage';
+import { ModulePage, SectionLockedPage } from '../features/placeholder/ModulePage';
+import { navOfPath } from './nav';
 import { ReportsPage } from '../features/reports/ReportsPage';
 import { ReportBuilder } from '../features/reports/ReportBuilder';
 import { VulnerabilitiesPage } from '../features/vulnerabilities/VulnerabilitiesPage';
@@ -31,6 +32,11 @@ import { ConfirmProvider } from '../components/Confirm';
 
 function Routes() {
   const { path } = useRouter();
+  const { me } = useAuth();
+  // Sections not installed on this server, or not in the license, show what is needed instead of the page.
+  const nav = navOfPath(path);
+  const sec = nav && !nav.item.admin ? me?.license.sections?.find((x) => x.id === nav.section) : undefined;
+  if (sec && (!sec.installed || (me!.license.featuresEnabled && !sec.enabled))) return <SectionLockedPage section={sec} label={nav!.item.label} />;
   if (path === '/' || path === '/dashboard') return <DashboardPage />;
   if (path === '/assets') return <AssetsPage />;
   const assetMatch = /^\/assets\/([0-9a-f-]{36})$/i.exec(path);

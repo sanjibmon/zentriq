@@ -149,7 +149,7 @@
         <ServiceControl Id="WorkerServiceControl" Name="ZentriqWorker" Stop="both" Remove="uninstall" Wait="yes" />
         <!-- Zentriq Remote Support: the same executable in remote-host mode supervises the bundled MeshCentral server. -->
         <ServiceInstall Id="RemoteServiceInstall" Name="ZentriqRemote" DisplayName="Zentriq Remote Support"
-                        Description="Zentriq Remote Support server (remote desktop, terminal and files; MeshCentral engine)."
+                        Description="Zentriq Remote Support server (remote desktop, terminal and files)."
                         Type="ownProcess" Start="auto" ErrorControl="normal" Vital="no" Arguments="--remote-host"
                         Account="NT SERVICE\ZentriqRemote" />
         <ServiceControl Id="RemoteServiceControl" Name="ZentriqRemote" Stop="both" Remove="uninstall" Wait="yes" />

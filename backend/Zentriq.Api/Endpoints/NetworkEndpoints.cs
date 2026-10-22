@@ -16,7 +16,7 @@ public static class NetworkEndpoints
     private const string ManagementExpr = NetworkStore.ManagementExpr;
 
     private const string DeviceSelect = $"""
-        SELECT a.id AS "id", a.hostname AS "hostname", host(a.primary_ip) AS "ip", COALESCE(a.device_type, 'network') AS "deviceType",
+        SELECT a.id AS "id", a.hostname AS "hostname", COALESCE(zentriq.asset_ipv4(a.id), host(a.primary_ip)) AS "ip", COALESCE(a.device_type, 'network') AS "deviceType",
                a.manufacturer AS "manufacturer", a.model AS "model", a.serial_number AS "serialNumber", a.os_name AS "osName",
                d.document->'os'->>'version' AS "firmware", d.document->'device'->>'location' AS "location",
                (d.document->'os'->>'lastBoot')::timestamptz AS "lastBoot",
@@ -93,7 +93,7 @@ public static class NetworkEndpoints
         // Switch port map. Search finds the port a device is connected to by MAC address, IP address or name.
         g.MapGet("/ports", async (NpgsqlDataSource ds, Guid? assetId, string? q, string? filter, CancellationToken ct) => await JsonAsync(ds, """
             SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY t."deviceName", t."ifIndex"), '[]')::text FROM (
-              SELECT i.asset_id AS "assetId", COALESCE(a.hostname, host(a.primary_ip)) AS "deviceName", i.if_index AS "ifIndex", i.name AS "name",
+              SELECT i.asset_id AS "assetId", COALESCE(a.hostname, zentriq.asset_ipv4(a.id), host(a.primary_ip)) AS "deviceName", i.if_index AS "ifIndex", i.name AS "name",
                      i.description AS "description", i.alias AS "alias", i.type AS "type", i.admin AS "admin", i.oper AS "oper", i.speed_mbps AS "speedMbps",
                      i.duplex AS "duplex", i.vlan AS "vlan", i.trunk AS "trunk", i.poe AS "poe", i.in_errors AS "inErrors", i.out_errors AS "outErrors",
                      i.mac AS "mac", i.ipv4 AS "ipv4", i.mac_count AS "macCount", i.connected AS "connected", i.neighbor AS "neighbor",
@@ -135,7 +135,7 @@ public static class NetworkEndpoints
 
         g.MapGet("/neighbors", async (NpgsqlDataSource ds, CancellationToken ct) => await JsonAsync(ds, """
             SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY t."deviceName", t."localPort"), '[]')::text FROM (
-              SELECT nb.asset_id AS "assetId", COALESCE(a.hostname, host(a.primary_ip)) AS "deviceName", COALESCE(a.device_type, 'network') AS "deviceType", nb.protocol AS "protocol",
+              SELECT nb.asset_id AS "assetId", COALESCE(a.hostname, zentriq.asset_ipv4(a.id), host(a.primary_ip)) AS "deviceName", COALESCE(a.device_type, 'network') AS "deviceType", nb.protocol AS "protocol",
                      nb.local_port AS "localPort", nb.remote_name AS "remoteName", nb.remote_port AS "remotePort", nb.remote_platform AS "remotePlatform",
                      nb.remote_description AS "remoteDescription", host(nb.remote_address) AS "remoteAddress", nb.remote_chassis_id AS "remoteChassisId",
                      nb.capabilities AS "capabilities", nb.remote_asset_id AS "remoteAssetId", ra.hostname AS "remoteAssetName",
@@ -153,7 +153,7 @@ public static class NetworkEndpoints
                      (SELECT count(*) FROM zentriq.network_interfaces i JOIN zentriq.assets x ON x.id = i.asset_id AND x.status = 'active'
                        WHERE i.vlan = v.vlan_id AND i.type = 'ethernet' AND NOT COALESCE(i.trunk, false))::int AS "accessPorts",
                      (SELECT count(*) FROM zentriq.network_mac_table m JOIN zentriq.assets x ON x.id = m.asset_id AND x.status = 'active' WHERE m.vlan = v.vlan_id)::int AS "macs",
-                     (array_agg(DISTINCT COALESCE(a.hostname, host(a.primary_ip))))[1:20] AS "deviceNames"
+                     (array_agg(DISTINCT COALESCE(a.hostname, zentriq.asset_ipv4(a.id), host(a.primary_ip))))[1:20] AS "deviceNames"
                 FROM zentriq.network_vlans v JOIN zentriq.assets a ON a.id = v.asset_id AND a.status = 'active'
                GROUP BY v.vlan_id) t
             """, null, ct)).RequireAuthorization(Permissions.AssetsView);
@@ -163,7 +163,7 @@ public static class NetworkEndpoints
         g.MapGet("/unmanaged", async (NpgsqlDataSource ds, CancellationToken ct) => await JsonAsync(ds, $"""
             SELECT jsonb_build_object(
               'inferred', (SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY t."deviceName", t."ifIndex"), '[]') FROM (
-                  SELECT i.asset_id AS "assetId", COALESCE(a.hostname, host(a.primary_ip)) AS "deviceName", i.if_index AS "ifIndex", i.name AS "port",
+                  SELECT i.asset_id AS "assetId", COALESCE(a.hostname, zentriq.asset_ipv4(a.id), host(a.primary_ip)) AS "deviceName", i.if_index AS "ifIndex", i.name AS "port",
                          i.alias AS "alias", i.vlan AS "vlan", i.speed_mbps AS "speedMbps", i.mac_count AS "macCount", i.connected AS "connected",
                          (SELECT jsonb_agg(jsonb_build_object('mac', m.mac::text, 'ip', (SELECT host(r.ip) FROM zentriq.network_arp r WHERE r.mac = m.mac LIMIT 1)))
                             FROM (SELECT mac FROM zentriq.network_mac_table m WHERE m.asset_id = i.asset_id AND m.if_index = i.if_index ORDER BY mac LIMIT 50) m) AS "macs"

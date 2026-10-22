@@ -59,7 +59,7 @@ public sealed class IntegrationStore(NpgsqlDataSource ds, CredentialProtector pr
             SELECT 'vulnerability.new',
                    CASE WHEN bool_or(c.kev OR c.ms_exploited) THEN 'critical' ELSE replace((array_agg(COALESCE(c.severity,'low') ORDER BY array_position(ARRAY['critical','high','medium','low','none'], c.severity)))[1], 'none', 'info') END,
                    'vulnerability.new:' || f.asset_id || ':' || extract(epoch FROM @to)::bigint,
-                   count(*) || ' new vulnerabilit' || CASE WHEN count(*) = 1 THEN 'y' ELSE 'ies' END || ' on ' || COALESCE(a.hostname, host(a.primary_ip))
+                   count(*) || ' new vulnerabilit' || CASE WHEN count(*) = 1 THEN 'y' ELSE 'ies' END || ' on ' || COALESCE(a.hostname, zentriq.asset_ipv4(a.id), host(a.primary_ip))
                      || CASE WHEN count(*) FILTER (WHERE c.kev OR c.ms_exploited) > 0 THEN ' (' || count(*) FILTER (WHERE c.kev OR c.ms_exploited) || ' known exploited)' ELSE '' END,
                    string_agg(f.cve_id || ' [' || COALESCE(c.severity, '?') || COALESCE(', CVSS ' || c.cvss_score, '') || CASE WHEN c.kev OR c.ms_exploited THEN ', exploited' ELSE '' END || '] '
                               || f.software_name || ' ' || COALESCE(f.installed_version, f.software_version) || COALESCE(' → fixed in ' || f.fixed_version, '') || COALESCE(' (KB' || f.kb || ')', ''),
@@ -75,7 +75,7 @@ public sealed class IntegrationStore(NpgsqlDataSource ds, CredentialProtector pr
             SELECT 'vulnerability.overdue',
                    replace((array_agg(COALESCE(c.severity,'low') ORDER BY array_position(ARRAY['critical','high','medium','low','none'], c.severity)))[1], 'none', 'info'),
                    'vulnerability.overdue:' || f.asset_id || ':' || extract(epoch FROM @to)::bigint,
-                   count(*) || ' vulnerabilit' || CASE WHEN count(*) = 1 THEN 'y' ELSE 'ies' END || ' past the due date on ' || COALESCE(a.hostname, host(a.primary_ip)),
+                   count(*) || ' vulnerabilit' || CASE WHEN count(*) = 1 THEN 'y' ELSE 'ies' END || ' past the due date on ' || COALESCE(a.hostname, zentriq.asset_ipv4(a.id), host(a.primary_ip)),
                    string_agg(f.cve_id || ' ' || f.software_name || ' — due ' || to_char(f.due_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') || COALESCE(', ticket ' || f.ticket, ''), E'\n' ORDER BY f.due_at),
                    f.asset_id,
                    jsonb_build_object('findingIds', jsonb_agg(f.id), 'cves', jsonb_agg(DISTINCT f.cve_id), 'count', count(*)),
@@ -88,7 +88,7 @@ public sealed class IntegrationStore(NpgsqlDataSource ds, CredentialProtector pr
             SELECT 'security.failed',
                    CASE WHEN bool_or(s.severity = 'high') THEN 'high' WHEN bool_or(s.severity = 'medium') THEN 'medium' ELSE 'low' END,
                    'security.failed:' || s.asset_id || ':' || extract(epoch FROM @to)::bigint,
-                   count(*) || ' security check' || CASE WHEN count(*) = 1 THEN '' ELSE 's' END || ' failing on ' || COALESCE(a.hostname, host(a.primary_ip)),
+                   count(*) || ' security check' || CASE WHEN count(*) = 1 THEN '' ELSE 's' END || ' failing on ' || COALESCE(a.hostname, zentriq.asset_ipv4(a.id), host(a.primary_ip)),
                    string_agg(s.rule_id || ' ' || COALESCE(r.title, '') || ' [' || s.severity || ']' || COALESCE(' — ' || s.actual, ''), E'\n' ORDER BY s.rule_id),
                    s.asset_id,
                    jsonb_build_object('rules', jsonb_agg(DISTINCT s.rule_id), 'count', count(*)),
@@ -101,7 +101,7 @@ public sealed class IntegrationStore(NpgsqlDataSource ds, CredentialProtector pr
             SELECT c.kind || '.changed',
                    CASE WHEN c.kind = 'hardware' THEN 'medium' WHEN bool_or(c.change = 'uninstalled') OR bool_or(c.change = 'installed' AND c.component = 'Application') THEN 'low' ELSE 'info' END,
                    c.kind || '.changed:' || c.asset_id || ':' || extract(epoch FROM @to)::bigint,
-                   count(*) || ' ' || c.kind || ' change' || CASE WHEN count(*) = 1 THEN '' ELSE 's' END || ' on ' || COALESCE(a.hostname, host(a.primary_ip)),
+                   count(*) || ' ' || c.kind || ' change' || CASE WHEN count(*) = 1 THEN '' ELSE 's' END || ' on ' || COALESCE(a.hostname, zentriq.asset_ipv4(a.id), host(a.primary_ip)),
                    string_agg(initcap(c.change) || ' ' || c.component || ': ' || c.item || COALESCE(' (' || c.old_value || ' → ' || c.new_value || ')', COALESCE(' (' || c.new_value || ')', '')), E'\n' ORDER BY c.id),
                    c.asset_id,
                    jsonb_build_object('count', count(*), 'changes', jsonb_agg(jsonb_build_object('change', c.change, 'component', c.component, 'item', c.item, 'before', c.old_value, 'after', c.new_value) ORDER BY c.id)),
@@ -112,15 +112,15 @@ public sealed class IntegrationStore(NpgsqlDataSource ds, CredentialProtector pr
             """),
         new("asset.discovered", """
             SELECT 'asset.discovered', 'info', 'asset.discovered:' || a.id,
-                   'New device: ' || COALESCE(a.hostname, host(a.primary_ip), a.id::text),
-                   concat_ws(E'\n', 'Category: ' || a.category, 'Operating system: ' || a.os_name, 'IP address: ' || host(a.primary_ip), 'Found by: ' || a.source),
+                   'New device: ' || COALESCE(a.hostname, zentriq.asset_ipv4(a.id), host(a.primary_ip), a.id::text),
+                   concat_ws(E'\n', 'Category: ' || a.category, 'Operating system: ' || a.os_name, 'IP address: ' || COALESCE(zentriq.asset_ipv4(a.id), host(a.primary_ip)), 'Found by: ' || a.source),
                    a.id, jsonb_build_object('source', a.source), '/assets/' || a.id
               FROM zentriq.assets a
              WHERE a.first_seen_at > @from AND a.first_seen_at <= @to AND a.status = 'active'
             """),
         new("asset.offline", """
             SELECT 'asset.offline', 'medium', 'asset.offline:' || a.id || ':' || extract(epoch FROM x.last)::bigint,
-                   COALESCE(a.hostname, host(a.primary_ip)) || ' not seen for ' || @hours || ' hours',
+                   COALESCE(a.hostname, zentriq.asset_ipv4(a.id), host(a.primary_ip)) || ' not seen for ' || @hours || ' hours',
                    'Last contact: ' || to_char(x.last AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') || ' UTC',
                    a.id, jsonb_build_object('lastContact', x.last), '/assets/' || a.id
               FROM zentriq.assets a
@@ -290,7 +290,7 @@ public sealed class IntegrationStore(NpgsqlDataSource ds, CredentialProtector pr
     {
         await using var cmd = ds.CreateCommand("""
             SELECT e.id, e.event_type, e.severity, e.title, e.body, e.occurred_at, e.link, e.data::text,
-                   a.id, COALESCE(a.hostname, host(a.primary_ip)), host(a.primary_ip), a.category, a.criticality, a.os_name
+                   a.id, COALESCE(a.hostname, zentriq.asset_ipv4(a.id), host(a.primary_ip)), COALESCE(zentriq.asset_ipv4(a.id), host(a.primary_ip)), a.category, a.criticality, a.os_name
               FROM zentriq.int_events e LEFT JOIN zentriq.assets a ON a.id = e.asset_id WHERE e.id = @id
             """);
         cmd.Parameters.AddWithValue("id", id);

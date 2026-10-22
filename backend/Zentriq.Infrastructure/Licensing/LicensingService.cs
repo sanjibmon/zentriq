@@ -57,7 +57,18 @@ public sealed class LicensingService(
 
         return LicenseEvaluator.Evaluate(new LicenseInputs(
             state?.InitializedAt is not null, trial, license, clock.UtcNow,
-            state?.LastSeenUtc ?? clock.UtcNow, tolerance));
+            state?.LastSeenUtc ?? clock.UtcNow, tolerance)).RestrictTo(await InstalledSectionsAsync(ct));
+    }
+
+    /// <summary>Setting written by setup (Standard / Advanced installation): the product sections installed on this server.</summary>
+    public const string SectionsSetting = "product.sections";
+
+    /// <summary>The product sections installed on this server; all of them when setup did not record a choice.</summary>
+    public async Task<IReadOnlyList<string>> InstalledSectionsAsync(CancellationToken ct = default)
+    {
+        await using var cmd = dataSource.CreateCommand("SELECT value::text FROM zentriq.system_settings WHERE key = @k");
+        cmd.Parameters.AddWithValue("k", SectionsSetting);
+        return ProductSections.Parse(await cmd.ExecuteScalarAsync(ct) as string);
     }
 
     public async Task<IReadOnlyList<WorkloadUsage>> GetUsageAsync(CancellationToken ct = default)

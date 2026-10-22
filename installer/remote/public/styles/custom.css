@@ -1,0 +1,93 @@
+/*
+ * Zentriq Remote Support: modern look for the remote session window (engine's modern UI, siteStyle 3).
+ * Loaded on every page of the remote support server (styles/custom.css). Colours follow the Zentriq console.
+ */
+:root {
+  --zq-accent: #0A7385;
+  --zq-accent-2: #38B3C4;
+  --zq-ink: #0B1F26;
+  --zq-grad: linear-gradient(135deg, #0A7385 0%, #1497A8 55%, #38B3C4 100%);
+  --zq-danger: linear-gradient(135deg, #C2410C 0%, #E11D48 100%);
+  --zq-ok: linear-gradient(135deg, #047857 0%, #10B981 100%);
+  --zq-radius: 10px;
+  --zq-shadow: 0 6px 18px rgba(10, 115, 133, .22);
+  --bs-primary: #0A7385; --bs-primary-rgb: 10, 115, 133;
+  --bs-link-color: #0A7385; --bs-link-hover-color: #075A68;
+}
+[data-bs-theme="dark"] { --bs-primary: #38B3C4; --bs-primary-rgb: 56, 179, 196; --bs-link-color: #5CC7D6; }
+
+body { font-family: "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif !important; letter-spacing: .1px; }
+
+/* Header: Zentriq gradient bar */
+#masthead, .masthead-container { background: var(--zq-grad) !important; box-shadow: 0 2px 12px rgba(6, 22, 27, .25); }
+#masthead .title, #masthead .title2, .masthead-title { color: #fff !important; }
+#masthead .title2 { opacity: .85; font-weight: 500; }
+
+/* Buttons: soft rounded, gradient primaries, gentle lift on hover */
+.btn { border-radius: var(--zq-radius) !important; font-weight: 600; transition: transform .12s ease, box-shadow .15s ease, filter .15s ease; }
+.btn:hover:not(:disabled) { transform: translateY(-1px); }
+.btn:active:not(:disabled) { transform: translateY(0); }
+.btn-primary { background: var(--zq-grad) !important; border-color: transparent !important; box-shadow: var(--zq-shadow); }
+.btn-primary:hover:not(:disabled) { filter: brightness(1.07); }
+.btn-success { background: var(--zq-ok) !important; border-color: transparent !important; box-shadow: 0 6px 18px rgba(4, 120, 87, .25); }
+.btn-danger { background: var(--zq-danger) !important; border-color: transparent !important; box-shadow: 0 6px 18px rgba(225, 29, 72, .22); }
+.btn-secondary { background: rgba(10, 115, 133, .08) !important; color: var(--zq-accent) !important; border: 1px solid rgba(10, 115, 133, .25) !important; }
+[data-bs-theme="dark"] .btn-secondary { color: #9FE3EC !important; background: rgba(56, 179, 196, .12) !important; }
+.btn:disabled, .btn.disabled { box-shadow: none !important; opacity: .45; }
+
+/* Icons on the session toolbar buttons (the engine draws them as text-only buttons) */
+#connectbutton1, #disconnectbutton1, #deskActionsBtn, #deskActionsSettings, #DeskToolsButton, #DeskWD, #DeskClip, #DeskType, #DeskESC,
+#connectbutton2, #disconnectbutton2, #connectbutton3, #disconnectbutton3 {
+  background-repeat: no-repeat !important; background-position: 9px center !important; background-size: 15px 15px !important; padding-left: 30px !important;
+}
+#connectbutton1, #connectbutton2, #connectbutton3 { background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M12 22v-5'/><path d='M9 8V2'/><path d='M15 8V2'/><path d='M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8z'/></svg>"), var(--zq-ok) !important; }
+#disconnectbutton1, #disconnectbutton2, #disconnectbutton3 { background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M12 2v10'/><path d='M18.4 6.6a9 9 0 1 1-12.77.04'/></svg>"), var(--zq-danger) !important; }
+#deskActionsBtn { background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M13 2 3 14h9l-1 8 10-12h-9l1-8z'/></svg>"), var(--zq-grad) !important; }
+#deskActionsSettings { background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><line x1='4' y1='21' x2='4' y2='14'/><line x1='4' y1='10' x2='4' y2='3'/><line x1='12' y1='21' x2='12' y2='12'/><line x1='12' y1='8' x2='12' y2='3'/><line x1='20' y1='21' x2='20' y2='16'/><line x1='20' y1='12' x2='20' y2='3'/><line x1='1' y1='14' x2='7' y2='14'/><line x1='9' y1='8' x2='15' y2='8'/><line x1='17' y1='16' x2='23' y2='16'/></svg>"), var(--zq-grad) !important; }
+#DeskToolsButton { background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z'/></svg>"), var(--zq-grad) !important; }
+#DeskWD { background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m22 2-7 20-4-9-9-4z'/><path d='M22 2 11 13'/></svg>"), var(--zq-grad) !important; }
+#DeskClip { background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%230A7385' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='8' y='2' width='8' height='4' rx='1'/><path d='M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2'/></svg>"), rgba(10, 115, 133, .08) !important; }
+#DeskType { background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%230A7385' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='2' y='4' width='20' height='16' rx='2'/><path d='M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10'/></svg>"), rgba(10, 115, 133, .08) !important; }
+#DeskESC { background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%230A7385' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M9 14 4 9l5-5'/><path d='M4 9h10.5a5.5 5.5 0 0 1 0 11H11'/></svg>"), rgba(10, 115, 133, .08) !important; }
+
+/* Toolbars of the remote desktop, terminal and files views: frosted, rounded */
+#deskarea1, #deskarea4, #termarea1, #termarea4, #p13toolbar, .areaHead, .areaFoot {
+  background: rgba(255, 255, 255, .78) !important; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(10, 115, 133, .14) !important; border-radius: 12px !important; padding: 6px 8px !important; margin: 4px 0 !important;
+  box-shadow: 0 4px 14px rgba(6, 22, 27, .06);
+}
+[data-bs-theme="dark"] #deskarea1, [data-bs-theme="dark"] #deskarea4, [data-bs-theme="dark"] .areaHead, [data-bs-theme="dark"] .areaFoot {
+  background: rgba(17, 33, 40, .82) !important; border-color: rgba(56, 179, 196, .22) !important;
+}
+#deskstatus { font-weight: 600; margin-left: 6px; padding: 2px 10px; border-radius: 999px; background: rgba(10, 115, 133, .1); color: var(--zq-accent); }
+
+/* Round icon buttons (screenshot, refresh, clipboard, lock input, share, rotate…) */
+#deskarea4Icons > span[role="button"], .deskareaicon {
+  display: inline-grid !important; place-items: center; width: 30px; height: 30px; margin: 0 2px; border-radius: 50%;
+  color: var(--zq-accent); background: rgba(10, 115, 133, .08); cursor: pointer; transition: all .15s ease;
+}
+#deskarea4Icons > span[role="button"]:hover, .deskareaicon:hover { background: var(--zq-grad); color: #fff; box-shadow: var(--zq-shadow); transform: translateY(-1px) scale(1.06); }
+#deskarea4Icons > span[role="button"] i, .deskareaicon i { color: inherit !important; }
+#DeskInputLockedButton i { color: #E11D48 !important; }
+#DeskLatency, #DeskTimer { font-variant-numeric: tabular-nums; font-size: 12px; color: #4B6470; }
+
+/* The remote screen: framed like a monitor */
+#Desk, #deskarea3x canvas, #KVMCanvas { border-radius: 10px; box-shadow: 0 10px 30px rgba(6, 22, 27, .25); }
+
+/* Device page tabs and side menu */
+.nav-tabs .nav-link.active, .nav-pills .nav-link.active { background: var(--zq-grad) !important; color: #fff !important; border-color: transparent !important; border-radius: 10px; }
+.nav-link { border-radius: 10px; }
+.form-check-input:checked { background-color: var(--zq-accent) !important; border-color: var(--zq-accent) !important; }
+.modal-content { border-radius: 16px !important; border: 0; box-shadow: 0 24px 60px rgba(6, 22, 27, .3); }
+.modal-header { background: var(--zq-grad); color: #fff; border-top-left-radius: 16px; border-top-right-radius: 16px; }
+.modal-header .btn-close { filter: invert(1) grayscale(1) brightness(2); }
+.dropdown-menu { border-radius: 12px; border: 1px solid rgba(10, 115, 133, .15); box-shadow: 0 12px 30px rgba(6, 22, 27, .15); padding: 6px; }
+.dropdown-item { border-radius: 8px; }
+.dropdown-item:hover { background: rgba(10, 115, 133, .1); color: var(--zq-accent); }
+
+/* Things Zentriq does not use */
+#connectbutton1rspan, #connectbutton1hspan, #autoconnectbutton1 { display: none !important; }
+
+/* Sign-in / message / download pages */
+#centralTable, .login-container, #loginpanel { border-radius: 16px; }
+a { color: var(--bs-link-color); }

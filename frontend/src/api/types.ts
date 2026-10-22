@@ -14,7 +14,13 @@ export interface LicenseSummary {
   daysRemaining: number | null;
   featuresEnabled: boolean;
   modules: string[];
+  /** 'trial', 'standard', 'advanced' or null (custom module list). */
+  edition?: string | null;
+  /** Product sections: installed on this server (Standard / Advanced setup) and enabled by the trial or license. */
+  sections?: SectionInfo[];
 }
+
+export interface SectionInfo { id: string; title: string; installed: boolean; enabled: boolean; standard: boolean }
 
 export interface Me {
   id: string;

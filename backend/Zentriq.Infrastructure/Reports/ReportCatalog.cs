@@ -26,13 +26,16 @@ public static class ReportCatalog
     private const string FreePct = "(SELECT round(min((v ->> 'freeBytes')::numeric * 100 / NULLIF((v ->> 'sizeBytes')::numeric, 0)), 1) FROM jsonb_array_elements(CASE WHEN jsonb_typeof(d.document #> '{hardware,volumes}') = 'array' THEN d.document #> '{hardware,volumes}' ELSE '[]' END) v WHERE (v ->> 'sizeBytes')::numeric > 0 AND v ->> 'freeBytes' IS NOT NULL)";
     private static string YesNo(string path) => $"CASE WHEN d.document #>> '{path}' = 'true' THEN 'yes' WHEN d.document #>> '{path}' = 'false' THEN 'no' END";
     private const string TypeExpr = "COALESCE(a.device_type, d.document #>> '{device,chassis}', h.chassis, a.category)";
+    /// <summary>The device's IPv6 address (primary when IPv6, else the first global address of its adapters); reports show IPv4 by default.</summary>
+    private const string Ipv6Expr = "COALESCE(CASE WHEN family(a.primary_ip) = 6 THEN host(a.primary_ip) END, (SELECT ip FROM jsonb_array_elements(COALESCE(d.document->'network', '[]'::jsonb)) nic, jsonb_array_elements_text(COALESCE(nic->'ipv6', '[]'::jsonb)) ip WHERE ip NOT ILIKE 'fe80%' AND ip <> '::1' LIMIT 1))";
     private const string OsExpr = "COALESCE(a.os_name, initcap(a.os_family))";
 
     private static readonly ReportColumn[] DeviceColumns =
     [
-        new("hostname", "Hostname", ReportColumnType.Text, "COALESCE(a.hostname, host(a.primary_ip))", "Device"),
+        new("hostname", "Hostname", ReportColumnType.Text, "COALESCE(a.hostname, zentriq.asset_ipv4(a.id), host(a.primary_ip))", "Device"),
         new("fqdn", "FQDN", ReportColumnType.Text, "a.fqdn", "Device"),
-        new("ip", "IP address", ReportColumnType.Text, "host(a.primary_ip)", "Device"),
+        new("ip", "IP address", ReportColumnType.Text, "COALESCE(zentriq.asset_ipv4(a.id), host(a.primary_ip))", "Device"),
+        new("ipv6", "IPv6 address", ReportColumnType.Text, Ipv6Expr, "Device"),
         new("mac", "MAC address", ReportColumnType.Text, "a.mac_address::text", "Device"),
         new("category", "Category", ReportColumnType.Text, "a.category", "Device"),
         new("type", "Device type", ReportColumnType.Text, TypeExpr, "Device"),
@@ -153,7 +156,7 @@ public static class ReportCatalog
             """,
             [
                 new("requested_at", "Requested", ReportColumnType.Date, "x.requested_at", "Action"),
-                new("hostname", "Device", ReportColumnType.Text, "COALESCE(a.hostname, host(a.primary_ip))", "Action"),
+                new("hostname", "Device", ReportColumnType.Text, "COALESCE(a.hostname, zentriq.asset_ipv4(a.id), host(a.primary_ip))", "Action"),
                 new("action", "Action", ReportColumnType.Text,
                     "CASE x.operation WHEN 'start' THEN 'Start service' WHEN 'stop' THEN 'Stop service' WHEN 'restart' THEN 'Restart service' WHEN 'uninstall' THEN CASE WHEN x.kind = 'remote-support' THEN 'Remove remote support' ELSE 'Uninstall software' END WHEN 'update' THEN 'Update agent' WHEN 'install' THEN 'Install remote support' ELSE x.operation END", "Action"),
                 new("target", "Target", ReportColumnType.Text, "x.target", "Action"),
@@ -466,7 +469,7 @@ public static class ReportCatalog
                 new("to_location", "To location", ReportColumnType.Text, "lt.name", "Where"),
                 new("person", "Person", ReportColumnType.Text, "m.person", "Who"),
                 new("department", "Department / unit", ReportColumnType.Text, "dp.name", "Who"),
-                new("device", "Device", ReportColumnType.Text, "COALESCE(a.hostname, host(a.primary_ip))", "Who"),
+                new("device", "Device", ReportColumnType.Text, "COALESCE(a.hostname, zentriq.asset_ipv4(a.id), host(a.primary_ip))", "Who"),
                 new("condition", "Condition", ReportColumnType.Text, "m.condition", "Movement"),
                 new("reason", "Reason", ReportColumnType.Text, "m.reason", "Movement"),
                 new("reference", "Reference (invoice / PO / ticket)", ReportColumnType.Text, "m.reference", "Movement"),

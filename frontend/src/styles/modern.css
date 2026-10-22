@@ -316,3 +316,28 @@ details.rs-advanced[open] summary { margin-bottom: 12px; }
 @media (max-width: 640px) { .line-row, .line-row.no-cost { grid-template-columns: 1fr 80px 34px; } .line-row .cost { display: none; } }
 .tbl-tools { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); }
 .tbl-tools .btn { padding-top: 4px; padding-bottom: 4px; }
+
+/* Column chooser: rearrangeable rows */
+.col-row { display: flex; align-items: center; gap: 6px; padding: 1px 2px; border-radius: 7px; cursor: grab; }
+.col-row:hover { background: var(--surface-2); }
+.col-row.dragging { opacity: .45; }
+.col-row .row-check { flex: 1; margin: 0; }
+.col-grip { color: var(--text-3, #94a3b8); font-size: 11px; letter-spacing: -2px; user-select: none; }
+.col-move { display: inline-flex; gap: 2px; opacity: .55; }
+.col-row:hover .col-move { opacity: 1; }
+.col-move .icon-btn { width: 22px; height: 22px; font-size: 12px; line-height: 1; padding: 0; }
+.col-pop { min-width: 270px; }
+
+/* Gradient icon tiles (Remote Support) */
+.ico-tile { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; flex: none; color: #fff;
+  background: linear-gradient(135deg, #0A7385 0%, #1497A8 55%, #38B3C4 100%); box-shadow: 0 6px 16px rgba(10, 115, 133, .28); vertical-align: middle; margin-right: 8px; }
+.ico-tile.xl { width: 64px; height: 64px; border-radius: 18px; margin: 0 0 6px; box-shadow: 0 12px 28px rgba(10, 115, 133, .3); }
+.rs-install h4 { display: flex; align-items: center; }
+.rs-actions .btn svg, .rs-menu svg { transition: transform .15s ease; }
+.rs-actions .btn:hover:not(:disabled) svg { transform: scale(1.12); }
+
+/* Navigation: sections not in the license */
+.nav-lock { margin-left: 6px; font-size: 9.5px; letter-spacing: .4px; text-transform: uppercase; padding: 1px 6px; border-radius: 999px;
+  background: linear-gradient(135deg, #0A7385, #38B3C4); color: #fff; vertical-align: middle; }
+.nav a.locked { opacity: .62; }
+.nav a .nav-lock-ico { margin-left: auto; opacity: .8; }

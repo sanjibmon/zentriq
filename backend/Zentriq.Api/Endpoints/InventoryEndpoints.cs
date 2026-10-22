@@ -121,7 +121,7 @@ public static class InventoryEndpoints
         g.MapGet("/software/installs", async (NpgsqlDataSource ds, string name, CancellationToken ct) =>
         {
             await using var cmd = ds.CreateCommand("""
-                SELECT a.id, a.hostname, host(a.primary_ip), a.os_name, s.version, s.installed_on, s.source,
+                SELECT a.id, a.hostname, COALESCE(zentriq.asset_ipv4(a.id), host(a.primary_ip)), a.os_name, s.version, s.installed_on, s.source,
                        (SELECT CASE WHEN 'software-uninstall' = ANY(r.capabilities) THEN 'ready' ELSE 'old' END FROM zentriq.agent_registrations r
                          WHERE r.asset_id = a.id AND r.status = 'active' ORDER BY r.last_checkin_at DESC NULLS LAST LIMIT 1),
                        (SELECT x.status || '|' || COALESCE(x.detail, '') FROM zentriq.asset_actions x
@@ -155,7 +155,7 @@ public static class InventoryEndpoints
                           FROM jsonb_array_elements(CASE WHEN jsonb_typeof(h.disks) = 'object' THEN COALESCE(h.disks->'disks', '[]'::jsonb) ELSE h.disks END) d
                          WHERE d ? 'sizeBytes' AND jsonb_typeof(d->'sizeBytes') = 'number') AS disk_gb,
                        h.source, h.collected_at, count(*) OVER () AS total,
-                       a.department_id, dp.name, a.location_id, lo.name, host(a.primary_ip), hw.manual
+                       a.department_id, dp.name, a.location_id, lo.name, COALESCE(zentriq.asset_ipv4(a.id), host(a.primary_ip)), hw.manual
                   FROM zentriq.hardware_inventory h JOIN zentriq.assets a ON a.id = h.asset_id AND a.status = 'active'
                   CROSS JOIN LATERAL (SELECT COALESCE(zentriq.hw_value(h.vendor), zentriq.hw_value(a.manufacturer)) AS dv, zentriq.hw_value(h.model) AS dm,
                                              COALESCE(zentriq.hw_value(h.serial_number), zentriq.hw_value(a.serial_number)) AS ds) det
@@ -229,7 +229,7 @@ public static class InventoryEndpoints
         {
             var (p, size) = Paging.Normalize(page, pageSize);
             await using var cmd = ds.CreateCommand("""
-                SELECT c.id, c.asset_id, COALESCE(a.hostname, host(a.primary_ip)), a.os_name, dp.name, c.detected_at, c.kind, c.change, c.component, c.item,
+                SELECT c.id, c.asset_id, COALESCE(a.hostname, zentriq.asset_ipv4(a.id), host(a.primary_ip)), a.os_name, dp.name, c.detected_at, c.kind, c.change, c.component, c.item,
                        c.old_value, c.new_value, c.source, count(*) OVER ()
                   FROM zentriq.asset_changes c JOIN zentriq.assets a ON a.id = c.asset_id
                   LEFT JOIN zentriq.departments dp ON dp.id = a.department_id
@@ -295,7 +295,7 @@ public static class InventoryEndpoints
                 changes = r.GetInt64(3), last = r.GetFieldValue<DateTimeOffset>(4), summary = r.IsDBNull(5) ? null : r.GetString(5),
             };
             string ByDevice(string kind) => $"""
-                SELECT c.asset_id, COALESCE(a.hostname, host(a.primary_ip)), (SELECT dp.name FROM zentriq.departments dp WHERE dp.id = a.department_id),
+                SELECT c.asset_id, COALESCE(a.hostname, zentriq.asset_ipv4(a.id), host(a.primary_ip)), (SELECT dp.name FROM zentriq.departments dp WHERE dp.id = a.department_id),
                        count(*), max(c.detected_at),
                        string_agg(c.change || ' ' || c.component || ': ' || c.item || COALESCE(' (' || c.old_value || ' → ' || c.new_value || ')', ''), '; ' ORDER BY c.detected_at DESC, c.id DESC)
                 {Window} AND c.kind = '{kind}' GROUP BY c.asset_id, a.hostname, a.primary_ip, a.department_id ORDER BY max(c.detected_at) DESC LIMIT 15

@@ -292,7 +292,7 @@ public static class RemoteEndpoints
                 return Results.Problem(statusCode: 503, title: "Remote support is not available: " + ex.Message);
             }
             await using var q = ds.CreateCommand("""
-                SELECT a.id, COALESCE(a.hostname, host(a.primary_ip)), ag.id, COALESCE('remote-support' = ANY(ag.capabilities), false),
+                SELECT a.id, COALESCE(a.hostname, zentriq.asset_ipv4(a.id), host(a.primary_ip)), ag.id, COALESCE('remote-support' = ANY(ag.capabilities), false),
                        EXISTS (SELECT 1 FROM zentriq.asset_actions x WHERE x.asset_id = a.id AND x.kind = 'remote-support' AND x.status IN ('queued','sent','running')
                                   AND x.requested_at > now() - interval '1 hour')
                   FROM zentriq.assets a

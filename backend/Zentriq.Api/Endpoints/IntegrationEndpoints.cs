@@ -226,7 +226,7 @@ public static partial class IntegrationEndpoints
             var (p, ps) = Paging.Normalize(page, pageSize);
             await using var cmd = ds.CreateCommand("""
                 SELECT d.id, d.status, d.attempts, d.response, d.error, d.created_at, d.sent_at, d.next_attempt_at,
-                       e.id, e.event_type, e.severity, e.title, c.id, c.name, c.kind, r.name, COALESCE(a.hostname, host(a.primary_ip)), count(*) OVER ()
+                       e.id, e.event_type, e.severity, e.title, c.id, c.name, c.kind, r.name, COALESCE(a.hostname, zentriq.asset_ipv4(a.id), host(a.primary_ip)), count(*) OVER ()
                   FROM zentriq.int_deliveries d
                   JOIN zentriq.int_events e ON e.id = d.event_id
                   LEFT JOIN zentriq.int_channels c ON c.id = d.channel_id
@@ -273,7 +273,7 @@ public static partial class IntegrationEndpoints
         {
             var (p, ps) = Paging.Normalize(page, pageSize);
             await using var cmd = ds.CreateCommand("""
-                SELECT e.id, e.event_type, e.severity, e.title, left(e.body, 2000), e.occurred_at, e.link, e.asset_id, COALESCE(a.hostname, host(a.primary_ip)),
+                SELECT e.id, e.event_type, e.severity, e.title, left(e.body, 2000), e.occurred_at, e.link, e.asset_id, COALESCE(a.hostname, zentriq.asset_ipv4(a.id), host(a.primary_ip)),
                        (SELECT count(*) FROM zentriq.int_deliveries d WHERE d.event_id = e.id AND d.status = 'sent'),
                        (SELECT count(*) FROM zentriq.int_deliveries d WHERE d.event_id = e.id), count(*) OVER ()
                   FROM zentriq.int_events e LEFT JOIN zentriq.assets a ON a.id = e.asset_id

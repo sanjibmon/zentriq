@@ -67,7 +67,7 @@ public static class SecurityEndpoints
                  ORDER BY array_position(ARRAY['high','medium','low'], min(x.severity)), 4 DESC LIMIT 10
                 """, r => new { rule = r.GetString(0), title = r.IsDBNull(1) ? r.GetString(0) : r.GetString(1), severity = r.GetString(2), failing = r.GetInt64(3), assessed = r.GetInt64(4) });
             var worst = await Rows($"""
-                SELECT a.id, COALESCE(a.hostname, host(a.primary_ip)), a.os_name, s.score, s.failed, s.failed_high, a.criticality
+                SELECT a.id, COALESCE(a.hostname, zentriq.asset_ipv4(a.id), host(a.primary_ip)), a.os_name, s.score, s.failed, s.failed_high, a.criticality
                 {Scores} AND s.score IS NOT NULL ORDER BY s.score, s.failed_high DESC LIMIT 10
                 """, r => new { assetId = r.GetGuid(0), hostname = r.IsDBNull(1) ? null : r.GetString(1), os = r.IsDBNull(2) ? null : r.GetString(2), score = r.GetInt32(3), failed = r.GetInt32(4), failedHigh = r.GetInt32(5), criticality = r.GetString(6) });
             var distribution = await Rows($"""
@@ -129,7 +129,7 @@ public static class SecurityEndpoints
             var b = await ResolveBaselineAsync(ds, baselineId, ct);
             var devices = new List<object>();
             await using (var cmd = ds.CreateCommand("""
-                SELECT a.id, COALESCE(a.hostname, host(a.primary_ip)), a.os_name, a.category, x.status, x.actual, x.first_failed_at, x.evaluated_at, x.severity
+                SELECT a.id, COALESCE(a.hostname, zentriq.asset_ipv4(a.id), host(a.primary_ip)), a.os_name, a.category, x.status, x.actual, x.first_failed_at, x.evaluated_at, x.severity
                   FROM zentriq.sec_results x JOIN zentriq.assets a ON a.id = x.asset_id
                  WHERE a.status = 'active' AND x.baseline_id = @b AND x.rule_id = @r AND (@s::text IS NULL OR x.status = @s)
                  ORDER BY array_position(ARRAY['fail','unknown','exempt','pass'], x.status), x.first_failed_at NULLS LAST, 2 LIMIT 2000
@@ -161,7 +161,7 @@ public static class SecurityEndpoints
             var (p, ps) = Paging.Normalize(page, pageSize);
             var order = sort switch { "host" => "2", "failed" => "s.failed DESC, s.score", "best" => "s.score DESC NULLS LAST, 2", _ => "s.score NULLS FIRST, s.failed_high DESC, 2" };
             await using var cmd = ds.CreateCommand($"""
-                SELECT a.id, COALESCE(a.hostname, host(a.primary_ip)), a.os_name, a.category, a.criticality, s.score, s.passed, s.failed, s.failed_high, s.unknown, s.exempt, s.evaluated_at, count(*) OVER ()
+                SELECT a.id, COALESCE(a.hostname, zentriq.asset_ipv4(a.id), host(a.primary_ip)), a.os_name, a.category, a.criticality, s.score, s.passed, s.failed, s.failed_high, s.unknown, s.exempt, s.evaluated_at, count(*) OVER ()
                   FROM zentriq.sec_scores s JOIN zentriq.assets a ON a.id = s.asset_id
                  WHERE a.status = 'active' AND s.baseline_id = @b AND (@q::text IS NULL OR a.hostname ILIKE '%' || @q || '%' OR host(a.primary_ip) LIKE @q || '%')
                  ORDER BY {order} LIMIT @l OFFSET @o
@@ -424,7 +424,7 @@ public static class SecurityEndpoints
     {
         var list = new List<object>();
         await using var cmd = ds.CreateCommand("""
-            SELECT e.id, e.rule_id, e.asset_id, COALESCE(a.hostname, host(a.primary_ip)), e.baseline_id, b.name, e.reason, e.expires_at, u.display_name, e.created_at,
+            SELECT e.id, e.rule_id, e.asset_id, COALESCE(a.hostname, zentriq.asset_ipv4(a.id), host(a.primary_ip)), e.baseline_id, b.name, e.reason, e.expires_at, u.display_name, e.created_at,
                    e.expires_at IS NOT NULL AND e.expires_at <= now()
               FROM zentriq.sec_exceptions e
               LEFT JOIN zentriq.assets a ON a.id = e.asset_id LEFT JOIN zentriq.sec_baselines b ON b.id = e.baseline_id LEFT JOIN zentriq.users u ON u.id = e.created_by

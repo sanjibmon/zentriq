@@ -8,6 +8,8 @@ export interface NavItem {
   /** Implemented in this release; others show the module status page. */
   ready: boolean;
   permission?: string;
+  /** Administration pages (licensing, users, settings, audit): always available, whatever is installed or licensed. */
+  admin?: boolean;
 }
 
 // Same groups, labels and icons as the Zentriq prototype navigation.
@@ -24,7 +26,7 @@ export const NAV: [string, NavItem[]][] = [
     { id: 'agents', label: 'Agents', icon: 'host', path: '/agents', ready: true },
     { id: 'activity', label: 'Activity Log', icon: 'activity', path: '/activity', ready: true },
   ]],
-  ['Remote management', [
+  ['Remote support', [
     { id: 'remote', label: 'Remote Support', icon: 'remote', path: '/remote', ready: true, permission: 'remote.start' },
   ]],
   ['Infrastructure', [
@@ -42,11 +44,29 @@ export const NAV: [string, NavItem[]][] = [
   ['Insight & admin', [
     { id: 'reports', label: 'Reports & Analytics', icon: 'report', path: '/reports', ready: true, permission: 'assets.view' },
     { id: 'integrations', label: 'Integrations & Automation', icon: 'plug', path: '/integrations', ready: true, permission: 'integrations.manage' },
-    { id: 'licensing', label: 'Licensing', icon: 'key', path: '/licensing', ready: true },
-    { id: 'audit', label: 'Audit Logs', icon: 'log', path: '/audit', ready: true, permission: 'audit.view' },
-    { id: 'users', label: 'Users, Roles & Sites', icon: 'users', path: '/users', ready: true, permission: 'users.manage' },
-    { id: 'settings', label: 'System Settings', icon: 'gear', path: '/settings', ready: true, permission: 'settings.manage' },
+    { id: 'licensing', label: 'Licensing', icon: 'key', path: '/licensing', ready: true, admin: true },
+    { id: 'audit', label: 'Audit Logs', icon: 'log', path: '/audit', ready: true, permission: 'audit.view', admin: true },
+    { id: 'users', label: 'Users, Roles & Sites', icon: 'users', path: '/users', ready: true, permission: 'users.manage', admin: true },
+    { id: 'settings', label: 'System Settings', icon: 'gear', path: '/settings', ready: true, permission: 'settings.manage', admin: true },
   ]],
 ];
 
 export const ALL_NAV = NAV.flatMap(([, items]) => items);
+
+/** Product section of each navigation group (installed by Standard / Advanced setup, enabled by the edition). */
+export const SECTION_OF_GROUP: Record<string, string> = {
+  'Overview': 'overview', 'Discover & inventory': 'discover', 'Remote support': 'remote',
+  'Infrastructure': 'infrastructure', 'Secure & remediate': 'secure', 'Insight & admin': 'insight',
+};
+
+/** The navigation item and section a path belongs to (longest matching path wins). */
+export function navOfPath(path: string): { item: NavItem; section: string } | null {
+  let best: { item: NavItem; section: string } | null = null;
+  for (const [group, items] of NAV) {
+    for (const item of items) {
+      const hit = item.path === '/' ? path === '/' : path === item.path || path.startsWith(item.path + '/') || (item.id === 'reports' && path.startsWith('/reports'));
+      if (hit && (!best || item.path.length > best.item.path.length)) best = { item, section: SECTION_OF_GROUP[group] ?? '' };
+    }
+  }
+  return best;
+}

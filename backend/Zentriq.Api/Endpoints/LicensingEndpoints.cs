@@ -37,6 +37,7 @@ public static class LicensingEndpoints
             return Results.Ok(new
             {
                 mode = status.Mode.ToString(), status.Summary, status.ExpiresAt, status.DaysRemaining, status.FeaturesEnabled, status.Modules,
+                edition = status.Edition, sections = Zentriq.Domain.ProductSections.All.Select(x => new { id = x, title = Zentriq.Domain.ProductSections.Titles[x], installed = status.InstalledSections.Contains(x), enabled = status.SectionEnabled(x), standard = Zentriq.Domain.ProductSections.Standard.Contains(x) }),
                 limits = status.Limits, usage, installationId = state?.InstallationId,
                 trial = trial is null ? null : new { trial.StartedAt, trial.ExpiresAt },
                 license = active,

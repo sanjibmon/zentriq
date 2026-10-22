@@ -4,7 +4,7 @@
 // - Replaces the MeshCentral product name in the remaining pages technicians see with "Zentriq"; identifiers,
 //   file names and URLs are left alone, so the engine keeps working. Translations are removed (English only,
 //   so every page is the branded one).
-// - Uses the Zentriq icon as the browser tab icon.
+// - Uses the Zentriq icon as the browser tab icon, and Zentriq styles (public/styles/custom.css) on every page.
 // Licence and notice files are kept unchanged.
 'use strict';
 const fs = require('fs');
@@ -19,6 +19,15 @@ const src = __dirname;
 const views = path.join(app, 'meshcentral-web', 'views');
 fs.mkdirSync(views, { recursive: true });
 for (const f of fs.readdirSync(path.join(src, 'views'))) fs.copyFileSync(path.join(src, 'views', f), path.join(views, f));
+
+// 1b. Zentriq look for every page (styles/custom.css: colours, rounded controls, icons on the session toolbar).
+function copyDir(from, to) {
+  fs.mkdirSync(to, { recursive: true });
+  for (const e of fs.readdirSync(from, { withFileTypes: true })) {
+    if (e.isDirectory()) copyDir(path.join(from, e.name), path.join(to, e.name)); else fs.copyFileSync(path.join(from, e.name), path.join(to, e.name));
+  }
+}
+if (fs.existsSync(path.join(src, 'public'))) copyDir(path.join(src, 'public'), path.join(app, 'meshcentral-web', 'public'));
 
 // 2. English only.
 for (const d of [path.join(mc, 'views', 'translations'), path.join(mc, 'emails', 'translations')])

@@ -55,7 +55,7 @@ export function LicensingPage() {
             { label: 'State', value: <Pill tone={statusTone(d.mode)}>{fmt.label(d.mode)}</Pill> },
             { label: d.mode.startsWith('Trial') ? 'Trial ends' : 'Expires', value: fmt.day(d.expiresAt) },
             { label: 'Days remaining', value: d.daysRemaining ?? '—' },
-            { label: 'Modules', value: d.modules.includes('*') ? 'All' : d.modules.length },
+            { label: 'Edition', value: d.edition === 'trial' ? 'Trial (all sections)' : d.edition === 'advanced' ? 'Advanced' : d.edition === 'standard' ? 'Standard' : d.modules.includes('*') ? 'All modules' : 'Custom' },
           ]} />
           <div className="grid-2">
             <Panel title="Workload usage" sub="Active assets seen in the last 30 days" flush>
@@ -80,6 +80,16 @@ export function LicensingPage() {
                 {d.mode.startsWith('Trial') && <><dt>Trial edition</dt><dd>All modules, up to {d.limits.devices ?? 30} devices in total</dd></>}
               </dl>
             </Panel>
+            {d.sections && <Panel title="Sections" sub="What is installed on this server and what your trial or license covers" flush>
+              <DataTable rows={d.sections.map((x) => ({ ...x }))} columns={[
+                { key: 't', label: 'Section', render: (r) => <><b>{r.title}</b> <span className="faint" style={{ fontSize: 11.5 }}>{r.standard ? 'Standard' : 'Advanced'}</span></> },
+                { key: 'i', label: 'Installed', render: (r) => r.installed ? <Pill tone="ok">Installed</Pill> : <Pill>Not installed</Pill> },
+                { key: 'l', label: 'Available', render: (r) => !r.installed ? <span className="muted">—</span> : r.enabled ? <Pill tone="ok">Yes</Pill> : d.featuresEnabled ? <Pill tone="warn">Needs Advanced</Pill> : <Pill tone="crit">License required</Pill> },
+              ]} />
+              <div style={{ padding: '10px 14px' }} className="muted">
+                <small><b>Standard</b>: Overview, Discover &amp; inventory, Insight &amp; admin. <b>Advanced</b>: Standard plus Remote support, Infrastructure, Secure &amp; remediate. The trial includes every section. To add a section that is not installed, run Zentriq Setup on the server and choose <i>Update › Advanced installation</i>.</small>
+              </div>
+            </Panel>}
             {d.licensee && (
               <Panel title="Licensed to">
                 <dl className="dl2">

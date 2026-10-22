@@ -306,8 +306,8 @@ public static class NetworkStore
                    count(DISTINCT m.mac) FILTER (WHERE (get_byte(decode(left(replace(m.mac::text, ':', ''), 2), 'hex'), 0) & 2) = 0
                         AND left(m.mac::text, 8) <> ALL (@virt))::int AS real_macs,
                    (SELECT jsonb_agg(c) FROM (
-                        SELECT DISTINCT ON (a.id) jsonb_build_object('assetId', a.id, 'name', COALESCE(a.hostname, host(a.primary_ip)),
-                               'ip', COALESCE(host(a.primary_ip), (SELECT host(r.ip) FROM zentriq.network_arp r WHERE r.mac = m2.mac LIMIT 1)),
+                        SELECT DISTINCT ON (a.id) jsonb_build_object('assetId', a.id, 'name', COALESCE(a.hostname, zentriq.asset_ipv4(a.id), host(a.primary_ip)),
+                               'ip', COALESCE(zentriq.asset_ipv4(a.id), host(a.primary_ip), (SELECT host(r.ip) FROM zentriq.network_arp r WHERE r.mac = m2.mac LIMIT 1)),
                                'mac', m2.mac::text, 'type', COALESCE(a.device_type, a.category)) AS c
                           FROM zentriq.network_mac_table m2
                           JOIN zq_mac_owner o2 ON o2.mac = m2.mac AND o2.asset_id <> base.asset_id

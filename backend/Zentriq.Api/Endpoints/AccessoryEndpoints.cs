@@ -210,7 +210,7 @@ public static class AccessoryEndpoints
             var (p, size) = Paging.Normalize(page, pageSize);
             await using var cmd = ds.CreateCommand("""
                 SELECT m.id, m.occurred_at, m.kind, i.id, i.name, i.category, m.quantity, m.faulty_change, lo.name, lt.name, m.person, dp.name,
-                       m.asset_id, COALESCE(a.hostname, host(a.primary_ip)), m.condition, m.reason, m.reference, m.vendor, m.unit_cost, m.serials, m.note, m.by_name,
+                       m.asset_id, COALESCE(a.hostname, zentriq.asset_ipv4(a.id), host(a.primary_ip)), m.condition, m.reason, m.reference, m.vendor, m.unit_cost, m.serials, m.note, m.by_name,
                        count(*) OVER (), m.department_id, m.location_id
                   FROM zentriq.accessory_movements m
                   JOIN zentriq.accessory_items i ON i.id = m.item_id

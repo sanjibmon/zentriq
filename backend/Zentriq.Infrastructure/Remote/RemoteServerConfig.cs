@@ -166,7 +166,7 @@ public static class RemoteServerConfig
                 ["newAccounts"] = false,
                 ["showPasswordLogin"] = false,
                 ["nightMode"] = 2,
-                ["siteStyle"] = 2,
+                ["siteStyle"] = 3,   // the engine's modern interface (Bootstrap 5, Font Awesome icons), styled by Zentriq's custom.css
                 ["myServer"] = false,
                 ["novnc"] = false,
                 ["mstsc"] = false,
@@ -190,7 +190,7 @@ public static class RemoteServerConfig
                     ["productName"] = "Zentriq Remote Support",
                     ["internalName"] = "ZentriqRemoteSupport",
                     ["originalFilename"] = "ZentriqRemoteSupport.exe",
-                    ["legalCopyright"] = "Zentriq. Includes MeshCentral agent software, Apache License 2.0.",
+                    ["legalCopyright"] = "© Zentriq. Third-party notices: THIRD-PARTY-NOTICES.txt.",
                 },
                 ["consentMessages"] = new JsonObject
                 {

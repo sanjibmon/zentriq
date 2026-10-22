@@ -44,8 +44,8 @@ Zentriq has checked:
 3. If the connection fails although the address is public, the router may not support *NAT loopback* (connecting to its
    own public address from inside). Open the address from outside (for example a phone on mobile data); when it works,
    tick *I opened … from outside the network* and save. Private addresses can never be confirmed.
-4. **Check and use this address** saves it; the ZentriqRemote service applies it within a minute (MeshCentral
-   `agentAliasDNS` / `agentAliasPort`). Invitation links, install links and new agent installers then use it.
+4. **Check and use this address** saves it; the ZentriqRemote service applies it within a minute (the engine's
+   agent alias name and port). Invitation links, install links and new agent installers then use it.
 
 Router/firewall: forward TCP **8446** (or the public port you chose) to the server's port 8446 — only remote support is
 published, not the console or the agent port. For no browser warning outside, use a certificate from a public CA that
@@ -57,16 +57,29 @@ HTTP 409 (`internet-required`).
 
 ## Zentriq branding, Windows / macOS / Linux
 
-* The invitation page people open is Zentriq's own page (`installer/remote/views/agentinvite.handlebars`, installed as a
-  MeshCentral page override): Zentriq logo and wording, only **Windows** (x64 and ARM64), **macOS** and **Linux**
+* The invitation page people open is Zentriq's own page (`installer/remote/views/agentinvite.handlebars`, installed as an
+  engine page override): Zentriq logo and wording, only **Windows** (x64 and ARM64), **macOS** and **Linux**
   (x64, ARM64) — no Android, Assistant, BSD or other platforms. It picks the visitor's system automatically.
   - Quick support (run only): Windows downloads the app (*Connect*, nothing installed); macOS and Linux get a one-line
     Terminal command that runs the agent with `-connect` until it is stopped.
   - Install links: Windows installer, macOS package, Linux install script.
-* When the installer is built, `installer/remote/brand.js` replaces the MeshCentral product name with Zentriq in the
+* When the installer is built, `installer/remote/brand.js` replaces the engine's product name with Zentriq in the
   pages technicians see (identifiers, file names and licence texts are kept), removes the translated page copies (so
   every page is the branded English one) and uses the Zentriq icon. The Windows agent is branded through the engine
   configuration (name, service, icon, file information, consent texts).
+
+## Session window (build 79)
+
+Remote sessions open in the engine's modern interface, styled by Zentriq (`installer/remote/public/styles/custom.css`, installed as `meshcentral-web/public/styles/custom.css`):
+
+- **Header:** the Zentriq gradient header.
+- **Buttons:** rounded gradient buttons.
+- **Icons:** icons on every toolbar button (connect, disconnect, actions, settings, tools, send keys, clipboard, type text) and round icon buttons for screenshot, refresh, clipboard, input lock and share.
+- **Screen and toolbars:** frosted toolbars and a framed remote screen.
+- **Hidden:** RDP and hardware-KVM buttons, which Zentriq does not use.
+- **Dark mode:** follows the system.
+
+Settings › Advanced shows only status, address, service and permissions; engine details were removed.
 
 ## Install for unattended access
 
@@ -74,7 +87,7 @@ Settings › *Install for unattended access* offers three ways: through the Zent
 
 ## Engine
 
-Zentriq does not build its own remote-control stack. It bundles **MeshCentral 1.2.5** (open source, Apache-2.0, https://github.com/Ylianst/MeshCentral) and runs it on **Node.js 22** (MIT), with Zentriq branding. Both are downloaded and verified when the installer is built, so the server never downloads anything at run time:
+Zentriq Remote Support runs on a bundled open-source remote-control engine (Apache-2.0; attribution and licence in THIRD-PARTY-NOTICES.txt) on **Node.js 22** (MIT), fully branded as Zentriq. The engine's name does not appear in the console, the session window, the agents or the installer. Both are downloaded and verified when the installer is built, so the server never downloads anything at run time:
 
 - The Node.js zip is checked against the SHA-256 published by nodejs.org.
 - node.exe must carry a valid OpenJS Foundation signature.
@@ -153,7 +166,7 @@ To support devices outside the LAN, see *Internet access* above (and publish 844
 
 ## Antivirus
 
-The installer ships only the MeshCentral files Zentriq uses: the Windows, macOS and Linux agents and their core scripts (`installer/remote/agents-keep.txt`). Android agents, MeshCmd, MeshCentral Router and Satellite are left out. The installer is not code-signed yet; if Microsoft Defender or another product still blocks it, note the threat name and file from *Protection history* (`Get-MpThreatDetection`) — sign the build or submit the file as a false positive.
+The installer ships only the engine files Zentriq uses: the Windows, macOS and Linux agents and their core scripts (`installer/remote/agents-keep.txt`). Android agents, the command-line tool, router and satellite helpers are left out. The installer is not code-signed yet; if Microsoft Defender or another product still blocks it, note the threat name and file from *Protection history* (`Get-MpThreatDetection`) — sign the build or submit the file as a false positive.
 
 ## Troubleshooting
 
@@ -166,8 +179,8 @@ The installer ships only the MeshCentral files Zentriq uses: the Windows, macOS 
 
 ## Tests
 
-- **Unit tests:** sign-in cookie format (matches MeshCentral), server configuration, rights and consent flags, technician rights (terminal on/off), quick support codes and invitation text, internet address parsing and how it is applied to the engine.
-- **Live test (ci-quick, real MeshCentral):** the control channel, group, user and consent management, a signed-in session link (a forged link is refused), the agent installer and sync; a quick support session (own group, public run-only invitation page, Windows/Linux/macOS downloads, technician link, end removes the group and the link), the install link, invitation address with an internet name.
+- **Unit tests:** sign-in cookie format (matches the engine), server configuration, rights and consent flags, technician rights (terminal on/off), quick support codes and invitation text, internet address parsing and how it is applied to the engine.
+- **Live test (ci-quick, real engine):** the control channel, group, user and consent management, a signed-in session link (a forged link is refused), the agent installer and sync; a quick support session (own group, public run-only invitation page, Windows/Linux/macOS downloads, technician link, end removes the group and the link), the install link, invitation address with an internet name.
 - **Windows acceptance tests:**
   - **T59:** service and health; branded sign-in page and installer; the remote agent connects; a session link opens the signed-in device view.
   - **T60:** removing and reinstalling the remote agent through the Zentriq Agent from the console.
