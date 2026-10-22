@@ -250,6 +250,7 @@ namespace Zentriq.CustomActions
                 cad["Mode"] = mode;
                 cad["DataDir"] = (session["DATAFOLDER"] ?? "").TrimEnd('\\');
                 cad["PgInstaller"] = session["PGINSTALLER"] ?? "";
+                cad["Sections"] = (session["ZQ_SECTIONS"] ?? "").Trim();
                 if (!string.IsNullOrEmpty(answerFile)) cad["AnswerFile"] = answerFile;
                 else cad["Json"] = BuildAnswerJson(session, mode);
                 session["ZqProvision"] = cad.ToString();
@@ -264,6 +265,48 @@ namespace Zentriq.CustomActions
             }
         }
 
+        private const string BundleUpgradeCode = "{6F1919F9-1BBA-47F1-B7FE-A85266ABE7D6}";
+
+        /// <summary>
+        /// "Remove" chosen while an earlier Zentriq version is installed: starts that version's own uninstaller (its Setup
+        /// bundle, or its MSI) after this wizard closes. Data folder and database are kept, as with any uninstall.
+        /// </summary>
+        [CustomAction]
+        public static ActionResult RemoveExisting(Session session)
+        {
+            try
+            {
+                string cmd = null, cmdArgs = null;
+                foreach (var view in new[] { RegistryView.Registry64, RegistryView.Registry32 })
+                    using (var root = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, view).OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"))
+                    {
+                        if (root == null || cmd != null) continue;
+                        foreach (var name in root.GetSubKeyNames())
+                            using (var k = root.OpenSubKey(name))
+                            {
+                                var codes = k?.GetValue("BundleUpgradeCode");
+                                var list = codes as string[] ?? (codes is string one ? new[] { one } : new string[0]);
+                                if (!list.Any(c => string.Equals(c, BundleUpgradeCode, StringComparison.OrdinalIgnoreCase))) continue;
+                                var cache = k.GetValue("BundleCachePath") as string;
+                                if (!string.IsNullOrEmpty(cache) && File.Exists(cache)) { cmd = cache; cmdArgs = "/uninstall"; break; }
+                            }
+                    }
+                if (cmd == null)
+                {
+                    var product = (session["WIX_UPGRADE_DETECTED"] ?? "").Split(';').FirstOrDefault(x => x.Length > 0);
+                    if (string.IsNullOrEmpty(product)) { session.Log("No earlier Zentriq installation to remove."); return ActionResult.Success; }
+                    cmd = Path.Combine(Environment.SystemDirectory, "msiexec.exe");
+                    cmdArgs = "/x " + product;
+                }
+                session.Log("Starting removal of the installed Zentriq: \"" + cmd + "\" " + cmdArgs);
+                // Wait until this setup has closed (Windows Installer runs one installation at a time).
+                var script = "/c ping -n 9 127.0.0.1 >nul & start \"\" \"" + cmd + "\" " + cmdArgs;
+                Process.Start(new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "cmd.exe"), script) { UseShellExecute = false, CreateNoWindow = true });
+            }
+            catch (Exception ex) { session.Log("Could not start the removal: " + ex.Message); }
+            return ActionResult.Success;
+        }
+
         [CustomAction]
         public static ActionResult Provision(Session session)
         {
@@ -272,6 +315,7 @@ namespace Zentriq.CustomActions
             var args = new StringBuilder("provision --input - --mode ").Append(cad["Mode"]);
             if (!string.IsNullOrEmpty(cad["DataDir"])) args.Append(" --data-dir ").Append(Quote(cad["DataDir"]));
             if (!string.IsNullOrEmpty(cad["PgInstaller"])) args.Append(" --pg-installer ").Append(Quote(cad["PgInstaller"]));
+            if (cad.ContainsKey("Sections") && !string.IsNullOrEmpty(cad["Sections"])) args.Append(" --sections ").Append(Quote(cad["Sections"]));
 
             string stdin = cad.ContainsKey("AnswerFile") ? File.ReadAllText(cad["AnswerFile"]) : cad["Json"];
             var psi = new ProcessStartInfo(exe, args.ToString())

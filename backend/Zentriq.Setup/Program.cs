@@ -67,12 +67,14 @@ internal static class Cli
                     var src = TakeOption(args, "--input") ?? throw new SetupException("provision requires --input <file|->.");
                     var mode = TakeOption(args, "--mode");
                     var pgInstaller = TakeOption(args, "--pg-installer");
+                    var sections = TakeOption(args, "--sections");
                     var json = src == "-" ? await Console.In.ReadToEndAsync(ct) : await File.ReadAllTextAsync(src, ct);
                     var input = ProvisionInput.Parse(json);
                     json = ""; // do not keep the answer file (it may contain passwords) around longer than needed
                     if (mode is "install" or "repair" or "upgrade") input.Mode = mode;
                     else if (mode is not null) throw new SetupException($"Unknown mode '{mode}'.");
                     if (string.IsNullOrEmpty(input.Postgres.InstallerPath)) input.Postgres.InstallerPath = pgInstaller;
+                    if (!string.IsNullOrWhiteSpace(sections)) input.Sections = sections;
                     return await ProvisionAsync(input, paths, ct);
                 }
                 case "repair":

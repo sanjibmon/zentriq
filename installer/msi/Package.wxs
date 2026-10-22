@@ -58,6 +58,10 @@
     <Property Id="HTTPSHOSTNAME" Secure="yes">
       <RegistrySearch Id="RegHttpsHost" Root="HKLM" Key="SOFTWARE\Zentriq\Console" Name="HttpsHostName" Type="raw" Bitness="always64" />
     </Property>
+    <!-- Installed product sections (Standard / Advanced installation), kept for repair, update and upgrade. -->
+    <Property Id="ZQ_SECTIONS_REG" Secure="yes">
+      <RegistrySearch Id="RegSections" Root="HKLM" Key="SOFTWARE\Zentriq\Console" Name="Sections" Type="raw" Bitness="always64" />
+    </Property>
     <Property Id="FIREWALLSCOPE" Value="any" Secure="yes">
       <RegistrySearch Id="RegFwScope" Root="HKLM" Key="SOFTWARE\Zentriq\Console" Name="FirewallScope" Type="raw" Bitness="always64" />
     </Property>
@@ -83,10 +87,29 @@
     <Property Id="ZQ_FROM_BUNDLE" Secure="yes" />
     <Property Id="ZQ_URL" Secure="yes" />
     <Property Id="DESKTOPSHORTCUT" Value="1" Secure="yes" />
+    <!-- Sections: "overview,discover,insight" (Standard), "all", or Standard plus remote / infrastructure / secure.
+         Silent installs: ZQ_SECTIONS=standard|all|<list> (default Standard on a new server; kept on repair and upgrade). -->
+    <Property Id="ZQ_SECTIONS" Secure="yes" />
+    <Property Id="ZQ_INSTALLTYPE" Value="standard" Secure="yes" />
+    <Property Id="ZQ_SEC_REMOTE" Secure="yes" />
+    <Property Id="ZQ_SEC_INFRA" Secure="yes" />
+    <Property Id="ZQ_SEC_SECURE" Secure="yes" />
+    <Property Id="ZQ_MAINT" Secure="yes" />
 
     <SetProperty Id="INSTALLFOLDER" Value="[INSTALLFOLDER_REG]" After="AppSearch" Sequence="both" Condition="INSTALLFOLDER_REG" />
     <SetProperty Id="DATAFOLDER" Action="SetDataFolderFromExisting" Value="[ZQ_EXISTING]" After="AppSearch" Sequence="both" Condition="NOT DATAFOLDER AND ZQ_EXISTING" />
     <SetProperty Id="DATAFOLDER" Action="SetDataFolderDefault" Value="[CommonAppDataFolder]Zentriq" After="SetDataFolderFromExisting" Sequence="both" Condition="NOT DATAFOLDER" />
+    <SetProperty Id="ZQ_SECTIONS" Action="SetSectionsFromRegistry" Value="[ZQ_SECTIONS_REG]" After="AppSearch" Sequence="both" Condition="NOT ZQ_SECTIONS AND ZQ_SECTIONS_REG" />
+    <SetProperty Id="ZQ_SECTIONS" Action="SetSectionsExisting" Value="all" After="SetSectionsFromRegistry" Sequence="both" Condition="NOT ZQ_SECTIONS AND (ZQ_EXISTING OR WIX_UPGRADE_DETECTED OR Installed)" />
+    <SetProperty Id="ZQ_SECTIONS" Action="SetSectionsStandard" Value="overview,discover,insight" After="SetSectionsExisting" Sequence="both" Condition='NOT ZQ_SECTIONS OR ZQ_SECTIONS = "standard"' />
+    <SetProperty Id="ZQ_INSTALLTYPE" Action="SetInstallTypeAdvanced" Value="advanced" After="SetSectionsStandard" Sequence="first"
+                 Condition='ZQ_SECTIONS &lt;&gt; "overview,discover,insight"' />
+    <SetProperty Id="ZQ_SEC_REMOTE" Action="SetSecRemote" Value="1" After="SetInstallTypeAdvanced" Sequence="first"
+                 Condition='ZQ_SECTIONS = "all" OR ZQ_SECTIONS = "advanced" OR ZQ_SECTIONS &gt;&lt; "remote" OR NOT (ZQ_EXISTING OR WIX_UPGRADE_DETECTED OR Installed)' />
+    <SetProperty Id="ZQ_SEC_INFRA" Action="SetSecInfra" Value="1" After="SetSecRemote" Sequence="first"
+                 Condition='ZQ_SECTIONS = "all" OR ZQ_SECTIONS = "advanced" OR ZQ_SECTIONS &gt;&lt; "infrastructure" OR NOT (ZQ_EXISTING OR WIX_UPGRADE_DETECTED OR Installed)' />
+    <SetProperty Id="ZQ_SEC_SECURE" Action="SetSecSecure" Value="1" After="SetSecInfra" Sequence="first"
+                 Condition='ZQ_SECTIONS = "all" OR ZQ_SECTIONS = "advanced" OR ZQ_SECTIONS &gt;&lt; "secure" OR NOT (ZQ_EXISTING OR WIX_UPGRADE_DETECTED OR Installed)' />
     <SetProperty Id="PGINSTALLDIR" Value="[ProgramFiles64Folder]PostgreSQL\17" After="AppSearch" Sequence="both" Condition="NOT PGINSTALLDIR" />
     <SetProperty Id="PGDATADIR" Value="[CommonAppDataFolder]PostgreSQL\17\data" After="AppSearch" Sequence="both" Condition="NOT PGDATADIR" />
 
@@ -180,6 +203,7 @@
         <RegistryValue Name="HttpsHostName" Type="string" Value="[HTTPSHOSTNAME]" />
         <RegistryValue Name="FirewallScope" Type="string" Value="[FIREWALLSCOPE]" />
         <RegistryValue Name="Version" Type="string" Value="$(var.ProductVersion)" />
+        <RegistryValue Name="Sections" Type="string" Value="[ZQ_SECTIONS]" />
       </RegistryKey>
     </Component>
 
@@ -249,6 +273,7 @@
     <CustomAction Id="ZqValidateDatabase" BinaryRef="ZqCA" DllEntry="ValidateDatabase" Execute="immediate" Return="check" />
     <CustomAction Id="ZqValidateHttps" BinaryRef="ZqCA" DllEntry="ValidateHttps" Execute="immediate" Return="check" />
     <CustomAction Id="ZqValidateAdmin" BinaryRef="ZqCA" DllEntry="ValidateAdmin" Execute="immediate" Return="check" />
+    <CustomAction Id="ZqRemoveExisting" BinaryRef="ZqCA" DllEntry="RemoveExisting" Execute="immediate" Return="ignore" />
     <CustomAction Id="ZqOpenConsole" BinaryRef="ZqCA" DllEntry="OpenConsole" Execute="immediate" Return="ignore" />
     <CustomAction Id="ZqPrepareProvision" BinaryRef="ZqCA" DllEntry="PrepareProvision" Execute="immediate" Return="check" HideTarget="yes" />
     <CustomAction Id="ZqProvision" BinaryRef="ZqCA" DllEntry="Provision" Execute="deferred" Impersonate="no" Return="check" HideTarget="yes" />

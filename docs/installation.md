@@ -30,14 +30,45 @@ Run `Zentriq-Setup-x64.exe` as an administrator. The wizard:
 
 1. **Welcome** and **license agreement**.
 2. **System check** – OS, memory, disk, ports, PostgreSQL, existing Zentriq data. Items marked *FAIL* block setup; *WARN* items are advisory. *Re-check* after fixing.
-3. **Folders** – program files (default `C:\Program Files\Zentriq`) and the data folder (default `C:\ProgramData\Zentriq`), which contains `Config`, `Secrets`, `Logs`, `Packages`, `Exports` and `Backups`. Data is never stored with the program files.
-4. **PostgreSQL** – *Install PostgreSQL 17 on this server* (choose port and data folder; it can be on another volume, e.g. `D:\PostgreSQL\17\data`) or *Use an existing PostgreSQL server* (14–18; host, port, and a role with CREATEROLE/CREATEDB used once and not stored).
-5. **HTTPS and network access** – host name users will type, HTTPS port, certificate (self-signed, or an existing certificate in *Local Computer › Personal* by thumbprint) and the Windows Firewall rules (any network / local subnet / none) for the console port and the agent gateway (TCP 8444).
-6. **First administrator** – organization, name, sign-in e-mail and password (12+ characters, three character classes).
-7. **Ready** → **Progress**. Setup installs PostgreSQL, creates the database and least-privilege roles, applies migrations, issues/binds the certificate, starts the services, has the worker run a self-test job, creates the administrator, starts the 14-day trial and verifies the console over HTTPS.
-8. **Finish** – opens the console URL. A **Zentriq Web Console** shortcut (Zentriq icon) is created on the desktop (unless unticked on the Folders page) and in *Start › Zentriq*.
+3. **Installation type** (build 79):
+   - **Standard installation** (recommended): *Overview*, *Discover & inventory* and *Insight & admin*.
+   - **Advanced installation**: Standard plus the sections ticked on the next page: *Remote support*, *Infrastructure*, *Secure & remediate*.
 
-If existing Zentriq data is found (reinstall), pages 4–6 are skipped and the saved settings are reused. If Zentriq is already installed, Setup updates it in place instead (Welcome → Update Zentriq → Ready); see [upgrade.md](upgrade.md).
+   Sections that are not installed do not appear in the console. Their APIs answer "not installed", and the Remote Support service is disabled. See [Installation types and editions](#installation-types-and-editions).
+4. **Folders** – program files (default `C:\Program Files\Zentriq`) and the data folder (default `C:\ProgramData\Zentriq`), which contains `Config`, `Secrets`, `Logs`, `Packages`, `Exports` and `Backups`. Data is never stored with the program files.
+5. **PostgreSQL** – *Install PostgreSQL 17 on this server* (choose port and data folder; it can be on another volume, e.g. `D:\PostgreSQL\17\data`) or *Use an existing PostgreSQL server* (14–18; host, port, and a role with CREATEROLE/CREATEDB used once and not stored).
+6. **HTTPS and network access** – host name users will type, HTTPS port, certificate (self-signed, or an existing certificate in *Local Computer › Personal* by thumbprint) and the Windows Firewall rules (any network / local subnet / none) for the console port and the agent gateway (TCP 8444).
+7. **First administrator** – organization, name, sign-in e-mail and password (12+ characters, three character classes).
+8. **Ready** → **Progress**. Setup installs PostgreSQL, creates the database and least-privilege roles, applies migrations, issues/binds the certificate, starts the services, has the worker run a self-test job, creates the administrator, starts the 14-day trial and verifies the console over HTTPS.
+9. **Finish** – opens the console URL. A **Zentriq Web Console** shortcut (Zentriq icon) is created on the desktop (unless unticked on the Folders page) and in *Start › Zentriq*.
+
+If existing Zentriq data is found (reinstall), pages 5–7 are skipped and the saved settings are reused.
+
+**Zentriq already installed: Update, Repair, Remove.** Running Setup on a server where Zentriq is installed opens a choice page instead of a fresh installation:
+
+| | Same version installed | Earlier version installed |
+|---|---|---|
+| **Update** | Change the installation type or sections (Standard ↔ Advanced). | Update to the new version and review the sections. |
+| **Repair** | Reinstall program files, re-apply the configuration, restart the services; sections unchanged. | Update to the new version with the same sections. |
+| **Remove** | Uninstall the program and services. | Setup closes and starts the installed version's uninstaller. |
+
+In every case the data folder, the database, users, settings and enrolled agents are kept; see [upgrade.md](upgrade.md).
+
+## Installation types and editions
+
+| Section | Contents | Standard installation | Advanced installation | Licence edition |
+|---|---|---|---|---|
+| Overview | Dashboards | ✓ | ✓ | Standard |
+| Discover & inventory | Discovery, IT / non-IT assets, hardware, software, network, IT accessories, agents, activity | ✓ | ✓ | Standard |
+| Insight & admin | Reports, integrations; licensing, users, audit, settings | ✓ | ✓ | Standard |
+| Remote support | Remote desktop, files, terminal, quick support, unattended access | — | optional | Advanced |
+| Infrastructure | Cloud & infrastructure, asset lifecycle (as released) | — | optional | Advanced |
+| Secure & remediate | Vulnerabilities, security configuration, patch management, software deployment | — | optional | Advanced |
+
+- **What you can use** is what is **installed** and **licensed**. The 14-day trial licenses every section.
+- **Standard licence:** Advanced sections that are installed show a lock and an *Advanced* badge.
+- **Recorded choice:** the choice is kept in `HKLM\SOFTWARE\Zentriq\Console\Sections` and in the database (`product.sections`). Repair and version updates keep it.
+- **Existing servers:** servers installed before build 79 count as Advanced (all sections), so nothing disappears after updating.
 
 **Setup reports success only after every verification passes.** If a step fails you get the failed step, the reason, what to do and the log path; Windows Installer then removes the program files, while PostgreSQL, the database and the data folder are kept, so running setup again continues where it stopped. See [troubleshooting.md](troubleshooting.md).
 
@@ -60,8 +91,19 @@ Create an answer file (protect it – it contains the administrator password –
 ```
 
 ```powershell
-.\Zentriq-Setup-x64.exe /quiet /norestart /log C:\Temp\zentriq-setup.log ZQ_ANSWERFILE=C:\Temp\answers.json
+.\Zentriq-Setup-x64.exe /quiet /norestart /log C:\Temp\zentriq-setup.log ZQ_ANSWERFILE=C:\Temp\answers.json ZQ_SECTIONS=standard
 $LASTEXITCODE   # 0 = installed and verified, 3010 = reboot required (VC++ runtime), anything else = failed
+```
+
+`ZQ_SECTIONS` selects the installation type:
+- `standard` is the default on a new server.
+- `all` installs every section (Advanced).
+- A list adds chosen sections, for example `overview,discover,insight,remote,secure`. The standard sections are always included.
+
+To change the installation type later, without the wizard:
+
+```powershell
+msiexec /i <Zentriq product code> REINSTALL=ALL REINSTALLMODE=mus ZQ_SECTIONS=all /qn
 ```
 
 Existing PostgreSQL: `"postgres": { "mode": "existing", "host": "pg01", "port": 5432, "superUser": "zentriq_setup", "superPassword": "...", "sslMode": "Require" }`.
@@ -76,7 +118,7 @@ msiexec /i Zentriq.msi /qn /l*v C:\Temp\zentriq-msi.log ZQ_ANSWERFILE=C:\Temp\an
 Public MSI properties: `INSTALLFOLDER`, `DATAFOLDER`, `PGMODE` (bundled|existing), `PGHOST`, `PGPORT`, `PGSUPERUSER`,
 `PGSUPERPASSWORD`, `PGDATADIR`, `PGINSTALLDIR`, `HTTPSHOSTNAME`, `HTTPSPORT`, `CERTMODE` (selfsigned|existing),
 `CERTTHUMBPRINT`, `FIREWALLSCOPE` (any|localsubnet|none), `ADMINORG`, `ADMINNAME`, `ADMINEMAIL`, `ADMINPASSWORD`,
-`ZQ_ANSWERFILE`. Password properties are hidden from the MSI log; prefer the answer file so passwords do not appear on a command line.
+`ZQ_ANSWERFILE`, `ZQ_SECTIONS` (standard|all|list). Password properties are hidden from the MSI log; prefer the answer file so passwords do not appear on a command line.
 
 ## After installation
 

@@ -44,6 +44,7 @@ public sealed class Provisioner(ProvisionInput input, ZentriqPaths paths, Report
             ("Create database, roles and protected credentials", DatabaseAsync),
             ("Pre-upgrade backup", PreUpgradeBackupAsync),
             ("Apply database migrations", MigrateAsync),
+            ("Record the installed sections", SectionsAsync),
             ("Configure HTTPS certificate", HttpsAsync),
             ("Write configuration", ConfigAsync),
             ("Configure and start Zentriq services", ServicesAsync),
@@ -231,6 +232,35 @@ public sealed class Provisioner(ProvisionInput input, ZentriqPaths paths, Report
         log.Info(applied == 0 ? "Database schema already current." : $"Applied {applied} migration(s).");
     }
 
+    /// <summary>
+    /// Standard installation: Overview, Discover &amp; inventory, Insight &amp; admin. Advanced adds the chosen optional sections
+    /// (Remote support, Infrastructure, Secure &amp; remediate). The choice is stored for the console and licensing; Remote
+    /// support's service only runs when its section is installed.
+    /// </summary>
+    private IReadOnlyList<string> _sections = ProductSections.All;
+
+    private async Task SectionsAsync(CancellationToken ct)
+    {
+        await using var c = new NpgsqlConnection(OwnerConnection);
+        await c.OpenAsync(ct);
+        var requested = input.Sections?.Trim().ToLowerInvariant();
+        if (string.IsNullOrEmpty(requested))
+        {
+            await using var q = new NpgsqlCommand("SELECT value::text FROM zentriq.system_settings WHERE key = 'product.sections'", c);
+            _sections = ProductSections.Parse(await q.ExecuteScalarAsync(ct) as string);
+            log.Info($"Installed sections unchanged: {string.Join(", ", _sections)}.");
+            return;
+        }
+        _sections = requested == "standard" ? ProductSections.Standard : ProductSections.Parse(requested);
+        await using var cmd = new NpgsqlCommand("""
+            INSERT INTO zentriq.system_settings (key, value, updated_at) VALUES ('product.sections', @v::jsonb, now())
+            ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()
+            """, c);
+        cmd.Parameters.AddWithValue("v", JsonSerializer.Serialize(_sections));
+        await cmd.ExecuteNonQueryAsync(ct);
+        log.Info($"{(_sections.Count == ProductSections.All.Count ? "Advanced" : _sections.SequenceEqual(ProductSections.Standard) ? "Standard" : "Advanced (custom)")} installation: {string.Join(", ", _sections.Select(x => ProductSections.Titles[x]))}.");
+    }
+
     private Task HttpsAsync(CancellationToken ct)
     {
         var cm = new CertificateManager(log);
@@ -269,7 +299,7 @@ public sealed class Provisioner(ProvisionInput input, ZentriqPaths paths, Report
             }
         }
         catch (JsonException) { }
-        _options.Remote.Enabled = RemoteInstalled;
+        _options.Remote.Enabled = RemoteInstalled && _sections.Contains(ProductSections.Remote);
         var json = JsonSerializer.Serialize(new { Zentriq = _options }, new JsonSerializerOptions { WriteIndented = true });
         File.WriteAllText(paths.ConfigFile, json);
         log.Info($"Configuration written to {paths.ConfigFile} (no secrets).");
@@ -307,7 +337,17 @@ public sealed class Provisioner(ProvisionInput input, ZentriqPaths paths, Report
     /// </summary>
     private async Task RemoteAsync(CancellationToken ct)
     {
-        if (!_options.Remote.Enabled) { log.Info("Remote support is not part of this installation."); return; }
+        if (!_options.Remote.Enabled)
+        {
+            log.Info("Remote support is not part of this installation.");
+            if (WindowsHost.ServiceExists(RemoteService))
+            {
+                // Installed earlier and now deselected (or never selected): keep the files, stop and disable the service.
+                WindowsHost.StopAndWait(RemoteService, TimeSpan.FromMinutes(1));
+                await WindowsHost.DisableAsync(RemoteService, log);
+            }
+            return;
+        }
         try
         {
             var sid = WindowsHost.ServiceSid(RemoteService);

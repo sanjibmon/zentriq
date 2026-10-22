@@ -6,8 +6,13 @@
     8 Ready  9 Progress (zentriqctl: PostgreSQL, database, migrations, HTTPS, services, admin, trial, health)
    10 Finish (opens the console)
   Pages 5-7 are skipped when existing Zentriq data is found (repair/upgrade reuse the saved settings).
-  When an earlier Zentriq is installed (WIX_UPGRADE_DETECTED) the wizard is Welcome > Update > Ready: the existing
-  installation is updated in place (MajorUpgrade), not installed a second time.
+  Installation type (after the system check): Standard (Overview, Discover & inventory, Insight & admin) or Advanced
+  (Standard plus the chosen sections: Remote support, Infrastructure, Secure & remediate).
+  On a server where Zentriq is installed, Setup offers Update / Repair / Remove (ZqMaintenanceDlg):
+    same version:    Update = change the installed sections; Repair = reinstall and re-apply; Remove = uninstall
+    earlier version: Update = update and choose the sections; Repair = update keeping the sections;
+                     Remove = start the installed version's uninstaller
+  The existing installation is updated in place (MajorUpgrade), not installed a second time.
 -->
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
   <Fragment>
@@ -46,7 +51,7 @@
 
       <!-- Welcome / License -->
       <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="LicenseAgreementDlg" Condition="NOT Installed AND NOT WIX_UPGRADE_DETECTED" />
-      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="ZqUpgradeDlg" Condition="NOT Installed AND WIX_UPGRADE_DETECTED" />
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="ZqMaintenanceDlg" Condition="NOT Installed AND WIX_UPGRADE_DETECTED" />
       <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" Condition="Installed AND PATCH" />
 
       <Publish Dialog="LicenseAgreementDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" />
@@ -56,10 +61,10 @@
       <!-- Ready / maintenance -->
       <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="ZqAdminDlg" Order="1" Condition="NOT Installed AND NOT (WIX_UPGRADE_DETECTED AND ZQ_EXISTING)" />
       <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="ZqUpgradeDlg" Order="1" Condition="NOT Installed AND WIX_UPGRADE_DETECTED AND ZQ_EXISTING" />
-      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="MaintenanceTypeDlg" Order="2" Condition="Installed AND NOT PATCH" />
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="ZqMaintenanceDlg" Order="2" Condition="Installed AND NOT PATCH" />
       <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" Order="2" Condition="Installed AND PATCH" />
 
-      <Publish Dialog="MaintenanceWelcomeDlg" Control="Next" Event="NewDialog" Value="MaintenanceTypeDlg" />
+      <Publish Dialog="MaintenanceWelcomeDlg" Control="Next" Event="NewDialog" Value="ZqMaintenanceDlg" />
       <Publish Dialog="MaintenanceTypeDlg" Control="RepairButton" Event="NewDialog" Value="VerifyReadyDlg" />
       <Publish Dialog="MaintenanceTypeDlg" Control="RemoveButton" Event="NewDialog" Value="VerifyReadyDlg" />
       <Publish Dialog="MaintenanceTypeDlg" Control="Back" Event="NewDialog" Value="MaintenanceWelcomeDlg" />
@@ -77,6 +82,7 @@
         <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
         <Control Id="Intro" Type="Text" X="20" Y="56" Width="330" Height="28" NoPrefix="yes"
                  Text="Setup will update the existing installation to version [ProductVersion]. It is not installed a second time: the earlier program files are replaced and one Zentriq entry remains in Apps and Features." />
+        <Control Id="SectionsLine" Type="Text" X="20" Y="200" Width="330" Height="26" NoPrefix="yes" Text="[ZQ_SECTIONS_TEXT]" HideCondition="NOT (ZQ_SECTIONS_TEXT AND ZQ_EXISTING)" ShowCondition="ZQ_SECTIONS_TEXT AND ZQ_EXISTING" />
         <Control Id="Kept" Type="Text" X="20" Y="90" Width="330" Height="70" NoPrefix="yes"
                  Text="Kept as they are: the data folder, database and all inventory, users and passwords, MFA, settings, HTTPS certificate, licence or trial, scheduled scans, credentials and enrolled agents. The database is backed up before any schema update. Agents keep reporting; they do not need to be reinstalled." />
         <Control Id="Downtime" Type="Text" X="20" Y="164" Width="330" Height="28" NoPrefix="yes"
@@ -85,12 +91,180 @@
                  Text="The earlier setup did not finish configuring Zentriq, so the next pages ask for the remaining settings." />
         <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
         <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)">
-          <Publish Event="NewDialog" Value="WelcomeDlg" />
+          <Publish Event="NewDialog" Value="ZqMaintenanceDlg" />
         </Control>
         <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)">
           <Publish Event="DoAction" Value="ZqCheckPrerequisites" Order="1" />
           <Publish Event="NewDialog" Value="ZqPrereqDlg" Order="2" Condition='ZQ_PREREQ_BLOCK = "1" OR NOT ZQ_EXISTING' />
           <Publish Event="NewDialog" Value="VerifyReadyDlg" Order="3" Condition='ZQ_PREREQ_BLOCK &lt;&gt; "1" AND ZQ_EXISTING' />
+        </Control>
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
+          <Publish Event="SpawnDialog" Value="CancelDlg" />
+        </Control>
+      </Dialog>
+
+      <!-- ===== Existing installation: Update / Repair / Remove ======================== -->
+      <Dialog Id="ZqMaintenanceDlg" Width="370" Height="270" Title="[ProductName] Setup">
+        <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="WixUI_Bmp_Banner" />
+        <Control Id="Title" Type="Text" X="15" Y="6" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Text="{\WixUI_Font_Title}Zentriq is already installed" />
+        <Control Id="DescInstalled" Type="Text" X="25" Y="23" Width="300" Height="15" Transparent="yes" NoPrefix="yes" Text="Choose what to do with Zentriq [ProductVersion] on this server."
+                 HideCondition="NOT Installed" ShowCondition="Installed" />
+        <Control Id="DescUpgrade" Type="Text" X="25" Y="23" Width="300" Height="15" Transparent="yes" NoPrefix="yes" Text="An earlier version is installed. Setup can update it to [ProductVersion]."
+                 HideCondition="Installed" ShowCondition="NOT Installed" />
+        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+
+        <Control Id="UpdateButton" Type="PushButton" X="25" Y="60" Width="80" Height="22" Default="yes" Text="&amp;Update">
+          <Publish Property="ZQ_MAINT" Value="update" Order="1" />
+          <Publish Event="NewDialog" Value="ZqInstallTypeDlg" Order="2" />
+        </Control>
+        <Control Id="UpdateText" Type="Text" X="115" Y="58" Width="235" Height="30" NoPrefix="yes" HideCondition="NOT Installed" ShowCondition="Installed"
+                 Text="Change what is installed: Standard or Advanced installation and its sections. Data, settings and agents are kept." />
+        <Control Id="UpdateTextUpg" Type="Text" X="115" Y="58" Width="235" Height="30" NoPrefix="yes" HideCondition="Installed" ShowCondition="NOT Installed"
+                 Text="Update to version [ProductVersion] and review the installed sections (Standard or Advanced). Data, settings and agents are kept." />
+
+        <Control Id="RepairButton" Type="PushButton" X="25" Y="108" Width="80" Height="22" Text="&amp;Repair">
+          <Publish Property="ZQ_MAINT" Value="repair" Order="1" />
+          <Publish Property="WixUI_InstallMode" Value="Repair" Order="2" Condition="Installed" />
+          <Publish Event="ReinstallMode" Value="ecmus" Order="3" Condition="Installed" />
+          <Publish Event="Reinstall" Value="All" Order="4" Condition="Installed" />
+          <Publish Event="NewDialog" Value="VerifyReadyDlg" Order="5" Condition="Installed" />
+          <Publish Event="NewDialog" Value="ZqUpgradeDlg" Order="6" Condition="NOT Installed" />
+        </Control>
+        <Control Id="RepairText" Type="Text" X="115" Y="106" Width="235" Height="30" NoPrefix="yes" HideCondition="NOT Installed" ShowCondition="Installed"
+                 Text="Reinstall the program files, re-apply the configuration and restart the services. Sections stay as they are." />
+        <Control Id="RepairTextUpg" Type="Text" X="115" Y="106" Width="235" Height="30" NoPrefix="yes" HideCondition="Installed" ShowCondition="NOT Installed"
+                 Text="Update to version [ProductVersion] with the same sections, replacing every program file and re-applying the configuration." />
+
+        <Control Id="RemoveButton" Type="PushButton" X="25" Y="156" Width="80" Height="22" Text="Re&amp;move">
+          <Publish Property="ZQ_MAINT" Value="remove" Order="1" />
+          <Publish Property="WixUI_InstallMode" Value="Remove" Order="2" Condition="Installed" />
+          <Publish Event="Remove" Value="All" Order="3" Condition="Installed" />
+          <Publish Event="NewDialog" Value="VerifyReadyDlg" Order="4" Condition="Installed" />
+          <Publish Event="SpawnDialog" Value="ZqRemoveExistingDlg" Order="5" Condition="NOT Installed" />
+        </Control>
+        <Control Id="RemoveText" Type="Text" X="115" Y="154" Width="235" Height="40" NoPrefix="yes"
+                 Text="Remove the Zentriq program and services from this server. The data folder and the PostgreSQL database are kept, so a later installation finds everything again." />
+
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)">
+          <Publish Event="NewDialog" Value="MaintenanceWelcomeDlg" Condition="Installed" />
+          <Publish Event="NewDialog" Value="WelcomeDlg" Condition="NOT Installed" />
+        </Control>
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Disabled="yes" Text="!(loc.WixUINext)" />
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
+          <Publish Event="SpawnDialog" Value="CancelDlg" />
+        </Control>
+      </Dialog>
+
+      <!-- Remove an earlier version: its own uninstaller runs after this wizard closes. -->
+      <Dialog Id="ZqRemoveExistingDlg" Width="270" Height="120" Title="[ProductName] Setup">
+        <Control Id="Icon" Type="Icon" X="15" Y="15" Width="24" Height="24" FixedSize="yes" IconSize="32" Text="WixUI_Ico_Exclam" />
+        <Control Id="Text" Type="Text" X="50" Y="15" Width="205" Height="62" NoPrefix="yes"
+                 Text="Setup will close and start the uninstaller of the installed Zentriq version. The data folder and the database are kept. Continue?" />
+        <Control Id="Yes" Type="PushButton" X="136" Y="90" Width="56" Height="17" Default="yes" Text="!(loc.WixUIYes)">
+          <Publish Event="DoAction" Value="ZqRemoveExisting" Order="1" />
+          <Publish Event="EndDialog" Value="Exit" Order="2" />
+        </Control>
+        <Control Id="No" Type="PushButton" X="198" Y="90" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUINo)">
+          <Publish Event="EndDialog" Value="Return" />
+        </Control>
+      </Dialog>
+
+      <!-- ===== Installation type: Standard / Advanced ================================== -->
+      <Dialog Id="ZqInstallTypeDlg" Width="370" Height="270" Title="[ProductName] Setup">
+        <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="WixUI_Bmp_Banner" />
+        <Control Id="Title" Type="Text" X="15" Y="6" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Text="{\WixUI_Font_Title}Installation type" />
+        <Control Id="Description" Type="Text" X="25" Y="23" Width="300" Height="15" Transparent="yes" NoPrefix="yes" Text="Choose which parts of Zentriq to install on this server." />
+        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+        <Control Id="Type" Type="RadioButtonGroup" X="20" Y="54" Width="330" Height="130" Property="ZQ_INSTALLTYPE">
+          <RadioButtonGroup Property="ZQ_INSTALLTYPE">
+            <RadioButton Value="standard" X="0" Y="0" Width="330" Height="15" Text="{\WixUI_Font_Title}&amp;Standard installation (recommended)" />
+            <RadioButton Value="advanced" X="0" Y="66" Width="330" Height="15" Text="{\WixUI_Font_Title}&amp;Advanced installation" />
+          </RadioButtonGroup>
+        </Control>
+        <Control Id="StandardText" Type="Text" X="36" Y="71" Width="314" Height="44" NoPrefix="yes"
+                 Text="Overview (dashboards), Discover &amp; inventory (discovery, IT and non-IT assets, hardware, software, network, accessories, agents) and Insight &amp; admin (reports, integrations, licensing, users, audit, settings). Covered by the Standard and Advanced editions." />
+        <Control Id="AdvancedText" Type="Text" X="36" Y="137" Width="314" Height="44" NoPrefix="yes"
+                 Text="Everything in Standard, plus the sections you choose on the next page: Remote support, Infrastructure, and Secure &amp; remediate. These need the Advanced edition; the 14-day trial includes them." />
+        <Control Id="Note" Type="Text" X="20" Y="200" Width="330" Height="26" NoPrefix="yes"
+                 Text="You can change this later: run Setup again and choose Update. Data and settings are always kept." />
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)">
+          <Publish Event="NewDialog" Value="ZqPrereqDlg" Condition="NOT Installed AND NOT WIX_UPGRADE_DETECTED" />
+          <Publish Event="NewDialog" Value="ZqMaintenanceDlg" Condition="Installed OR WIX_UPGRADE_DETECTED" />
+        </Control>
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)">
+          <Publish Property="ZQ_SECTIONS" Value="overview,discover,insight" Order="1" Condition='ZQ_INSTALLTYPE = "standard"' />
+          <Publish Property="ZQ_SECTIONS_TEXT" Value="Standard installation: Overview, Discover &amp; inventory, Insight &amp; admin" Order="2" Condition='ZQ_INSTALLTYPE = "standard"' />
+          <Publish Event="NewDialog" Value="ZqSectionsDlg" Order="3" Condition='ZQ_INSTALLTYPE = "advanced"' />
+          <Publish Event="NewDialog" Value="ZqFoldersDlg" Order="4" Condition='ZQ_INSTALLTYPE = "standard" AND NOT Installed AND NOT WIX_UPGRADE_DETECTED' />
+          <Publish Event="NewDialog" Value="ZqUpgradeDlg" Order="5" Condition='ZQ_INSTALLTYPE = "standard" AND NOT Installed AND WIX_UPGRADE_DETECTED' />
+          <Publish Event="NewDialog" Value="ZqUpdateReadyDlg" Order="6" Condition='ZQ_INSTALLTYPE = "standard" AND Installed' />
+        </Control>
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
+          <Publish Event="SpawnDialog" Value="CancelDlg" />
+        </Control>
+      </Dialog>
+
+      <!-- ===== Advanced: choose the sections =========================================== -->
+      <Dialog Id="ZqSectionsDlg" Width="370" Height="270" Title="[ProductName] Setup">
+        <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="WixUI_Bmp_Banner" />
+        <Control Id="Title" Type="Text" X="15" Y="6" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Text="{\WixUI_Font_Title}Advanced installation" />
+        <Control Id="Description" Type="Text" X="25" Y="23" Width="300" Height="15" Transparent="yes" NoPrefix="yes" Text="Standard sections are always installed. Choose the additional sections." />
+        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+        <Control Id="StdHead" Type="Text" X="20" Y="52" Width="330" Height="12" NoPrefix="yes" Text="{\WixUI_Font_Title}Always installed (Standard)" />
+        <Control Id="StdList" Type="Text" X="30" Y="66" Width="320" Height="24" NoPrefix="yes"
+                 Text="Overview  ·  Discover &amp; inventory  ·  Insight &amp; admin" />
+        <Control Id="OptHead" Type="Text" X="20" Y="88" Width="330" Height="12" NoPrefix="yes" Text="{\WixUI_Font_Title}Additional sections (Advanced edition)" />
+        <Control Id="Remote" Type="CheckBox" X="30" Y="104" Width="320" Height="14" Property="ZQ_SEC_REMOTE" CheckBoxValue="1" Text="&amp;Remote support" />
+        <Control Id="RemoteText" Type="Text" X="44" Y="118" Width="306" Height="20" NoPrefix="yes"
+                 Text="Remote desktop, files and terminal, quick support sessions and unattended access (port 8446)." />
+        <Control Id="Infra" Type="CheckBox" X="30" Y="140" Width="320" Height="14" Property="ZQ_SEC_INFRA" CheckBoxValue="1" Text="&amp;Infrastructure" />
+        <Control Id="InfraText" Type="Text" X="44" Y="154" Width="306" Height="20" NoPrefix="yes"
+                 Text="Cloud &amp; infrastructure and asset lifecycle (added as they are released)." />
+        <Control Id="Secure" Type="CheckBox" X="30" Y="176" Width="320" Height="14" Property="ZQ_SEC_SECURE" CheckBoxValue="1" Text="&amp;Secure &amp;&amp; remediate" />
+        <Control Id="SecureText" Type="Text" X="44" Y="190" Width="306" Height="30" NoPrefix="yes"
+                 Text="Vulnerability management, security configuration, patch management and software deployment." />
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)">
+          <Publish Event="NewDialog" Value="ZqInstallTypeDlg" />
+        </Control>
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)">
+          <Publish Property="ZQ_SECTIONS" Value="overview,discover,insight" Order="1" />
+          <Publish Property="ZQ_SECTIONS_TEXT" Value="Advanced installation: Overview, Discover &amp; inventory, Insight &amp; admin" Order="2" />
+          <Publish Property="ZQ_SECTIONS" Value="[ZQ_SECTIONS],remote" Order="3" Condition="ZQ_SEC_REMOTE" />
+          <Publish Property="ZQ_SECTIONS_TEXT" Value="[ZQ_SECTIONS_TEXT], Remote support" Order="4" Condition="ZQ_SEC_REMOTE" />
+          <Publish Property="ZQ_SECTIONS" Value="[ZQ_SECTIONS],infrastructure" Order="5" Condition="ZQ_SEC_INFRA" />
+          <Publish Property="ZQ_SECTIONS_TEXT" Value="[ZQ_SECTIONS_TEXT], Infrastructure" Order="6" Condition="ZQ_SEC_INFRA" />
+          <Publish Property="ZQ_SECTIONS" Value="[ZQ_SECTIONS],secure" Order="7" Condition="ZQ_SEC_SECURE" />
+          <Publish Property="ZQ_SECTIONS_TEXT" Value="[ZQ_SECTIONS_TEXT], Secure &amp; remediate" Order="8" Condition="ZQ_SEC_SECURE" />
+          <Publish Event="NewDialog" Value="ZqFoldersDlg" Order="9" Condition="NOT Installed AND NOT WIX_UPGRADE_DETECTED" />
+          <Publish Event="NewDialog" Value="ZqUpgradeDlg" Order="10" Condition="NOT Installed AND WIX_UPGRADE_DETECTED" />
+          <Publish Event="NewDialog" Value="ZqUpdateReadyDlg" Order="11" Condition="Installed" />
+        </Control>
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
+          <Publish Event="SpawnDialog" Value="CancelDlg" />
+        </Control>
+      </Dialog>
+
+      <!-- ===== Same version installed: confirm the change of sections ===================== -->
+      <Dialog Id="ZqUpdateReadyDlg" Width="370" Height="270" Title="[ProductName] Setup">
+        <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="WixUI_Bmp_Banner" />
+        <Control Id="Title" Type="Text" X="15" Y="6" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Text="{\WixUI_Font_Title}Ready to update Zentriq" />
+        <Control Id="Description" Type="Text" X="25" Y="23" Width="300" Height="15" Transparent="yes" NoPrefix="yes" Text="Setup will apply the installation type below." />
+        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+        <Control Id="Sections" Type="Text" X="20" Y="58" Width="330" Height="40" NoPrefix="yes" Text="[ZQ_SECTIONS_TEXT]" />
+        <Control Id="What" Type="Text" X="20" Y="104" Width="330" Height="60" NoPrefix="yes"
+                 Text="The program files are refreshed, the configuration is re-applied and the services restart (about a minute). Sections you removed are hidden in the console and their services are stopped; their data is kept and comes back if you add the section again." />
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)">
+          <Publish Event="NewDialog" Value="ZqInstallTypeDlg" />
+        </Control>
+        <Control Id="Update" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" ElevationShield="yes" Text="&amp;Update">
+          <Publish Property="WixUI_InstallMode" Value="Repair" Order="1" />
+          <Publish Event="ReinstallMode" Value="ecmus" Order="2" />
+          <Publish Event="Reinstall" Value="All" Order="3" />
+          <Publish Event="EndDialog" Value="Return" Order="4" />
         </Control>
         <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
           <Publish Event="SpawnDialog" Value="CancelDlg" />
@@ -117,7 +291,8 @@
         </Control>
         <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)"
                  DisableCondition='ZQ_PREREQ_BLOCK = "1"' EnableCondition='ZQ_PREREQ_BLOCK &lt;&gt; "1"'>
-          <Publish Event="NewDialog" Value="ZqFoldersDlg" />
+          <Publish Event="NewDialog" Value="ZqInstallTypeDlg" Condition="NOT WIX_UPGRADE_DETECTED" />
+          <Publish Event="NewDialog" Value="ZqFoldersDlg" Condition="WIX_UPGRADE_DETECTED" />
         </Control>
         <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
           <Publish Event="SpawnDialog" Value="CancelDlg" />
@@ -147,7 +322,9 @@
                  Text="Create a Zentriq Web Console shortcut on the desktop" />
         <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
         <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)">
-          <Publish Event="NewDialog" Value="ZqPrereqDlg" />
+          <Publish Event="NewDialog" Value="ZqPrereqDlg" Condition="WIX_UPGRADE_DETECTED" />
+          <Publish Event="NewDialog" Value="ZqInstallTypeDlg" Condition='NOT WIX_UPGRADE_DETECTED AND ZQ_INSTALLTYPE = "standard"' />
+          <Publish Event="NewDialog" Value="ZqSectionsDlg" Condition='NOT WIX_UPGRADE_DETECTED AND ZQ_INSTALLTYPE = "advanced"' />
         </Control>
         <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)">
           <Publish Event="SetTargetPath" Value="[WIXUI_INSTALLDIR]" Order="1" />

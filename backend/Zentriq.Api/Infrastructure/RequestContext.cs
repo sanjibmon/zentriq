@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Zentriq.Domain;
 using Zentriq.Application.Licensing;
 using Zentriq.Infrastructure.Audit;
 using Zentriq.Infrastructure.Licensing;
@@ -33,8 +34,12 @@ public sealed class RequireModuleFilter(string module) : IEndpointFilter
         if (!status.ModuleEnabled(module))
         {
             await rc.AuditAsync("license.blocked", ctx.HttpContext.Request.Path, "Denied", new { module, mode = status.Mode.ToString() });
+            var section = ProductSections.SectionOf(module);
+            var notInstalled = section is not null && !status.InstalledSections.Contains(section);
             return Results.Problem(statusCode: StatusCodes.Status403Forbidden,
-                title: "This feature is not available under the current license.",
+                title: notInstalled
+                    ? $"{ProductSections.Titles[section!]} is not installed on this server. Run Zentriq Setup and choose Update to add it."
+                    : "This feature is not available under the current license.",
                 detail: status.Summary,
                 type: "https://zentriq.local/problems/license-required",
                 extensions: new Dictionary<string, object?> { ["licenseMode"] = status.Mode.ToString(), ["module"] = module });

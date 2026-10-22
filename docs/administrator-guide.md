@@ -73,6 +73,17 @@ scan must be cancelled first.
   management or destabilise Windows (ZentriqAgent, WinRM, RPC, WMI, LSM, firewall/BFE, Event Log …) cannot be
   stopped from the console.
 
+## Table columns
+
+Each inventory table (IT Asset, Non-IT, Hardware, Software, Network, IT Accessories) has a **Columns** button.
+
+- **Show and hide:** tick a column to show it; ticking an optional column adds it.
+- **Rearrange (build 79):** drag a column in the list, or use the ↑ ↓ arrows. The selection column stays first and the actions column stays last.
+- **Remembered:** the choice is kept per table in your browser.
+- **Reset:** restores the default columns and order.
+
+Report columns are ordered in the report builder.
+
 ## Dashboard
 
 *Customize* (top right) shows, hides and reorders the charts and makes any of them wide; the layout is saved per user

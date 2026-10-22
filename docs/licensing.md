@@ -15,6 +15,23 @@
 * Expiry is enforced by the API: module endpoints (inventory, discovery, dashboards, ...) refuse requests when the trial or license does not cover them, not only hidden in the UI. Expiry never deletes
   data and never blocks sign-in, viewing existing data, backup, restore, export of an activation request, or license import.
 
+## Editions: Standard and Advanced (build 79)
+
+Commercial licences are sold in two editions. The licence names its edition, `"edition": "standard"` or `"advanced"`, and the edition decides the modules:
+
+| Edition | Sections | Modules |
+|---|---|---|
+| **Standard** | Overview, Discover & inventory, Insight & admin | dashboards, inventory, discovery, reports, integrations |
+| **Advanced** | Standard + Remote support, Infrastructure, Secure & remediate | all modules |
+
+- **Trial:** every section, limited to 30 devices.
+- **Extra modules:** a licence can list modules besides its edition, for example a Standard licence with `remote`. Those modules are added.
+- **Older licences:** licences without an edition keep their module list.
+- **Installed sections:** what the server installed (Standard or Advanced installation) further limits the available sections; see [installation.md](installation.md#installation-types-and-editions).
+- **Locked sections:** sections an installed licence does not cover show a lock and an *Advanced* badge in the navigation. Their APIs answer 403 with a clear reason.
+- **Licensing page:** shows the edition and, per section, whether it is installed and available.
+- **Issuing licences:** the signing tool takes `--edition standard|advanced`. The licence server is a later project; until then, licences are issued offline as described below.
+
 ## What is billable
 
 An asset counts against a workload when it is `active`, not merged into another asset, and was seen by discovery
@@ -61,7 +78,7 @@ snapshots (`license.usage_snapshot` job) are kept for reconciliation and shown u
   "payload": "<base64 UTF-8 JSON>", "signature": "<base64 ECDSA P-256/SHA-256, IEEE P1363>" }
 ```
 The payload holds `schemaVersion, licenseId, customer, installationId, issuedAt, notBefore, expiresAt, graceDays,
-modules, entitlements, requestId` and, in schema 2, `licensee { company, contactName, contactEmail, contactPhone,
+modules, entitlements, requestId`, optionally `edition` (standard | advanced) and, in schema 2, `licensee { company, contactName, contactEmail, contactPhone,
 address, country, taxId }`. Zentriq verifies the signature over the exact payload bytes **before** reading any
 field, then checks: known and non-revoked key ID, supported schema version, installation binding, validity window
 and grace, known modules and workloads, value ranges. Malformed, tampered, expired, wrongly bound, unknown-key and

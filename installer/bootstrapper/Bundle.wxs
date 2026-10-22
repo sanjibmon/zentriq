@@ -10,7 +10,7 @@
 
   The internal-UI bootstrapper installs the prerequisite first and then hands over to the MSI wizard, so
   there is one license page and one set of questions. Silent install:
-     Zentriq-Setup-x64.exe /quiet /norestart /log setup.log ZQ_ANSWERFILE=C:\path\answers.json
+     Zentriq-Setup-x64.exe /quiet /norestart /log setup.log ZQ_ANSWERFILE=C:\path\answers.json [ZQ_SECTIONS=all]
 -->
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
      xmlns:bal="http://wixtoolset.org/schemas/v4/wxs/bal"
@@ -38,6 +38,8 @@
                    Condition="VersionNT64" />
 
     <Variable Name="ZQ_ANSWERFILE" Value="" bal:Overridable="yes" />
+    <!-- Sections for silent installs: standard (default on a new server), all, or e.g. overview,discover,insight,remote. -->
+    <Variable Name="ZQ_SECTIONS" Value="" bal:Overridable="yes" />
 
     <util:RegistrySearch Id="VcRuntimeInstalledSearch" Variable="VcRuntimeInstalled" Result="value"
                          Root="HKLM" Key="SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64" Value="Installed" Bitness="always64" />
@@ -59,6 +61,7 @@
       <MsiPackage Id="ZentriqMsi" SourceFile="$(var.MsiPath)" Vital="yes">
         <MsiProperty Name="ZQ_FROM_BUNDLE" Value="1" />
         <MsiProperty Name="ZQ_ANSWERFILE" Value="[ZQ_ANSWERFILE]" />
+        <MsiProperty Name="ZQ_SECTIONS" Value="[ZQ_SECTIONS]" />
         <Payload Id="PostgresInstaller" SourceFile="$(var.PrereqDir)\$(var.PgInstallerName)" Name="prereqs\$(var.PgInstallerName)" />
       </MsiPackage>
     </Chain>

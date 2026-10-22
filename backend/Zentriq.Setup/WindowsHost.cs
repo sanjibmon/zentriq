@@ -100,6 +100,9 @@ public static class WindowsHost
         await Sc(log, "sidtype", service, "unrestricted");
     }
 
+    /// <summary>Sets a service to Disabled (it stays registered; ConfigureRecoveryAsync turns it back on).</summary>
+    public static Task DisableAsync(string service, Reporter log) => Sc(log, "config", service, "start=", "disabled");
+
     private static async Task Sc(Reporter log, params string[] args)
     {
         var r = await RunAsync(SystemExe("sc.exe"), args, TimeSpan.FromSeconds(30));

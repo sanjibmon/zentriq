@@ -63,6 +63,10 @@ There are 22 built-in reports, and they are read-only. They include *Vulnerabili
 
 Data sources with their own permission (vulnerability findings: `vuln.view`; audit trail: `audit.view`) are checked on every path: the data-source list, preview, export, saving, sending, downloading a run file, and scheduled delivery. A scheduled report runs only while its owner still has that permission.
 
+### IP addresses in reports (build 79)
+
+Every report shows the **IPv4** address by default: the device's primary address when it is IPv4, otherwise the first usable IPv4 address of its adapters (adapters with a gateway first). Devices with no IPv4 address show their IPv6 address. Device datasets also offer an optional **IPv6 address** column. Device names fall back to the IPv4 address when a device has no host name. The same rule applies to Hardware, Software and Network Inventory, security and vulnerability lists, and event notifications.
+
 ## Vulnerability Management
 
 **Console:** Secure & remediate › Vulnerability Management (`/vulnerabilities`), plus a **Vulnerabilities** tab on each device.

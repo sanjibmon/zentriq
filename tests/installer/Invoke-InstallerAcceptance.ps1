@@ -114,12 +114,12 @@ New-Item -ItemType Directory -Force -Path 'C:\ZentriqTestData\postgresql' | Out-
 Set-Content 'C:\ZentriqTestData\postgresql\PG_VERSION' '17' -Encoding ascii
 
 # ---- T01 install -------------------------------------------------------------------------------
-$installed = Check 'T01' 'First-time installation (silent, answer file)' { $sw = [Diagnostics.Stopwatch]::StartNew(); $r = Run-Setup $Bundle @("ZQ_ANSWERFILE=`"$answer`"") 'install'; "$r in $([int]$sw.Elapsed.TotalMinutes) min" }
+$installed = Check 'T01' 'First-time installation (silent, answer file)' { $sw = [Diagnostics.Stopwatch]::StartNew(); $r = Run-Setup $Bundle @("ZQ_ANSWERFILE=`"$answer`"", 'ZQ_SECTIONS=all') 'install'; "$r in $([int]$sw.Elapsed.TotalMinutes) min" }
 Remove-Item $answer -Force   # contains the administrator password
 
 if (-not $installed) {
     foreach ($t in 'T02 PostgreSQL provisioning', 'T03 Database migration', 'T04 Administrator sign-in', 'T05 API and worker services', 'T06 Trial initialization',
-                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection', 'T68 Live agent connection', 'T69 Locations and IT accessories', 'T70 Manual hardware details') {
+                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection', 'T68 Live agent connection', 'T69 Locations and IT accessories', 'T70 Manual hardware details', 'T71 Standard and Advanced installation') {
         Record $t.Substring(0, 3) $t.Substring(4) 'BLOCKED' 'installation failed'
     }
 } else {
@@ -1594,6 +1594,46 @@ if (-not $installed) {
         $a = Api GET "/assets/$id" -Session $s
         Assert (-not $a.manualSerial -and -not $a.manualModel -and -not $a.manualManufacturer) 'entered values not removed'
         "saved and linked to $($r.identities) identit(y/ies); $hwNote; 201 characters refused; removed"
+    } | Out-Null
+
+    Check 'T71' 'Installation type: Advanced recorded, change to Standard (Remote support off, section locked) and back with Setup Update' {
+        $s = Login
+        $st = Api GET '/licensing/status' -Session $s
+        Assert ($st.edition -eq 'trial') "edition: $($st.edition)"
+        $secs = @($st.sections)
+        Assert ($secs.Count -eq 6 -and @($secs | Where-Object { -not $_.installed -or -not $_.enabled }).Count -eq 0) "trial on Advanced installation: $($secs | ConvertTo-Json -Compress)"
+        Assert ((Get-ItemProperty 'HKLM:\SOFTWARE\Zentriq\Console').Sections -eq 'all') "registry Sections: $((Get-ItemProperty 'HKLM:\SOFTWARE\Zentriq\Console').Sections)"
+        $code = (Get-ChildItem 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall' | Get-ItemProperty |
+                 Where-Object { $_.PSObject.Properties['DisplayName'] -and $_.DisplayName -eq 'Zentriq' -and $_.PSObject.Properties['WindowsInstaller'] -and $_.WindowsInstaller -eq 1 } | Select-Object -First 1).PSChildName
+        Assert $code 'Zentriq MSI product code not found'
+        function Update-Sections([string] $Sections, [string] $Name) {
+            $log = Join-Path $OutDir "$Name.log"
+            $p = Start-Process msiexec.exe -ArgumentList '/i', $code, 'REINSTALL=ALL', 'REINSTALLMODE=mus', "ZQ_SECTIONS=$Sections", '/qn', '/norestart', '/l*v', "`"$log`"" -Wait -PassThru
+            if ($p.ExitCode -notin 0, 3010) { throw "Update to $Sections exited with $($p.ExitCode); see $log" }
+            Wait-Ready | Out-Null
+        }
+        Update-Sections 'standard' 'update-standard'
+        $s = Login
+        $st = Api GET '/licensing/status' -Session $s
+        $remote = @($st.sections) | Where-Object id -eq 'remote'
+        $secure = @($st.sections) | Where-Object id -eq 'secure'
+        Assert (-not $remote.installed -and -not $secure.installed) "after Standard: $($st.sections | ConvertTo-Json -Compress)"
+        $blocked = Invoke-WebRequest "$base/api/v1/vulnerabilities/overview" -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } -SkipHttpErrorCheck
+        Assert ([int]$blocked.StatusCode -eq 403) "vulnerabilities API on a Standard installation: $([int]$blocked.StatusCode)"
+        $svc = Get-CimInstance Win32_Service -Filter "Name='ZentriqRemote'"
+        Assert ($svc.StartMode -eq 'Disabled' -and $svc.State -ne 'Running') "ZentriqRemote on Standard: $($svc.StartMode) / $($svc.State)"
+        Assert ((Get-ItemProperty 'HKLM:\SOFTWARE\Zentriq\Console').Sections -eq 'overview,discover,insight') 'registry not Standard'
+        $inv = Invoke-WebRequest "$base/api/v1/assets" -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } -SkipHttpErrorCheck
+        Assert ([int]$inv.StatusCode -eq 200) "inventory on Standard: $([int]$inv.StatusCode)"
+
+        Update-Sections 'all' 'update-advanced'
+        $s = Login
+        $st = Api GET '/licensing/status' -Session $s
+        Assert (@($st.sections | Where-Object { -not $_.enabled }).Count -eq 0) "after Advanced: $($st.sections | ConvertTo-Json -Compress)"
+        $deadline = (Get-Date).AddMinutes(3)
+        do { Start-Sleep 5; $svc = Get-CimInstance Win32_Service -Filter "Name='ZentriqRemote'" } while ($svc.State -ne 'Running' -and (Get-Date) -lt $deadline)
+        Assert ($svc.StartMode -ne 'Disabled' -and $svc.State -eq 'Running') "ZentriqRemote after Advanced: $($svc.StartMode) / $($svc.State)"
+        "trial: 6 sections; Standard: Remote support and Secure & remediate removed, vulnerabilities API 403, remote service disabled, inventory works; Advanced again: all sections, remote service running"
     } | Out-Null
 
     if ($UpgradeBundle) {
