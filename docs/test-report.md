@@ -1,18 +1,24 @@
 # Test report
 
-Latest: GitHub Actions run 39642523078, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
-10.0.20348** VM. Release: `v1.1.1-build.78` (pre-release, **unsigned**), package version **1.1.1.78**. Results: unit +
-PostgreSQL integration tests **236 PASS, 2 skipped** (the live MeshCentral and live SNMP tests run in ci-quick: PASS, 238/238);
-installer acceptance **60 passed, 0 failed**; in-place updates PASS (database migration V0022).
+Latest: GitHub Actions run 39767245830, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
+10.0.20348** VM. Release: `v1.1.1-build.79` (pre-release, **unsigned**), package version **1.1.1.79**. Results: unit +
+PostgreSQL integration tests **248 PASS, 2 skipped** (the live remote support and live SNMP tests run in ci-quick: PASS);
+installer acceptance **61 passed, 0 failed**; in-place updates PASS.
 
-New in build 78 (manufacturer, model and serial number entered manually, remembered by SMBIOS UUID and MAC):
+New in build 79:
+- Standard / Advanced installation with Update / Repair / Remove.
+- Standard / Advanced licence editions.
+- Rearrangeable columns.
+- IPv4 by default in reports.
+- Modern remote support session window, with no engine name anywhere a customer can see.
 
 | ID | Test | Result | Detail |
 |---|---|---|---|
-| T70 | Manual hardware details | **PASS** | saved and linked to 2 fixed identities of the test server; its detected serial number kept priority; device found by the entered serial; 201 characters refused; removed |
-| — | PostgreSQL / unit tests | **PASS** | firmware placeholders ("To be filled by O.E.M.", "Default string", "0000000000") are not values; entered values come back on a new record with the same SMBIOS UUID and MAC; not applied when only the MAC matches and the UUID differs; clearing removes the profile |
-
-Build 77 (run 39633522889): console start page sent with `Cache-Control: no-cache, no-store`, hashed assets `immutable` (T23 checks the headers) - all tests PASS.
+| T01 | Silent installation with `ZQ_SECTIONS=all` | **PASS** | exit 0 in 1 min |
+| T71 | Installation type | **PASS** | trial with 6 sections recorded as Advanced (registry `Sections=all`); Update to Standard: Remote support and Secure & remediate not installed, vulnerabilities API 403, ZentriqRemote disabled, inventory works; Update to Advanced: all sections, remote service running |
+| T59 / T60 | Remote support (modern interface, siteStyle 3) | **PASS** | branded server, agent connects, signed-in session opens; install/remove via agent |
+| — | Unit tests (EditionTests) | **PASS** | Standard edition covers Overview, Discover & inventory, Insight & admin only; Advanced covers all; extra licensed modules add up; installed sections parsed (standard sections always included); trial limited to the installed sections; expired licence enables nothing |
+| — | PostgreSQL tests | **PASS** | report, integration and inventory queries with the IPv4 display address (grouped by device) |
 
 ## Build and packaging
 
@@ -31,11 +37,11 @@ replaced) and the trial's 30-device total cap.
 ## Release artifacts (SHA-256)
 
 ```
-27362db47c4cc8db3c5d72bf13e18fde1a71f6ebf4c5b1087eb7a009b8546e60  Zentriq-1.1.1-docs.zip
-6bab32f2d73db4613fb7d59c4860ed87036b6fb01f35372a96b8acda044d7d80  Zentriq-1.1.1-msi-offline-kit.zip
-986d51a1e679eac0869dac6d0f1bf8feac71bbd883fdca3084015cca6b293fe8  Zentriq-Setup-x64.exe
-ab431eb46b0e2977e22c1ce9e1bf41363a62730b41f085edc06acbccdab1331e  Zentriq.msi
-5e74edbf13b2b5b9fa2273cf2e1c3f4cf2355c220eaa7476939ce49af7a4c1ff  ZentriqAgent-x64.msi
+a833ad3fc27cbf867b0fd77963fe7878957013a4cc2b9be1f1faeb28c3d2c506  Zentriq-1.1.1-docs.zip
+f3ded3e99f80afc30495ef5dbd0b3ba999cc56ffb356d7673d28b81598ec8f8f  Zentriq-1.1.1-msi-offline-kit.zip
+4e153e3b9a8794e0cb51a2817eb1121be2f532bd8e74354a8651e52297f003c3  Zentriq-Setup-x64.exe
+52f5d1a4cefe7794eabeb0d87c7eff0305fc9d9865470074bc2381748ea05439  Zentriq.msi
+7bae70857b1a321e117185a0613325067a55b89b55b5525688737ada3fb619dc  ZentriqAgent-x64.msi
 ```
 
 ## Installer acceptance (tests/installer/Invoke-InstallerAcceptance.ps1)
