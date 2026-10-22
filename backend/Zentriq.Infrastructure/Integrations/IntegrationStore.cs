@@ -69,7 +69,7 @@ public sealed class IntegrationStore(NpgsqlDataSource ds, CredentialProtector pr
                    '/assets/' || f.asset_id
               FROM zentriq.vuln_findings f JOIN zentriq.vuln_cves c ON c.cve_id = f.cve_id JOIN zentriq.assets a ON a.id = f.asset_id
              WHERE f.first_seen_at > @from AND f.first_seen_at <= @to AND f.status = 'open' AND a.status = 'active'
-             GROUP BY f.asset_id, a.hostname, a.primary_ip
+             GROUP BY f.asset_id, a.id, a.hostname, a.primary_ip
             """),
         new("vulnerability.overdue", """
             SELECT 'vulnerability.overdue',
@@ -82,7 +82,7 @@ public sealed class IntegrationStore(NpgsqlDataSource ds, CredentialProtector pr
                    '/vulnerabilities'
               FROM zentriq.vuln_findings f JOIN zentriq.vuln_cves c ON c.cve_id = f.cve_id JOIN zentriq.assets a ON a.id = f.asset_id
              WHERE f.due_at > @from AND f.due_at <= @to AND f.status IN ('open','in_progress') AND a.status = 'active'
-             GROUP BY f.asset_id, a.hostname, a.primary_ip
+             GROUP BY f.asset_id, a.id, a.hostname, a.primary_ip
             """),
         new("security.failed", """
             SELECT 'security.failed',
@@ -95,7 +95,7 @@ public sealed class IntegrationStore(NpgsqlDataSource ds, CredentialProtector pr
                    '/assets/' || s.asset_id
               FROM zentriq.sec_results s JOIN zentriq.assets a ON a.id = s.asset_id LEFT JOIN zentriq.sec_rules r ON r.id = s.rule_id
              WHERE s.status = 'fail' AND s.first_failed_at > @from AND s.first_failed_at <= @to AND a.status = 'active'
-             GROUP BY s.asset_id, a.hostname, a.primary_ip
+             GROUP BY s.asset_id, a.id, a.hostname, a.primary_ip
             """),
         new("inventory.changed", """
             SELECT c.kind || '.changed',
@@ -108,7 +108,7 @@ public sealed class IntegrationStore(NpgsqlDataSource ds, CredentialProtector pr
                    '/assets/' || c.asset_id || '?tab=changes'
               FROM zentriq.asset_changes c JOIN zentriq.assets a ON a.id = c.asset_id
              WHERE c.detected_at > @from AND c.detected_at <= @to AND a.status = 'active'
-             GROUP BY c.kind, c.asset_id, a.hostname, a.primary_ip
+             GROUP BY c.kind, c.asset_id, a.id, a.hostname, a.primary_ip
             """),
         new("asset.discovered", """
             SELECT 'asset.discovered', 'info', 'asset.discovered:' || a.id,

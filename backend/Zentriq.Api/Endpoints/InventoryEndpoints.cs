@@ -298,7 +298,7 @@ public static class InventoryEndpoints
                 SELECT c.asset_id, COALESCE(a.hostname, zentriq.asset_ipv4(a.id), host(a.primary_ip)), (SELECT dp.name FROM zentriq.departments dp WHERE dp.id = a.department_id),
                        count(*), max(c.detected_at),
                        string_agg(c.change || ' ' || c.component || ': ' || c.item || COALESCE(' (' || c.old_value || ' → ' || c.new_value || ')', ''), '; ' ORDER BY c.detected_at DESC, c.id DESC)
-                {Window} AND c.kind = '{kind}' GROUP BY c.asset_id, a.hostname, a.primary_ip, a.department_id ORDER BY max(c.detected_at) DESC LIMIT 15
+                {Window} AND c.kind = '{kind}' GROUP BY c.asset_id, a.id, a.hostname, a.primary_ip, a.department_id ORDER BY max(c.detected_at) DESC LIMIT 15
                 """;
             var hardwareDevices = await Rows(ByDevice("hardware"), Device);
             var softwareDevices = await Rows(ByDevice("software"), Device);
