@@ -80,7 +80,7 @@ export function LicensingPage() {
                 {d.mode.startsWith('Trial') && <><dt>Trial edition</dt><dd>All modules, up to {d.limits.devices ?? 30} devices in total</dd></>}
               </dl>
             </Panel>
-            {d.sections && <Panel title="Sections" sub="What is installed on this server and what your trial or license covers" flush>
+            {d.sections && <div style={{ gridColumn: '1 / -1' }}><Panel title="Sections" sub="What is installed on this server and what your trial or license covers" flush>
               <DataTable rows={d.sections.map((x) => ({ ...x }))} columns={[
                 { key: 't', label: 'Section', render: (r) => <><b>{r.title}</b> <span className="faint" style={{ fontSize: 11.5 }}>{r.standard ? 'Standard' : 'Advanced'}</span></> },
                 { key: 'i', label: 'Installed', render: (r) => r.installed ? <Pill tone="ok">Installed</Pill> : <Pill>Not installed</Pill> },
@@ -89,7 +89,7 @@ export function LicensingPage() {
               <div style={{ padding: '10px 14px' }} className="muted">
                 <small><b>Standard</b>: Overview, Discover &amp; inventory, Insight &amp; admin. <b>Advanced</b>: Standard plus Remote support, Infrastructure, Secure &amp; remediate. The trial includes every section. To add a section that is not installed, run Zentriq Setup on the server and choose <i>Update › Advanced installation</i>.</small>
               </div>
-            </Panel>}
+            </Panel></div>}
             {d.licensee && (
               <Panel title="Licensed to">
                 <dl className="dl2">

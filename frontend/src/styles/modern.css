@@ -341,3 +341,6 @@ details.rs-advanced[open] summary { margin-bottom: 12px; }
   background: linear-gradient(135deg, #0A7385, #38B3C4); color: #fff; vertical-align: middle; }
 .nav a.locked { opacity: .62; }
 .nav a .nav-lock-ico { margin-left: auto; opacity: .8; }
+.nav a.locked > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav a .nav-lock-ico { flex: none; }
+.ico-tile svg { color: #fff !important; stroke: #fff !important; opacity: 1 !important; }
