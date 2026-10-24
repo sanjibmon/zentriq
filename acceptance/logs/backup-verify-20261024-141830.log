@@ -1,0 +1,9 @@
+﻿2026-10-24T14:18:31.0097512Z INFO Backup zentriq-20261024-141830-ci.zbak decrypted and readable: version 1.1.1, created 2026-10-24 14:18:30Z, 665 TOC lines.
+2026-10-24T14:18:33.4556298Z INFO   restored zentriq.schema_migrations: 23 row(s)
+2026-10-24T14:18:33.4581026Z INFO   restored zentriq.install_state: 1 row(s)
+2026-10-24T14:18:33.4590072Z INFO   restored zentriq.users: 1 row(s)
+2026-10-24T14:18:33.4609328Z INFO   restored zentriq.assets: 0 row(s)
+2026-10-24T14:18:33.4615176Z INFO   restored zentriq.audit_events: 3 row(s)
+2026-10-24T14:18:33.4620089Z INFO   restored zentriq.trial: 1 row(s)
+2026-10-24T14:18:33.4640796Z INFO Deep restore validation PASSED.
+2026-10-24T14:18:35.5492456Z INFO Backup verification PASSED.

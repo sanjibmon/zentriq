@@ -1,0 +1,3 @@
+[PASS   ] U01 Install previous release 1.0.2 schema 3
+[PASS   ] U02 Upgrade 1.0.2 -> 1.1.1.80 in place keeps data, sign-in and trial (30 devices) schema 23; Programs and Features: one entry 'Zentriq 1.1.1.80'
+[PASS   ] U05 New features work after the update activity log 200, software uninstall 400, agent update 400, dashboard overview 200; dashboard layout saved and read back

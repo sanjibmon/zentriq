@@ -1,0 +1,4 @@
+Asset tag,Name *,Category *,Status,Purchase date,Purchase cost,Location,Cost centre
+CI-FUR-1,CI desk,Desk / workstation,In use,31/03/2025,"8,000",Floor 1,CC-1
+,CI AC,Air conditioner,In store,,45000,Store room,
+,CI golf cart,CI golf cart,,,,,

@@ -1,0 +1,32 @@
+[
+  {
+    "id": "S01",
+    "test": "Install previous release 1.1.1.79",
+    "outcome": "PASS",
+    "detail": "schema 22"
+  },
+  {
+    "id": "S03",
+    "test": "Enroll previous agent 1.1.1.79",
+    "outcome": "PASS",
+    "detail": "agent 4cd9cf03-557d-4a9b-a564-5ab23ce437a9"
+  },
+  {
+    "id": "S02",
+    "test": "Upgrade 1.1.1.79 -> 1.1.1.80 in place keeps data, sign-in and trial (30 devices)",
+    "outcome": "PASS",
+    "detail": "schema 23; Programs and Features: one entry 'Zentriq 1.1.1.80'"
+  },
+  {
+    "id": "S05",
+    "test": "New features work after the update",
+    "outcome": "PASS",
+    "detail": "activity log 200, software uninstall 400, agent update 400, dashboard overview 200; dashboard layout saved and read back"
+  },
+  {
+    "id": "S04",
+    "test": "Agent 1.1.1.79 -> 1.1.1.80 updated in place (no enrollment code)",
+    "outcome": "PASS",
+    "detail": "old agent checked in to the upgraded server; same registration 4cd9cf03-557d-4a9b-a564-5ab23ce437a9 and certificate; console updates now available; one 'Zentriq Agent' entry (1.1.1.80); service running"
+  }
+]

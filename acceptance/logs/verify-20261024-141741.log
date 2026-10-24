@@ -1,0 +1,12 @@
+﻿2026-10-24T14:17:42.0099033Z INFO PASS configuration: C:\ProgramData\Zentriq\Config\zentriq.json
+2026-10-24T14:17:42.0177593Z INFO PASS postgresql service: Running
+2026-10-24T14:17:42.0187113Z INFO PASS ZentriqWorker service: Running
+2026-10-24T14:17:42.0187315Z INFO PASS ZentriqApi service: Running
+2026-10-24T14:17:42.0206327Z INFO PASS postgresql connection: PostgreSQL 17.11 as zentriq_app
+2026-10-24T14:17:42.0206506Z INFO PASS database schema: version 23 of 23
+2026-10-24T14:17:42.0206645Z INFO PASS initialization: initialized 2026-10-24 14:17:38Z
+2026-10-24T14:17:42.0206841Z INFO PASS worker heartbeat: last 2026-10-24 14:17:20Z
+2026-10-24T14:17:42.0227869Z INFO PASS api readiness (https): 200 https://localhost/health/ready
+2026-10-24T14:17:42.0228216Z INFO PASS license state: Trial (trial ends 2026-11-07T14:17:38.235+00:00)
+2026-10-24T14:17:42.0252980Z INFO PASS web console: 200 https://localhost/
+2026-10-24T14:17:42.0272447Z INFO All checks passed.
