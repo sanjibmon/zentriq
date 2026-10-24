@@ -1,24 +1,17 @@
 # Test report
 
-Latest: GitHub Actions run 39767245830, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
-10.0.20348** VM. Release: `v1.1.1-build.79` (pre-release, **unsigned**), package version **1.1.1.79**. Results: unit +
-PostgreSQL integration tests **248 PASS, 2 skipped** (the live remote support and live SNMP tests run in ci-quick: PASS);
-installer acceptance **61 passed, 0 failed**; in-place updates PASS.
+Latest: GitHub Actions run 40100189926, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
+10.0.20348** VM. Release: `v1.1.1-build.80` (pre-release, **unsigned**), package version **1.1.1.80**. Results: unit +
+PostgreSQL integration tests **257 PASS, 2 skipped** (live remote support and SNMP tests run in ci-quick: PASS, 259/259);
+installer acceptance **62 passed, 0 failed**; in-place updates PASS (database migration V0023).
 
-New in build 79:
-- Standard / Advanced installation with Update / Repair / Remove.
-- Standard / Advanced licence editions.
-- Rearrangeable columns.
-- IPv4 by default in reports.
-- Modern remote support session window, with no engine name anywhere a customer can see.
+New in build 80: Asset Lifecycle for IT assets. Infrastructure (Asset Lifecycle, Cloud & Infrastructure) moves into the Standard edition and Standard installation.
 
 | ID | Test | Result | Detail |
 |---|---|---|---|
-| T01 | Silent installation with `ZQ_SECTIONS=all` | **PASS** | exit 0 in 1 min |
-| T71 | Installation type | **PASS** | trial with 6 sections recorded as Advanced (registry `Sections=all`); Update to Standard: Remote support and Secure & remediate not installed, vulnerabilities API 403, ZentriqRemote disabled, inventory works; Update to Advanced: all sections, remote service running |
-| T59 / T60 | Remote support (modern interface, siteStyle 3) | **PASS** | branded server, agent connects, signed-in session opens; install/remove via agent |
-| — | Unit tests (EditionTests) | **PASS** | Standard edition covers Overview, Discover & inventory, Insight & admin only; Advanced covers all; extra licensed modules add up; installed sections parsed (standard sections always included); trial limited to the installed sections; expired licence enables nothing |
-| — | PostgreSQL tests | **PASS** | report, integration and inventory queries with the IPv4 display address (grouped by device) |
+| T72 | Asset lifecycle end to end | **PASS** | stock item LAP-000001 with depreciation schedule; duplicate serial refused; loan without return date refused; assigned, handover lists it, returned; stale edit 409; contract linked; refresh candidate; QR label; retired; disposal refused without data sanitisation, accepted with purge + certificate; 7 history entries; disposal register report |
+| T71 | Installation type (Standard now includes Infrastructure) | **PASS** | registry `overview,discover,infrastructure,insight` on Standard; Remote support and Secure & remediate removed and restored |
+| — | Unit / PostgreSQL tests | **PASS** | book value (straight-line, declining balance, none) and schedule; transitions; assign/loan/return/retire/dispose rules and history; stock item deployed when first seen; not-seen → Missing and back; tags per class prefix; editions with Infrastructure in Standard |
 
 ## Build and packaging
 
@@ -37,11 +30,11 @@ replaced) and the trial's 30-device total cap.
 ## Release artifacts (SHA-256)
 
 ```
-a833ad3fc27cbf867b0fd77963fe7878957013a4cc2b9be1f1faeb28c3d2c506  Zentriq-1.1.1-docs.zip
-f3ded3e99f80afc30495ef5dbd0b3ba999cc56ffb356d7673d28b81598ec8f8f  Zentriq-1.1.1-msi-offline-kit.zip
-4e153e3b9a8794e0cb51a2817eb1121be2f532bd8e74354a8651e52297f003c3  Zentriq-Setup-x64.exe
-52f5d1a4cefe7794eabeb0d87c7eff0305fc9d9865470074bc2381748ea05439  Zentriq.msi
-7bae70857b1a321e117185a0613325067a55b89b55b5525688737ada3fb619dc  ZentriqAgent-x64.msi
+437916b0979bc545c5390213f2e603943338c9fc255d134436060ce64971f973  Zentriq-1.1.1-docs.zip
+53f70c9d6b1714f1f76edceb998de455db3d23bc24ab2fd27a3af9e707ab7834  Zentriq-1.1.1-msi-offline-kit.zip
+ee1abe283842b4662a8946d5ba9a60319b440fc7ef09e318c7a8e8f729e3acbc  Zentriq-Setup-x64.exe
+9515eea34c563c2ff48f07d504adbe9cc8f31540a01f6eff6c01cb2c14d7a54f  Zentriq.msi
+9a7943e8a8d2fb0ba7e0bf7e7a612bd26eae539e76a65000539114769edfee04  ZentriqAgent-x64.msi
 ```
 
 ## Installer acceptance (tests/installer/Invoke-InstallerAcceptance.ps1)
