@@ -12,7 +12,7 @@ import { useLocations } from '../locations/Locations';
 import { AddToContractDialog, BulkStageDialog, ContractDialog, StockDialog, useLcMeta } from './LifecycleDialogs';
 import { LifecyclePanel } from './LifecyclePanel';
 import {
-  CONTRACT_KIND, KIND_LABEL, money, STAGE_ORDER, STAGE_TONE, stageLabel, statusLabel,
+  CONTRACT_KIND, KIND_LABEL, money, moneyShort, STAGE_ORDER, STAGE_TONE, stageLabel, statusLabel,
   type LcAsset, type LcContract, type LcEvent, type LcMeta, type LcPerson, type LcPolicy, type LcRefresh, type LcSummary,
 } from './types';
 
@@ -66,7 +66,7 @@ function Overview({ meta, tick }: { meta: LcMeta; tick: number }) {
     <>
       <Kpis items={[
         { label: 'IT assets', value: d.total.toLocaleString(), sub: `${(d.stages.in_use ?? 0).toLocaleString()} in use · ${(d.stages.in_stock ?? 0).toLocaleString()} in stock`, to: '/lifecycle?tab=assets' },
-        { label: 'Book value', value: money(d.bookValue, d.currency), sub: `of ${money(d.purchaseValue, d.currency)} cost · ${d.withCost} with a cost` },
+        { label: 'Book value', value: <span title={money(d.bookValue, d.currency)}>{moneyShort(d.bookValue, d.currency)}</span>, sub: `of ${moneyShort(d.purchaseValue, d.currency)} cost · ${d.withCost} with a cost` },
         { label: 'Warranty ending', value: d.warranty90.toLocaleString(), sub: `${d.warranty30} within 30 days · ${d.warrantyExpired} in service expired`, to: '/lifecycle?tab=assets&warranty=expiring' },
         { label: 'Contracts ending', value: d.contracts90.toLocaleString(), sub: 'within 90 days', to: '/lifecycle?tab=contracts' },
         { label: 'Due for refresh', value: d.refreshDue.toLocaleString(), sub: 'age policy or OS out of support', to: '/lifecycle?tab=refresh' },
@@ -412,7 +412,7 @@ function History({ meta }: { meta: LcMeta }) {
         <DataTable rows={ev.data?.items ?? []} empty={ev.loading ? 'Loading…' : 'No changes.'} columns={[
           { key: 'at', label: 'When', render: (e) => fmt.date(e.at) },
           { key: 'a', label: 'Asset', render: (e) => <Link to={`/lifecycle/assets/${e.assetId}`}>{e.assetTag || e.name || '—'}</Link> },
-          { key: 'k', label: 'Change', render: (e) => <>{KIND_LABEL[e.kind] ?? e.kind}{e.toStage && e.toStage !== e.fromStage ? <span className="faint"> · {stageLabel(meta, e.fromStage)} → {stageLabel(meta, e.toStage)}</span> : null}</> },
+          { key: 'k', label: 'Change', render: (e) => <>{KIND_LABEL[e.kind] ?? e.kind}{e.toStage && e.toStage !== e.fromStage ? <span className="faint"> · {e.fromStage ? `${stageLabel(meta, e.fromStage)} → ` : ''}{stageLabel(meta, e.toStage)}</span> : null}</> },
           { key: 'p', label: 'Person', render: (e) => e.person ?? '—' },
           { key: 'r', label: 'Reason', className: 'wrap', render: (e) => e.reason ?? '—' },
           { key: 'b', label: 'By', render: (e) => e.actor ?? '—' },

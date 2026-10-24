@@ -111,7 +111,7 @@ export function LifecyclePanel({ assetId, onMessage }: { assetId: string; onMess
       <Panel title="Lifecycle history" flush>
         <DataTable rows={d.events} empty="No changes yet." columns={[
           { key: 'at', label: 'When', render: (e) => fmt.date(e.at) },
-          { key: 'k', label: 'Change', render: (e) => <>{KIND_LABEL[e.kind] ?? e.kind}{e.toStage && e.fromStage !== e.toStage ? <span className="faint"> · {stageLabel(m, e.fromStage)} → {stageLabel(m, e.toStage)}</span> : e.toStatus && e.toStatus !== e.fromStatus ? <span className="faint"> · {statusLabel(m, e.toStatus)}</span> : null}</> },
+          { key: 'k', label: 'Change', render: (e) => <>{KIND_LABEL[e.kind] ?? e.kind}{e.toStage && e.fromStage !== e.toStage ? <span className="faint"> · {e.fromStage ? `${stageLabel(m, e.fromStage)} → ` : ''}{stageLabel(m, e.toStage)}</span> : e.toStatus && e.toStatus !== e.fromStatus ? <span className="faint"> · {statusLabel(m, e.toStatus)}</span> : null}</> },
           { key: 'p', label: 'Person', render: (e) => e.person ?? '—' },
           { key: 'r', label: 'Reason', className: 'wrap', render: (e) => e.reason ?? '—' },
           { key: 'b', label: 'By', render: (e) => e.actor ?? '—' },

@@ -78,6 +78,13 @@ export function money(n: number | null | undefined, currency = 'INR'): string {
   catch { return `${currency} ${Math.round(n).toLocaleString()}`; }
 }
 
+/** Short amount for tiles: ₹1.74 Cr / $1.2M (full amount in a tooltip where shown). */
+export function moneyShort(n: number | null | undefined, currency = 'INR'): string {
+  if (n == null) return '—';
+  try { return new Intl.NumberFormat(currency === 'INR' ? 'en-IN' : undefined, { style: 'currency', currency, notation: 'compact', maximumFractionDigits: 2 }).format(n); }
+  catch { return money(n, currency); }
+}
+
 export const KIND_LABEL: Record<string, string> = {
   created: 'Added', stage: 'Stage changed', assigned: 'Assigned', returned: 'Returned', updated: 'Details updated', disposed: 'Disposed',
   auto: 'Automatic', seen_again: 'Seen again after retirement', contract: 'Contract',
