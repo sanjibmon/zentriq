@@ -155,6 +155,47 @@ public sealed class IntegrationStore(NpgsqlDataSource ds, CredentialProtector pr
               FROM zentriq.accessory_stock s JOIN zentriq.accessory_items i ON i.id = s.item_id JOIN zentriq.locations lo ON lo.id = s.location_id
              WHERE s.low_since > @from AND s.low_since <= @to AND i.active
             """),
+        new("lifecycle.warranty", """
+            SELECT 'lifecycle.warranty', CASE WHEN l.warranty_end <= x.at::date THEN 'medium' ELSE 'low' END,
+                   'lifecycle.warranty:' || a.id || ':' || l.warranty_end || ':' || x.k,
+                   'Warranty of ' || COALESCE(l.asset_tag || ' ', '') || COALESCE(a.hostname, a.serial_number, 'IT asset') ||
+                       CASE WHEN x.k = 'end' THEN ' ended' ELSE ' ends on ' || to_char(l.warranty_end, 'YYYY-MM-DD') END,
+                   concat_ws(E'\n', 'Provider: ' || l.warranty_provider, 'Type: ' || l.warranty_type, 'Assigned to: ' || l.assigned_to, 'Stage: ' || l.stage),
+                   a.id, jsonb_build_object('warrantyEnd', l.warranty_end, 'tag', l.asset_tag), '/lifecycle/assets/' || a.id
+              FROM zentriq.asset_lifecycle l JOIN zentriq.assets a ON a.id = l.asset_id
+              CROSS JOIN LATERAL (VALUES ('30', (l.warranty_end - 30)::timestamptz), ('end', l.warranty_end::timestamptz)) AS x(k, at)
+             WHERE l.warranty_end IS NOT NULL AND l.stage NOT IN ('retired','disposed') AND x.at > @from AND x.at <= @to
+            """),
+        new("lifecycle.contract", """
+            SELECT 'lifecycle.contract', CASE WHEN x.k = 'end' THEN 'medium' ELSE 'low' END,
+                   'lifecycle.contract:' || c.id || ':' || c.end_date || ':' || x.k,
+                   initcap(c.kind) || ' contract "' || c.name || '"' || CASE WHEN x.k = 'end' THEN ' ended' ELSE ' ends on ' || to_char(c.end_date, 'YYYY-MM-DD') END,
+                   concat_ws(E'\n', 'Vendor: ' || c.vendor, 'Reference: ' || c.reference,
+                             (SELECT count(*) FROM zentriq.asset_contract_assets ca WHERE ca.contract_id = c.id) || ' asset(s) covered'),
+                   NULL::uuid, jsonb_build_object('contractId', c.id, 'endDate', c.end_date), '/lifecycle?tab=contracts'
+              FROM zentriq.asset_contracts c
+              CROSS JOIN LATERAL (VALUES ('notice', (c.end_date - c.notify_days)::timestamptz), ('end', c.end_date::timestamptz)) AS x(k, at)
+             WHERE c.end_date IS NOT NULL AND x.at > @from AND x.at <= @to AND (x.k = 'end' OR c.notify_days > 0)
+            """),
+        new("lifecycle.loan_overdue", """
+            SELECT 'lifecycle.loan_overdue', 'low', 'lifecycle.loan:' || a.id || ':' || l.expected_return,
+                   COALESCE(l.asset_tag || ' ', '') || COALESCE(a.hostname, a.serial_number, 'IT asset') || ' on loan to ' || l.assigned_to || ' was due back on ' || to_char(l.expected_return, 'YYYY-MM-DD'),
+                   concat_ws(E'\n', 'E-mail: ' || l.assigned_email, 'Loaned since: ' || to_char(l.assigned_at, 'YYYY-MM-DD')),
+                   a.id, jsonb_build_object('person', l.assigned_to, 'expectedReturn', l.expected_return), '/lifecycle/assets/' || a.id
+              FROM zentriq.asset_lifecycle l JOIN zentriq.assets a ON a.id = l.asset_id
+             WHERE l.status = 'loaned' AND (l.expected_return + 1)::timestamptz > @from AND (l.expected_return + 1)::timestamptz <= @to
+            """),
+        new("lifecycle.events", """
+            SELECT CASE e.kind WHEN 'seen_again' THEN 'lifecycle.retired_seen' ELSE 'lifecycle.missing' END,
+                   CASE e.kind WHEN 'seen_again' THEN 'high' ELSE 'medium' END,
+                   'lifecycle.event:' || e.id,
+                   CASE e.kind WHEN 'seen_again' THEN 'Retired IT asset seen again: ' ELSE 'IT asset not seen, marked missing: ' END ||
+                       COALESCE(l.asset_tag || ' ', '') || COALESCE(a.hostname, a.serial_number, 'IT asset'),
+                   concat_ws(E'\n', e.reason, 'Stage: ' || l.stage, 'Last custodian: ' || COALESCE(e.person, l.assigned_to)),
+                   a.id, jsonb_build_object('eventId', e.id) || e.detail, '/lifecycle/assets/' || a.id
+              FROM zentriq.asset_lifecycle_events e JOIN zentriq.assets a ON a.id = e.asset_id JOIN zentriq.asset_lifecycle l ON l.asset_id = a.id
+             WHERE e.at > @from AND e.at <= @to AND (e.kind = 'seen_again' OR (e.kind = 'auto' AND e.to_stage = 'missing'))
+            """),
         new("job.failed", """
             SELECT 'job.failed', 'medium', 'job.failed:' || j.id,
                    'Background job failed: ' || j.job_type,

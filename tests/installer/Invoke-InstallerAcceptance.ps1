@@ -1622,7 +1622,7 @@ if (-not $installed) {
         Assert ([int]$blocked.StatusCode -eq 403) "vulnerabilities API on a Standard installation: $([int]$blocked.StatusCode)"
         $svc = Get-CimInstance Win32_Service -Filter "Name='ZentriqRemote'"
         Assert ($svc.StartMode -eq 'Disabled' -and $svc.State -ne 'Running') "ZentriqRemote on Standard: $($svc.StartMode) / $($svc.State)"
-        Assert ((Get-ItemProperty 'HKLM:\SOFTWARE\Zentriq\Console').Sections -eq 'overview,discover,insight') 'registry not Standard'
+        Assert ((Get-ItemProperty 'HKLM:\SOFTWARE\Zentriq\Console').Sections -eq 'overview,discover,infrastructure,insight') 'registry not Standard'
         $inv = Invoke-WebRequest "$base/api/v1/assets" -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } -SkipHttpErrorCheck
         Assert ([int]$inv.StatusCode -eq 200) "inventory on Standard: $([int]$inv.StatusCode)"
 

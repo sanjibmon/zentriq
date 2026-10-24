@@ -6,8 +6,8 @@
     8 Ready  9 Progress (zentriqctl: PostgreSQL, database, migrations, HTTPS, services, admin, trial, health)
    10 Finish (opens the console)
   Pages 5-7 are skipped when existing Zentriq data is found (repair/upgrade reuse the saved settings).
-  Installation type (after the system check): Standard (Overview, Discover & inventory, Insight & admin) or Advanced
-  (Standard plus the chosen sections: Remote support, Infrastructure, Secure & remediate).
+  Installation type (after the system check): Standard (Overview, Discover & inventory, Infrastructure, Insight & admin) or
+  Advanced (Standard plus the chosen sections: Remote support, Secure & remediate).
   On a server where Zentriq is installed, Setup offers Update / Repair / Remove (ZqMaintenanceDlg):
     same version:    Update = change the installed sections; Repair = reinstall and re-apply; Remove = uninstall
     earlier version: Update = update and choose the sections; Repair = update keeping the sections;
@@ -183,9 +183,9 @@
           </RadioButtonGroup>
         </Control>
         <Control Id="StandardText" Type="Text" X="36" Y="71" Width="314" Height="44" NoPrefix="yes"
-                 Text="Overview (dashboards), Discover &amp; inventory (discovery, IT and non-IT assets, hardware, software, network, accessories, agents) and Insight &amp; admin (reports, integrations, licensing, users, audit, settings). Covered by the Standard and Advanced editions." />
+                 Text="Overview, Discover &amp; inventory (discovery, IT and non-IT assets, hardware, software, network, accessories, agents), Infrastructure (asset lifecycle, cloud &amp; infrastructure) and Insight &amp; admin (reports, integrations, users, settings)." />
         <Control Id="AdvancedText" Type="Text" X="36" Y="137" Width="314" Height="44" NoPrefix="yes"
-                 Text="Everything in Standard, plus the sections you choose on the next page: Remote support, Infrastructure, and Secure &amp; remediate. These need the Advanced edition; the 14-day trial includes them." />
+                 Text="Everything in Standard, plus the sections you choose on the next page: Remote support, and Secure &amp; remediate. These need the Advanced edition; the 14-day trial includes them." />
         <Control Id="Note" Type="Text" X="20" Y="200" Width="330" Height="26" NoPrefix="yes"
                  Text="You can change this later: run Setup again and choose Update. Data and settings are always kept." />
         <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
@@ -194,8 +194,8 @@
           <Publish Event="NewDialog" Value="ZqMaintenanceDlg" Condition="Installed OR WIX_UPGRADE_DETECTED" />
         </Control>
         <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)">
-          <Publish Property="ZQ_SECTIONS" Value="overview,discover,insight" Order="1" Condition='ZQ_INSTALLTYPE = "standard"' />
-          <Publish Property="ZQ_SECTIONS_TEXT" Value="Standard installation: Overview, Discover &amp; inventory, Insight &amp; admin" Order="2" Condition='ZQ_INSTALLTYPE = "standard"' />
+          <Publish Property="ZQ_SECTIONS" Value="overview,discover,infrastructure,insight" Order="1" Condition='ZQ_INSTALLTYPE = "standard"' />
+          <Publish Property="ZQ_SECTIONS_TEXT" Value="Standard installation: Overview, Discover &amp; inventory, Infrastructure, Insight &amp; admin" Order="2" Condition='ZQ_INSTALLTYPE = "standard"' />
           <Publish Event="NewDialog" Value="ZqSectionsDlg" Order="3" Condition='ZQ_INSTALLTYPE = "advanced"' />
           <Publish Event="NewDialog" Value="ZqFoldersDlg" Order="4" Condition='ZQ_INSTALLTYPE = "standard" AND NOT Installed AND NOT WIX_UPGRADE_DETECTED' />
           <Publish Event="NewDialog" Value="ZqUpgradeDlg" Order="5" Condition='ZQ_INSTALLTYPE = "standard" AND NOT Installed AND WIX_UPGRADE_DETECTED' />
@@ -214,28 +214,23 @@
         <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
         <Control Id="StdHead" Type="Text" X="20" Y="52" Width="330" Height="12" NoPrefix="yes" Text="{\WixUI_Font_Title}Always installed (Standard)" />
         <Control Id="StdList" Type="Text" X="30" Y="66" Width="320" Height="24" NoPrefix="yes"
-                 Text="Overview  ·  Discover &amp; inventory  ·  Insight &amp; admin" />
+                 Text="Overview  ·  Discover &amp; inventory  ·  Infrastructure  ·  Insight &amp; admin" />
         <Control Id="OptHead" Type="Text" X="20" Y="88" Width="330" Height="12" NoPrefix="yes" Text="{\WixUI_Font_Title}Additional sections (Advanced edition)" />
         <Control Id="Remote" Type="CheckBox" X="30" Y="104" Width="320" Height="14" Property="ZQ_SEC_REMOTE" CheckBoxValue="1" Text="&amp;Remote support" />
         <Control Id="RemoteText" Type="Text" X="44" Y="118" Width="306" Height="20" NoPrefix="yes"
                  Text="Remote desktop, files and terminal, quick support sessions and unattended access (port 8446)." />
-        <Control Id="Infra" Type="CheckBox" X="30" Y="140" Width="320" Height="14" Property="ZQ_SEC_INFRA" CheckBoxValue="1" Text="&amp;Infrastructure" />
-        <Control Id="InfraText" Type="Text" X="44" Y="154" Width="306" Height="20" NoPrefix="yes"
-                 Text="Cloud &amp; infrastructure and asset lifecycle (added as they are released)." />
-        <Control Id="Secure" Type="CheckBox" X="30" Y="176" Width="320" Height="14" Property="ZQ_SEC_SECURE" CheckBoxValue="1" Text="&amp;Secure &amp;&amp; remediate" />
-        <Control Id="SecureText" Type="Text" X="44" Y="190" Width="306" Height="30" NoPrefix="yes"
+        <Control Id="Secure" Type="CheckBox" X="30" Y="144" Width="320" Height="14" Property="ZQ_SEC_SECURE" CheckBoxValue="1" Text="&amp;Secure &amp;&amp; remediate" />
+        <Control Id="SecureText" Type="Text" X="44" Y="158" Width="306" Height="30" NoPrefix="yes"
                  Text="Vulnerability management, security configuration, patch management and software deployment." />
         <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
         <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)">
           <Publish Event="NewDialog" Value="ZqInstallTypeDlg" />
         </Control>
         <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)">
-          <Publish Property="ZQ_SECTIONS" Value="overview,discover,insight" Order="1" />
-          <Publish Property="ZQ_SECTIONS_TEXT" Value="Advanced installation: Overview, Discover &amp; inventory, Insight &amp; admin" Order="2" />
+          <Publish Property="ZQ_SECTIONS" Value="overview,discover,infrastructure,insight" Order="1" />
+          <Publish Property="ZQ_SECTIONS_TEXT" Value="Advanced installation: Overview, Discover &amp; inventory, Infrastructure, Insight &amp; admin" Order="2" />
           <Publish Property="ZQ_SECTIONS" Value="[ZQ_SECTIONS],remote" Order="3" Condition="ZQ_SEC_REMOTE" />
           <Publish Property="ZQ_SECTIONS_TEXT" Value="[ZQ_SECTIONS_TEXT], Remote support" Order="4" Condition="ZQ_SEC_REMOTE" />
-          <Publish Property="ZQ_SECTIONS" Value="[ZQ_SECTIONS],infrastructure" Order="5" Condition="ZQ_SEC_INFRA" />
-          <Publish Property="ZQ_SECTIONS_TEXT" Value="[ZQ_SECTIONS_TEXT], Infrastructure" Order="6" Condition="ZQ_SEC_INFRA" />
           <Publish Property="ZQ_SECTIONS" Value="[ZQ_SECTIONS],secure" Order="7" Condition="ZQ_SEC_SECURE" />
           <Publish Property="ZQ_SECTIONS_TEXT" Value="[ZQ_SECTIONS_TEXT], Secure &amp; remediate" Order="8" Condition="ZQ_SEC_SECURE" />
           <Publish Event="NewDialog" Value="ZqFoldersDlg" Order="9" Condition="NOT Installed AND NOT WIX_UPGRADE_DETECTED" />

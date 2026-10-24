@@ -68,8 +68,9 @@ public static class Modules
 
 /// <summary>
 /// The product sections (the console's navigation groups and the installer's choices) and the modules in each.
-/// Standard installation and Standard edition: Overview, Discover &amp; inventory, Insight &amp; admin. Advanced adds Remote
-/// support, Infrastructure and Secure &amp; remediate. What can be used is what is installed AND licensed (the trial licenses everything).
+/// Standard installation and Standard edition: Overview, Discover &amp; inventory, Infrastructure (Cloud &amp; infrastructure,
+/// Asset lifecycle) and Insight &amp; admin. Advanced adds Remote support and Secure &amp; remediate. What can be used is what is
+/// installed AND licensed (the trial licenses everything).
 /// </summary>
 public static class ProductSections
 {
@@ -81,8 +82,8 @@ public static class ProductSections
     public const string Insight = "insight";
 
     public static readonly IReadOnlyList<string> All = [Overview, Discover, Remote, Infrastructure, Secure, Insight];
-    public static readonly IReadOnlyList<string> Standard = [Overview, Discover, Insight];
-    public static readonly IReadOnlyList<string> Optional = [Remote, Infrastructure, Secure];
+    public static readonly IReadOnlyList<string> Standard = [Overview, Discover, Infrastructure, Insight];
+    public static readonly IReadOnlyList<string> Optional = [Remote, Secure];
 
     public static readonly IReadOnlyDictionary<string, string> Titles = new Dictionary<string, string>
     {

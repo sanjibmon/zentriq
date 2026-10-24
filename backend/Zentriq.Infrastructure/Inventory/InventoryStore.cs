@@ -66,6 +66,8 @@ public sealed class InventoryStore(LicensingService licensing)
         await AddIdentifiersAsync(conn, tx, assetId.Value, doc, hints, ct);
         // Manufacturer / model / serial entered by hand earlier for this machine (agent or OS reinstalled, device re-created).
         await HardwareProfiles.RestoreAsync(conn, tx, assetId.Value, doc, ct);
+        // A retired / disposed device in use again (Asset Lifecycle alert).
+        if (created) await Zentriq.Infrastructure.Lifecycle.LifecycleStore.RecordRetiredSeenAsync(conn, tx, assetId.Value, LifecycleIds(doc), ct);
         if (doc.NetworkDevice is { } net)
         {
             await NetworkStore.SaveAsync(conn, tx, assetId.Value, net, ct);
@@ -74,6 +76,15 @@ public sealed class InventoryStore(LicensingService licensing)
         await RecordChangesAsync(conn, tx, assetId.Value, InventoryChanges.Compare(prevDoc, prevSoftware, doc), doc.Source, ct);
         await tx.CommitAsync(ct);
         return new(assetId, created, null);
+    }
+
+    private static List<(string Kind, string Value)> LifecycleIds(InventoryDocument doc)
+    {
+        var ids = new List<(string Kind, string Value)>();
+        if (doc.Device.SmbiosUuid is { } uuid) ids.Add(("smbios_uuid", uuid));
+        if (HardwareProfiles.Clean(doc.Device.SerialNumber) is { } serial && serial.Length >= 4) ids.Add(("serial", Key(doc.Device.Manufacturer, serial)));
+        foreach (var mac in doc.Network.Select(n => n.Mac).Where(m => m is not null).Distinct()) ids.Add(("mac", mac!));
+        return ids;
     }
 
     private static async Task<(InventoryDocument? Doc, List<InstalledSoftware>? Software)> PreviousAsync(NpgsqlConnection conn, NpgsqlTransaction tx, Guid id, CancellationToken ct)
@@ -133,6 +144,8 @@ public sealed class InventoryStore(LicensingService licensing)
             cmd.Parameters.AddWithValue("v", value);
             if (await cmd.ExecuteScalarAsync(ct) is Guid g) return g;
         }
+        // An item added to stock / on order before Zentriq saw it (Asset Lifecycle), recognised by its serial number.
+        if (await Zentriq.Infrastructure.Lifecycle.LifecycleStore.MatchStockAsync(conn, tx, HardwareProfiles.Clean(doc.Device.SerialNumber), ct) is Guid stock) return stock;
 
         var name = doc.Device.Fqdn ?? doc.Device.Hostname;
         await using (var byName = new NpgsqlCommand("""

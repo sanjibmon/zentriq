@@ -21,6 +21,11 @@ public static class EventTypes
         new("scan.completed", "Discovery scan finished", "A discovery scan finished (with or without errors).", false),
         new("scan.failed", "Discovery scan failed", "A discovery scan failed or was cancelled.", false),
         new("accessory.low", "IT accessory stock low", "An IT accessory fell to or below its reorder level at a location (out of stock = medium).", false),
+        new("lifecycle.warranty", "Warranty ending", "An IT asset's warranty ends in 30 days, or ended today (Asset Lifecycle).", true),
+        new("lifecycle.contract", "Contract ending", "A support, AMC, lease or insurance contract reaches its reminder date or ends (Asset Lifecycle).", false),
+        new("lifecycle.loan_overdue", "Loaned asset not returned", "An IT asset on loan passed its return date (Asset Lifecycle).", true),
+        new("lifecycle.missing", "IT asset not seen", "An IT asset in use was not seen for the configured days and is now Missing · Not seen (Asset Lifecycle).", true),
+        new("lifecycle.retired_seen", "Retired IT asset seen again", "A retired or disposed IT asset was seen on the network again (Asset Lifecycle).", true),
         new("job.failed", "Background job failed", "A background job (report delivery, feed update, inventory...) failed.", false),
     ];
 

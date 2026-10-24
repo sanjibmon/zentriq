@@ -11,9 +11,12 @@ public sealed class EditionTests
         new(LicenseMode.Licensed, "", null, null, Editions.Expand(edition, modules), new Dictionary<string, int>(), "L1", "C", edition);
 
     [Fact]
-    public void Standard_edition_covers_overview_inventory_and_insight_only()
+    public void Standard_edition_covers_overview_inventory_infrastructure_and_insight()
     {
         var s = Licensed(Editions.Standard);
+        Assert.True(s.ModuleEnabled(Modules.Lifecycle));
+        Assert.True(s.ModuleEnabled(Modules.Cloud));
+        Assert.True(s.SectionEnabled(ProductSections.Infrastructure));
         Assert.True(s.ModuleEnabled(Modules.Inventory));
         Assert.True(s.ModuleEnabled(Modules.Dashboards));
         Assert.True(s.ModuleEnabled(Modules.Reports));
@@ -37,11 +40,11 @@ public sealed class EditionTests
     [Theory]
     [InlineData(null, 6)]
     [InlineData("", 6)]
-    [InlineData("overview,discover,insight", 3)]
-    [InlineData("remote", 4)]                       // standard sections are always installed
-    [InlineData("[\"remote\",\"secure\"]", 5)]
+    [InlineData("overview,discover,insight", 4)]     // standard sections (with Infrastructure) are always installed
+    [InlineData("remote", 5)]
+    [InlineData("[\"remote\",\"secure\"]", 6)]
     [InlineData("advanced", 6)]
-    [InlineData("bogus", 3)]
+    [InlineData("bogus", 4)]
     public void Installed_sections_are_parsed(string? stored, int count) => Assert.Equal(count, ProductSections.Parse(stored).Count);
 
     [Fact]

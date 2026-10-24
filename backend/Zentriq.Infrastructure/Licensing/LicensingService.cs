@@ -84,7 +84,7 @@ public sealed class LicensingService(
 
     /// <summary>
     /// Counts billable assets per workload. Billable = status 'active', not merged, seen within
-    /// licensing.billable_seen_within_days. See <see cref="Workloads"/>.
+    /// licensing.billable_seen_within_days, and not planned / on order / in stock (Asset Lifecycle). See <see cref="Workloads"/>.
     /// </summary>
     public async Task<Dictionary<string, int>> CountBillableAsync(NpgsqlConnection? conn, NpgsqlTransaction? tx, CancellationToken ct = default)
     {
@@ -98,6 +98,8 @@ public sealed class LicensingService(
               FROM zentriq.assets
              WHERE status = 'active' AND merged_into IS NULL
                AND last_seen_at >= now() - make_interval(days => @d)
+               -- Asset Lifecycle: items planned, on order or waiting in stock are not in use
+               AND NOT EXISTS (SELECT 1 FROM zentriq.asset_lifecycle l WHERE l.asset_id = assets.id AND l.stage IN ('planned','on_order','in_stock'))
              GROUP BY 1
             """;
         await using var cmd = conn is null ? dataSource.CreateCommand(sql) : new NpgsqlCommand(sql, conn, tx);

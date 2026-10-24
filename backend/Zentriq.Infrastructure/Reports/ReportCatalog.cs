@@ -28,6 +28,7 @@ public static class ReportCatalog
     private const string TypeExpr = "COALESCE(a.device_type, d.document #>> '{device,chassis}', h.chassis, a.category)";
     /// <summary>The device's IPv6 address (primary when IPv6, else the first global address of its adapters); reports show IPv4 by default.</summary>
     private const string Ipv6Expr = "COALESCE(CASE WHEN family(a.primary_ip) = 6 THEN host(a.primary_ip) END, (SELECT ip FROM jsonb_array_elements(COALESCE(d.document->'network', '[]'::jsonb)) nic, jsonb_array_elements_text(COALESCE(nic->'ipv6', '[]'::jsonb)) ip WHERE ip NOT ILIKE 'fe80%' AND ip <> '::1' LIMIT 1))";
+    private const string StageExpr = "CASE v.stage WHEN 'planned' THEN 'Planned' WHEN 'on_order' THEN 'On order' WHEN 'in_stock' THEN 'In stock' WHEN 'in_use' THEN 'In use' WHEN 'in_maintenance' THEN 'In maintenance' WHEN 'missing' THEN 'Missing' WHEN 'retired' THEN 'Retired' WHEN 'disposed' THEN 'Disposed' END";
     private const string OsExpr = "COALESCE(a.os_name, initcap(a.os_family))";
 
     private static readonly ReportColumn[] DeviceColumns =
@@ -479,6 +480,81 @@ public static class ReportCatalog
                 new("serials", "Serial numbers", ReportColumnType.Text, "array_to_string(m.serials, ', ')", "Movement"),
                 new("by", "Recorded by", ReportColumnType.Text, "m.by_name", "Movement"),
                 new("note", "Note", ReportColumnType.Text, "left(m.note, 500)", "Movement"),
+            ]),
+
+        new("asset_lifecycle", "IT asset lifecycle", "One row per IT asset: lifecycle stage and status, asset tag, custodian, purchase, depreciation and book value, warranty, lease and disposal.",
+            """
+            zentriq.v_asset_lifecycle v
+            LEFT JOIN zentriq.departments dp ON dp.id = v.department_id
+            LEFT JOIN zentriq.locations lo ON lo.id = v.location_id
+            """,
+            [
+                new("asset_tag", "Asset tag", ReportColumnType.Text, "v.asset_tag", "Asset"),
+                new("device", "Device", ReportColumnType.Text, "COALESCE(v.hostname, v.serial, v.model)", "Asset"),
+                new("serial", "Serial number", ReportColumnType.Text, "v.serial", "Asset"),
+                new("manufacturer", "Manufacturer", ReportColumnType.Text, "v.manufacturer", "Asset"),
+                new("model", "Model", ReportColumnType.Text, "v.model", "Asset"),
+                new("class", "Device class", ReportColumnType.Text, "v.class_label", "Asset"),
+                new("os", "Operating system", ReportColumnType.Text, "v.os_name", "Asset"),
+                new("stage", "Lifecycle stage", ReportColumnType.Text, StageExpr, "Lifecycle"),
+                new("status", "Lifecycle status", ReportColumnType.Text, "initcap(replace(v.status, '_', ' '))", "Lifecycle"),
+                new("stage_changed", "Stage since", ReportColumnType.Date, "v.stage_changed_at", "Lifecycle"),
+                new("stage_reason", "Reason", ReportColumnType.Text, "v.stage_reason", "Lifecycle"),
+                new("age_months", "Age (months)", ReportColumnType.Number, "v.age_months", "Lifecycle"),
+                new("refresh_due", "Due for refresh", ReportColumnType.YesNo, "CASE WHEN v.refresh_due THEN 'yes' ELSE 'no' END", "Lifecycle"),
+                new("assigned_to", "Assigned to", ReportColumnType.Text, "v.assigned_to", "Custody"),
+                new("assigned_email", "Custodian e-mail", ReportColumnType.Text, "v.assigned_email", "Custody"),
+                new("assigned_at", "Assigned on", ReportColumnType.Date, "v.assigned_at", "Custody"),
+                new("expected_return", "Loan ends", ReportColumnType.Date, "v.expected_return", "Custody"),
+                new("department", "Department / unit", ReportColumnType.Text, "dp.name", "Custody"),
+                new("location", "Location", ReportColumnType.Text, "lo.name", "Custody"),
+                new("acquisition", "Acquisition", ReportColumnType.Text, "initcap(v.acquisition)", "Purchase"),
+                new("purchase_date", "Purchase date", ReportColumnType.Date, "v.purchase_date", "Purchase"),
+                new("purchase_cost", "Purchase cost", ReportColumnType.Number, "v.purchase_cost", "Purchase"),
+                new("currency", "Currency", ReportColumnType.Text, "v.currency", "Purchase"),
+                new("vendor", "Vendor", ReportColumnType.Text, "v.vendor", "Purchase"),
+                new("invoice_number", "Invoice", ReportColumnType.Text, "v.invoice_number", "Purchase"),
+                new("po_number", "Purchase order", ReportColumnType.Text, "v.po_number", "Purchase"),
+                new("depreciation_method", "Depreciation", ReportColumnType.Text, "initcap(replace(v.depreciation_method, '_', ' '))", "Purchase"),
+                new("useful_life_months", "Useful life (months)", ReportColumnType.Number, "v.useful_life_months", "Purchase"),
+                new("book_value", "Book value", ReportColumnType.Number, "v.book_value", "Purchase"),
+                new("depreciated", "Depreciated so far", ReportColumnType.Number, "v.purchase_cost - v.book_value", "Purchase"),
+                new("lessor", "Lessor", ReportColumnType.Text, "v.lessor", "Lease"),
+                new("lease_end", "Lease ends", ReportColumnType.Date, "v.lease_end", "Lease"),
+                new("lease_monthly_cost", "Lease cost / month", ReportColumnType.Number, "v.lease_monthly_cost", "Lease"),
+                new("warranty_provider", "Warranty provider", ReportColumnType.Text, "v.warranty_provider", "Warranty"),
+                new("warranty_type", "Warranty type", ReportColumnType.Text, "v.warranty_type", "Warranty"),
+                new("warranty_end", "Warranty ends", ReportColumnType.Date, "v.warranty_end", "Warranty"),
+                new("warranty_days", "Warranty days left", ReportColumnType.Number, "v.warranty_days", "Warranty"),
+                new("contracts", "Contracts", ReportColumnType.Text, "(SELECT string_agg(c.name, ', ' ORDER BY c.end_date) FROM zentriq.asset_contract_assets ca JOIN zentriq.asset_contracts c ON c.id = ca.contract_id WHERE ca.asset_id = v.asset_id)", "Warranty"),
+                new("disposed_on", "Disposed on", ReportColumnType.Date, "v.disposed_on", "Disposal"),
+                new("disposal_method", "Disposal method", ReportColumnType.Text, "initcap(replace(v.disposal_method, '_', ' '))", "Disposal"),
+                new("disposal_vendor", "Disposal vendor", ReportColumnType.Text, "v.disposal_vendor", "Disposal"),
+                new("disposal_value", "Disposal value", ReportColumnType.Number, "v.disposal_value", "Disposal"),
+                new("sanitization_method", "Data sanitisation (NIST SP 800-88)", ReportColumnType.Text, "initcap(replace(v.sanitization_method, '_', ' '))", "Disposal"),
+                new("sanitized_by", "Sanitised by", ReportColumnType.Text, "v.sanitized_by", "Disposal"),
+                new("sanitized_on", "Sanitised on", ReportColumnType.Date, "v.sanitized_on", "Disposal"),
+                new("certificate_ref", "Certificate", ReportColumnType.Text, "v.certificate_ref", "Disposal"),
+                new("last_seen", "Last seen", ReportColumnType.Date, "v.last_seen_at", "Asset"),
+            ]),
+
+        new("asset_lifecycle_events", "IT asset lifecycle history", "One row per lifecycle change: stage, assignment, return, disposal and automatic changes.",
+            """
+            zentriq.asset_lifecycle_events e
+            JOIN zentriq.assets a ON a.id = e.asset_id
+            JOIN zentriq.asset_lifecycle l ON l.asset_id = a.id
+            """,
+            [
+                new("at", "Date", ReportColumnType.Date, "e.at", "Change"),
+                new("device", "Device", ReportColumnType.Text, "COALESCE(a.hostname, a.serial_number, a.manual_serial)", "Asset"),
+                new("asset_tag", "Asset tag", ReportColumnType.Text, "l.asset_tag", "Asset"),
+                new("kind", "Change", ReportColumnType.Text, "initcap(replace(e.kind, '_', ' '))", "Change"),
+                new("from_stage", "From", ReportColumnType.Text, "initcap(replace(e.from_stage, '_', ' '))", "Change"),
+                new("to_stage", "To", ReportColumnType.Text, "initcap(replace(e.to_stage, '_', ' '))", "Change"),
+                new("to_status", "Status", ReportColumnType.Text, "initcap(replace(e.to_status, '_', ' '))", "Change"),
+                new("person", "Person", ReportColumnType.Text, "e.person", "Change"),
+                new("reason", "Reason", ReportColumnType.Text, "left(e.reason, 500)", "Change"),
+                new("by", "By", ReportColumnType.Text, "e.actor", "Change"),
             ]),
 
         new("discovery", "Discovery results", "One row per address checked by a discovery scan.",

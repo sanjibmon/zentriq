@@ -87,7 +87,7 @@
     <Property Id="ZQ_FROM_BUNDLE" Secure="yes" />
     <Property Id="ZQ_URL" Secure="yes" />
     <Property Id="DESKTOPSHORTCUT" Value="1" Secure="yes" />
-    <!-- Sections: "overview,discover,insight" (Standard), "all", or Standard plus remote / infrastructure / secure.
+    <!-- Sections: "overview,discover,infrastructure,insight" (Standard), "all", or Standard plus remote / secure.
          Silent installs: ZQ_SECTIONS=standard|all|<list> (default Standard on a new server; kept on repair and upgrade). -->
     <Property Id="ZQ_SECTIONS" Secure="yes" />
     <Property Id="ZQ_INSTALLTYPE" Value="standard" Secure="yes" />
@@ -101,9 +101,9 @@
     <SetProperty Id="DATAFOLDER" Action="SetDataFolderDefault" Value="[CommonAppDataFolder]Zentriq" After="SetDataFolderFromExisting" Sequence="both" Condition="NOT DATAFOLDER" />
     <SetProperty Id="ZQ_SECTIONS" Action="SetSectionsFromRegistry" Value="[ZQ_SECTIONS_REG]" After="AppSearch" Sequence="both" Condition="NOT ZQ_SECTIONS AND ZQ_SECTIONS_REG" />
     <SetProperty Id="ZQ_SECTIONS" Action="SetSectionsExisting" Value="all" After="SetSectionsFromRegistry" Sequence="both" Condition="NOT ZQ_SECTIONS AND (ZQ_EXISTING OR WIX_UPGRADE_DETECTED OR Installed)" />
-    <SetProperty Id="ZQ_SECTIONS" Action="SetSectionsStandard" Value="overview,discover,insight" After="SetSectionsExisting" Sequence="both" Condition='NOT ZQ_SECTIONS OR ZQ_SECTIONS = "standard"' />
+    <SetProperty Id="ZQ_SECTIONS" Action="SetSectionsStandard" Value="overview,discover,infrastructure,insight" After="SetSectionsExisting" Sequence="both" Condition='NOT ZQ_SECTIONS OR ZQ_SECTIONS = "standard"' />
     <SetProperty Id="ZQ_INSTALLTYPE" Action="SetInstallTypeAdvanced" Value="advanced" After="SetSectionsStandard" Sequence="first"
-                 Condition='ZQ_SECTIONS &lt;&gt; "overview,discover,insight"' />
+                 Condition='ZQ_SECTIONS &lt;&gt; "overview,discover,infrastructure,insight"' />
     <SetProperty Id="ZQ_SEC_REMOTE" Action="SetSecRemote" Value="1" After="SetInstallTypeAdvanced" Sequence="first"
                  Condition='ZQ_SECTIONS = "all" OR ZQ_SECTIONS = "advanced" OR ZQ_SECTIONS &gt;&lt; "remote" OR NOT (ZQ_EXISTING OR WIX_UPGRADE_DETECTED OR Installed)' />
     <SetProperty Id="ZQ_SEC_INFRA" Action="SetSecInfra" Value="1" After="SetSecRemote" Sequence="first"

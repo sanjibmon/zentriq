@@ -141,6 +141,22 @@ public static class DuplicateAssets
             UPDATE zentriq.remote_sessions SET asset_id = @k WHERE asset_id = ANY(@d);
             UPDATE zentriq.asset_actions SET asset_id = @k WHERE asset_id = ANY(@d);
             UPDATE zentriq.asset_changes SET asset_id = @k WHERE asset_id = ANY(@d);
+            -- Asset Lifecycle: the kept record takes the tag, custodian, purchase, warranty and contracts it does not have.
+            WITH src AS (SELECT l.* FROM zentriq.asset_lifecycle l JOIN zentriq.assets a ON a.id = l.asset_id
+                          WHERE l.asset_id = ANY(@d) ORDER BY (l.asset_tag IS NOT NULL) DESC, (l.purchase_cost IS NOT NULL) DESC, a.last_seen_at DESC LIMIT 1)
+            UPDATE zentriq.asset_lifecycle k SET
+                assigned_to = COALESCE(k.assigned_to, (SELECT assigned_to FROM src)), assigned_email = COALESCE(k.assigned_email, (SELECT assigned_email FROM src)),
+                assigned_at = COALESCE(k.assigned_at, (SELECT assigned_at FROM src)),
+                status = CASE WHEN k.stage = 'in_use' AND k.assigned_to IS NULL AND (SELECT assigned_to FROM src) IS NOT NULL THEN 'assigned' ELSE k.status END,
+                purchase_date = COALESCE(k.purchase_date, (SELECT purchase_date FROM src)), purchase_cost = COALESCE(k.purchase_cost, (SELECT purchase_cost FROM src)),
+                currency = COALESCE(k.currency, (SELECT currency FROM src)), vendor = COALESCE(k.vendor, (SELECT vendor FROM src)),
+                invoice_number = COALESCE(k.invoice_number, (SELECT invoice_number FROM src)), po_number = COALESCE(k.po_number, (SELECT po_number FROM src)),
+                warranty_provider = COALESCE(k.warranty_provider, (SELECT warranty_provider FROM src)), warranty_type = COALESCE(k.warranty_type, (SELECT warranty_type FROM src)),
+                warranty_start = COALESCE(k.warranty_start, (SELECT warranty_start FROM src)), warranty_end = COALESCE(k.warranty_end, (SELECT warranty_end FROM src)),
+                notes = COALESCE(k.notes, (SELECT notes FROM src))
+             WHERE k.asset_id = @k AND EXISTS (SELECT 1 FROM src);
+            INSERT INTO zentriq.asset_contract_assets (contract_id, asset_id) SELECT contract_id, @k FROM zentriq.asset_contract_assets WHERE asset_id = ANY(@d) ON CONFLICT DO NOTHING;
+            UPDATE zentriq.asset_lifecycle_events SET asset_id = @k WHERE asset_id = ANY(@d);
             UPDATE zentriq.assets SET merged_into = @k WHERE merged_into = ANY(@d);
             UPDATE zentriq.assets SET status = 'duplicate', merged_into = @k, updated_at = now(), row_version = row_version + 1
              WHERE id = ANY(@d) AND status = 'active';
@@ -148,6 +164,26 @@ public static class DuplicateAssets
         cmd.Parameters.AddWithValue("k", keep);
         cmd.Parameters.AddWithValue("d", dups);
         await cmd.ExecuteNonQueryAsync(ct);
+        // The asset tag moves to the kept record when it has none (two steps: tags are unique).
+        await using (var tag = new NpgsqlCommand("""
+            SELECT asset_tag FROM zentriq.asset_lifecycle WHERE asset_id = ANY(@d) AND asset_tag IS NOT NULL
+               AND NOT EXISTS (SELECT 1 FROM zentriq.asset_lifecycle WHERE asset_id = @k AND asset_tag IS NOT NULL) LIMIT 1
+            """, conn, tx))
+        {
+            tag.Parameters.AddWithValue("k", keep);
+            tag.Parameters.AddWithValue("d", dups);
+            if (await tag.ExecuteScalarAsync(ct) is string t)
+            {
+                await using var move = new NpgsqlCommand("""
+                    UPDATE zentriq.asset_lifecycle SET asset_tag = NULL WHERE asset_id = ANY(@d) AND lower(asset_tag) = lower(@t);
+                    UPDATE zentriq.asset_lifecycle SET asset_tag = @t WHERE asset_id = @k;
+                    """, conn, tx);
+                move.Parameters.AddWithValue("k", keep);
+                move.Parameters.AddWithValue("d", dups);
+                move.Parameters.AddWithValue("t", t);
+                await move.ExecuteNonQueryAsync(ct);
+            }
+        }
         await tx.CommitAsync(ct);
         return dups.Length;
     }
