@@ -21,8 +21,8 @@ Commercial licences are sold in two editions. The licence names its edition, `"e
 
 | Edition | Sections | Modules |
 |---|---|---|
-| **Standard** | Overview, Discover & inventory, Insight & admin | dashboards, inventory, discovery, reports, integrations |
-| **Advanced** | Standard + Remote support, Infrastructure, Secure & remediate | all modules |
+| **Standard** | Overview, Discover & inventory, Infrastructure, Insight & admin | dashboards, inventory, discovery, lifecycle, cloud, reports, integrations |
+| **Advanced** | Standard + Remote support, Secure & remediate | all modules |
 
 - **Trial:** every section, limited to 30 devices.
 - **Extra modules:** a licence can list modules besides its edition, for example a Standard licence with `remote`. Those modules are added.

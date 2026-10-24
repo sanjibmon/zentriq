@@ -31,7 +31,7 @@ export const NAV: [string, NavItem[]][] = [
   ]],
   ['Infrastructure', [
     { id: 'cloud', label: 'Cloud & Infrastructure', icon: 'cloud', path: '/modules/cloud', ready: false },
-    { id: 'lifecycle', label: 'Asset Lifecycle', icon: 'cycle', path: '/modules/lifecycle', ready: false },
+    { id: 'lifecycle', label: 'Asset Lifecycle', icon: 'cycle', path: '/lifecycle', ready: true },
   ]],
   ['Secure & remediate', [
     { id: 'patch', label: 'Patch Management', icon: 'patch', path: '/modules/patch', ready: false },

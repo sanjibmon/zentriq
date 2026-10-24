@@ -119,7 +119,7 @@ Remove-Item $answer -Force   # contains the administrator password
 
 if (-not $installed) {
     foreach ($t in 'T02 PostgreSQL provisioning', 'T03 Database migration', 'T04 Administrator sign-in', 'T05 API and worker services', 'T06 Trial initialization',
-                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection', 'T68 Live agent connection', 'T69 Locations and IT accessories', 'T70 Manual hardware details', 'T71 Standard and Advanced installation') {
+                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection', 'T68 Live agent connection', 'T69 Locations and IT accessories', 'T70 Manual hardware details', 'T71 Standard and Advanced installation', 'T72 Asset lifecycle') {
         Record $t.Substring(0, 3) $t.Substring(4) 'BLOCKED' 'installation failed'
     }
 } else {
@@ -1594,6 +1594,77 @@ if (-not $installed) {
         $a = Api GET "/assets/$id" -Session $s
         Assert (-not $a.manualSerial -and -not $a.manualModel -and -not $a.manualManufacturer) 'entered values not removed'
         "saved and linked to $($r.identities) identit(y/ies); $hwNote; 201 characters refused; removed"
+    } | Out-Null
+
+    Check 'T72' 'Asset lifecycle: add to stock with tags, details and depreciation, assign and return, contract, refresh, labels, retire and dispose with data sanitisation, report' {
+        $s = Login
+        function Raw([string] $Method, [string] $Path, $Body) {
+            $p = @{ Uri = "$base/api/v1$Path"; Method = $Method; WebSession = $s; Headers = @{ 'X-Zentriq-Request' = '1' }; ContentType = 'application/json'; SkipHttpErrorCheck = $true }
+            if ($null -ne $Body) { $p.Body = ($Body | ConvertTo-Json -Depth 6) }
+            $resp = Invoke-WebRequest @p
+            $text = if ($resp.Content -is [byte[]]) { [Text.Encoding]::UTF8.GetString($resp.Content) } else { [string]$resp.Content }
+            [pscustomobject]@{ StatusCode = [int]$resp.StatusCode; Content = $text }
+        }
+        $meta = Api GET '/lifecycle/meta' -Session $s
+        Assert (@($meta.stages).Count -eq 8 -and $meta.currency) "meta: $(@($meta.stages).Count) stages"
+        $sn = 'CI-LC-' + (Get-Random -Maximum 999999)
+        $add = Api POST '/lifecycle/stock' @{ items = @(@{ serial = $sn; manufacturer = 'CI'; model = 'CI Book 14'; deviceType = 'laptop' }); stage = 'in_stock'; status = 'new'; purchaseDate = '2024-01-15'; purchaseCost = 90000; vendor = 'CI Vendor'; poNumber = 'PO-CI-72'; warrantyEnd = (Get-Date).AddDays(20).ToString('yyyy-MM-dd') } -Session $s
+        $item = @($add.created)[0]
+        Assert ($item.tag -like 'LAP-*') "stock item tag: $($item.tag)"
+        $dupe = Raw POST '/lifecycle/stock' @{ items = @(@{ serial = $sn; deviceType = 'laptop' }) }
+        Assert ($dupe.StatusCode -eq 400) "same serial added twice ($($dupe.StatusCode))"
+        $d = Api GET "/lifecycle/assets/$($item.id)" -Session $s
+        Assert ($d.asset.stage -eq 'in_stock' -and $d.asset.awaitingFirstSighting -and $d.asset.bookValue -lt 90000 -and $d.asset.bookValue -gt 0) "stock item: $($d.asset | ConvertTo-Json -Compress -Depth 2)"
+        Assert (@($d.schedule).Count -ge 4) "depreciation schedule rows: $(@($d.schedule).Count)"
+        $summary = Api GET '/lifecycle/summary' -Session $s
+        Assert ($summary.warranty30 -ge 1) "warranty ending not counted: $($summary | ConvertTo-Json -Compress -Depth 2)"
+        # Billing ignores items in stock
+        $usage = (Api GET '/licensing/status' -Session $s).usage
+
+        # Assign the stock item, loan rules, people view, return.
+        $bad = Raw POST "/lifecycle/assets/$($item.id)/stage" @{ stage = 'in_use'; status = 'loaned'; assignedTo = 'CI Person' }
+        Assert ($bad.StatusCode -eq 400 -and $bad.Content -match 'loan') "loan without return date: $($bad.StatusCode) $($bad.Content)"
+        Api POST "/lifecycle/assets/$($item.id)/stage" @{ stage = 'in_use'; status = 'assigned'; assignedTo = 'CI Person'; assignedEmail = 'ci.person@example.test' } -Session $s | Out-Null
+        $people = @(Api GET '/lifecycle/people?q=CI%20Person' -Session $s | ForEach-Object { $_ })
+        Assert (@($people | Where-Object person -eq 'CI Person').assets -ge 1) "people: $($people | ConvertTo-Json -Compress)"
+        $hold = Api GET '/lifecycle/people/holdings?person=CI%20Person' -Session $s
+        Assert (@($hold.assets | Where-Object id -eq $item.id).Count -eq 1) 'handover form does not list the asset'
+        $jump = Raw POST "/lifecycle/assets/$($item.id)/stage" @{ stage = 'disposed'; status = 'recycled' }
+        Assert ($jump.StatusCode -eq 400) "in use straight to disposed allowed ($($jump.StatusCode))"
+        Api POST "/lifecycle/assets/$($item.id)/return" @{ stage = 'in_stock'; status = 'refurbished'; reason = 'CI return' } -Session $s | Out-Null
+
+        # Details, contract, labels, refresh.
+        $d = Api GET "/lifecycle/assets/$($item.id)" -Session $s
+        Api PUT "/lifecycle/assets/$($item.id)" @{ assetTag = $d.asset.assetTag; acquisition = 'purchase'; purchaseDate = '2020-01-15'; purchaseCost = 90000; currency = 'INR'; vendor = 'CI Vendor'; warrantyEnd = '2023-01-15'; notes = 'CI'; rowVersion = $d.asset.rowVersion } -Session $s | Out-Null
+        $stale = Raw PUT "/lifecycle/assets/$($item.id)" @{ purchaseCost = 1; rowVersion = $d.asset.rowVersion }
+        Assert ($stale.StatusCode -eq 409) "stale update accepted ($($stale.StatusCode))"
+        $c = Api POST '/lifecycle/contracts' @{ name = 'CI AMC'; kind = 'amc'; vendor = 'CI Vendor'; endDate = (Get-Date).AddDays(45).ToString('yyyy-MM-dd'); notifyDays = 60 } -Session $s
+        $link = Api POST "/lifecycle/contracts/$($c.id)/assets" @{ add = @($item.id) } -Session $s
+        Assert ($link.added -eq 1) 'asset not added to the contract'
+        $refresh = Api GET '/lifecycle/refresh' -Session $s
+        Assert (@($refresh.candidates | Where-Object id -eq $item.id).Count -eq 1) 'six-year-old laptop not a refresh candidate'
+        $labels = @(Api GET "/lifecycle/labels?ids=$($item.id)" -Session $s | ForEach-Object { $_ })
+        Assert ($labels.Count -eq 1 -and $labels[0].qrSvg -match '<svg') 'label without QR code'
+
+        # Retire and dispose (NIST SP 800-88 sanitisation required).
+        Api POST "/lifecycle/assets/$($item.id)/stage" @{ stage = 'retired'; status = 'pending_disposal'; reason = 'CI end of life' } -Session $s | Out-Null
+        $noSan = Raw POST "/lifecycle/assets/$($item.id)/stage" @{ stage = 'disposed'; status = 'recycled'; disposedOn = (Get-Date).ToString('yyyy-MM-dd') }
+        Assert ($noSan.StatusCode -eq 400 -and $noSan.Content -match 'sanit|800-88|data') "disposal without sanitisation: $($noSan.StatusCode) $($noSan.Content)"
+        $today = (Get-Date).ToString('yyyy-MM-dd')
+        Api POST "/lifecycle/assets/$($item.id)/stage" @{ stage = 'disposed'; status = 'recycled'; disposedOn = $today; sanitizationMethod = 'purge'; sanitizedBy = 'CI'; sanitizedOn = $today; certificateRef = 'COD-CI'; disposalVendor = 'CI Recycler' } -Session $s | Out-Null
+        $d = Api GET "/lifecycle/assets/$($item.id)" -Session $s
+        Assert ($d.asset.stage -eq 'disposed' -and $d.asset.assetStatus -eq 'retired') "after disposal: $($d.asset.stage) / $($d.asset.assetStatus)"
+        $kinds = @($d.events | ForEach-Object kind)
+        Assert ('disposed' -in $kinds -and 'assigned' -in $kinds -and 'returned' -in $kinds) "history: $($kinds -join ', ')"
+
+        # Report dataset and the lifecycle tab of the server's own record.
+        $r = Api POST '/reports/run' @{ dataset = 'asset_lifecycle'; definition = @{ columns = @('asset_tag', 'stage', 'disposal_method', 'sanitization_method', 'book_value'); filters = @(@{ column = 'stage'; op = 'eq'; value = 'Disposed' }) } } -Session $s
+        Assert (@($r.rows).Count -ge 1) "disposal register empty: $($r | ConvertTo-Json -Compress -Depth 3)"
+        $own = ((Api GET '/assets' -Session $s).items | Select-Object -First 1)
+        $ownLc = Api GET "/lifecycle/assets/$($own.id)" -Session $s
+        Assert ($ownLc.asset.stage -in 'in_use', 'missing') "server record lifecycle: $($ownLc.asset.stage)"
+        Api DELETE "/lifecycle/contracts/$($c.id)" -Session $s | Out-Null
+        "stock item $($item.tag) (book value below cost, schedule $(@($d.schedule).Count) years); duplicate serial refused; loan without date refused; assigned to CI Person, handover lists it; returned; stale edit 409; contract linked; refresh candidate; QR label; retired; disposal without sanitisation refused, disposed (purge, certificate); history $($kinds.Count) changes; report row(s) $(@($r.rows).Count)"
     } | Out-Null
 
     Check 'T71' 'Installation type: Advanced recorded, change to Standard (Remote support off, section locked) and back with Setup Update' {

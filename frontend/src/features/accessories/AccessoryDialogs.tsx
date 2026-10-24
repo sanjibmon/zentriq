@@ -65,7 +65,7 @@ export function ItemDialog({ item, categories, onClose, onSaved }: { item: Acces
 
 // ---- people and devices ------------------------------------------------------------------------------------------
 
-function PersonInput({ value, onChange, id }: { value: string; onChange: (v: string) => void; id: string }) {
+export function PersonInput({ value, onChange, id }: { value: string; onChange: (v: string) => void; id: string }) {
   const [q, setQ] = useState(value);
   useEffect(() => { const t = setTimeout(() => setQ(value), 250); return () => clearTimeout(t); }, [value]);
   const people = useApi(() => api.get<{ name: string; source: string }[]>('/accessories/people', { q }), [q]);

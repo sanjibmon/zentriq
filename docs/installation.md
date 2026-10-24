@@ -31,8 +31,8 @@ Run `Zentriq-Setup-x64.exe` as an administrator. The wizard:
 1. **Welcome** and **license agreement**.
 2. **System check** – OS, memory, disk, ports, PostgreSQL, existing Zentriq data. Items marked *FAIL* block setup; *WARN* items are advisory. *Re-check* after fixing.
 3. **Installation type** (build 79):
-   - **Standard installation** (recommended): *Overview*, *Discover & inventory* and *Insight & admin*.
-   - **Advanced installation**: Standard plus the sections ticked on the next page: *Remote support*, *Infrastructure*, *Secure & remediate*.
+   - **Standard installation** (recommended): *Overview*, *Discover & inventory*, *Infrastructure* (Asset Lifecycle, Cloud & Infrastructure) and *Insight & admin*.
+   - **Advanced installation**: Standard plus the sections ticked on the next page: *Remote support*, *Secure & remediate*.
 
    Sections that are not installed do not appear in the console. Their APIs answer "not installed", and the Remote Support service is disabled. See [Installation types and editions](#installation-types-and-editions).
 4. **Folders** – program files (default `C:\Program Files\Zentriq`) and the data folder (default `C:\ProgramData\Zentriq`), which contains `Config`, `Secrets`, `Logs`, `Packages`, `Exports` and `Backups`. Data is never stored with the program files.
@@ -62,7 +62,7 @@ In every case the data folder, the database, users, settings and enrolled agents
 | Discover & inventory | Discovery, IT / non-IT assets, hardware, software, network, IT accessories, agents, activity | ✓ | ✓ | Standard |
 | Insight & admin | Reports, integrations; licensing, users, audit, settings | ✓ | ✓ | Standard |
 | Remote support | Remote desktop, files, terminal, quick support, unattended access | — | optional | Advanced |
-| Infrastructure | Cloud & infrastructure, asset lifecycle (as released) | — | optional | Advanced |
+| Infrastructure | Asset lifecycle, Cloud & infrastructure (build 80: part of Standard) | ✓ | ✓ | Standard |
 | Secure & remediate | Vulnerabilities, security configuration, patch management, software deployment | — | optional | Advanced |
 
 - **What you can use** is what is **installed** and **licensed**. The 14-day trial licenses every section.
@@ -98,7 +98,7 @@ $LASTEXITCODE   # 0 = installed and verified, 3010 = reboot required (VC++ runti
 `ZQ_SECTIONS` selects the installation type:
 - `standard` is the default on a new server.
 - `all` installs every section (Advanced).
-- A list adds chosen sections, for example `overview,discover,insight,remote,secure`. The standard sections are always included.
+- A list adds chosen sections, for example `overview,discover,infrastructure,insight,remote,secure`. The standard sections are always included.
 
 To change the installation type later, without the wizard:
 

@@ -344,3 +344,59 @@ details.rs-advanced[open] summary { margin-bottom: 12px; }
 .nav a.locked > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nav a .nav-lock-ico { flex: none; }
 .ico-tile svg { color: #fff !important; stroke: #fff !important; opacity: 1 !important; }
+
+/* ---- Asset Lifecycle ---------------------------------------------------------------------------------------------- */
+.grid-3.tight { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px 14px; margin: 0; }
+.lc-h { margin: 6px 0 -2px; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted, #64748b); }
+.lc-track { list-style: none; display: flex; gap: 0; margin: 4px 0 0; padding: 0; overflow-x: auto; }
+.lc-track li { flex: 1; min-width: 92px; position: relative; padding-top: 18px; font-size: 12px; color: var(--muted, #64748b); text-align: center; }
+.lc-track li::before { content: ''; position: absolute; top: 6px; left: 0; right: 0; height: 3px; background: var(--line); }
+.lc-track li:first-child::before { left: 50%; } .lc-track li:last-child::before { right: 50%; }
+.lc-track li .dot { position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 15px; height: 15px; border-radius: 50%; background: var(--surface); border: 3px solid var(--line); }
+.lc-track li.done::before, .lc-track li.on::before { background: linear-gradient(90deg, #0A7385, #38B3C4); }
+.lc-track li.done .dot { border-color: #0A7385; background: #0A7385; }
+.lc-track li.on { color: var(--text); font-weight: 700; }
+.lc-track li.on .dot { border-color: #0A7385; background: #38B3C4; box-shadow: 0 0 0 4px rgba(56, 179, 196, .25); }
+.lc-track li.side .dot { border-color: #d97706; }
+.lc-track li em { display: block; font-style: normal; font-size: 11px; color: #d97706; font-weight: 600; }
+.lc-funnel { display: grid; gap: 6px; }
+.lc-funnel-row { display: grid; grid-template-columns: 130px 1fr 60px; gap: 10px; align-items: center; color: inherit; text-decoration: none; padding: 2px 4px; border-radius: 8px; }
+.lc-funnel-row:hover { background: var(--surface-2); }
+.lc-funnel-row .bar { height: 12px; border-radius: 6px; background: var(--surface-2); overflow: hidden; }
+.lc-funnel-row .bar i { display: block; height: 100%; border-radius: 6px; background: #94a3b8; min-width: 2px; }
+.lc-funnel-row .bar i.t-ok { background: linear-gradient(90deg, #0A7385, #38B3C4); }
+.lc-funnel-row .bar i.t-info { background: #60a5fa; } .lc-funnel-row .bar i.t-warn { background: #f59e0b; } .lc-funnel-row .bar i.t-crit { background: #e11d48; }
+.lc-funnel-row b { text-align: right; }
+.lc-attn { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+.bulk-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 8px 12px; margin-bottom: 10px; border-radius: 10px;
+  background: var(--accent-soft, #E0F1F3); border: 1px solid rgba(10, 115, 133, .2); }
+
+/* Print: labels and handover forms */
+.label-sheet { display: grid; grid-template-columns: repeat(3, 70mm); gap: 0; }
+.asset-label { width: 70mm; height: 37mm; box-sizing: border-box; padding: 3mm; display: flex; gap: 3mm; align-items: center; border: 1px dashed #cbd5e1; background: #fff; color: #0f172a; overflow: hidden; }
+.asset-label .qr { width: 28mm; height: 28mm; flex: none; }
+.asset-label .qr svg { width: 100%; height: 100%; }
+.asset-label .txt { min-width: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
+.asset-label .tag { font: 700 13pt/1.1 Consolas, monospace; letter-spacing: .5px; }
+.asset-label .nm { font-size: 8pt; margin-top: 1mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.asset-label .sn { font: 7.5pt Consolas, monospace; }
+.asset-label .own { font-size: 6.5pt; color: #475569; margin-top: 1mm; }
+.form-doc { background: #fff; color: #0f172a; max-width: 210mm; margin: 0 auto; padding: 14mm; border-radius: 6px; box-shadow: 0 4px 20px rgba(15, 23, 42, .1); font-size: 10.5pt; }
+.form-doc header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0A7385; padding-bottom: 6mm; margin-bottom: 6mm; }
+.form-doc h1 { margin: 0; font-size: 16pt; text-align: right; } .form-doc header p { margin: 2px 0 0; text-align: right; color: #475569; }
+.form-doc h2 { font-size: 11pt; margin: 6mm 0 2mm; color: #0A7385; }
+.form-doc table { width: 100%; border-collapse: collapse; }
+.form-doc .doc-kv th { text-align: left; width: 22%; color: #475569; font-weight: 600; padding: 2mm 0; } .form-doc .doc-kv td { padding: 2mm 0; border-bottom: 1px solid #e2e8f0; }
+.form-doc .doc-t th, .form-doc .doc-t td { border: 1px solid #cbd5e1; padding: 1.8mm 2mm; text-align: left; vertical-align: top; }
+.form-doc .doc-t th { background: #f1f5f9; font-size: 9pt; }
+.form-doc .terms { margin-top: 6mm; font-size: 9.5pt; color: #334155; }
+.form-doc .signs { display: grid; grid-template-columns: 1fr 1fr 0.6fr; gap: 10mm; margin-top: 18mm; }
+.form-doc .signs div { border-top: 1px solid #0f172a; padding-top: 2mm; font-size: 9pt; color: #475569; }
+@media print {
+  @page { size: A4; margin: 10mm; }
+  .rail, .topbar, .crumbs, .no-print, .license-strip, .page-head { display: none !important; }
+  .app, .main-col, main, .content { display: block !important; margin: 0 !important; padding: 0 !important; background: #fff !important; }
+  body { background: #fff !important; }
+  .form-doc { box-shadow: none; padding: 0; max-width: none; }
+  .asset-label { border-color: transparent; break-inside: avoid; }
+}
