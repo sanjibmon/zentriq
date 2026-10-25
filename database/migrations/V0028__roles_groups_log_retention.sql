@@ -34,6 +34,12 @@ SELECT rp.role_id, p.code FROM role_permissions rp
 ON CONFLICT DO NOTHING;
 INSERT INTO role_permissions (role_id, permission_code) SELECT 'admin', code FROM permissions ON CONFLICT DO NOTHING;
 
+-- API tokens keep what they could read: report data (reports.view) and, where they could read assets, every inventory area.
+UPDATE api_tokens SET permissions = ARRAY(SELECT DISTINCT unnest(permissions || ARRAY['reports.view']))
+ WHERE 'reports.export' = ANY(permissions) AND NOT 'reports.view' = ANY(permissions);
+UPDATE api_tokens SET permissions = ARRAY(SELECT DISTINCT unnest(permissions || ARRAY['nonit.view', 'accessories.view', 'lifecycle.view', 'cloud.view', 'activity.view']))
+ WHERE 'assets.view' = ANY(permissions);
+
 -- ---- Roles -------------------------------------------------------------------------------------------------------------
 ALTER TABLE roles ADD COLUMN created_at timestamptz NOT NULL DEFAULT now(),
                   ADD COLUMN updated_at timestamptz NOT NULL DEFAULT now(),
