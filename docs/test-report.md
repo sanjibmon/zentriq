@@ -1,17 +1,19 @@
 # Test report
 
-Latest: GitHub Actions run 40100189926, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
-10.0.20348** VM. Release: `v1.1.1-build.80` (pre-release, **unsigned**), package version **1.1.1.80**. Results: unit +
-PostgreSQL integration tests **257 PASS, 2 skipped** (live remote support and SNMP tests run in ci-quick: PASS, 259/259);
-installer acceptance **62 passed, 0 failed**; in-place updates PASS (database migration V0023).
+Latest: GitHub Actions run 40165790356, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
+10.0.20348** VM. Release: `v1.1.1-build.81` (pre-release, **unsigned**), package version **1.1.1.81**. Results: unit +
+PostgreSQL integration tests **271 PASS, 2 skipped** (live remote support and SNMP tests run in ci-quick: PASS, 273/273);
+installer acceptance **63 passed, 0 failed**; in-place updates PASS (database migration V0024, schema 24).
 
-New in build 80: Asset Lifecycle for IT assets. Infrastructure (Asset Lifecycle, Cloud & Infrastructure) moves into the Standard edition and Standard installation.
+New in build 81: Cloud & Infrastructure — read-only connections to Microsoft Azure, Amazon Web Services, VMware vCenter
+and Hyper-V hosts; resources, links to inventoried devices, change history, cost and exposure findings, events and reports.
 
 | ID | Test | Result | Detail |
 |---|---|---|---|
-| T72 | Asset lifecycle end to end | **PASS** | stock item LAP-000001 with depreciation schedule; duplicate serial refused; loan without return date refused; assigned, handover lists it, returned; stale edit 409; contract linked; refresh candidate; QR label; retired; disposal refused without data sanitisation, accepted with purge + certificate; 7 history entries; disposal register report |
-| T71 | Installation type (Standard now includes Infrastructure) | **PASS** | registry `overview,discover,infrastructure,insight` on Standard; Remote support and Secure & remediate removed and restored |
-| — | Unit / PostgreSQL tests | **PASS** | book value (straight-line, declining balance, none) and schedule; transitions; assign/loan/return/retire/dispose rules and history; stock item deployed when first seen; not-seen → Missing and back; tags per class prefix; editions with Infrastructure in Standard |
+| T73 | Cloud & infrastructure | **PASS** | validation (Azure tenant ID, AWS access key, Hyper-V Windows account); unreachable vCenter 127.0.0.1:9 → sync *failed* with "Could not reach 127.0.0.1 …"; secret write-only and kept on edit; platform change refused; resources / findings / changes APIs; both report datasets run; built-in reports present; connection deleted |
+| T72 | Asset lifecycle end to end | **PASS** | unchanged from build 80 |
+| T71 | Installation type | **PASS** | Standard (with Infrastructure) and back to Advanced |
+| — | Unit / PostgreSQL tests | **PASS** | AWS SigV4 test vector; Azure Resource Graph mapping (VM power state, NIC MAC/IP, public IP, NSG rules, storage); paged Resource Graph and sign-in errors against a fake Azure; AWS EC2/EBS/security group/RDS parsing, one service denied = warning not failure; vCenter `/api` and legacy `/rest` shapes, datastore free %; Hyper-V WMI rows (state since, checkpoints, KVP guest data, memory commit); all finding rules; PostgreSQL: sync stores resources, links the VM by byte-swapped BIOS UUID, maps the department tag, keeps resources on partial reads, deletes and resolves findings on complete reads, restores |
 
 ## Build and packaging
 
@@ -30,11 +32,11 @@ replaced) and the trial's 30-device total cap.
 ## Release artifacts (SHA-256)
 
 ```
-437916b0979bc545c5390213f2e603943338c9fc255d134436060ce64971f973  Zentriq-1.1.1-docs.zip
-53f70c9d6b1714f1f76edceb998de455db3d23bc24ab2fd27a3af9e707ab7834  Zentriq-1.1.1-msi-offline-kit.zip
-ee1abe283842b4662a8946d5ba9a60319b440fc7ef09e318c7a8e8f729e3acbc  Zentriq-Setup-x64.exe
-9515eea34c563c2ff48f07d504adbe9cc8f31540a01f6eff6c01cb2c14d7a54f  Zentriq.msi
-9a7943e8a8d2fb0ba7e0bf7e7a612bd26eae539e76a65000539114769edfee04  ZentriqAgent-x64.msi
+2861808808435bc129870a57cbba0bc14b744d6794bb0b9174c5dd4c88366a6c  Zentriq-1.1.1-docs.zip
+87c99cdd02dde412438ed4fb82fa1779f5d5af22ef75febd500e0de65b3f12e2  Zentriq-1.1.1-msi-offline-kit.zip
+f51c30187f94866add68ef57f05f2b6e1adc474686f2eb0fd9b20a8cd2a67682  Zentriq-Setup-x64.exe
+93144660cf315169c676655ead307c944c9c3defeed0307f46152a23d37c377a  Zentriq.msi
+cdf1051196ffbf77c39710c036deb606d02d4267c0be1f3c1749eebb05d93101  ZentriqAgent-x64.msi
 ```
 
 ## Installer acceptance (tests/installer/Invoke-InstallerAcceptance.ps1)

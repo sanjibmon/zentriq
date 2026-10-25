@@ -119,7 +119,7 @@ public static class CloudHttp
     }
 
     public static string Unreachable(string host, Exception ex) =>
-        $"Could not reach {host}: {(ex is TaskCanceledException ? "timed out" : ex.InnerException?.Message ?? ex.Message)}. The Zentriq server needs outbound HTTPS to it (check the firewall and proxy).";
+        $"Could not reach {host}: {(ex is TaskCanceledException ? "timed out" : (ex.InnerException?.Message ?? ex.Message).TrimEnd('.'))}. The Zentriq server needs outbound HTTPS to it (check the firewall and proxy).";
 }
 
 public class CloudException(string message, Exception? inner = null) : Exception(message, inner);
