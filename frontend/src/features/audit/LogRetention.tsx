@@ -115,7 +115,7 @@ export function LogRetention() {
                     <option value={12}>12 months — each calendar year</option>
                   </select>
                 </label>
-                <div className="row-actions">
+                <div className="check-grid">
                   <label className="row-check"><input type="checkbox" checked={form.schedule.includeAudit} disabled={!manage || !form.schedule.enabled} onChange={(e) => setSchedule({ includeAudit: e.target.checked })} /> <span>Audit log</span></label>
                   <label className="row-check"><input type="checkbox" checked={form.schedule.includeActivity} disabled={!manage || !form.schedule.enabled} onChange={(e) => setSchedule({ includeActivity: e.target.checked })} /> <span>Activity log</span></label>
                 </div>
@@ -126,7 +126,7 @@ export function LogRetention() {
                   </select>
                   <small className="muted">Destinations are set up in Backup &amp; Restore (network share, SFTP, Azure, S3, Google Cloud …).</small>
                 </label>
-                {d.settings.schedule.enabled && d.nextScheduled && <small className="muted">Next export: after {fmt.day(d.nextScheduled)} ({d.scheduleText.toLowerCase()}).</small>}
+                {d.settings.schedule.enabled && d.nextScheduled && <small className="muted">Next scheduled export: {fmt.day(d.nextScheduled)}.</small>}
               </div>
             </Panel>
           </div>
@@ -141,13 +141,13 @@ export function LogRetention() {
         <ErrorBox error={archives.error} />
         <DataTable rows={archives.data?.items ?? []} empty={archives.loading ? 'Loading…' : 'No log exports yet.'} columns={[
           { key: 'p', label: 'Period', render: (a) => <><b>{fmt.day(a.from)} – {fmt.day(new Date(new Date(a.to).getTime() - 1000).toISOString())}</b><div className="faint" style={{ fontSize: 11.5 }}>{[a.includeAudit && 'Audit', a.includeActivity && 'Activity'].filter(Boolean).join(' + ')}</div></> },
-          { key: 't', label: 'Made', render: (a) => <>{TRIGGER[a.trigger]}<div className="faint" style={{ fontSize: 11.5 }}>{fmt.date(a.createdAt)}{a.requestedBy && a.trigger === 'manual' ? ` · ${a.requestedBy}` : ''}</div></> },
+          { key: 't', label: 'Made', render: (a) => <>{TRIGGER[a.trigger]}<div className="faint" style={{ fontSize: 11.5 }}>{fmt.date(a.createdAt)}</div>{a.requestedBy && a.trigger === 'manual' && <div className="faint" style={{ fontSize: 11.5 }}>{a.requestedBy}</div>}</> },
           { key: 's', label: 'Status', render: (a) => <Pill tone={STATUS[a.status][0]}>{STATUS[a.status][1]}</Pill> },
           { key: 'r', label: 'Entries', render: (a) => a.status !== 'succeeded' ? '' : <span className="faint">{[a.includeAudit && `${(a.auditRows ?? 0).toLocaleString()} audit`, a.includeActivity && `${(a.activityRows ?? 0).toLocaleString()} activity`].filter(Boolean).join(' · ')}{a.size != null ? ` · ${fmt.bytes(a.size)}` : ''}</span> },
           { key: 'c', label: 'Copy', className: 'wrap', render: (a) => a.error ? <span className="text-crit" style={{ fontSize: 12.5 }}>{a.error}</span>
             : a.copy ? <span style={{ fontSize: 12.5 }} className={a.copy.status === "ok" ? "" : "text-crit"}>{a.copy.message}</span> : <span className="faint">Server only</span> },
           { key: 'x', label: '', render: (a) => <div className="row-actions">
-            {a.status === 'succeeded' && a.available && <a className="btn sm" href={`/api/v1/logs/archives/${a.id}/file`} download title={a.sha256 ? `SHA-256 ${a.sha256}` : undefined}><Icon name="down" size={13} /> Download</a>}
+            {a.status === 'succeeded' && a.available && <a className="btn sm" href={`/api/v1/logs/archives/${a.id}/file`} download aria-label="Download archive" title={a.sha256 ? `Download · SHA-256 ${a.sha256}` : 'Download'}><Icon name="down" size={13} /></a>}
             {a.status === 'succeeded' && !a.available && <span className="faint">File removed</span>}
             {manage && a.status !== 'queued' && a.status !== 'running' && <button className="btn sm danger" onClick={() => void remove(a)} aria-label="Delete archive"><Icon name="trash" size={13} /></button>}
           </div> },
@@ -193,7 +193,7 @@ function ExportDialog({ onClose, onQueued }: { onClose: () => void; onQueued: (m
           <label>From<input className="in" type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} /></label>
           <label>To (inclusive)<input className="in" type="date" value={to} min={from} onChange={(e) => setTo(e.target.value)} /></label>
         </div>
-        <div className="row-actions">
+        <div className="check-grid">
           <label className="row-check"><input type="checkbox" checked={audit} onChange={(e) => setAudit(e.target.checked)} /> <span>Audit log</span></label>
           {can('activity.view') && <label className="row-check"><input type="checkbox" checked={activity} onChange={(e) => setActivity(e.target.checked)} /> <span>Activity log</span></label>}
         </div>

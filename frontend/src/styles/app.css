@@ -350,5 +350,9 @@ fieldset.plain { border: 0; padding: 0; margin: 0; min-width: 0; }
 .access-list { margin: 0; padding-left: 16px; font-size: 12.5px; line-height: 1.5; }
 .field-title { font-size: 13px; font-weight: 500; margin-bottom: 5px; }
 .text-crit { color: var(--crit); }
-.row-actions .row-check, .form-v .row-actions label.row-check { display: inline-flex; gap: 6px; align-items: center; font-weight: 400; }
+.check-grid label.row-check, .form-v .check-grid label.row-check { display: inline-flex; gap: 6px; align-items: center; font-weight: 400; }
 .btn.disabled { pointer-events: none; opacity: .5; }
+.perm-table { width: 100%; table-layout: fixed; }
+.perm-table th:nth-child(4) { width: 240px; }
+.perm-extras .perm-box { white-space: normal; }
+.form-v > * { min-width: 0; }

@@ -114,7 +114,8 @@ application disappears from the inventory once removed.
 
 *Activity Log* (left menu) lists every service start/stop/restart and software uninstall requested from the console:
 device, action, how it ran (agent or WinRM/WMI), result, detail and who asked. Each asset's Services tab links to its
-own log. All of these are also in the audit log.
+own log. All of these are also in the audit log. *Download CSV* exports a date range; how long entries are kept and
+scheduled exports are described in [Log retention and export](log-retention.md).
 
 ## Moving data
 
@@ -143,7 +144,7 @@ Complete removal (irreversible – take and export a backup first):
   *System Settings › Sign-in security › Require two-step verification* makes it mandatory: users without MFA must set
   it up at their next sign-in and cannot use anything else until they do (the server grants no permissions to such a
   session). Set it up for your own account first.
-* **Lost phone.** An administrator opens *Users, Roles & Sites › Edit / Reset MFA* for that user; the user signs in
+* **Lost phone.** An administrator opens *Users, Roles & Groups › Edit / Reset MFA* for that user; the user signs in
   with the password and sets MFA up again. Locked-out last administrator: on the server run
   `zentriqctl reset-password --email admin@company.com --disable-mfa` (elevated).
 * **Forgotten password.**
@@ -151,8 +152,67 @@ Complete removal (irreversible – take and export a backup first):
     sender, console address used in links; *Send test*), the sign-in page offers *Forgot password?*. The user receives
     a one-time link valid for 30 minutes (configurable). Users with MFA must also enter an authenticator code to
     reset. The answer never reveals whether an address has an account; at most three links per user per hour.
-  * Without e-mail, an administrator sets a new password under *Users, Roles & Sites › Edit*, or on the server:
+  * Without e-mail, an administrator sets a new password under *Users, Roles & Groups › Edit*, or on the server:
     `zentriqctl reset-password --email user@company.com` (prompts for the new password; unlocks the account and signs
     out existing sessions).
 * RBAC is enforced by the API for every endpoint; the UI only hides what the API would refuse.
+
+## Roles, groups and custom roles
+
+*Users, Roles & Groups* has three tabs.
+
+**Areas and permissions.** Every console area has its own *see* and *change* permission, so a role can open one area
+and nothing else: menus, pages, dashboard widgets, report data sources and the API all follow it.
+
+| Area | See | Change | More |
+|---|---|---|---|
+| Dashboard | `dashboard.view` | | widgets show only the areas below the user may see |
+| IT asset inventory (devices, hardware, software, network, agents, discovery results) | `assets.view` | `assets.manage` | `assets.control`, `software.uninstall`, `agents.manage`, `directory.manage` |
+| Discovery & scans | | | `scans.run`, `scans.profiles`, `credentials.manage` |
+| Activity log | `activity.view` | | |
+| Non-IT asset inventory | `nonit.view` | `nonit.manage` | |
+| IT accessories | `accessories.view` | `accessories.manage` | |
+| Asset lifecycle (stages, people, contracts) | `lifecycle.view` | `lifecycle.manage` | |
+| Cloud & infrastructure | `cloud.view` | `cloud.manage` | |
+| Remote support | `remote.start` | `remote.manage` | `remote.unattended` |
+| Vulnerabilities | `vuln.view` | `vuln.manage` | `vuln.except` |
+| Security configuration | `security.view` | `security.manage` | |
+| Reports & Analytics | `reports.view` | `reports.design` | `reports.export`, `dashboards.share` |
+| Administration | | | `users.manage`, `settings.manage`, `licensing.manage`, `backup.run`, `audit.view`, `jobs.view`, `integrations.manage` |
+
+Departments and locations are shared by the inventories: anyone who can see one of the inventories can pick them, and
+anyone who can change one can maintain them. A report data source needs the *see* permission of its area (for example
+*Non-IT assets* needs `nonit.view`), so a non-IT user's reports can only use non-IT data, including scheduled reports
+(checked again at each delivery).
+
+**Built-in roles** (read-only; *Duplicate* makes an editable copy):
+
+| Role | For |
+|---|---|
+| Administrator | everything |
+| IT Asset Manager | IT inventory, accessories and lifecycle, activity log, dashboard, reports |
+| Non-IT Asset Manager | only the non-IT inventory (add, change, upload), its dashboard widgets and reports |
+| Non-IT Asset Viewer | read-only non-IT inventory, its dashboard widgets and reports |
+| Asset Lifecycle Manager | procurement to disposal: lifecycle, people, contracts, IT accessories; dashboard, reports |
+| Cloud Administrator | cloud and virtual infrastructure; dashboard, reports |
+| Security Analyst | vulnerabilities and security configuration, read access to the IT inventory; dashboard, reports |
+| Roles from earlier versions | unchanged: where they could see assets they now see every inventory area |
+
+**Custom roles.** *Roles › New role* (or *Duplicate*): tick *See* / *Change* / *More* per area. Examples:
+
+* *Facilities — non-IT assets*: Dashboard, Non-IT *see + change*, Reports *see + design + export*.
+* *Store keeper*: IT accessories *see + change*, Dashboard.
+* *Finance / auditors*: Asset lifecycle *see*, Non-IT *see*, Reports *see + export*, Audit log.
+* *Helpdesk*: IT inventory *see*, Remote support *start sessions*, Activity log, Start / stop services.
+* *Cloud team*: Cloud *see + change*, Reports.
+
+You can only give permissions you hold yourself, built-in roles cannot be changed, and a role cannot be deleted while
+a user or group has it.
+
+**Groups.** *Groups › New group*: a name, its roles and its members (for example *Facilities team* with the Non-IT
+Asset Manager role). Members get the group's roles in addition to their own; a user can be in several groups and the
+user list shows roles "via" groups. At least one active administrator must remain.
+
+**Changes apply immediately.** When a role, a group or a user's roles change, the affected users' next request uses the
+new rights (nobody is signed out). A user without dashboard access lands on the first page they may open.
 * Every security-relevant action is written to the audit log (`/api/v1/audit`).

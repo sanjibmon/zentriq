@@ -119,7 +119,7 @@ Remove-Item $answer -Force   # contains the administrator password
 
 if (-not $installed) {
     foreach ($t in 'T02 PostgreSQL provisioning', 'T03 Database migration', 'T04 Administrator sign-in', 'T05 API and worker services', 'T06 Trial initialization',
-                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection', 'T68 Live agent connection', 'T69 Locations and IT accessories', 'T70 Manual hardware details', 'T71 Standard and Advanced installation', 'T72 Asset lifecycle', 'T73 Cloud and infrastructure', 'T74 Own asset tags, people and bulk upload', 'T75 Backup and restore') {
+                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection', 'T68 Live agent connection', 'T69 Locations and IT accessories', 'T70 Manual hardware details', 'T71 Standard and Advanced installation', 'T72 Asset lifecycle', 'T73 Cloud and infrastructure', 'T74 Own asset tags, people and bulk upload', 'T75 Backup and restore', 'T76 Roles and groups', 'T77 Log retention and export') {
         Record $t.Substring(0, 3) $t.Substring(4) 'BLOCKED' 'installation failed'
     }
 } else {
@@ -1882,6 +1882,96 @@ if (-not $installed) {
             Remove-LocalUser -Name $shareUser -ErrorAction SilentlyContinue
             Remove-Item $folder, $shareDir, (Join-Path $env:TEMP 'zq-dl.zbak'), (Join-Path $env:TEMP 'zq-bk-pass.txt') -Recurse -Force -ErrorAction SilentlyContinue
         }
+    } | Out-Null
+
+    Check 'T76' 'Roles and groups: custom Non-IT role through a group sees only non-IT assets, its dashboard and reports; built-in roles read-only; rights change without signing out' {
+        $s = Login
+        function Raw76([string] $Method, [string] $Path, $Body, $Session) {
+            $p = @{ Uri = "$base/api/v1$Path"; Method = $Method; WebSession = $Session; Headers = @{ 'X-Zentriq-Request' = '1' }; ContentType = 'application/json'; SkipHttpErrorCheck = $true }
+            if ($null -ne $Body) { $p.Body = ($Body | ConvertTo-Json -Depth 6) }
+            $r = Invoke-WebRequest @p
+            [pscustomobject]@{ StatusCode = [int]$r.StatusCode; Content = (Body $r) }
+        }
+        $roles = Api GET '/roles' -Session $s
+        foreach ($id in 'admin', 'nonit', 'nonit_viewer', 'it_assets', 'lifecycle', 'cloud', 'security') { Assert (@($roles | Where-Object id -eq $id).Count -eq 1) "built-in role $id missing" }
+        $builtIn = Raw76 PUT '/roles/nonit' @{ name = 'Changed'; permissions = @('nonit.view') } $s
+        Assert ($builtIn.StatusCode -ge 400 -and $builtIn.StatusCode -lt 500) "built-in role changed: $($builtIn.StatusCode)"
+        $unknown = Raw76 POST '/roles' @{ name = 'CI bad'; permissions = @('nonit.view', 'everything.please') } $s
+        Assert ($unknown.StatusCode -eq 400) "unknown permission accepted: $($unknown.StatusCode)"
+        $role = Api POST '/roles' @{ name = 'CI Facilities'; description = 'Non-IT only'; permissions = @('dashboard.view', 'nonit.view', 'nonit.manage', 'reports.view') } -Session $s
+        $group = Api POST '/groups' @{ name = 'CI Facilities team'; roles = @($role.id); members = @() } -Session $s
+        $uMail = "facilities$(Get-Random -Maximum 99999)@ci.zentriq.test"
+        $uPass = 'Fa-' + [Guid]::NewGuid().ToString('N').Substring(0, 16) + '-x9'
+        $user = Api POST '/users' @{ email = $uMail; displayName = 'CI Facilities'; password = $uPass; roles = @(); groups = @($group.id) } -Session $s
+        try {
+            $f = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+            for ($i = 0; ; $i++) {
+                $lr = Invoke-WebRequest "$base/api/v1/auth/login" -Method Post -Body (@{ email = $uMail; password = $uPass } | ConvertTo-Json) -ContentType 'application/json' -Headers @{ 'X-Zentriq-Request' = '1' } -WebSession $f -SkipHttpErrorCheck
+                if ($lr.StatusCode -eq 429 -and $i -lt 5) { Start-Sleep 15; continue }
+                Assert ($lr.StatusCode -eq 200) "facilities login $($lr.StatusCode)"; break
+            }
+            $me = Api GET '/auth/me' -Session $f
+            Assert (@($me.permissions) -contains 'nonit.manage' -and @($me.permissions) -notcontains 'assets.view') "permissions: $(@($me.permissions) -join ',')"
+            $allowed = @{ '/nonit/assets' = 200; '/nonit/summary' = 200; '/dashboards' = 200; '/reports/datasets' = 200 }
+            $denied = @('/assets', '/software', '/accessories/items', '/lifecycle/summary', '/cloud/summary', '/activity', '/audit', '/users', '/roles', '/backup', '/vulnerabilities', '/logs')
+            foreach ($k in $allowed.Keys) { $r = Raw76 GET $k $null $f; Assert ($r.StatusCode -eq 200) "$k returned $($r.StatusCode)" }
+            $leaks = @(foreach ($k in $denied) { $r = Raw76 GET $k $null $f; if ($r.StatusCode -notin 403, 404) { "$k=$($r.StatusCode)" } })
+            Assert ($leaks.Count -eq 0) "reachable without permission: $($leaks -join ', ')"
+            $ds = (Api GET '/reports/datasets' -Session $f).datasets
+            Assert ((@($ds | ForEach-Object key) -join ',') -eq 'nonit_assets') "report sources: $(@($ds | ForEach-Object key) -join ',')"
+            $escalate = Raw76 POST '/roles' @{ name = 'CI escalate'; permissions = @('users.manage') } $f
+            Assert ($escalate.StatusCode -eq 403) "role editing allowed: $($escalate.StatusCode)"
+            $inUse = Raw76 DELETE "/roles/$($role.id)" $null $s
+            Assert ($inUse.StatusCode -eq 409) "role in use deleted: $($inUse.StatusCode)"
+            # Viewer instead of manager: the same session loses write access at its next request.
+            Api PUT "/groups/$($group.id)" @{ name = 'CI Facilities team'; roles = @('nonit_viewer'); members = @($user.id) } -Session $s | Out-Null
+            $me2 = Api GET '/auth/me' -Session $f
+            Assert (@($me2.permissions) -contains 'nonit.view' -and @($me2.permissions) -notcontains 'nonit.manage') "after change: $(@($me2.permissions) -join ',')"
+            $write = Raw76 POST '/nonit/assets' @{ name = 'CI chair' } $f
+            Assert ($write.StatusCode -eq 403) "viewer could add a non-IT asset: $($write.StatusCode)"
+            "7 built-in roles (read-only); custom role via group: non-IT, dashboard and reports only ($($denied.Count) other areas refused, report sources: nonit_assets); no escalation; role in use kept; viewer applied to the live session"
+        } finally {
+            Raw76 PUT "/users/$($user.id)" @{ status = 'disabled'; roles = @(); groups = @() } $s | Out-Null
+            Raw76 DELETE "/groups/$($group.id)" $null $s | Out-Null
+            Raw76 DELETE "/roles/$($role.id)" $null $s | Out-Null
+        }
+    } | Out-Null
+
+    Check 'T77' 'Log retention and export: one year by default, validation, schedule every 6 months, export a period now, archive download with manifest, CSV download of the audit and activity logs' {
+        $s = Login
+        $info = Api GET '/logs' -Session $s
+        Assert ($info.settings.auditRetentionDays -eq 365 -and $info.settings.activityRetentionDays -eq 365 -and $info.settings.archiveBeforeDelete) "defaults: $($info.settings | ConvertTo-Json -Compress -Depth 4)"
+        $p = @{ Uri = "$base/api/v1/logs/settings"; Method = 'PUT'; WebSession = $s; Headers = @{ 'X-Zentriq-Request' = '1' }; ContentType = 'application/json'; SkipHttpErrorCheck = $true; Body = (@{ auditRetentionDays = 30 } | ConvertTo-Json) }
+        Assert ((Invoke-WebRequest @p).StatusCode -eq 400) '30-day audit retention accepted'
+        $saved = Api PUT '/logs/settings' @{ auditRetentionDays = 730; activityRetentionDays = 365; schedule = @{ enabled = $true; everyMonths = 6; includeAudit = $true; includeActivity = $true } } -Session $s
+        Assert ($saved.auditRetentionDays -eq 730 -and $saved.schedule.everyMonths -eq 6) "saved: $($saved | ConvertTo-Json -Compress -Depth 4)"
+        $to = (Get-Date).ToUniversalTime().AddMinutes(1); $from = $to.AddDays(-30)
+        $req = Api POST '/logs/archives' @{ from = $from.ToString('o'); to = $to.ToString('o'); includeAudit = $true; includeActivity = $true } -Session $s
+        & $ctl maintenance run-pending | Out-Host
+        $arch = (Api GET '/logs/archives' -Session $s).items
+        $mine = @($arch | Where-Object id -eq $req.id)[0]
+        Assert ($mine.status -eq 'succeeded' -and $mine.auditRows -gt 0 -and $mine.available) "archive: $($mine | ConvertTo-Json -Compress -Depth 4)"
+        $sched = @($arch | Where-Object trigger -eq 'schedule')
+        Assert ($sched.Count -ge 1 -and $sched[0].status -eq 'succeeded') "scheduled archive: $($sched | ConvertTo-Json -Compress -Depth 4)"
+        $zipPath = Join-Path $env:TEMP 'zq-logs.zip'
+        Invoke-WebRequest "$base/api/v1/logs/archives/$($mine.id)/file" -WebSession $s -OutFile $zipPath
+        Assert ((Get-FileHash $zipPath -Algorithm SHA256).Hash.ToLower() -eq $mine.sha256) 'archive checksum differs'
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        $zip = [IO.Compression.ZipFile]::OpenRead($zipPath)
+        try {
+            $names = @($zip.Entries | ForEach-Object FullName | Sort-Object)
+            Assert (($names -join ',') -eq 'activity.csv,audit.csv,manifest.json') "zip: $($names -join ',')"
+            $sr = New-Object IO.StreamReader($zip.GetEntry('manifest.json').Open()); $manifest = $sr.ReadToEnd() | ConvertFrom-Json; $sr.Dispose()
+            Assert ($manifest.audit.rows -eq $mine.auditRows -and $manifest.audit.sha256.Length -eq 64) "manifest: $($manifest | ConvertTo-Json -Compress -Depth 4)"
+        } finally { $zip.Dispose(); Remove-Item $zipPath -Force -ErrorAction SilentlyContinue }
+        $q = "from=$([uri]::EscapeDataString($from.ToString('o')))&to=$([uri]::EscapeDataString($to.ToString('o')))"
+        $csv = Invoke-WebRequest "$base/api/v1/audit/export?$q" -WebSession $s
+        $csvText = Body $csv
+        Assert ($csv.Headers['Content-Disposition'] -match 'zentriq-audit-' -and $csvText -match 'occurred_at_utc' -and $csvText -match 'logs.export_request') 'audit CSV incomplete'
+        $act = Invoke-WebRequest "$base/api/v1/activity/export?$q" -WebSession $s
+        Assert ((Body $act) -match 'requested_at_utc') 'activity CSV has no header'
+        Api PUT '/logs/settings' @{ auditRetentionDays = 365; activityRetentionDays = 365; schedule = @{ enabled = $false; everyMonths = 3; includeAudit = $true; includeActivity = $true } } -Session $s | Out-Null
+        "defaults 1 year; 30 days refused; export of 30 days: $($mine.auditRows) audit / $($mine.activityRows) activity entries, checksum and manifest OK; scheduled half-year archive made; CSV downloads OK"
     } | Out-Null
 
     Check 'T71' 'Installation type: Advanced recorded, change to Standard (Remote support off, section locked) and back with Setup Update' {
