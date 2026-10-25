@@ -33,7 +33,7 @@ public static class LogEndpoints
                 await r.ReadAsync(ct);
                 return new { rows = r.GetInt64(0), oldest = r.IsDBNull(1) ? (DateTimeOffset?)null : r.GetFieldValue<DateTimeOffset>(1) };
             }
-            var next = s.Schedule.Enabled ? NextScheduled(s.Schedule, now) : null;
+            var next = s.Schedule.Enabled ? NextScheduled(s.Schedule, now) : (DateTimeOffset?)null;
             return Results.Ok(new
             {
                 settings = s,
@@ -47,7 +47,7 @@ public static class LogEndpoints
                 retentionChoices = LogSettings.RetentionChoices,
                 destinations = rc.Has(Permissions.SettingsManage) || rc.Has(Permissions.BackupRun)
                     ? (await backups.DestinationsAsync(false, ct)).Select(d => (object)new { id = d.Destination.Id, name = d.Destination.Name, kind = d.Destination.Kind, enabled = d.Destination.Enabled }).ToList()
-                    : [],
+                    : new List<object>(),
             });
         });
 

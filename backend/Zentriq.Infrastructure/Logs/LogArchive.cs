@@ -193,7 +193,7 @@ public static class LogArchiver
             {
                 async Task<(long Rows, string Sha, long? First, long? Last, string? LastHash)> Part(string entry, string sql, string header, bool audit)
                 {
-                    // Written to memory-free temporary file first so its checksum can go into the manifest.
+                    // Written to a temporary file first so its checksum can go into the manifest.
                     var t = Path.Combine(folder, $".{Guid.NewGuid():N}.csv");
                     try
                     {
