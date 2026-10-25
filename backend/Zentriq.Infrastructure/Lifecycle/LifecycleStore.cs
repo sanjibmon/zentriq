@@ -220,6 +220,8 @@ public static class LifecycleStore
         else if (!retiring && cur.AssetStatus == "retired")
             await Exec(conn, tx, "UPDATE zentriq.assets SET status = 'active', retired_at = NULL, updated_at = now(), row_version = row_version + 1 WHERE id = @a", assetId, ct);
         if (c.Stage == "in_use" && person is not null)
+            await AddPersonAsync(conn, tx, person, Trim(c.AssignedEmail, 254), "assignment", actor, ct);
+        if (c.Stage == "in_use" && person is not null)
             await Exec(conn, tx, $"UPDATE zentriq.assets SET owner_name = (SELECT assigned_to FROM zentriq.asset_lifecycle WHERE asset_id = @a), updated_at = now() WHERE id = @a", assetId, ct);
 
         var kind = c.Stage == "disposed" ? "disposed"
@@ -262,34 +264,46 @@ public static class LifecycleStore
     }
 
     /// <summary>
-    /// Gives the asset its next tag (PREFIX-000123, prefix from the device class policy) unless it has one. Returns the tag.
+    /// Gives the asset the next tag in the organisation's format (setting lifecycle.tag_format, default PREFIX-000123 with the
+    /// device class prefix) unless it has one. Returns the tag. Works in manual mode too (the "Give the next tag" action).
     /// </summary>
-    public static async Task<string> EnsureTagAsync(NpgsqlConnection conn, NpgsqlTransaction tx, Guid assetId, CancellationToken ct)
+    public static async Task<string> EnsureTagAsync(NpgsqlConnection conn, NpgsqlTransaction tx, Guid assetId, CancellationToken ct, TagSettings? settings = null)
     {
         await using (var has = new NpgsqlCommand("SELECT asset_tag FROM zentriq.asset_lifecycle WHERE asset_id = @a", conn, tx))
         {
             has.Parameters.AddWithValue("a", assetId);
             if (await has.ExecuteScalarAsync(ct) is string t) return t;
         }
-        string prefix;
+        var ts = settings ?? await TagSettings.LoadAsync(conn, tx, ct);
+        string prefix = "AST", loc = "";
         await using (var p = new NpgsqlCommand($"""
-            SELECT COALESCE(lp.tag_prefix, 'AST') FROM zentriq.assets a {ClassJoins}
-              LEFT JOIN zentriq.lifecycle_policies lp ON lp.class = {ClassSql} WHERE a.id = @a
+            SELECT COALESCE(lp.tag_prefix, 'AST'), lo.code, lo.name FROM zentriq.assets a {ClassJoins}
+              LEFT JOIN zentriq.lifecycle_policies lp ON lp.class = {ClassSql}
+              LEFT JOIN zentriq.locations lo ON lo.id = a.location_id
+             WHERE a.id = @a
             """, conn, tx))
         {
             p.Parameters.AddWithValue("a", assetId);
-            prefix = await p.ExecuteScalarAsync(ct) as string ?? "AST";
+            await using var r = await p.ExecuteReaderAsync(ct);
+            if (await r.ReadAsync(ct))
+            {
+                prefix = r.GetString(0);
+                loc = TagFormat.LocationCode(r.IsDBNull(1) ? null : r.GetString(1), r.IsDBNull(2) ? null : r.GetString(2));
+            }
         }
-        for (var attempt = 0; attempt < 50; attempt++)
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        var key = TagFormat.CounterKey(ts.Format, prefix, ts.Org, loc, today);
+        for (var attempt = 0; attempt < 200; attempt++)
         {
             await using var next = new NpgsqlCommand("""
-                INSERT INTO zentriq.lifecycle_tag_counters (prefix, next_value) VALUES (@p, 2)
+                INSERT INTO zentriq.lifecycle_tag_counters (prefix, next_value) VALUES (@p, @start + 1)
                 ON CONFLICT (prefix) DO UPDATE SET next_value = lifecycle_tag_counters.next_value + 1
                 RETURNING next_value - 1
                 """, conn, tx);
-            next.Parameters.AddWithValue("p", prefix);
+            next.Parameters.AddWithValue("p", key);
+            next.Parameters.AddWithValue("start", ts.Start);
             var n = (int)(await next.ExecuteScalarAsync(ct))!;
-            var tag = $"{prefix}-{n:D6}";
+            var tag = TagFormat.Render(ts.Format, prefix, ts.Org, loc, today, n);
             await using var set = new NpgsqlCommand("""
                 UPDATE zentriq.asset_lifecycle SET asset_tag = @t, updated_at = now()
                  WHERE asset_id = @a AND asset_tag IS NULL AND NOT EXISTS (SELECT 1 FROM zentriq.asset_lifecycle x WHERE lower(x.asset_tag) = lower(@t))
@@ -298,7 +312,39 @@ public static class LifecycleStore
             set.Parameters.AddWithValue("t", tag);
             if (await set.ExecuteNonQueryAsync(ct) == 1) return tag;
         }
-        throw new LifecycleValidationException("assetTag", "Could not find a free asset tag; check the tag prefixes.");
+        throw new LifecycleValidationException("assetTag", "Could not find a free asset tag; check the tag format and prefixes.");
+    }
+
+    /// <summary>Sets a tag typed by a person (or taken from an upload). Checks the characters and that no other asset has it.</summary>
+    public static async Task SetTagAsync(NpgsqlConnection conn, NpgsqlTransaction tx, Guid assetId, string tag, CancellationToken ct)
+    {
+        tag = tag.Trim();
+        if (!TagFormat.TagPattern.IsMatch(tag)) throw new LifecycleValidationException("assetTag", $"Asset tag \"{tag}\": use letters, digits and . _ / - (up to 40 characters).");
+        await using var dup = new NpgsqlCommand("SELECT 1 FROM zentriq.asset_lifecycle WHERE lower(asset_tag) = lower(@t) AND asset_id <> @a", conn, tx);
+        dup.Parameters.AddWithValue("t", tag);
+        dup.Parameters.AddWithValue("a", assetId);
+        if (await dup.ExecuteScalarAsync(ct) is not null) throw new LifecycleValidationException("assetTag", $"Asset tag {tag} is already used by another asset.");
+        await using var set = new NpgsqlCommand("UPDATE zentriq.asset_lifecycle SET asset_tag = @t, updated_at = now() WHERE asset_id = @a", conn, tx);
+        set.Parameters.AddWithValue("t", tag);
+        set.Parameters.AddWithValue("a", assetId);
+        await set.ExecuteNonQueryAsync(ct);
+    }
+
+    /// <summary>Adds a person to the people directory unless someone with that name is there (assignments, uploads).</summary>
+    public static async Task<bool> AddPersonAsync(NpgsqlConnection conn, NpgsqlTransaction? tx, string name, string? email, string source, string? actor, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return false;
+        await using var cmd = new NpgsqlCommand("""
+            INSERT INTO zentriq.lifecycle_people (name, email, source, created_by)
+            SELECT @n, @e, @s, @by
+             WHERE NOT EXISTS (SELECT 1 FROM zentriq.lifecycle_people p WHERE lower(btrim(p.name)) = lower(btrim(@n)))
+               AND NOT (@e::text IS NOT NULL AND EXISTS (SELECT 1 FROM zentriq.lifecycle_people p WHERE lower(p.email) = lower(@e)))
+            """, conn, tx);
+        cmd.Parameters.AddWithValue("n", name.Trim());
+        cmd.Parameters.Add(new NpgsqlParameter("e", NpgsqlTypes.NpgsqlDbType.Text) { Value = string.IsNullOrWhiteSpace(email) ? DBNull.Value : email.Trim() });
+        cmd.Parameters.AddWithValue("s", source);
+        cmd.Parameters.Add(new NpgsqlParameter("by", NpgsqlTypes.NpgsqlDbType.Text) { Value = (object?)actor ?? DBNull.Value });
+        return await cmd.ExecuteNonQueryAsync(ct) == 1;
     }
 
     /// <summary>

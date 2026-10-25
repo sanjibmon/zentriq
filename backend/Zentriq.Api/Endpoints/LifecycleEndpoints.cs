@@ -23,8 +23,9 @@ public static class LifecycleEndpoints
     public sealed record DetailsBody(string? AssetTag, string? Acquisition, DateOnly? PurchaseDate, DateOnly? InServiceDate, decimal? PurchaseCost, string? Currency,
         string? Vendor, string? InvoiceNumber, string? PoNumber, string? DepreciationMethod, int? UsefulLifeMonths, decimal? SalvageValue,
         string? Lessor, DateOnly? LeaseStart, DateOnly? LeaseEnd, decimal? LeaseMonthlyCost,
-        string? WarrantyProvider, string? WarrantyType, DateOnly? WarrantyStart, DateOnly? WarrantyEnd, string? Notes, int? RowVersion);
-    public sealed record StockItem(string? Serial, string? Manufacturer, string? Model, string? DeviceType, string? Hostname);
+        string? WarrantyProvider, string? WarrantyType, DateOnly? WarrantyStart, DateOnly? WarrantyEnd, string? Notes, int? RowVersion,
+        Dictionary<string, string?>? Custom = null);
+    public sealed record StockItem(string? Serial, string? Manufacturer, string? Model, string? DeviceType, string? Hostname, string? AssetTag = null);
     public sealed record StockBody(StockItem[] Items, string? Stage, string? Status, Guid? DepartmentId, Guid? LocationId,
         DateOnly? PurchaseDate, decimal? PurchaseCost, string? Currency, string? Vendor, string? InvoiceNumber, string? PoNumber,
         string? WarrantyProvider, DateOnly? WarrantyEnd, string? Notes);
@@ -32,7 +33,11 @@ public static class LifecycleEndpoints
         decimal? Cost, string? Currency, int? NotifyDays, string? Notes);
     public sealed record ContractAssetsBody(Guid[]? Add, Guid[]? Remove);
     public sealed record PolicyBody(string TagPrefix, int UsefulLifeMonths, string DepreciationMethod, decimal SalvagePercent, decimal RefreshYears);
-    public sealed record SettingsBody(string? Currency, int? NotSeenDays, bool? AutoTag);
+    public sealed record SettingsBody(string? Currency, int? NotSeenDays, bool? AutoTag, string? TagMode = null, string? TagFormat = null, string? TagOrg = null,
+        int? TagStart = null, bool? TagDiscovered = null);
+    public sealed record PersonBody(string Name, string? Email, string? EmployeeId, string? Title, string? Phone, Guid? DepartmentId, Guid? LocationId,
+        string? Manager, string? Status, string? Notes);
+    public sealed record FieldBody(string Label, string Type, string[]? Options, bool? Required, int? Sort);
     public sealed record IdsBody(Guid[] AssetIds);
 
     /// <summary>Columns of the view as camelCase JSON.</summary>
@@ -90,15 +95,23 @@ public static class LifecycleEndpoints
                                  FROM zentriq.lifecycle_policies),
                   'currency', COALESCE((SELECT value #>> '{}' FROM zentriq.system_settings WHERE key = 'lifecycle.currency'), 'INR'),
                   'notSeenDays', COALESCE((SELECT (value #>> '{}')::int FROM zentriq.system_settings WHERE key = 'lifecycle.not_seen_days'), 60),
-                  'autoTag', COALESCE((SELECT (value #>> '{}')::boolean FROM zentriq.system_settings WHERE key = 'lifecycle.auto_tag'), true))::text
+                  'autoTag', COALESCE((SELECT (value #>> '{}')::boolean FROM zentriq.system_settings WHERE key = 'lifecycle.auto_tag'), true),
+                  'fields', (SELECT COALESCE(json_agg(json_build_object('id', f.id, 'key', f.key, 'label', f.label, 'type', f.type, 'options', f.options,
+                                'required', f.required, 'sort', f.sort) ORDER BY f.sort, lower(f.label)), '[]') FROM zentriq.lifecycle_fields f))::text
                 """);
             cmd.Parameters.Add(new NpgsqlParameter("classes", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = LifecycleStore.Classes });
             var m = await JsonAsync(cmd, ct);
+            TagSettings ts;
+            await using (var tconn = await ds.OpenConnectionAsync(ct)) ts = await TagSettings.LoadAsync(tconn, null, ct);
+            var today = DateOnly.FromDateTime(DateTime.Today);
             return Results.Ok(new
             {
                 stages = LifecycleStore.Stages.Select(s => new { id = s.Stage, label = s.Label, statuses = s.Statuses.Select(x => new { id = x, label = LifecycleStore.StatusLabel(x) }), next = LifecycleStore.Transitions[s.Stage] }),
                 policies = m.GetProperty("policies"), currency = m.GetProperty("currency").GetString(), notSeenDays = m.GetProperty("notSeenDays").GetInt32(),
-                autoTag = m.GetProperty("autoTag").GetBoolean(),
+                autoTag = ts.Auto,
+                tags = new { mode = ts.Mode, format = ts.Format, org = ts.Org, start = ts.Start, discovered = ts.TagDiscovered,
+                    example = TagFormat.Render(ts.Format, "LAP", ts.Org, "PUNE", today, ts.Start) },
+                fields = m.GetProperty("fields"),
                 sanitizationMethods = new[] { new { id = "clear", label = "Clear (overwrite, NIST SP 800-88)" }, new { id = "purge", label = "Purge (secure / crypto erase, degauss)" },
                     new { id = "destroy", label = "Destroy (shred, disintegrate, incinerate)" }, new { id = "not_required", label = "Not required (no data storage)" } },
                 depreciationMethods = new[] { new { id = "straight_line", label = "Straight-line" }, new { id = "declining_balance", label = "Declining balance (double)" }, new { id = "none", label = "Not depreciated" } },
@@ -195,7 +208,8 @@ public static class LifecycleEndpoints
                   'contracts', (SELECT COALESCE(json_agg(x ORDER BY x."endDate" NULLS LAST), '[]') FROM (
                         SELECT c.id, c.name, c.kind, c.vendor, c.reference, c.start_date AS "startDate", c.end_date AS "endDate"
                           FROM zentriq.asset_contracts c JOIN zentriq.asset_contract_assets ca ON ca.contract_id = c.id WHERE ca.asset_id = @id) x),
-                  'osEndOfSupport', (SELECT {{OsEndOfSupport}} FROM zentriq.v_asset_lifecycle v WHERE v.asset_id = @id))::text
+                  'osEndOfSupport', (SELECT {{OsEndOfSupport}} FROM zentriq.v_asset_lifecycle v WHERE v.asset_id = @id),
+                  'custom', (SELECT l.custom FROM zentriq.asset_lifecycle l WHERE l.asset_id = @id))::text
                 """);
             cmd.Parameters.AddWithValue("id", id);
             var r = await JsonAsync(cmd, ct);
@@ -216,7 +230,7 @@ public static class LifecycleEndpoints
             return Results.Ok(new
             {
                 asset = a, events = r.GetProperty("events"), contracts = r.GetProperty("contracts"), osEndOfSupport = r.GetProperty("osEndOfSupport"),
-                next = LifecycleStore.Transitions[stage], schedule,
+                next = LifecycleStore.Transitions[stage], schedule, custom = r.GetProperty("custom"),
             });
         });
 
@@ -230,10 +244,19 @@ public static class LifecycleEndpoints
             if (b.WarrantyStart is { } ws && b.WarrantyEnd is { } we && we < ws) return Validation.Problem("warrantyEnd", "The warranty ends before it starts.");
             if (b.LeaseStart is { } ls && b.LeaseEnd is { } le && le < ls) return Validation.Problem("leaseEnd", "The lease ends before it starts.");
             var tag = Clean(b.AssetTag, 40);
-            if (tag is not null && !System.Text.RegularExpressions.Regex.IsMatch(tag, @"^[A-Za-z0-9][A-Za-z0-9._/\-]{0,39}$"))
+            if (tag is not null && !TagFormat.TagPattern.IsMatch(tag))
                 return Validation.Problem("assetTag", "Asset tags use letters, digits and . _ / - (up to 40 characters).");
             await using var conn = await ds.OpenConnectionAsync(ct);
             await using var tx = await conn.BeginTransactionAsync(ct);
+            var custom = new System.Text.Json.Nodes.JsonObject();
+            if (b.Custom is not null)
+            {
+                foreach (var f in await LifecycleFields.LoadAsync(conn, tx, ct))
+                {
+                    try { custom[f.Key] = LifecycleFields.Parse(f, b.Custom.GetValueOrDefault(f.Key)); }
+                    catch (LifecycleValidationException ex) { return Validation.Problem(ex.Field, ex.Message); }
+                }
+            }
             await using (var dup = new NpgsqlCommand("SELECT 1 FROM zentriq.asset_lifecycle WHERE lower(asset_tag) = lower(@t) AND asset_id <> @id", conn, tx))
             {
                 dup.Parameters.Add(T("t", tag));
@@ -246,6 +269,7 @@ public static class LifecycleEndpoints
                        depreciation_method = @dm, useful_life_months = @life, salvage_value = @salv,
                        lessor = @lessor, lease_start = @lst, lease_end = @lend, lease_monthly_cost = @lmc,
                        warranty_provider = @wp, warranty_type = @wt, warranty_start = @wst, warranty_end = @wend, notes = @notes,
+                       custom = CASE WHEN @hasCustom THEN @custom ELSE custom END,
                        updated_at = now(), updated_by = @by, row_version = row_version + 1
                  WHERE asset_id = @id AND (@rv::int IS NULL OR row_version = @rv)
                 RETURNING row_version
@@ -274,6 +298,8 @@ public static class LifecycleEndpoints
             cmd.Parameters.Add(T("notes", Clean(b.Notes, 4000)));
             cmd.Parameters.Add(T("by", rc.UserName));
             cmd.Parameters.Add(new NpgsqlParameter("rv", NpgsqlDbType.Integer) { Value = (object?)b.RowVersion ?? DBNull.Value });
+            cmd.Parameters.AddWithValue("hasCustom", b.Custom is not null);
+            cmd.Parameters.Add(new NpgsqlParameter("custom", NpgsqlDbType.Jsonb) { Value = custom.ToJsonString() });
             if (await cmd.ExecuteScalarAsync(ct) is not int)
                 return Results.Problem(statusCode: 409, title: "The asset was changed by someone else (or does not exist). Reload and try again.");
             await LifecycleStore.EventAsync(conn, tx, id, rc.UserName, "updated", null, null, null, null, null, null,
@@ -337,7 +363,11 @@ public static class LifecycleEndpoints
             var status = b.Status ?? LifecycleStore.DefaultStatus(stage, null);
             if (!LifecycleStore.Stages.First(s => s.Stage == stage).Statuses.Contains(status)) return Validation.Problem("status", "Unknown status for this stage.");
             if (b.Items is not { Length: > 0 and <= 500 }) return Validation.Problem("items", "Add between 1 and 500 items.");
-            var items = b.Items.Select(i => i with { Serial = Clean(i.Serial, 100), Manufacturer = Clean(i.Manufacturer), Model = Clean(i.Model), Hostname = Clean(i.Hostname, 63) }).ToList();
+            var items = b.Items.Select(i => i with { Serial = Clean(i.Serial, 100), Manufacturer = Clean(i.Manufacturer), Model = Clean(i.Model), Hostname = Clean(i.Hostname, 63), AssetTag = Clean(i.AssetTag, 40) }).ToList();
+            if (items.FirstOrDefault(i => i.AssetTag is not null && !TagFormat.TagPattern.IsMatch(i.AssetTag)) is { } badTag)
+                return Validation.Problem("items", $"Asset tag {badTag.AssetTag}: use letters, digits and . _ / - (up to 40 characters).");
+            var dupTags = items.Where(i => i.AssetTag is not null).GroupBy(i => i.AssetTag!.ToUpperInvariant()).Where(g2 => g2.Count() > 1).Select(g2 => g2.Key).ToList();
+            if (dupTags.Count > 0) return Validation.Problem("items", "Asset tag(s) entered twice: " + string.Join(", ", dupTags.Take(5)));
             if (items.Any(i => i.Serial is null && i.Hostname is null)) return Validation.Problem("items", "Every item needs a serial number (or a host name).");
             if (items.Any(i => i.DeviceType is not null && !Zentriq.Inventory.DeviceTypes.IsKnown(i.DeviceType))) return Validation.Problem("items", "Unknown device type.");
             var dupSerials = items.Where(i => i.Serial is not null).GroupBy(i => i.Serial!.ToUpperInvariant()).Where(g2 => g2.Count() > 1).Select(g2 => g2.Key).ToList();
@@ -355,9 +385,7 @@ public static class LifecycleEndpoints
                 exist.Parameters.Add(new NpgsqlParameter("s", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = items.Where(i => i.Serial is not null).Select(i => i.Serial!).ToArray() });
                 if (await exist.ExecuteScalarAsync(ct) is string known) return Validation.Problem("items", $"Already in the inventory: {known}. Open the device and change its lifecycle stage instead.");
             }
-            bool autoTag;
-            await using (var at = new NpgsqlCommand("SELECT COALESCE((SELECT (value #>> '{}')::boolean FROM zentriq.system_settings WHERE key = 'lifecycle.auto_tag'), true)", conn, tx))
-                autoTag = (bool)(await at.ExecuteScalarAsync(ct))!;
+            var tagSettings = await TagSettings.LoadAsync(conn, tx, ct);
             var created = new List<object>();
             foreach (var i in items)
             {
@@ -402,7 +430,13 @@ public static class LifecycleEndpoints
                     upd.Parameters.Add(T("by", rc.UserName));
                     await upd.ExecuteNonQueryAsync(ct);
                 }
-                var tag = autoTag ? await LifecycleStore.EnsureTagAsync(conn, tx, id, ct) : null;
+                string? tag = null;
+                try
+                {
+                    if (i.AssetTag is not null) { await LifecycleStore.SetTagAsync(conn, tx, id, i.AssetTag, ct); tag = i.AssetTag; }
+                    else if (tagSettings.Auto) tag = await LifecycleStore.EnsureTagAsync(conn, tx, id, ct, tagSettings);
+                }
+                catch (LifecycleValidationException ex) { return Validation.Problem("items", ex.Message); }
                 await LifecycleStore.EventAsync(conn, tx, id, rc.UserName, "created", null, stage, null, status, null, "Added to the register", new { i.Serial, i.Model, b.PoNumber }, ct);
                 created.Add(new { id, tag, serial = i.Serial });
             }
@@ -454,32 +488,217 @@ public static class LifecycleEndpoints
         });
 
         // ---- people (custody) -----------------------------------------------------------------------------------
-        g.MapGet("/people", async (NpgsqlDataSource ds, string? q, CancellationToken ct) =>
+        g.MapGet("/people", async (NpgsqlDataSource ds, string? q, string? status, bool? holding, CancellationToken ct) =>
         {
             await using var cmd = ds.CreateCommand("""
                 WITH it AS (
-                    SELECT lower(v.assigned_to) AS k, (array_agg(v.assigned_to ORDER BY v.assigned_at DESC NULLS LAST))[1] AS person,
+                    SELECT lower(btrim(v.assigned_to)) AS k, (array_agg(v.assigned_to ORDER BY v.assigned_at DESC NULLS LAST))[1] AS person,
                            (array_agg(v.assigned_email ORDER BY v.assigned_at DESC NULLS LAST) FILTER (WHERE v.assigned_email IS NOT NULL))[1] AS email,
                            (array_agg(dp.name ORDER BY v.assigned_at DESC NULLS LAST) FILTER (WHERE dp.name IS NOT NULL))[1] AS department,
                            count(*) AS assets, count(*) FILTER (WHERE v.status = 'loaned') AS loans,
                            count(*) FILTER (WHERE v.status = 'loaned' AND v.expected_return < current_date) AS overdue,
                            COALESCE(sum(v.book_value), 0) AS value
                       FROM zentriq.v_asset_lifecycle v LEFT JOIN zentriq.departments dp ON dp.id = v.department_id
-                     WHERE v.assigned_to IS NOT NULL AND v.stage IN ('in_use','in_maintenance','missing') GROUP BY lower(v.assigned_to)),
+                     WHERE v.assigned_to IS NOT NULL AND v.stage IN ('in_use','in_maintenance','missing') GROUP BY lower(btrim(v.assigned_to))),
                 acc AS (
                     SELECT person_key AS k, sum(held) AS accessories FROM (
                         SELECT m.person_key, m.item_id, sum(CASE m.kind WHEN 'issue' THEN -m.quantity ELSE -(m.quantity + m.faulty_change) END) AS held
                           FROM zentriq.accessory_movements m JOIN zentriq.accessory_items i ON i.id = m.item_id
                          WHERE m.kind IN ('issue','return') AND m.person_key IS NOT NULL AND i.returnable GROUP BY m.person_key, m.item_id) x
-                     WHERE held > 0 GROUP BY person_key)
+                     WHERE held > 0 GROUP BY person_key),
+                dir AS (SELECT p.*, lower(btrim(p.name)) AS k FROM zentriq.lifecycle_people p)
                 SELECT COALESCE(json_agg(x ORDER BY lower(x.person)), '[]')::text FROM (
-                    SELECT it.person, it.email, it.department, it.assets, it.loans, it.overdue, it.value, COALESCE(acc.accessories, 0) AS accessories
-                      FROM it LEFT JOIN acc ON acc.k = regexp_replace(it.k, '\s+', ' ', 'g')
-                     WHERE @q::text IS NULL OR it.person ILIKE @q OR it.email ILIKE @q OR it.department ILIKE @q) x
+                    SELECT dir.id, COALESCE(dir.name, it.person) AS person, COALESCE(dir.email, it.email) AS email, dir.employee_id AS "employeeId",
+                           dir.title, dir.phone, dir.manager, dir.notes, COALESCE(dir.status, 'active') AS status, dir.source,
+                           COALESCE(dd.name, it.department) AS department, dir.department_id AS "departmentId", lo.name AS location, dir.location_id AS "locationId",
+                           COALESCE(it.assets, 0) AS assets, COALESCE(it.loans, 0) AS loans, COALESCE(it.overdue, 0) AS overdue, COALESCE(it.value, 0) AS value,
+                           COALESCE(acc.accessories, 0) AS accessories
+                      FROM dir FULL JOIN it ON it.k = dir.k
+                      LEFT JOIN acc ON acc.k = regexp_replace(COALESCE(dir.k, it.k), '\s+', ' ', 'g')
+                      LEFT JOIN zentriq.departments dd ON dd.id = dir.department_id
+                      LEFT JOIN zentriq.locations lo ON lo.id = dir.location_id
+                     WHERE (@q::text IS NULL OR COALESCE(dir.name, it.person) ILIKE @q OR COALESCE(dir.email, it.email) ILIKE @q OR dir.employee_id ILIKE @q
+                            OR COALESCE(dd.name, it.department) ILIKE @q OR dir.title ILIKE @q)
+                       AND (@st::text IS NULL OR COALESCE(dir.status, 'active') = @st)
+                       AND (NOT @holding OR COALESCE(it.assets, 0) + COALESCE(acc.accessories, 0) > 0)
+                     LIMIT 5000) x
+                """);
+            cmd.Parameters.Add(T("q", string.IsNullOrWhiteSpace(q) ? null : "%" + q.Trim() + "%"));
+            cmd.Parameters.Add(T("st", status is "active" or "left" ? status : null));
+            cmd.Parameters.AddWithValue("holding", holding == true);
+            return Results.Ok(await JsonAsync(cmd, ct));
+        });
+
+        // Names for the "Assigned to" box: the people directory first, then logged-on users and accessory holders.
+        g.MapGet("/people/suggest", async (NpgsqlDataSource ds, string? q, CancellationToken ct) =>
+        {
+            await using var cmd = ds.CreateCommand("""
+                SELECT COALESCE(json_agg(x), '[]')::text FROM (
+                    SELECT p.name, p.email, d.name AS department, p.employee_id AS "employeeId" FROM zentriq.lifecycle_people p
+                      LEFT JOIN zentriq.departments d ON d.id = p.department_id
+                     WHERE p.status = 'active' AND (@q::text IS NULL OR p.name ILIKE @q OR p.email ILIKE @q OR p.employee_id ILIKE @q)
+                     ORDER BY lower(p.name) LIMIT 50) x
                 """);
             cmd.Parameters.Add(T("q", string.IsNullOrWhiteSpace(q) ? null : "%" + q.Trim() + "%"));
             return Results.Ok(await JsonAsync(cmd, ct));
         });
+
+        async Task<IResult> SavePerson(Guid? id, PersonBody b, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct)
+        {
+            var name = Clean(b.Name);
+            if (name is null) return Validation.Problem("name", "Enter the name.");
+            var email = Clean(b.Email, 254);
+            if (email is not null && !System.Text.RegularExpressions.Regex.IsMatch(email, @"^[^@\s]+@[^@\s]+\.[^@\s]+$")) return Validation.Problem("email", "Enter a valid e-mail address.");
+            if (b.Status is { } st && st is not ("active" or "left")) return Validation.Problem("status", "Status is Active or Left.");
+            await using var conn = await ds.OpenConnectionAsync(ct);
+            await using var tx = await conn.BeginTransactionAsync(ct);
+            string? oldName = null;
+            if (id is not null)
+            {
+                await using var o = new NpgsqlCommand("SELECT name FROM zentriq.lifecycle_people WHERE id = @id", conn, tx);
+                o.Parameters.AddWithValue("id", id.Value);
+                oldName = await o.ExecuteScalarAsync(ct) as string;
+                if (oldName is null) return Results.NotFound();
+            }
+            await using var cmd = new NpgsqlCommand(id is null ? """
+                INSERT INTO zentriq.lifecycle_people (name, email, employee_id, title, phone, department_id, location_id, manager, status, notes, source, created_by)
+                VALUES (@n, @e, @emp, @title, @phone, @dep, @loc, @mgr, COALESCE(@st, 'active'), @notes, 'manual', @by) RETURNING id
+                """ : """
+                UPDATE zentriq.lifecycle_people SET name = @n, email = @e, employee_id = @emp, title = @title, phone = @phone, department_id = @dep, location_id = @loc,
+                       manager = @mgr, status = COALESCE(@st, status), notes = @notes, updated_at = now() WHERE id = @id RETURNING id
+                """, conn, tx);
+            cmd.Parameters.Add(U("id", id));
+            cmd.Parameters.AddWithValue("n", name);
+            cmd.Parameters.Add(T("e", email));
+            cmd.Parameters.Add(T("emp", Clean(b.EmployeeId, 50)));
+            cmd.Parameters.Add(T("title", Clean(b.Title)));
+            cmd.Parameters.Add(T("phone", Clean(b.Phone, 50)));
+            cmd.Parameters.Add(U("dep", b.DepartmentId));
+            cmd.Parameters.Add(U("loc", b.LocationId));
+            cmd.Parameters.Add(T("mgr", Clean(b.Manager)));
+            cmd.Parameters.Add(T("st", b.Status));
+            cmd.Parameters.Add(T("notes", Clean(b.Notes, 4000)));
+            cmd.Parameters.Add(T("by", rc.UserName));
+            Guid newId;
+            try { newId = (Guid)(await cmd.ExecuteScalarAsync(ct))!; }
+            catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation)
+            {
+                return Validation.Problem(ex.ConstraintName switch { "ux_lifecycle_people_email" => "email", "ux_lifecycle_people_empid" => "employeeId", _ => "name" },
+                    ex.ConstraintName switch
+                    {
+                        "ux_lifecycle_people_email" => "Another person has this e-mail.",
+                        "ux_lifecycle_people_empid" => "Another person has this employee ID.",
+                        _ => "A person with this name is already in the directory.",
+                    });
+            }
+            // Renaming a person renames their assignments (assignments are by name).
+            if (oldName is not null && !string.Equals(oldName.Trim(), name, StringComparison.Ordinal))
+            {
+                await using var ren = new NpgsqlCommand("""
+                    UPDATE zentriq.asset_lifecycle SET assigned_to = @n, assigned_email = COALESCE(@e, assigned_email), updated_at = now() WHERE lower(btrim(assigned_to)) = lower(btrim(@o));
+                    UPDATE zentriq.assets a SET owner_name = @n FROM zentriq.asset_lifecycle l WHERE l.asset_id = a.id AND l.assigned_to = @n AND a.owner_name IS DISTINCT FROM @n;
+                    """, conn, tx);
+                ren.Parameters.AddWithValue("n", name);
+                ren.Parameters.AddWithValue("o", oldName);
+                ren.Parameters.Add(T("e", email));
+                await ren.ExecuteNonQueryAsync(ct);
+            }
+            await tx.CommitAsync(ct);
+            await rc.AuditAsync(id is null ? "lifecycle.person_create" : "lifecycle.person_update", name, detail: new { email, b.EmployeeId, b.Status });
+            return Results.Ok(new { id = newId });
+        }
+
+        g.MapPost("/people", (PersonBody b, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) => SavePerson(null, b, ds, rc, ct))
+            .RequireAuthorization(Permissions.AssetsManage);
+        g.MapPut("/people/{id:guid}", (Guid id, PersonBody b, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) => SavePerson(id, b, ds, rc, ct))
+            .RequireAuthorization(Permissions.AssetsManage);
+        g.MapDelete("/people/{id:guid}", async (Guid id, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
+        {
+            await using var cmd = ds.CreateCommand("""
+                DELETE FROM zentriq.lifecycle_people p WHERE p.id = @id
+                   AND NOT EXISTS (SELECT 1 FROM zentriq.asset_lifecycle l WHERE lower(btrim(l.assigned_to)) = lower(btrim(p.name)) AND l.stage IN ('in_use','in_maintenance','missing'))
+                RETURNING name
+                """);
+            cmd.Parameters.AddWithValue("id", id);
+            if (await cmd.ExecuteScalarAsync(ct) is not string name)
+                return Results.Problem(statusCode: 409, title: "This person still holds IT assets (or no longer exists). Check them in first, or mark the person as Left.");
+            await rc.AuditAsync("lifecycle.person_delete", name);
+            return Results.NoContent();
+        }).RequireAuthorization(Permissions.AssetsManage);
+
+        // ---- bulk upload: IT assets, people, contracts --------------------------------------------------------------
+        g.MapGet("/import/{kind}/template", async (string kind, NpgsqlDataSource ds, CancellationToken ct) =>
+        {
+            if (!LifecycleImport.Kinds.Contains(kind)) return Results.NotFound();
+            await using var conn = await ds.OpenConnectionAsync(ct);
+            var file = await LifecycleImport.TemplateAsync(conn, kind, ct);
+            return Results.File(file, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                $"Zentriq-{kind switch { "people" => "people", "contracts" => "contracts", _ => "IT-assets" }}-upload.xlsx");
+        });
+
+        g.MapPost("/import/{kind}", async (string kind, HttpContext http, NpgsqlDataSource ds, RequestContext rc, bool? dryRun, bool? update, bool? createMissing, string? name, CancellationToken ct) =>
+        {
+            if (!LifecycleImport.Kinds.Contains(kind)) return Results.NotFound();
+            if (http.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpMaxRequestBodySizeFeature>() is { IsReadOnly: false } size) size.MaxRequestBodySize = 25 * 1024 * 1024;
+            using var ms = new MemoryStream();
+            await http.Request.Body.CopyToAsync(ms, ct);
+            if (ms.Length == 0) return Validation.Problem("file", "The file is empty.");
+            List<string[]> rows;
+            try { rows = Zentriq.Infrastructure.NonIt.SheetReader.Read(ms.ToArray(), kind switch { "people" => "People", "contracts" => "Contracts", _ => "Assets" }); }
+            catch (Exception ex) when (ex is InvalidDataException or System.Xml.XmlException)
+            {
+                return Validation.Problem("file", "The file could not be read: " + ex.Message);
+            }
+            await using var conn = await ds.OpenConnectionAsync(ct);
+            var result = await LifecycleImport.RunAsync(conn, kind, rows, new LcImportOptions(dryRun != false, update != false, createMissing != false), rc.UserName, ct);
+            if (!result.DryRun && result.Ok)
+                await rc.AuditAsync("lifecycle.import", $"{LifecycleImport.Title(kind)}: {name ?? "upload"}", detail: new { kind, result.Rows, result.Created, result.Updated, result.Skipped });
+            return Results.Ok(result);
+        }).RequireAuthorization(Permissions.AssetsManage).DisableAntiforgery();
+
+        // ---- custom fields on IT assets -----------------------------------------------------------------------------
+        async Task<IResult> SaveField(Guid? id, FieldBody b, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct)
+        {
+            var label = Clean(b.Label, 60);
+            if (label is null) return Validation.Problem("label", "Enter the field name.");
+            if (!LifecycleFields.Types.Contains(b.Type)) return Validation.Problem("type", "Type is text, number, date, list or yes / no.");
+            var options = (b.Options ?? []).Select(o => o.Trim()).Where(o => o.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).Take(200).ToArray();
+            if (b.Type == "list" && options.Length == 0) return Validation.Problem("options", "Enter the values of the list.");
+            await using var cmd = ds.CreateCommand(id is null ? """
+                INSERT INTO zentriq.lifecycle_fields (key, label, type, options, required, sort)
+                VALUES (@k, @l, @t, @o, @r, COALESCE(@s, (SELECT COALESCE(max(sort), 0) + 10 FROM zentriq.lifecycle_fields))) RETURNING id
+                """ : """
+                UPDATE zentriq.lifecycle_fields SET label = @l, type = @t, options = @o, required = @r, sort = COALESCE(@s, sort) WHERE id = @id RETURNING id
+                """);
+            cmd.Parameters.Add(U("id", id));
+            cmd.Parameters.AddWithValue("k", LifecycleFields.KeyOf(label));
+            cmd.Parameters.AddWithValue("l", label);
+            cmd.Parameters.AddWithValue("t", b.Type);
+            cmd.Parameters.Add(new NpgsqlParameter("o", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = options });
+            cmd.Parameters.AddWithValue("r", b.Required == true);
+            cmd.Parameters.Add(new NpgsqlParameter("s", NpgsqlDbType.Integer) { Value = (object?)b.Sort ?? DBNull.Value });
+            try
+            {
+                if (await cmd.ExecuteScalarAsync(ct) is not Guid fid) return Results.NotFound();
+                await rc.AuditAsync(id is null ? "lifecycle.field_create" : "lifecycle.field_update", label, detail: new { b.Type, options });
+                return Results.Ok(new { id = fid });
+            }
+            catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation) { return Validation.Problem("label", "A field with this name already exists."); }
+        }
+        g.MapPost("/fields", (FieldBody b, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) => SaveField(null, b, ds, rc, ct)).RequireAuthorization(Permissions.SettingsManage);
+        g.MapPut("/fields/{id:guid}", (Guid id, FieldBody b, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) => SaveField(id, b, ds, rc, ct)).RequireAuthorization(Permissions.SettingsManage);
+        g.MapDelete("/fields/{id:guid}", async (Guid id, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
+        {
+            await using var cmd = ds.CreateCommand("""
+                WITH d AS (DELETE FROM zentriq.lifecycle_fields WHERE id = @id RETURNING key, label)
+                UPDATE zentriq.asset_lifecycle SET custom = custom - (SELECT key FROM d) WHERE custom ? (SELECT key FROM d)
+                RETURNING (SELECT label FROM d)
+                """);
+            cmd.Parameters.AddWithValue("id", id);
+            await cmd.ExecuteNonQueryAsync(ct);
+            await rc.AuditAsync("lifecycle.field_delete", id.ToString());
+            return Results.NoContent();
+        }).RequireAuthorization(Permissions.SettingsManage);
 
         // Everything one person holds (IT assets and returnable accessories): handover / return form and offboarding.
         g.MapGet("/people/holdings", async (string person, NpgsqlDataSource ds, CancellationToken ct) =>
@@ -700,6 +919,10 @@ public static class LifecycleEndpoints
         {
             if (b.Currency is { } c && !System.Text.RegularExpressions.Regex.IsMatch(c.Trim(), "^[A-Za-z]{3}$")) return Validation.Problem("currency", "Use a three-letter currency code (INR, USD, EUR…).");
             if (b.NotSeenDays is < 0 or > 3650) return Validation.Problem("notSeenDays", "Enter 0 (off) to 3650 days.");
+            if (b.TagMode is { } mode && mode is not ("auto" or "manual")) return Validation.Problem("tagMode", "Choose automatic or manual tags.");
+            if (b.TagFormat is { } fmt && TagFormat.Validate(fmt.Trim()) is { } fmtError) return Validation.Problem("tagFormat", fmtError);
+            if (b.TagOrg is { } org && !System.Text.RegularExpressions.Regex.IsMatch(org.Trim(), "^[A-Za-z0-9]{0,10}$")) return Validation.Problem("tagOrg", "The organisation code is up to 10 letters and digits.");
+            if (b.TagStart is < 1 or > 99_999_999) return Validation.Problem("tagStart", "Start numbers at 1 to 99,999,999.");
             await using var conn = await ds.OpenConnectionAsync(ct);
             async Task Set(string key, string json)
             {
@@ -714,7 +937,12 @@ public static class LifecycleEndpoints
             }
             if (b.Currency is { } cur) await Set("lifecycle.currency", JsonSerializer.Serialize(cur.Trim().ToUpperInvariant()));
             if (b.NotSeenDays is { } d) await Set("lifecycle.not_seen_days", d.ToString(System.Globalization.CultureInfo.InvariantCulture));
-            if (b.AutoTag is { } t) await Set("lifecycle.auto_tag", t ? "true" : "false");
+            if (b.AutoTag is { } t) { await Set("lifecycle.auto_tag", t ? "true" : "false"); if (b.TagMode is null) await Set("lifecycle.tag_mode", t ? "\"auto\"" : "\"manual\""); }
+            if (b.TagMode is { } tm) { await Set("lifecycle.tag_mode", JsonSerializer.Serialize(tm)); await Set("lifecycle.auto_tag", tm == "auto" ? "true" : "false"); }
+            if (b.TagFormat is { } tf) await Set("lifecycle.tag_format", JsonSerializer.Serialize(tf.Trim()));
+            if (b.TagOrg is { } to) await Set("lifecycle.tag_org", JsonSerializer.Serialize(to.Trim().ToUpperInvariant()));
+            if (b.TagStart is { } tst) await Set("lifecycle.tag_start", tst.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            if (b.TagDiscovered is { } td) await Set("lifecycle.tag_discovered", td ? "true" : "false");
             await rc.AuditAsync("lifecycle.settings", null, detail: b);
             return Results.Ok(new { ok = true });
         }).RequireAuthorization(Permissions.SettingsManage);
