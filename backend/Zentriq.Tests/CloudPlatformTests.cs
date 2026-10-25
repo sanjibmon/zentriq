@@ -60,9 +60,7 @@ public sealed class CloudPlatformTests
                       {"id":"f3","name":"internal","direction":"INGRESS","sourceRanges":["10.0.0.0/8"],"allowed":[{"IPProtocol":"tcp","ports":["22"]}]},
                       {"id":"f4","name":"off","direction":"INGRESS","disabled":true,"sourceRanges":["0.0.0.0/0"],"allowed":[{"IPProtocol":"tcp","ports":["22"]}]}]}
             """)], "p", snap);
-        GcpCollector.MapSql([J("""{"items":[{"name":"orders","databaseVersion":"POSTGRES_16","state":"RUNNABLE","region":"asia-south1",
-            "settings":{"tier":"db-custom-2-7680","dataDiskSizeGb":"100","ipConfiguration":{"ipv4Enabled":true,"authorizedNetworks":[{"value":"0.0.0.0/0"}]}},
-            "ipAddresses":[{"type":"PRIMARY","ipAddress":"34.1.1.9"}]}]}""")], "p", snap);
+        GcpCollector.MapSql([J("""{"items":[{"name":"orders","databaseVersion":"POSTGRES_16","state":"RUNNABLE","region":"asia-south1", "settings":{"tier":"db-custom-2-7680","dataDiskSizeGb":"100","ipConfiguration":{"ipv4Enabled":true,"authorizedNetworks":[{"value":"0.0.0.0/0"}]}}, "ipAddresses":[{"type":"PRIMARY","ipAddress":"34.1.1.9"}]}]}""")], "p", snap);
         GcpCollector.MapFunctions([J("""{"functions":[{"name":"projects/p/locations/asia-south1/functions/resize","state":"ACTIVE","buildConfig":{"runtime":"python312"},"serviceConfig":{"availableMemory":"512Mi"}}]}""")], "p", snap);
 
         var disk = snap.Items.Single(i => i.Kind == "disk");
@@ -117,12 +115,8 @@ public sealed class CloudPlatformTests
         NutanixCollector.Map(
             [J("""{"metadata":{"uuid":"c1"},"status":{"name":"NTNX-DC1","state":"COMPLETE","resources":{"nodes":{"hypervisor_server_list":[{},{},{}]},"config":{"service_list":["AOS"],"build":{"version":"6.5.5"}}}}}"""),
              J("""{"metadata":{"uuid":"pc"},"status":{"name":"PC","resources":{"config":{"service_list":["PRISM_CENTRAL"]}}}}""")],
-            [J("""{"metadata":{"uuid":"h1"},"status":{"name":"NTNX-A","cluster_reference":{"uuid":"c1"},"resources":{"hypervisor":{"hypervisor_full_name":"AHV 20230302","ip":"10.0.0.11"},
-               "num_cpu_sockets":2,"num_cpu_cores":32,"memory_capacity_mib":524288,"serial_number":"21SM1A","block":{"block_model":"NX-3170-G8"}}}}""")],
-            [J("""{"metadata":{"uuid":"7a1b2c3d-1111-2222-3333-444455556666","categories":{"Department":"Finance"},"creation_time":"2025-01-02T03:04:05Z"},
-               "status":{"name":"FIN-APP01","cluster_reference":{"uuid":"c1"},"resources":{"power_state":"ON","num_sockets":2,"num_vcpus_per_socket":2,"memory_size_mib":16384,
-               "host_reference":{"uuid":"h1"},"nic_list":[{"mac_address":"50:6b:8d:aa:bb:cc","ip_endpoint_list":[{"ip":"10.0.1.20"}]}],
-               "disk_list":[{"disk_size_bytes":107374182400,"device_properties":{"device_type":"DISK"}},{"disk_size_bytes":5000000,"device_properties":{"device_type":"CDROM"}}]}}}""")],
+            [J("""{"metadata":{"uuid":"h1"},"status":{"name":"NTNX-A","cluster_reference":{"uuid":"c1"},"resources":{"hypervisor":{"hypervisor_full_name":"AHV 20230302","ip":"10.0.0.11"}, "num_cpu_sockets":2,"num_cpu_cores":32,"memory_capacity_mib":524288,"serial_number":"21SM1A","block":{"block_model":"NX-3170-G8"}}}}""")],
+            [J("""{"metadata":{"uuid":"7a1b2c3d-1111-2222-3333-444455556666","categories":{"Department":"Finance"},"creation_time":"2025-01-02T03:04:05Z"}, "status":{"name":"FIN-APP01","cluster_reference":{"uuid":"c1"},"resources":{"power_state":"ON","num_sockets":2,"num_vcpus_per_socket":2,"memory_size_mib":16384, "host_reference":{"uuid":"h1"},"nic_list":[{"mac_address":"50:6b:8d:aa:bb:cc","ip_endpoint_list":[{"ip":"10.0.1.20"}]}], "disk_list":[{"disk_size_bytes":107374182400,"device_properties":{"device_type":"DISK"}},{"disk_size_bytes":5000000,"device_properties":{"device_type":"CDROM"}}]}}}""")],
             snap);
         Assert.Single(snap.Items, i => i.Kind == "cluster");                       // Prism Central itself is not a cluster
         var host = snap.Items.Single(i => i.Kind == "host");
@@ -176,18 +170,12 @@ public sealed class CloudPlatformTests
         var d = new Dictionary<string, JsonElement>
         {
             ["pool"] = J("""{"OpaqueRef:p":{"uuid":"pool-1","name_label":"DC2 pool","ha_enabled":false}}"""),
-            ["host"] = J("""{"OpaqueRef:h1":{"uuid":"host-1","name_label":"xcp01","hostname":"xcp01","address":"10.0.0.31","enabled":true,"metrics":"OpaqueRef:m1",
-                "software_version":{"product_brand":"XCP-ng","product_version":"8.3.0"},"cpu_info":{"cpu_count":"24"},"bios_strings":{"system-manufacturer":"Dell Inc.","system-product-name":"PowerEdge R650","system-serial-number":"7XQ1"}}}"""),
+            ["host"] = J("""{"OpaqueRef:h1":{"uuid":"host-1","name_label":"xcp01","hostname":"xcp01","address":"10.0.0.31","enabled":true,"metrics":"OpaqueRef:m1", "software_version":{"product_brand":"XCP-ng","product_version":"8.3.0"},"cpu_info":{"cpu_count":"24"},"bios_strings":{"system-manufacturer":"Dell Inc.","system-product-name":"PowerEdge R650","system-serial-number":"7XQ1"}}}"""),
             ["host_metrics"] = J("""{"OpaqueRef:m1":{"memory_total":"68719476736"}}"""),
-            ["VM"] = J("""{"OpaqueRef:v1":{"uuid":"a1b2c3d4-0000-1111-2222-333344445555","name_label":"SQL02","power_state":"Running","is_a_template":false,"is_a_snapshot":false,"is_control_domain":false,
-                    "VCPUs_max":"4","memory_static_max":"17179869184","resident_on":"OpaqueRef:h1","guest_metrics":"OpaqueRef:g1","snapshots":["OpaqueRef:s1"],"tags":["prod"]},
-                "OpaqueRef:s1":{"uuid":"snap","name_label":"before","is_a_snapshot":true,"is_a_template":false,"is_control_domain":false,"snapshot_time":"20260901T00:00:00Z"},
-                "OpaqueRef:dom0":{"uuid":"dom0","name_label":"Control domain","is_control_domain":true,"is_a_template":false,"is_a_snapshot":false},
-                "OpaqueRef:t":{"uuid":"tmpl","name_label":"Debian 12","is_a_template":true,"is_a_snapshot":false,"is_control_domain":false}}"""),
+            ["VM"] = J("""{"OpaqueRef:v1":{"uuid":"a1b2c3d4-0000-1111-2222-333344445555","name_label":"SQL02","power_state":"Running","is_a_template":false,"is_a_snapshot":false,"is_control_domain":false, "VCPUs_max":"4","memory_static_max":"17179869184","resident_on":"OpaqueRef:h1","guest_metrics":"OpaqueRef:g1","snapshots":["OpaqueRef:s1"],"tags":["prod"]}, "OpaqueRef:s1":{"uuid":"snap","name_label":"before","is_a_snapshot":true,"is_a_template":false,"is_control_domain":false,"snapshot_time":"20260901T00:00:00Z"}, "OpaqueRef:dom0":{"uuid":"dom0","name_label":"Control domain","is_control_domain":true,"is_a_template":false,"is_a_snapshot":false}, "OpaqueRef:t":{"uuid":"tmpl","name_label":"Debian 12","is_a_template":true,"is_a_snapshot":false,"is_control_domain":false}}"""),
             ["VIF"] = J("""{"OpaqueRef:i1":{"VM":"OpaqueRef:v1","MAC":"da:4e:6b:00:11:22"}}"""),
             ["VM_guest_metrics"] = J("""{"OpaqueRef:g1":{"os_version":{"name":"Microsoft Windows Server 2022 Standard|C:\\Windows|\\Device\\Harddisk0\\Partition2"},"networks":{"0/ip":"10.0.2.15","0/ipv6/0":"fe80::1"}}}"""),
-            ["SR"] = J("""{"OpaqueRef:r1":{"uuid":"sr-1","name_label":"Local storage","type":"lvm","content_type":"user","physical_size":"1000000000000","physical_utilisation":"950000000000","shared":false},
-                       "OpaqueRef:r2":{"uuid":"sr-iso","name_label":"ISO","type":"iso","content_type":"iso"}}"""),
+            ["SR"] = J("""{"OpaqueRef:r1":{"uuid":"sr-1","name_label":"Local storage","type":"lvm","content_type":"user","physical_size":"1000000000000","physical_utilisation":"950000000000","shared":false}, "OpaqueRef:r2":{"uuid":"sr-iso","name_label":"ISO","type":"iso","content_type":"iso"}}"""),
         };
         var snap = new CloudSnapshot();
         XenServerCollector.Map(d, snap, now);
@@ -210,17 +198,9 @@ public sealed class CloudPlatformTests
         var snap = new CloudSnapshot();
         OvirtCollector.Map(
             J("""{"cluster":[{"id":"cl1","name":"Default","cpu":{"type":"Intel Icelake Server Family"},"version":{"major":"4","minor":"7"}}]}"""),
-            J("""{"host":[{"id":"h1","name":"rhvh01","address":"rhvh01.corp.local","status":"up","cluster":{"id":"cl1"},"memory":"274877906944",
-                "cpu":{"topology":{"sockets":"2","cores":"16","threads":"2"}},"os":{"type":"RHEL","version":{"full_version":"8.10"}},
-                "hardware_information":{"uuid":"4c4c4544-0042-3510-8051-b4c04f4d3232","serial_number":"ABC123","manufacturer":"Dell Inc.","product_name":"PowerEdge R750"}}]}"""),
-            J("""{"storage_domain":[{"id":"sd1","name":"data1","type":"data","available":"107374182400","used":"966367641600","committed":"2147483648000","storage":{"type":"nfs"}},
-                                    {"id":"iso","name":"iso","type":"iso"}]}"""),
-            J("""{"vm":[{"id":"aa11bb22-cc33-dd44-ee55-ff6677889900","name":"app01","status":"down","stop_time":1754006400000,"creation_time":1700000000000,
-                "memory":"8589934592","cpu":{"topology":{"sockets":"1","cores":"4","threads":"1"}},"host":{"id":"h1"},"cluster":{"id":"cl1"},"fqdn":"app01.corp.local",
-                "guest_operating_system":{"distribution":"Red Hat Enterprise Linux","version":{"full_version":"9.4"}},
-                "nics":{"nic":[{"mac":{"address":"56:6f:1a:2b:3c:4d"}}]},
-                "reported_devices":{"reported_device":[{"ips":{"ip":[{"address":"fe80::1","version":"v6"},{"address":"10.0.3.5","version":"v4"}]}}]},
-                "snapshots":{"snapshot":[{"snapshot_type":"active","date":1759000000000},{"snapshot_type":"regular","date":1788220800000}]}}]}"""),
+            J("""{"host":[{"id":"h1","name":"rhvh01","address":"rhvh01.corp.local","status":"up","cluster":{"id":"cl1"},"memory":"274877906944", "cpu":{"topology":{"sockets":"2","cores":"16","threads":"2"}},"os":{"type":"RHEL","version":{"full_version":"8.10"}}, "hardware_information":{"uuid":"4c4c4544-0042-3510-8051-b4c04f4d3232","serial_number":"ABC123","manufacturer":"Dell Inc.","product_name":"PowerEdge R750"}}]}"""),
+            J("""{"storage_domain":[{"id":"sd1","name":"data1","type":"data","available":"107374182400","used":"966367641600","committed":"2147483648000","storage":{"type":"nfs"}}, {"id":"iso","name":"iso","type":"iso"}]}"""),
+            J("""{"vm":[{"id":"aa11bb22-cc33-dd44-ee55-ff6677889900","name":"app01","status":"down","stop_time":1754006400000,"creation_time":1700000000000, "memory":"8589934592","cpu":{"topology":{"sockets":"1","cores":"4","threads":"1"}},"host":{"id":"h1"},"cluster":{"id":"cl1"},"fqdn":"app01.corp.local", "guest_operating_system":{"distribution":"Red Hat Enterprise Linux","version":{"full_version":"9.4"}}, "nics":{"nic":[{"mac":{"address":"56:6f:1a:2b:3c:4d"}}]}, "reported_devices":{"reported_device":[{"ips":{"ip":[{"address":"fe80::1","version":"v6"},{"address":"10.0.3.5","version":"v4"}]}}]}, "snapshots":{"snapshot":[{"snapshot_type":"active","date":1759000000000},{"snapshot_type":"regular","date":1788220800000}]}}]}"""),
             snap, now);
         var vm = snap.Items.Single(i => i.Kind == "vm");
         Assert.Equal(("down", 4, 8192L, "app01", "10.0.3.5", "Red Hat Enterprise Linux 9.4"), (vm.State, vm.Cpu, vm.MemoryMb, vm.Hostname, vm.PrivateIp, vm.Os));
