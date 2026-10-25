@@ -159,7 +159,7 @@ public static class CloudEndpoints
             var newSecret = !string.IsNullOrEmpty(body.Secret);
             await using var cmd = ds.CreateCommand($"""
                 UPDATE zentriq.cloud_accounts SET name = @n,
-                       settings = @s || CASE WHEN @keepEmail THEN jsonb_strip_nulls(jsonb_build_object('clientEmail', settings->'clientEmail')) ELSE '{}'::jsonb END,
+                       settings = @s || CASE WHEN @keepEmail THEN jsonb_strip_nulls(jsonb_build_object('clientEmail', settings->'clientEmail')) ELSE '{{}}'::jsonb END,
                        credential_id = @cred, enabled = @en, sync_hours = @h, updated_at = now()
                        {(newSecret ? ", secret_protected = @sec" : "")}
                  WHERE id = @id
