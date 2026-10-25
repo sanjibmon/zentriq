@@ -1,22 +1,25 @@
 # Test report
 
-Latest: GitHub Actions run 40197369473, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
-10.0.20348** VM. Release: `v1.1.1-build.85` (pre-release, **unsigned**), package version **1.1.1.85**. Results: unit +
-PostgreSQL integration tests **332 PASS, 2 skipped** (live remote support and SNMP tests run in ci-quick: PASS, 334/334);
-installer acceptance **65 passed, 0 failed**; in-place updates PASS (database migration V0027, schema 27).
+Latest: GitHub Actions run 40212734306, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
+10.0.20348** VM. Release: `v1.1.1-build.87` (pre-release, **unsigned**), package version **1.1.1.87**. Results: unit +
+PostgreSQL integration tests **343 PASS, 2 skipped** (live remote support and SNMP tests run in ci-quick: PASS, 345/345);
+installer acceptance **67 passed, 0 failed**; in-place updates PASS (database migration V0028, schema 28). Build 86 stopped
+at T55 (an API token with *Export reports* could no longer reach report data); fixed in build 87.
 
-New in build 85: **report time period** (From – to dates or a moving period such as last month, on any date column, saved
-with the report and used by schedules, exports, dashboards and the data API), and **Backup & Restore** in the console:
-backups of the whole installation (database, configuration, secrets, console certificate and CA, agent CA, MFA keys,
-remote support data, report files), always encrypted, with an optional backup password; schedule (daily / weekdays /
-monthly) and retention; destinations: local disk, SMB share, FTP/FTPS, SFTP, Azure Blob, Amazon S3 / S3-compatible,
-Google Cloud Storage; history and download; restore from an uploaded file, this server or a destination.
+New in build 87: **role-based access per area** (dashboard, IT inventory, non-IT inventory, IT accessories, lifecycle, cloud,
+activity log, reports each with their own see / change permissions; menus, pages, dashboard widgets, report data sources and
+the API all follow them), **built-in roles** (IT Asset Manager, Non-IT Asset Manager, Non-IT Asset Viewer, Asset Lifecycle
+Manager, Cloud Administrator, Security Analyst), **custom roles** and **user groups**, with rights applied to signed-in users
+at their next request; and **log retention and export**: audit and activity logs kept one year by default (90 days to 10
+years or for ever), archived before removal, scheduled exports every 3, 6 or 12 months, export a period now, copies to a
+backup destination, CSV downloads.
 
 | ID | Test | Result | Detail |
 |---|---|---|---|
-| T75 | Backup and restore | **PASS** | password and weekly schedule (validation); folder test OK; SMB share test OK; unreachable S3 refused; overview never shows a password; back up now copied to the folder and the SMB share (format 2, password, MFA key file); folder keeps 2 of 3; download; `backup-verify --password-file`; restored from the SMB share with the password: marker back, last restore and run history correct |
-| T11 | Encrypted backup and deep restore validation | **PASS** | new file name, format 2 |
-| — | Unit / PostgreSQL tests | **PASS** | report periods (relative ranges, custom inclusive dates, time zones, parameters only, DB filtering, summaries); backup crypto (install key or password, wrong password, no password, tampering and truncation, format 1 still opens); schedule slots and catch-up; file names and retention; folder, Azure (Shared Key signature recomputed), S3 (single and multipart, path-style, errors) and GCS (resumable pieces) targets; validation; data protection key ring through backup and restore on Windows (DPAPI); settings, destinations (encrypted secrets), history, unlock hand-off |
+| T76 | Roles and groups | **PASS** | 7 built-in roles (read-only); custom role through a group: non-IT, dashboard and reports only (12 other areas refused, report sources: nonit_assets); no privilege escalation; role in use cannot be deleted; switching the group to the viewer role applied to the live session without signing out |
+| T77 | Log retention and export | **PASS** | defaults 1 year; 30 days refused; export of 30 days (audit + activity) with checksum and manifest; scheduled half-year archive made; audit and activity CSV downloads |
+| T55 | API tokens | **PASS** | existing and new tokens with *Export reports* reach report data |
+| — | Unit / PostgreSQL tests | **PASS** | report sources need their area's permission; built-in roles and group grants; audit entries removable only by the database owner through the purge function, never the last 90 days, removal recorded with the last hash; archives contain exactly the period with formula-safe CSV and checksums; retention cut-offs and scheduled periods |
 
 ## Build and packaging
 
@@ -35,11 +38,11 @@ replaced) and the trial's 30-device total cap.
 ## Release artifacts (SHA-256)
 
 ```
-44bebfd8f8889f520d0c640ce93991bbce2d5bd815cfe043a8974bdd9bc8e1ee  Zentriq-1.1.1-docs.zip
-a984a256f02732d2f4930fc1f048eebe1b87c694fb33252c16a3d2c0fdc45ad7  Zentriq-1.1.1-msi-offline-kit.zip
-ba0cc35d6c1928eb91ae6dd228c2d4f3088d1bc0c34fcbf55f31b0774e1680d3  Zentriq-Setup-x64.exe
-fd5e0905e5b469284c1d37b1a2393d88c7f04c50fff383d5ef6427f3861ba8c8  Zentriq.msi
-68469f74122e677c26953e3ccedb500956408098d52500796c850a477ad36e4c  ZentriqAgent-x64.msi
+6ee9a00e99d607dc30ef236c97f52b876ab59852ec2f244e664e5f28629f7858  Zentriq-1.1.1-docs.zip
+6add656393deed647f342a2237ac7d8c93f3592d20576a07208564a124130272  Zentriq-1.1.1-msi-offline-kit.zip
+f1388d7611673eeaca9d326e2642b0775ec34c5fadc7d76553b54213c713dea8  Zentriq-Setup-x64.exe
+86c8efa85808bebde418cf2e0c123cd0c2a7e7e5d6cda0194fdc499e5d6092bd  Zentriq.msi
+68c8afebd1ed4b53564a83ba4c4747b746ae3cb64c42a5f6c18dfd3c8bd8bbc9  ZentriqAgent-x64.msi
 ```
 
 ## Installer acceptance (tests/installer/Invoke-InstallerAcceptance.ps1)
