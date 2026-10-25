@@ -6,6 +6,7 @@ import { useApi } from '../../app/useApi';
 import { Icon } from '../../components/Icon';
 import { Callout, DataTable, ErrorBox, fmt, Loading, Panel, Pill } from '../../components/ui';
 import { DetailsDialog, StageDialog, useLcMeta, type StageMode } from './LifecycleDialogs';
+import { customText } from './LifecycleExtras';
 import { CONTRACT_KIND, KIND_LABEL, money, STAGE_ORDER, STAGE_TONE, stageLabel, statusLabel, type LcDetail, type LcMeta } from './types';
 
 function KV({ items }: { items: [string, ReactNode][] }) {
@@ -92,6 +93,7 @@ export function LifecyclePanel({ assetId, onMessage }: { assetId: string; onMess
             ['Warranty', a.warrantyEnd ? <>{a.warrantyDays != null && a.warrantyDays < 0 ? <Pill tone="crit">Expired</Pill> : a.warrantyDays != null && a.warrantyDays <= 90 ? <Pill tone="warn">{a.warrantyDays} days left</Pill> : <Pill tone="ok">Active</Pill>} until {fmt.day(a.warrantyEnd)} <span className="faint">{[a.warrantyProvider, a.warrantyType].filter(Boolean).join(' · ')}</span></> : <span className="muted">Not recorded</span>],
             ['Contracts', d.contracts.length ? d.contracts.map((c) => `${c.name} (${CONTRACT_KIND[c.kind] ?? c.kind}${c.endDate ? `, until ${c.endDate}` : ''})`).join('; ') : null],
             ['Notes', a.notes],
+            ...m.fields.map((f) => [f.label, customText(d.custom?.[f.key]) || null] as [string, ReactNode]),
           ]} />
         </div>
         {a.stage === 'disposed' && <div style={{ marginTop: 10 }}><KV items={[
@@ -117,7 +119,7 @@ export function LifecyclePanel({ assetId, onMessage }: { assetId: string; onMess
           { key: 'b', label: 'By', render: (e) => e.actor ?? '—' },
         ]} />
       </Panel>
-      {dialog === 'details' && <DetailsDialog asset={a} meta={m} onClose={() => setDialog(null)} onDone={done} />}
+      {dialog === 'details' && <DetailsDialog asset={a} meta={m} custom={d.custom} onClose={() => setDialog(null)} onDone={done} />}
       {dialog && dialog !== 'details' && <StageDialog asset={a} meta={m} mode={dialog} onClose={() => setDialog(null)} onDone={done} />}
     </>
   );

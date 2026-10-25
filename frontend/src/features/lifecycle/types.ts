@@ -29,6 +29,7 @@ export interface LcContract {
 export interface LcDetail {
   asset: LcAsset; events: LcEvent[]; contracts: LcContract[]; osEndOfSupport: boolean | null; next: Stage[];
   schedule: { year: number; opening: number; depreciation: number; closing: number }[] | null;
+  custom: Record<string, string | number | boolean | null> | null;
 }
 
 export interface LcPolicy { class: string; label: string; tagPrefix: string; usefulLifeMonths: number; depreciationMethod: string; salvagePercent: number; refreshYears: number }
@@ -36,6 +37,8 @@ export interface LcPolicy { class: string; label: string; tagPrefix: string; use
 export interface LcMeta {
   stages: { id: Stage; label: string; statuses: { id: string; label: string }[]; next: Stage[] }[];
   policies: LcPolicy[]; currency: string; notSeenDays: number; autoTag: boolean;
+  tags: { mode: 'auto' | 'manual'; format: string; org: string; start: number; discovered: boolean; example: string };
+  fields: LcField[];
   sanitizationMethods: { id: string; label: string }[]; depreciationMethods: { id: string; label: string }[];
   contractKinds: string[]; acquisitions: string[];
 }
@@ -48,7 +51,18 @@ export interface LcSummary {
   recent: LcEvent[];
 }
 
-export interface LcPerson { person: string; email: string | null; department: string | null; assets: number; loans: number; overdue: number; value: number; accessories: number }
+export interface LcPerson {
+  id: string | null; person: string; email: string | null; employeeId: string | null; title: string | null; phone: string | null; manager: string | null; notes: string | null;
+  status: 'active' | 'left'; source: string | null; department: string | null; departmentId: string | null; location: string | null; locationId: string | null;
+  assets: number; loans: number; overdue: number; value: number; accessories: number;
+}
+
+export interface LcField { id: string; key: string; label: string; type: 'text' | 'number' | 'date' | 'list' | 'yesno'; options: string[]; required: boolean; sort: number }
+
+export interface LcImportResult {
+  kind: string; rows: number; created: number; updated: number; skipped: number; errors: { row: number; message: string }[];
+  newDepartments: string[]; newLocations: string[]; newPeople: string[]; unknownColumns: string[]; dryRun: boolean; ok: boolean;
+}
 
 export interface LcRefresh {
   candidates: { id: string; assetTag: string | null; name: string | null; model: string | null; classLabel: string | null; assignedTo: string | null; osName: string | null;

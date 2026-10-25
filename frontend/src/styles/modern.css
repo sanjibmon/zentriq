@@ -451,3 +451,11 @@ details.rs-advanced[open] summary { margin-bottom: 12px; }
 .cl-xenserver i, .cl-pick-btn.cl-xenserver i { background: linear-gradient(135deg, #2bb3d9, #0f5c8a); }
 .cl-ovirt i, .cl-pick-btn.cl-ovirt i { background: linear-gradient(135deg, #e04a4a, #8f1d1d); }
 .cl-pick { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+
+/* ---- Asset Lifecycle: tag scheme ------------------------------------------------------------------------------- */
+.lc-tagmode { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.lc-tagmode button { display: grid; gap: 4px; text-align: left; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--fg); cursor: pointer; }
+.lc-tagmode button small { color: var(--muted); font-size: 12px; line-height: 1.4; }
+.lc-tagmode button.on { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); background: color-mix(in srgb, var(--accent) 5%, var(--surface)); }
+.lc-tagmode button:disabled { cursor: default; }
+@media (max-width: 760px) { .lc-tagmode { grid-template-columns: 1fr; } }

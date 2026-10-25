@@ -10,6 +10,7 @@ import { Callout, DataTable, ErrorBox, fmt, Kpis, Loading, PageHead, Pager, Pane
 import { useDepartments } from '../departments/Departments';
 import { useLocations } from '../locations/Locations';
 import { AddToContractDialog, BulkStageDialog, ContractDialog, StockDialog, useLcMeta } from './LifecycleDialogs';
+import { CustomFieldsPanel, ImportDialog, PersonDialog, TagSettingsPanel, type ImportKind } from './LifecycleExtras';
 import { LifecyclePanel } from './LifecyclePanel';
 import {
   CONTRACT_KIND, KIND_LABEL, money, moneyShort, STAGE_ORDER, STAGE_TONE, stageLabel, statusLabel,
@@ -28,11 +29,13 @@ export function LifecyclePage() {
   const [tick, setTick] = useState(0);
   const [msg, setMsg] = useState<{ tone: 'info' | 'crit'; text: string } | null>(null);
   const [stock, setStock] = useState(false);
+  const [upload, setUpload] = useState<ImportKind | null>(null);
   const done = (text: string) => { setMsg({ tone: 'info', text }); setStock(false); setTick((x) => x + 1); };
   const m = meta.data;
   return (
     <>
       <PageHead title="Asset Lifecycle" actions={<>
+        {canEdit && m && <button className="btn" onClick={() => setUpload('assets')}><Icon name="upload" size={13} /> Bulk upload</button>}
         {canEdit && m && <button className="btn primary" onClick={() => setStock(true)}><Icon name="plus" size={13} /> Add new assets</button>}
       </>} />
       <div className="tabs" role="tablist">
@@ -43,13 +46,14 @@ export function LifecyclePage() {
       {!m ? <Loading /> : <>
         {tab === 'overview' && <Overview meta={m} tick={tick} />}
         {tab === 'assets' && <Assets meta={m} tick={tick} onMsg={done} />}
-        {tab === 'people' && <People meta={m} />}
-        {tab === 'contracts' && <Contracts meta={m} tick={tick} onMsg={done} />}
+        {tab === 'people' && <People meta={m} tick={tick} onMsg={done} onUpload={() => setUpload('people')} />}
+        {tab === 'contracts' && <Contracts meta={m} tick={tick} onMsg={done} onUpload={() => setUpload('contracts')} />}
         {tab === 'refresh' && <Refresh meta={m} />}
         {tab === 'history' && <History meta={m} />}
-        {tab === 'settings' && <Policies meta={m} onSaved={() => { meta.reload(); done('Saved.'); }} />}
+        {tab === 'settings' && <Policies meta={m} onSaved={() => { meta.reload(); done('Saved.'); }} onReload={meta.reload} />}
       </>}
       {stock && m && <StockDialog meta={m} onClose={() => setStock(false)} onDone={done} />}
+      {upload && <ImportDialog kind={upload} onClose={() => setUpload(null)} onDone={done} />}
     </>
   );
 }
@@ -237,31 +241,61 @@ function Assets({ meta, tick, onMsg }: { meta: LcMeta; tick: number; onMsg: (m: 
 
 // ---- people --------------------------------------------------------------------------------------------------------
 
-function People({ meta }: { meta: LcMeta }) {
+function People({ meta, tick, onMsg, onUpload }: { meta: LcMeta; tick: number; onMsg: (m: string) => void; onUpload: () => void }) {
   const { query, navigate } = useRouter();
+  const { can } = useAuth();
+  const canEdit = can('assets.manage');
+  const confirm = useConfirm();
   const [q, setQ] = useState('');
   const [search, setSearch] = useState('');
+  const [status, setStatus] = useState('active');
+  const [holding, setHolding] = useState(false);
+  const [local, setLocal] = useState(0);
+  const [edit, setEdit] = useState<LcPerson | 'new' | null>(null);
   const person = query.get('person');
-  const people = useApi(() => api.get<LcPerson[]>('/lifecycle/people', { q: search }), [search]);
+  const people = useApi(() => api.get<LcPerson[]>('/lifecycle/people', { q: search, status: status || undefined, holding: holding || undefined }), [search, status, holding, tick, local]);
   if (person) return <PersonHoldings person={person} meta={meta} onBack={() => navigate('/lifecycle?tab=people', true)} />;
+  async function remove(p: LcPerson) {
+    if (!p.id) return;
+    if (!(await confirm({ title: 'Remove person', message: `Remove ${p.person} from People? Their history stays on the assets.`, confirmLabel: 'Remove', danger: true }))) return;
+    try { await api.del(`/lifecycle/people/${p.id}`); setLocal((x) => x + 1); onMsg(`${p.person} removed.`); }
+    catch (e) { onMsg(e instanceof Error ? e.message : String(e)); }
+  }
+  const rows = people.data ?? [];
   return (
     <>
       <form className="toolbar-row" onSubmit={(e) => { e.preventDefault(); setSearch(q); }}>
-        <input className="in grow" placeholder="Search person, e-mail or department…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search people" />
+        <input className="in grow" placeholder="Search name, e-mail, employee ID, department, job title…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search people" />
+        <select className="in" value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Status">
+          <option value="active">Active</option><option value="left">Left the organisation</option><option value="">Everyone</option>
+        </select>
+        <label className="check-inline"><input type="checkbox" checked={holding} onChange={(e) => setHolding(e.target.checked)} /> Holding assets</label>
         <button className="btn" type="submit">Search</button>
+        {canEdit && <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+          <button type="button" className="btn" onClick={onUpload}><Icon name="upload" size={13} /> Bulk upload</button>
+          <button type="button" className="btn primary" onClick={() => setEdit('new')}><Icon name="plus" size={13} /> Add person</button>
+        </span>}
       </form>
       <ErrorBox error={people.error} />
-      <Panel flush sub="People holding IT assets, with the returnable IT accessories they hold">
-        <DataTable rows={(people.data ?? []).map((p) => ({ ...p, id: p.person }))} empty={people.loading ? 'Loading…' : 'Nobody holds IT assets yet. Assign assets from the IT assets tab or a device page.'} columns={[
-          { key: 'p', label: 'Person', render: (r) => <Link to={`/lifecycle?tab=people&person=${encodeURIComponent(r.person)}`}><b>{r.person}</b></Link> },
+      <Panel flush sub={`${rows.length} people — the directory used for assignments, with the IT assets and returnable accessories they hold`}>
+        <DataTable rows={rows.map((p) => ({ ...p, id: p.id ?? 'name:' + p.person, pid: p.id }))} empty={people.loading ? 'Loading…' : 'Nobody yet. Add people one by one or with Bulk upload; assigning an asset to a new name adds the person too.'} columns={[
+          { key: 'p', label: 'Person', render: (r) => <><Link to={`/lifecycle?tab=people&person=${encodeURIComponent(r.person)}`}><b>{r.person}</b></Link>{r.status === 'left' && <> <Pill tone="warn">left</Pill></>}
+            {r.title && <div className="faint" style={{ fontSize: 11.5 }}>{r.title}</div>}</> },
+          { key: 'id', label: 'Employee ID', render: (r) => r.employeeId ? <span className="mono">{r.employeeId}</span> : '—' },
           { key: 'e', label: 'E-mail', render: (r) => r.email ?? '—' },
           { key: 'd', label: 'Department', render: (r) => r.department ?? '—' },
-          { key: 'a', label: 'IT assets', render: (r) => r.assets },
+          { key: 'loc', label: 'Location', render: (r) => r.location ?? '—' },
+          { key: 'a', label: 'IT assets', render: (r) => r.assets || '—' },
           { key: 'l', label: 'On loan', render: (r) => r.loans ? <>{r.loans}{r.overdue ? <> <Pill tone="crit">{r.overdue} overdue</Pill></> : null}</> : '—' },
           { key: 'x', label: 'Accessories', render: (r) => r.accessories || '—' },
-          { key: 'v', label: 'Book value', render: (r) => money(r.value, meta.currency) },
+          { key: 'v', label: 'Book value', render: (r) => r.value ? money(r.value, meta.currency) : '—' },
+          ...(canEdit ? [{ key: 'act', label: '', render: (r: LcPerson & { id: string; pid: string | null }) => <span style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+            <button className="btn sm" onClick={() => setEdit({ ...r, id: r.pid })} aria-label={`Edit ${r.person}`}><Icon name="edit" size={13} /></button>
+            {r.assets === 0 && r.pid && <button className="btn sm ghost" onClick={() => void remove({ ...r, id: r.pid })} aria-label={`Remove ${r.person}`}><Icon name="trash" size={13} /></button>}
+          </span> }] : []),
         ]} />
       </Panel>
+      {edit && <PersonDialog person={edit === 'new' ? null : edit} onClose={() => setEdit(null)} onDone={(m) => { setEdit(null); setLocal((x) => x + 1); onMsg(m); }} />}
     </>
   );
 }
@@ -304,7 +338,7 @@ function PersonHoldings({ person, meta, onBack }: { person: string; meta: LcMeta
 
 // ---- contracts -----------------------------------------------------------------------------------------------------
 
-function Contracts({ meta, tick, onMsg }: { meta: LcMeta; tick: number; onMsg: (m: string) => void }) {
+function Contracts({ meta, tick, onMsg, onUpload }: { meta: LcMeta; tick: number; onMsg: (m: string) => void; onUpload: () => void }) {
   const { can } = useAuth();
   const canEdit = can('assets.manage');
   const confirm = useConfirm();
@@ -328,6 +362,7 @@ function Contracts({ meta, tick, onMsg }: { meta: LcMeta; tick: number; onMsg: (
       <div className="toolbar-row">
         <span className="muted">Warranty extensions, AMC, support, lease and insurance contracts that cover many assets. Reminders go out before they end (Integrations).</span>
         <span style={{ marginLeft: 'auto' }} />
+        {canEdit && <button className="btn" onClick={onUpload}><Icon name="upload" size={13} /> Bulk upload</button>}
         {canEdit && <button className="btn primary" onClick={() => setEditing('new')}><Icon name="plus" size={13} /> New contract</button>}
       </div>
       <ErrorBox error={list.error} />
@@ -425,11 +460,11 @@ function History({ meta }: { meta: LcMeta }) {
 
 // ---- policies and settings -----------------------------------------------------------------------------------------
 
-function Policies({ meta, onSaved }: { meta: LcMeta; onSaved: () => void }) {
+function Policies({ meta, onSaved, onReload }: { meta: LcMeta; onSaved: () => void; onReload: () => void }) {
   const { can } = useAuth();
   const canEdit = can('settings.manage');
   const [rows, setRows] = useState<LcPolicy[]>(meta.policies);
-  const [s, setS] = useState({ currency: meta.currency, notSeenDays: String(meta.notSeenDays), autoTag: meta.autoTag });
+  const [s, setS] = useState({ currency: meta.currency, notSeenDays: String(meta.notSeenDays) });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => setRows(meta.policies), [meta.policies]);
@@ -442,13 +477,15 @@ function Policies({ meta, onSaved }: { meta: LcMeta; onSaved: () => void }) {
         if (o && JSON.stringify(o) === JSON.stringify(p)) continue;
         await api.put(`/lifecycle/policies/${p.class}`, { tagPrefix: p.tagPrefix, usefulLifeMonths: p.usefulLifeMonths, depreciationMethod: p.depreciationMethod, salvagePercent: p.salvagePercent, refreshYears: p.refreshYears });
       }
-      await api.put('/lifecycle/settings', { currency: s.currency, notSeenDays: Number(s.notSeenDays), autoTag: s.autoTag });
+      await api.put('/lifecycle/settings', { currency: s.currency, notSeenDays: Number(s.notSeenDays) });
       onSaved();
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(false); }
   }
   return (
     <>
       {error && <Callout tone="crit" icon="alert">{error}</Callout>}
+      <TagSettingsPanel meta={meta} onSaved={onReload} />
+      <CustomFieldsPanel meta={meta} onSaved={onReload} />
       <Panel title="Policies per device class" sub="Asset tag prefix, depreciation (unless set on the asset) and the age at which devices are due for replacement" flush>
         <div className="tbl-wrap"><table className="t">
           <thead><tr><th>Class</th><th>Tag prefix</th><th>Depreciation</th><th>Useful life (months)</th><th>Salvage %</th><th>Refresh after (years)</th></tr></thead>
@@ -466,10 +503,9 @@ function Policies({ meta, onSaved }: { meta: LcMeta; onSaved: () => void }) {
         </table></div>
       </Panel>
       <Panel title="Settings">
-        <div className="grid-3 tight">
+        <div className="grid-2 tight">
           <label>Currency<input className="in mono" value={s.currency} maxLength={3} disabled={!canEdit} onChange={(e) => setS({ ...s, currency: e.target.value.toUpperCase() })} /></label>
           <label>Mark as missing when not seen for (days, 0 = never)<input className="in" type="number" min={0} max={3650} value={s.notSeenDays} disabled={!canEdit} onChange={(e) => setS({ ...s, notSeenDays: e.target.value })} /></label>
-          <label className="row-check" style={{ alignSelf: 'end' }}><input type="checkbox" checked={s.autoTag} disabled={!canEdit} onChange={(e) => setS({ ...s, autoTag: e.target.checked })} /> Give new assets the next asset tag automatically</label>
         </div>
         {canEdit && <div style={{ marginTop: 12 }}><button className="btn primary" disabled={busy} onClick={() => void save()}>{busy ? 'Saving…' : 'Save'}</button></div>}
       </Panel>

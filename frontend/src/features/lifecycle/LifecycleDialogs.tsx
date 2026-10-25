@@ -3,7 +3,7 @@ import { api } from '../../api/client';
 import { useApi } from '../../app/useApi';
 import { Modal } from '../../components/Modal';
 import { Callout } from '../../components/ui';
-import { PersonInput } from '../accessories/AccessoryDialogs';
+import { CustomFieldInputs, customText, LcPersonInput } from './LifecycleExtras';
 import { DeviceTypeSelect } from '../assets/DeviceManagement';
 import { DepartmentSelect, useDepartments } from '../departments/Departments';
 import { LocationSelect, useLocations } from '../locations/Locations';
@@ -100,7 +100,7 @@ export function StageDialog({ asset, meta, mode, onClose, onDone }: {
           </Field>
         </div>
         {needsPerson && <div className="grid-2 tight">
-          <Field label="Person"><PersonInput id="lc-person" value={person} onChange={setPerson} /></Field>
+          <Field label="Person"><LcPersonInput id="lc-person" value={person} onChange={setPerson} onPicked={(p) => { if (p.email && !email.trim()) setEmail(p.email); }} /></Field>
           <Field label="E-mail (optional)"><input className="in" type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={254} /></Field>
           {status === 'loaned' && <Field label="Return by"><input className="in" type="date" value={ret} onChange={(e) => setRet(e.target.value)} required /></Field>}
           <Field label="Department / unit">
@@ -143,7 +143,10 @@ export function StageDialog({ asset, meta, mode, onClose, onDone }: {
 
 // ---- details: tag, purchase, depreciation, lease, warranty -----------------------------------------------------------
 
-export function DetailsDialog({ asset, meta, onClose, onDone }: { asset: LcAsset; meta: LcMeta; onClose: () => void; onDone: (msg: string) => void }) {
+export function DetailsDialog({ asset, meta, custom, onClose, onDone }: {
+  asset: LcAsset; meta: LcMeta; custom?: Record<string, string | number | boolean | null> | null; onClose: () => void; onDone: (msg: string) => void;
+}) {
+  const [cv, setCv] = useState<Record<string, string>>(() => Object.fromEntries(meta.fields.map((x) => [x.key, customText(custom?.[x.key])])));
   const s = (v: string | number | null | undefined) => (v == null ? '' : String(v));
   const [f, setF] = useState({
     assetTag: s(asset.assetTag), acquisition: asset.acquisition, purchaseDate: s(asset.purchaseDate), purchaseCost: s(asset.purchaseCost),
@@ -168,6 +171,7 @@ export function DetailsDialog({ asset, meta, onClose, onDone }: { asset: LcAsset
         lessor: f.lessor.trim() || null, leaseStart: day(f.leaseStart), leaseEnd: day(f.leaseEnd), leaseMonthlyCost: num(f.leaseMonthlyCost),
         warrantyProvider: f.warrantyProvider.trim() || null, warrantyType: f.warrantyType.trim() || null, warrantyStart: day(f.warrantyStart), warrantyEnd: day(f.warrantyEnd),
         notes: f.notes.trim() || null, rowVersion: asset.rowVersion,
+        custom: meta.fields.length ? Object.fromEntries(meta.fields.map((x) => [x.key, cv[x.key]?.trim() || null])) : null,
       });
       onDone('Lifecycle details saved.');
     } catch (x) { setError(err(x)); } finally { setBusy(false); }
@@ -178,13 +182,14 @@ export function DetailsDialog({ asset, meta, onClose, onDone }: { asset: LcAsset
         {error && <Callout tone="crit" icon="alert">{error}</Callout>}
         <h4 className="lc-h">Identification</h4>
         <div className="grid-2 tight">
-          <Field label="Asset tag" hint={`Empty: the next ${policy?.tagPrefix ?? 'AST'}- number can be given from the list (Tag).`}><input className="in mono" value={f.assetTag} onChange={set('assetTag')} maxLength={40} /></Field>
+          <Field label="Asset tag" hint={meta.tags.mode === 'manual' ? 'Your own tag (letters, digits and . _ / -).' : `Your own tag, or leave empty and use "Give the next tag" (format ${meta.tags.format}, e.g. ${meta.tags.example}; class prefix ${policy?.tagPrefix ?? 'AST'}).`}><input className="in mono" value={f.assetTag} onChange={set('assetTag')} maxLength={40} /></Field>
           <Field label="Acquisition">
             <select className="in" value={f.acquisition} onChange={set('acquisition')}>
               {meta.acquisitions.map((a) => <option key={a} value={a}>{a === 'byod' ? 'Personal device (BYOD)' : a[0]!.toUpperCase() + a.slice(1)}</option>)}
             </select>
           </Field>
         </div>
+        {meta.fields.length > 0 && <><h4 className="lc-h">Custom fields</h4><CustomFieldInputs fields={meta.fields} values={cv} onChange={setCv} /></>}
         <h4 className="lc-h">Purchase</h4>
         <div className="grid-3 tight">
           <Field label="Purchase date"><input className="in" type="date" value={f.purchaseDate} onChange={set('purchaseDate')} /></Field>
@@ -245,14 +250,17 @@ export function StockDialog({ meta, onClose, onDone }: { meta: LcMeta; onClose: 
   const [loc, setLoc] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const list = serials.split(/[\n,;]+/).map((x) => x.trim()).filter(Boolean);
+  const [withTags, setWithTags] = useState(meta.tags.mode === 'manual');
+  const list = withTags
+    ? serials.split(/\n+/).map((x) => x.trim()).filter(Boolean).map((line) => { const [sn, tag] = line.split(/[\t,;]+|\s+/).map((v) => v.trim()); return { serial: sn ?? '', tag: tag || null }; })
+    : serials.split(/[\n,;]+/).map((x) => x.trim()).filter(Boolean).map((sn) => ({ serial: sn, tag: null as string | null }));
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value });
   async function submit(e: FormEvent) {
     e.preventDefault();
     setBusy(true); setError(null);
     try {
       const r = await api.post<{ message: string }>('/lifecycle/stock', {
-        items: list.map((s) => ({ serial: s, manufacturer: mf.trim() || null, model: model.trim() || null, deviceType: type || null, hostname: null })),
+        items: list.map((x) => ({ serial: x.serial, assetTag: x.tag, manufacturer: mf.trim() || null, model: model.trim() || null, deviceType: type || null, hostname: null })),
         stage, status, departmentId: dep || null, locationId: loc || null,
         purchaseDate: day(f.purchaseDate), purchaseCost: num(f.purchaseCost), currency: f.currency.trim() || null, vendor: f.vendor.trim() || null,
         invoiceNumber: f.invoiceNumber.trim() || null, poNumber: f.poNumber.trim() || null, warrantyProvider: f.warrantyProvider.trim() || null,
@@ -282,9 +290,12 @@ export function StockDialog({ meta, onClose, onDone }: { meta: LcMeta; onClose: 
           <Field label="Manufacturer"><input className="in" value={mf} onChange={(e) => setMf(e.target.value)} maxLength={200} /></Field>
           <Field label="Model"><input className="in" value={model} onChange={(e) => setModel(e.target.value)} maxLength={200} /></Field>
         </div>
-        <Field label={`Serial numbers (${list.length})`} hint="One per line (or separated by commas). A barcode scanner can type them in.">
-          <textarea className="in mono" rows={5} value={serials} onChange={(e) => setSerials(e.target.value)} required />
+        <Field label={withTags ? `Serial number and asset tag, one item per line (${list.length})` : `Serial numbers (${list.length})`}
+          hint={withTags ? 'Serial, then your tag: "5CG4410XYZ ACME-LAP-0101" (space, tab or comma between). Lines without a tag get one by the tag settings.'
+            : `One per line (or separated by commas). A barcode scanner can type them in.${meta.tags.mode === 'auto' ? ` Tags are given automatically (${meta.tags.example} …).` : ''}`}>
+          <textarea className="in mono" rows={5} value={serials} onChange={(e) => setSerials(e.target.value)} required placeholder={withTags ? '5CG4410XYZ  ACME-LAP-0101\n5CG4410XZA  ACME-LAP-0102' : ''} />
         </Field>
+        <label className="row-check"><input type="checkbox" checked={withTags} onChange={(e) => setWithTags(e.target.checked)} /> <span>I'll enter our own asset tag after each serial number</span></label>
         <div className="grid-3 tight">
           <Field label="Purchase date"><input className="in" type="date" value={f.purchaseDate} onChange={set('purchaseDate')} /></Field>
           <Field label="Cost per item"><input className="in" type="number" min={0} step="0.01" value={f.purchaseCost} onChange={set('purchaseCost')} /></Field>
