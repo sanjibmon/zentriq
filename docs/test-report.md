@@ -1,19 +1,17 @@
 # Test report
 
-Latest: GitHub Actions run 40165790356, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
-10.0.20348** VM. Release: `v1.1.1-build.81` (pre-release, **unsigned**), package version **1.1.1.81**. Results: unit +
-PostgreSQL integration tests **271 PASS, 2 skipped** (live remote support and SNMP tests run in ci-quick: PASS, 273/273);
-installer acceptance **63 passed, 0 failed**; in-place updates PASS (database migration V0024, schema 24).
+Latest: GitHub Actions run 40170754088, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
+10.0.20348** VM. Release: `v1.1.1-build.82` (pre-release, **unsigned**), package version **1.1.1.82**. Results: unit +
+PostgreSQL integration tests **279 PASS, 2 skipped** (live remote support and SNMP tests run in ci-quick: PASS, 281/281);
+installer acceptance **63 passed, 0 failed**; in-place updates PASS (database migration V0025, schema 25).
 
-New in build 81: Cloud & Infrastructure — read-only connections to Microsoft Azure, Amazon Web Services, VMware vCenter
-and Hyper-V hosts; resources, links to inventoried devices, change history, cost and exposure findings, events and reports.
+New in build 82: Cloud & Infrastructure adds **Google Cloud**, **Nutanix AHV** (Prism), **Proxmox VE**, **XCP-ng / Citrix
+Hypervisor** and **oVirt / Red Hat Virtualization / OLVM** (9 platforms in all); the page header has no tagline.
 
 | ID | Test | Result | Detail |
 |---|---|---|---|
-| T73 | Cloud & infrastructure | **PASS** | validation (Azure tenant ID, AWS access key, Hyper-V Windows account); unreachable vCenter 127.0.0.1:9 → sync *failed* with "Could not reach 127.0.0.1 …"; secret write-only and kept on edit; platform change refused; resources / findings / changes APIs; both report datasets run; built-in reports present; connection deleted |
-| T72 | Asset lifecycle end to end | **PASS** | unchanged from build 80 |
-| T71 | Installation type | **PASS** | Standard (with Infrastructure) and back to Advanced |
-| — | Unit / PostgreSQL tests | **PASS** | AWS SigV4 test vector; Azure Resource Graph mapping (VM power state, NIC MAC/IP, public IP, NSG rules, storage); paged Resource Graph and sign-in errors against a fake Azure; AWS EC2/EBS/security group/RDS parsing, one service denied = warning not failure; vCenter `/api` and legacy `/rest` shapes, datastore free %; Hyper-V WMI rows (state since, checkpoints, KVP guest data, memory commit); all finding rules; PostgreSQL: sync stores resources, links the VM by byte-swapped BIOS UUID, maps the department tag, keeps resources on partial reads, deletes and resolves findings on complete reads, restores |
+| T73 | Cloud & infrastructure (9 platforms) | **PASS** | validation (Azure tenant ID, AWS access key, Hyper-V Windows account, Google Cloud JSON key, Proxmox token ID); 9 platforms listed; unreachable Proxmox node and vCenter fail with "Could not reach 127.0.0.1"; secret write-only and kept on edit; platform change refused; APIs and report datasets; connections deleted |
+| — | Unit / PostgreSQL tests | **PASS** | Google service-account key read and JWT (RS256) verified with the public key; Compute Engine, disks, addresses, firewall rules, Cloud SQL and Cloud Functions mapping; disabled API = warning, key's own project used; Nutanix v3 lists (Prism Central entry skipped, categories as tags, CD-ROM not counted); Proxmox cluster resources, config (MAC, SMBIOS UUID, container IP), snapshots and guest agent; XCP-ng records (dom0, templates and snapshots skipped, guest metrics, SR free space); oVirt REST (topology, reported IPs, stop time, snapshots, storage domains); all build 81 tests |
 
 ## Build and packaging
 
@@ -32,11 +30,11 @@ replaced) and the trial's 30-device total cap.
 ## Release artifacts (SHA-256)
 
 ```
-2861808808435bc129870a57cbba0bc14b744d6794bb0b9174c5dd4c88366a6c  Zentriq-1.1.1-docs.zip
-87c99cdd02dde412438ed4fb82fa1779f5d5af22ef75febd500e0de65b3f12e2  Zentriq-1.1.1-msi-offline-kit.zip
-f51c30187f94866add68ef57f05f2b6e1adc474686f2eb0fd9b20a8cd2a67682  Zentriq-Setup-x64.exe
-93144660cf315169c676655ead307c944c9c3defeed0307f46152a23d37c377a  Zentriq.msi
-cdf1051196ffbf77c39710c036deb606d02d4267c0be1f3c1749eebb05d93101  ZentriqAgent-x64.msi
+aec6228ac49868777314053e4fe9a683f8d1b7d81259b53e8c1dc0f794d3bce8  Zentriq-1.1.1-docs.zip
+392a076e6a5e8e88fd159254047b1d5aeda094617dd2a9bd113c4ae7340be224  Zentriq-1.1.1-msi-offline-kit.zip
+61c8ad4bc3b8223f16b1586eb428a62da4393b420ebd7ba391c36a57d1743ef1  Zentriq-Setup-x64.exe
+43df224bae386c31395310481eb81a32f77ae0523971a3547588a0b4adf15f6f  Zentriq.msi
+812174adf1582355555e040cfaed210ffb3ad0819e0cad5f144c3827a84db210  ZentriqAgent-x64.msi
 ```
 
 ## Installer acceptance (tests/installer/Invoke-InstallerAcceptance.ps1)
