@@ -308,7 +308,7 @@ export function RestoreDialog({ destinations, initial, onClose, onStarted }: {
           {!useKey
             ? <Field label="Backup password"><input className="in" type="password" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="off" /></Field>
             : <Field label="Recovery key" hint="The Key: line of backup-recovery-key.txt from the old server (or paste the whole file)."><textarea className="in mono" rows={3} value={recovery} onChange={(e) => setRecovery(e.target.value)} /></Field>}
-          <button type="button" className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => setUseKey(!useKey)}>{useKey ? 'Use the backup password instead' : 'Use a recovery key file instead'}</button>
+          <button type="button" className="btn sm self-start" onClick={() => setUseKey(!useKey)}>{useKey ? 'Use the backup password instead' : 'Use a recovery key file instead'}</button>
         </>}
 
         {file && <Field label="Type RESTORE to confirm"><input className="in mono" value={confirm} onChange={(e) => setConfirm(e.target.value.toUpperCase())} placeholder="RESTORE" autoComplete="off" /></Field>}

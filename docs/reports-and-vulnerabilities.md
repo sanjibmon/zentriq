@@ -37,10 +37,17 @@ You can only pick columns from a fixed catalogue (`ReportCatalog.cs`). Each colu
    | Date only | in the last N days, older than N days (or never) |
    | Every type | is empty, is not empty |
 
-4. **Run** previews the first 500 rows. **Excel** or **CSV** exports up to 100,000 rows; **PDF** up to 20,000 rows (landscape A4, header on every page, page numbers, and a bar chart for summary reports).
+4. **Time period** (above the preview, build 85): every report can be limited to a period on one of its date columns —
+   **From – to dates** (both days included; either may be left empty), or a moving period: today, yesterday, last 7 / 30 / 90
+   days, this or last week (Monday to Sunday), month, quarter or year. Choose which date counts with **by** (for example
+   *First seen*, *Fixed*, *Purchase date*, *Date* of a change); it starts with the data source's main date. Dates are calendar
+   days in the server's time zone. The period is saved with the report, so a scheduled report set to *Last month* always
+   covers the previous month, and it is shown in the preview, the PDF, the delivery e-mail and the report list.
+   API: `GET /reports/{id}/data?from=2026-09-01&to=2026-09-30` (or `?range=last_month`, `&dateColumn=`) sets the period for one call.
+5. **Run** previews the first 500 rows. **Excel** or **CSV** exports up to 100,000 rows; **PDF** up to 20,000 rows (landscape A4, header on every page, page numbers, and a bar chart for summary reports).
    - The XLSX file has a frozen header row and an auto-filter, and keeps real numbers and dates.
    - In CSV files, cells that start with `= + - @` get an apostrophe prefix so spreadsheet programs don't run them as formulas.
-5. **Save** stores the report. **Share with all users** needs the *dashboards.share* permission or administrator rights.
+6. **Save** stores the report. **Share with all users** needs the *dashboards.share* permission or administrator rights.
 
 **Add to dashboard** puts a saved report on your dashboard: summary reports as a chart, detail reports as a short table. It runs with the permissions of whoever looks at the dashboard. You can also add saved reports under Dashboard › Customize.
 

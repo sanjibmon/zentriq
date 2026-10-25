@@ -281,9 +281,11 @@ public static class BackupEndpoints
 
         // Start a restore. The password / recovery key is checked here when the file can be read; the maintenance task
         // runs the restore (stops the services, replaces the data, starts them again).
-        g.MapPost("/restore", async (RestoreBody body, ZentriqPaths paths, BackupStore store, JobQueue jobs, RequestContext rc, CancellationToken ct) =>
+        g.MapPost("/restore", async (RestoreBody body, ZentriqPaths paths, BackupStore store, JobQueue jobs, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
         {
             if (body.Confirm != "RESTORE") return Validation.Problem("confirm", "Type RESTORE to confirm: all current data is replaced by the backup.");
+            await using (var busy = ds.CreateCommand("SELECT EXISTS (SELECT 1 FROM zentriq.jobs WHERE job_type = 'maintenance.restore' AND status IN ('queued', 'running'))"))
+                if (await busy.ExecuteScalarAsync(ct) is true) return Results.Problem(statusCode: 409, title: "A restore is already waiting or running.");
             if (body.Source is null || !Sources.Contains(body.Source)) return Validation.Problem("source", "Choose the backup to restore.");
             if (body.File is null || !IsFileName(body.File)) return Validation.Problem("file", "Choose a backup file.");
             string? recovery = null;
@@ -320,7 +322,7 @@ public static class BackupEndpoints
             var unlock = store.ProtectUnlock(string.IsNullOrEmpty(body.Password) ? null : body.Password, recovery, dataKey);
             var id = await jobs.EnqueueAsync(new EnqueueRequest(JobTypes.MaintenanceRestore,
                 new { source = body.Source, file = body.File, destinationId = body.DestinationId?.ToString(), unlock, requestedBy = rc.UserName },
-                $"restore:{DateTimeOffset.UtcNow:yyyyMMddHHmm}", Priority: 1, MaxAttempts: 1, TimeoutSeconds: 6 * 3600, CreatedBy: rc.UserId), ct: ct);
+                null, Priority: 1, MaxAttempts: 1, TimeoutSeconds: 6 * 3600, CreatedBy: rc.UserId), ct: ct);
             await rc.AuditAsync("backup.restore_request", body.File, detail: new { body.Source, body.DestinationId, jobId = id });
             return Results.Accepted($"/api/v1/jobs/{id}", new
             {

@@ -135,6 +135,6 @@ Public MSI properties: `INSTALLFOLDER`, `DATAFOLDER`, `PGMODE` (bundled|existing
 | Services | `ZentriqApi` (NT SERVICE\ZentriqApi), `ZentriqWorker` (NT SERVICE\ZentriqWorker): automatic (delayed) start, restart on failure, depend on PostgreSQL when bundled |
 | PostgreSQL | `postgresql-x64-17` (NETWORK SERVICE), listening on localhost only; roles `zentriq_owner` (schema owner, used by setup/maintenance) and `zentriq_app` (application, no DDL) |
 | Data | `C:\ProgramData\Zentriq` (ACL: SYSTEM, Administrators; services only where needed) |
-| Scheduled tasks | `\Zentriq\Maintenance` (every 5 min: privileged jobs such as on-demand backups), `\Zentriq\Nightly backup` (01:30, keeps 14) |
+| Scheduled tasks | `\Zentriq\Maintenance` (every 5 min: privileged jobs, and backups on the schedule set in Backup & Restore — default daily 01:30, 14 kept) |
 | Firewall | Inbound TCP on the HTTPS port (scope as chosen) |
 | Registry | `HKLM\SOFTWARE\Zentriq\Console` |

@@ -115,7 +115,7 @@ function Overview({ data, admin, reload, setMsg, onRestoreFrom }: { data: Backup
           { key: 's', label: 'Last copy / test', className: 'wrap', render: (d) => d.status
             ? <><Pill tone={d.status === 'ok' ? 'ok' : 'crit'}>{d.status === 'ok' ? 'OK' : 'Failed'}</Pill> <span className="faint">{fmt.ago(d.at)}</span>{d.message && <div className="faint" style={{ fontSize: 11.5 }}>{d.message}</div>}</>
             : <span className="muted">Not used yet</span> },
-          { key: 'a', label: '', render: (d) => admin && <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+          { key: 'a', label: '', render: (d) => admin && <div className="row-actions">
             <button className="btn sm" disabled={testing === d.id} onClick={() => void test(d)}>{testing === d.id ? 'Testing…' : 'Test'}</button>
             <button className="btn sm" onClick={() => onRestoreFrom(d)}>Backups…</button>
             <button className="btn sm" onClick={() => setEditing(d)}><Icon name="edit" size={13} /></button>
@@ -212,7 +212,7 @@ function History({ onRestore, admin }: { onRestore: (file: string) => void; admi
             ? <span className="muted">{r.trigger === 'pre-upgrade' || r.trigger === 'pre-restore' ? 'Kept on this server' : '—'}</span>
             : <div className="copy-chips">{r.destinations.map((d) => <span key={d.id} title={d.message}><Pill tone={d.status === 'ok' ? 'ok' : 'crit'}>{d.name}</Pill></span>)}</div> },
           { key: 'e', label: 'Detail', className: 'wrap', render: (r) => r.error ? <span className="faint">{r.error}</span> : <span className="mono faint" style={{ fontSize: 11.5 }}>{r.file}</span> },
-          { key: 'a', label: '', render: (r) => r.onServer && admin ? <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+          { key: 'a', label: '', render: (r) => r.onServer && admin ? <div className="row-actions">
             <a className="btn sm" href={`/api/v1/backup/files/${encodeURIComponent(r.file)}`} download><Icon name="down" size={13} /> Download</a>
             <button className="btn sm" onClick={() => onRestore(r.file)}>Restore…</button>
           </div> : null },
@@ -256,11 +256,11 @@ function RestoreProgress({ started }: { started: { note: string; since: number }
         {state === 'down' && <p><b>Restoring…</b> The console is stopped while the data is replaced. This page checks every 10 seconds.</p>}
         {state === 'failed' && <>
           <Callout tone="crit" icon="alert">The restore did not run; the current data is unchanged. The reason is in the notifications (bell) and in Jobs, or in the maintenance log on the server.</Callout>
-          <button className="btn" style={{ alignSelf: 'flex-start' }} onClick={() => window.location.reload()}>Back to Backup &amp; Restore</button>
+          <button className="btn self-start" onClick={() => window.location.reload()}>Back to Backup &amp; Restore</button>
         </>}
         {state === 'back' && <>
           <Callout tone="ok" icon="info">The restore has finished. Sign in again with an account from the backup.</Callout>
-          <button className="btn primary" style={{ alignSelf: 'flex-start' }} onClick={() => window.location.assign('/')}>Go to sign-in</button>
+          <button className="btn primary self-start" onClick={() => window.location.assign('/')}>Go to sign-in</button>
         </>}
       </div>
     </Panel>
