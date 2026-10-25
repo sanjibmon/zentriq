@@ -119,7 +119,7 @@ Remove-Item $answer -Force   # contains the administrator password
 
 if (-not $installed) {
     foreach ($t in 'T02 PostgreSQL provisioning', 'T03 Database migration', 'T04 Administrator sign-in', 'T05 API and worker services', 'T06 Trial initialization',
-                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection', 'T68 Live agent connection', 'T69 Locations and IT accessories', 'T70 Manual hardware details', 'T71 Standard and Advanced installation', 'T72 Asset lifecycle', 'T73 Cloud and infrastructure') {
+                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection', 'T68 Live agent connection', 'T69 Locations and IT accessories', 'T70 Manual hardware details', 'T71 Standard and Advanced installation', 'T72 Asset lifecycle', 'T73 Cloud and infrastructure', 'T74 Own asset tags, people and bulk upload') {
         Record $t.Substring(0, 3) $t.Substring(4) 'BLOCKED' 'installation failed'
     }
 } else {
@@ -1727,6 +1727,60 @@ if (-not $installed) {
         $gone = Raw GET "/cloud/resources/$([guid]::NewGuid())"
         Assert ($gone.StatusCode -eq 404) "unknown resource: $($gone.StatusCode)"
         "validation (Azure tenant, AWS key, Hyper-V account, Google key, Proxmox token); 9 platforms; unreachable Proxmox failed cleanly; vCenter 127.0.0.1:9 sync failed: $($a.lastError); secret write-only, kept on edit; platform change refused; reports $(@($r1.rows).Count)/$(@($r2.rows).Count) rows; built-in reports present; deleted"
+    } | Out-Null
+
+    Check 'T74' 'Asset lifecycle: own tag format and manual tags, people directory, custom field, Excel templates and bulk upload (check, all or nothing, upload)' {
+        $s = Login
+        function Raw([string] $Method, [string] $Path, $Body, [string] $ContentType = 'application/json') {
+            $p = @{ Uri = "$base/api/v1$Path"; Method = $Method; WebSession = $s; Headers = @{ 'X-Zentriq-Request' = '1' }; ContentType = $ContentType; SkipHttpErrorCheck = $true }
+            if ($null -ne $Body) { $p.Body = if ($Body -is [string]) { [Text.Encoding]::UTF8.GetBytes($Body) } else { ($Body | ConvertTo-Json -Depth 6) } }
+            $resp = Invoke-WebRequest @p
+            $text = if ($resp.Content -is [byte[]]) { [Text.Encoding]::UTF8.GetString($resp.Content) } else { [string]$resp.Content }
+            [pscustomobject]@{ StatusCode = [int]$resp.StatusCode; Content = $text }
+        }
+        $bad = Raw PUT '/lifecycle/settings' @{ tagFormat = '{PREFIX}-ONLY' }
+        Assert ($bad.StatusCode -eq 400 -and $bad.Content -match 'SEQ') "format without a number accepted: $($bad.StatusCode)"
+        Api PUT '/lifecycle/settings' @{ tagMode = 'auto'; tagFormat = '{ORG}-{PREFIX}-{SEQ:5}'; tagOrg = 'CI'; tagStart = 100 } -Session $s | Out-Null
+        $meta = Api GET '/lifecycle/meta' -Session $s
+        Assert ($meta.tags.example -match '^CI-LAP-\d{5}$') "tag example: $($meta.tags.example)"
+        $field = Api POST '/lifecycle/fields' @{ label = 'CI cost centre'; type = 'list'; options = @('CC-1', 'CC-2') } -Session $s
+        $p = Api POST '/lifecycle/people' @{ name = 'CI Directory Person'; email = 'ci.dir@example.test'; employeeId = 'CI-E1' } -Session $s
+        $dupe = Raw POST '/lifecycle/people' @{ name = 'Someone Else'; employeeId = 'CI-E1' }
+        Assert ($dupe.StatusCode -eq 400) "duplicate employee ID accepted ($($dupe.StatusCode))"
+        foreach ($k in 'assets', 'people', 'contracts') {
+            $t = Invoke-WebRequest "$base/api/v1/lifecycle/import/$k/template" -WebSession $s
+            Assert ($t.StatusCode -eq 200 -and $t.RawContentLength -gt 3000) "$k template: $($t.StatusCode) $($t.RawContentLength) bytes"
+        }
+        $sn1 = 'CI74-' + (Get-Random -Maximum 999999); $sn2 = 'CI74-' + (Get-Random -Maximum 999999)
+        $csv = "Asset tag,Serial number,Device type,Stage,Assigned to,Location,Purchase cost,CI cost centre`r`n" +
+               ",$sn1,Laptop,In use,CI Upload Person,CI Upload Site,85000,CC-1`r`nCI-OWN-$sn2,$sn2,Desktop,In stock,,,,`r`n"
+        $check = (Raw POST '/lifecycle/import/assets?dryRun=true' $csv 'text/csv').Content | ConvertFrom-Json
+        Assert ($check.ok -and $check.created -eq 2 -and @($check.newLocations) -contains 'CI Upload Site') "check: $($check | ConvertTo-Json -Compress -Depth 3)"
+        $none = Api GET "/lifecycle/assets?q=$sn1" -Session $s
+        Assert ($none.total -eq 0) 'the check saved something'
+        $badCsv = $csv + ",,Toaster,,,,,`r`n"
+        $failed = (Raw POST '/lifecycle/import/assets?dryRun=false' $badCsv 'text/csv').Content | ConvertFrom-Json
+        Assert (-not $failed.ok -and @($failed.errors).Count -ge 1) "bad file accepted: $($failed | ConvertTo-Json -Compress -Depth 3)"
+        Assert ((Api GET "/lifecycle/assets?q=$sn1" -Session $s).total -eq 0) 'a failed upload saved rows'
+        $up = (Raw POST '/lifecycle/import/assets?dryRun=false' $csv 'text/csv').Content | ConvertFrom-Json
+        Assert ($up.ok -and $up.created -eq 2) "upload: $($up | ConvertTo-Json -Compress -Depth 3)"
+        $a1 = @((Api GET "/lifecycle/assets?q=$sn1" -Session $s).items)[0]
+        $a2 = @((Api GET "/lifecycle/assets?q=$sn2" -Session $s).items)[0]
+        Assert ($a1.assetTag -match '^CI-LAP-\d{5}$' -and $a1.stage -eq 'in_use' -and $a1.assignedTo -eq 'CI Upload Person') "row 1: $($a1 | ConvertTo-Json -Compress)"
+        Assert ($a2.assetTag -eq "CI-OWN-$sn2" -and $a2.stage -eq 'in_stock') "row 2 (own tag): $($a2.assetTag) / $($a2.stage)"
+        $d1 = Api GET "/lifecycle/assets/$($a1.id)" -Session $s
+        Assert ($d1.custom.ci_cost_centre -eq 'CC-1') "custom field: $($d1.custom | ConvertTo-Json -Compress)"
+        $people = @(Api GET '/lifecycle/people?q=CI' -Session $s | ForEach-Object { $_ })
+        Assert (@($people | Where-Object person -eq 'CI Upload Person').Count -eq 1 -and @($people | Where-Object person -eq 'CI Directory Person').Count -eq 1) "people: $(($people | ForEach-Object person) -join ', ')"
+        # Manual mode: stock without a tag stays untagged; a typed tag is used.
+        Api PUT '/lifecycle/settings' @{ tagMode = 'manual' } -Session $s | Out-Null
+        $sn3 = 'CI74-' + (Get-Random -Maximum 999999)
+        $st = Api POST '/lifecycle/stock' @{ items = @(@{ serial = $sn3; deviceType = 'laptop' }, @{ serial = "$sn3-B"; deviceType = 'laptop'; assetTag = "MINE-$sn3" }) } -Session $s
+        Assert ($null -eq @($st.created)[0].tag -and @($st.created)[1].tag -eq "MINE-$sn3") "manual mode stock: $($st.created | ConvertTo-Json -Compress)"
+        Api PUT '/lifecycle/settings' @{ tagMode = 'auto'; tagFormat = '{PREFIX}-{SEQ:6}'; tagOrg = ''; tagStart = 1 } -Session $s | Out-Null
+        Api DELETE "/lifecycle/fields/$($field.id)" -Session $s | Out-Null
+        Api DELETE "/lifecycle/people/$($p.id)" -Session $s | Out-Null
+        "format CI-{PREFIX}-{SEQ:5} → $($a1.assetTag); own tag kept; templates x3; check saved nothing; bad file all-or-nothing ($(@($failed.errors).Count) problem(s)); 2 uploaded with person, new location, custom field; manual mode: no automatic tag, typed tag kept; settings restored"
     } | Out-Null
 
     Check 'T71' 'Installation type: Advanced recorded, change to Standard (Remote support off, section locked) and back with Setup Update' {

@@ -224,14 +224,14 @@ export function TagSettingsPanel({ meta, onSaved }: { meta: LcMeta; onSaved: () 
           <b>Manual — we use our own tags</b><small>Zentriq never gives a tag by itself. Type tags on the asset, when adding stock, or in the bulk upload.</small>
         </button>
       </div>
-      <div className="grid-3 tight" style={{ marginTop: 12 }}>
+      <div className="form-v" style={{ marginTop: 12 }}><div className="grid-3 tight">
         <Field label="Tag format" hint={<>Preview: <b className="mono">{preview(t.format, t.org, Number(t.start) || 1)}</b> (a laptop at location PUNE)</>}>
           <input className="in mono" value={t.format} onChange={(e) => setT({ ...t, format: e.target.value })} disabled={!canEdit} maxLength={60} list="lc-tag-presets" />
           <datalist id="lc-tag-presets">{PRESETS.map((p) => <option key={p} value={p} />)}</datalist>
         </Field>
         <Field label="Organisation code {ORG}" hint="Up to 10 letters and digits, e.g. ACME."><input className="in mono" value={t.org} onChange={(e) => setT({ ...t, org: e.target.value.toUpperCase() })} disabled={!canEdit} maxLength={10} /></Field>
         <Field label="Start numbers at" hint="For each new prefix / year / location. Existing numbering continues."><input className="in" type="number" min={1} max={99999999} value={t.start} onChange={(e) => setT({ ...t, start: e.target.value })} disabled={!canEdit} /></Field>
-      </div>
+      </div></div>
       <p className="muted" style={{ fontSize: 12.5, margin: '6px 0' }}>Tokens: {TOKENS.map(([k, v]) => <span key={k} style={{ marginRight: 10 }}><span className="mono">{k}</span> {v}</span>)}. Letters, digits and . _ / - in between. Class prefixes are set in the table below; location codes on Locations.</p>
       <label className="row-check"><input type="checkbox" checked={t.discovered} disabled={!canEdit || !auto} onChange={(e) => setT({ ...t, discovered: e.target.checked })} /> <span>Also tag devices found by agents and scans (hourly)</span></label>
       {canEdit && <div style={{ marginTop: 10 }}><button className="btn primary" disabled={busy} onClick={() => void save()}>{busy ? 'Saving…' : 'Save tag settings'}</button></div>}

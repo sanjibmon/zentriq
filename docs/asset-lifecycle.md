@@ -52,7 +52,8 @@ It follows ISO/IEC 19770-1 (IT asset management) and the ITIL 4 IT Asset Managem
   - loan past its return date (`lifecycle.loan_overdue`)
 
 ## What is recorded per asset
-- **Asset tag:** PREFIX-000001; prefix per device class (LAP, DSK, MOB, SRV, VM, NET, PRN, AST). Given automatically to new assets (setting), from the list (*Give asset tags*) or typed.
+- **Asset tag:** your organisation's own tag — typed on the asset, when adding stock, or in the bulk upload — or given automatically in your format (see *Asset tags* below). Unique across all assets.
+- **Custom fields:** your own columns (see *Custom fields* below).
 - **Custody:** assigned person and e-mail, since when, loan return date, department and location.
 - **Purchase:** acquisition (purchase, lease, rental, donation, BYOD), date, cost, currency (default INR), vendor, invoice, purchase order.
 - **Depreciation:** per device class (Policies) or per asset.
@@ -75,6 +76,60 @@ It follows ISO/IEC 19770-1 (IT asset management) and the ITIL 4 IT Asset Managem
 - **Warranty:** provider, type, start and end.
 - **Contracts:** AMC, support, lease, insurance or warranty extension covering many assets, with a reminder N days before the end.
 - **Disposal:** date, method, vendor, value recovered, sanitisation method, who and when, certificate reference.
+
+## Asset tags (build 83)
+
+*Policies › Asset tags*:
+
+| Setting | |
+|---|---|
+| **Automatic, in our format** | New assets get the next tag when they are added (Add new assets), uploaded, or — if *Also tag devices found by agents and scans* is on — found by an agent or scan (hourly). Typed and uploaded tags are kept. *Give asset tags* on a selection uses the same format. |
+| **Manual — we use our own tags** | Zentriq never gives a tag by itself. Tags are typed on the asset (Details), entered after each serial number in *Add new assets*, or given in the bulk upload. |
+| **Tag format** | Tokens `{PREFIX}` (class prefix: LAP, DSK, MOB, SRV, VM, NET, PRN, AST — editable per class), `{ORG}` (organisation code, up to 10 letters / digits), `{LOC}` (location code, or the first letters of its name), `{YYYY}` `{YY}` `{MM}`, and exactly one running number `{SEQ}` / `{SEQ:n}` (n digits). Anything else: letters, digits and `. _ / -`. Examples: `{PREFIX}-{SEQ:6}` → LAP-000123 (default), `{ORG}-{PREFIX}-{SEQ:5}` → ACME-LAP-00123, `{ORG}/{YYYY}/{LOC}/{SEQ:4}` → ACME/2026/PUNE/0123. |
+| **Start numbers at** | The first number for each new prefix / year / location (numbering runs separately for each). Existing numbering continues. |
+
+Tags are up to 40 characters. Existing tags never change when the format changes.
+
+## Custom fields (build 83)
+
+*Policies › Custom fields*: your own fields on IT assets — text, number, date, list of values or yes / no, optionally required.
+They appear on the asset's Lifecycle panel and in *Details*, are columns of the bulk upload template (with drop-down lists),
+and are checked by type on save and upload. Deleting a field removes its values.
+
+## People (build 83)
+
+The **People** tab is a directory of the people IT assets are assigned to: name, e-mail, employee ID, job title, phone,
+department, location, manager, status (Active / Left) and notes, with the IT assets, loans, accessories and book value
+each person holds.
+
+- **Add person**, **edit**, **remove** (only when the person holds nothing; otherwise mark them *Left*).
+- **Bulk upload** from the People template; rows are matched by employee ID, then e-mail, then name.
+- Assigning an asset suggests people from the directory (and fills their e-mail); a **new name** typed there is accepted
+  and added to the directory. Renaming a person renames their assignments.
+- Name, e-mail and employee ID are unique in the directory. Everyone who held an asset before build 83 was added.
+- Department and location boxes everywhere offer **＋ Add new …**.
+
+## Bulk upload (build 83)
+
+**Asset Lifecycle › Bulk upload** (IT assets), **People › Bulk upload**, **Contracts › Bulk upload**:
+
+1. **Download the Excel template** — the columns, an example row, drop-down lists (device types, stages, statuses,
+   departments, locations, people, acquisition, depreciation, custom list fields) and an Instructions sheet.
+2. Fill one row per item (.xlsx, or CSV with the same headings) and **Check file**: every problem is listed by spreadsheet
+   row; nothing is saved.
+3. **Upload**: all rows in one transaction — all or nothing.
+
+IT asset rows are matched by **asset tag**, then **serial number**:
+
+- **Existing asset:** only the filled cells change. A different stage, status or person is a lifecycle change with the
+  normal rules (recorded in its history). Host name, make and model only fill what the inventory does not know.
+- **New asset:** added to the register like *Add new assets* (default **In stock**; Planned, On order, In use or In
+  maintenance can be given). It moves to In use by itself when an agent or scan finds the same serial number.
+- The tag column sets your own tag; empty tags follow the tag settings.
+- Options: update existing rows (or skip them); create departments and locations that do not exist yet. New people named
+  in *Assigned to* join the directory.
+
+Contract rows are matched by name; the *Asset tags* column adds assets to the contract. Up to 20,000 rows and 25 MB per file.
 
 ## Console
 **Infrastructure › Asset Lifecycle**
@@ -117,6 +172,10 @@ It follows ISO/IEC 19770-1 (IT asset management) and the ITIL 4 IT Asset Managem
 | POST | `/assets/{id}/stage`, `/assets/{id}/return`, `/stage` (bulk) | stage changes |
 | POST | `/stock` | add Planned / On order / In stock items by serial number |
 | POST | `/tags` · GET `/labels?ids=` | asset tags; labels with QR SVG |
+| GET / POST / PUT / DELETE | `/people`, `/people/{id}` · GET `/people/suggest?q=` | people directory (list merges what each person holds) |
+| GET / POST | `/import/{assets\|people\|contracts}/template` · `/import/{kind}?dryRun=&update=&createMissing=` | Excel template; upload (body = .xlsx / .csv) |
+| POST / PUT / DELETE | `/fields`, `/fields/{id}` | custom fields |
+| PUT | `/settings` | currency, not-seen days, `tagMode`, `tagFormat`, `tagOrg`, `tagStart`, `tagDiscovered` |
 | GET | `/people`, `/people/holdings?person=` | custody |
 | GET / POST / PUT / DELETE | `/contracts`, `/contracts/{id}`, POST `/contracts/{id}/assets` | contracts |
 | GET | `/refresh`, `/events` | refresh candidates and forecast; history |

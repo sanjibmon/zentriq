@@ -503,10 +503,10 @@ function Policies({ meta, onSaved, onReload }: { meta: LcMeta; onSaved: () => vo
         </table></div>
       </Panel>
       <Panel title="Settings">
-        <div className="grid-2 tight">
+        <div className="form-v"><div className="grid-2 tight">
           <label>Currency<input className="in mono" value={s.currency} maxLength={3} disabled={!canEdit} onChange={(e) => setS({ ...s, currency: e.target.value.toUpperCase() })} /></label>
           <label>Mark as missing when not seen for (days, 0 = never)<input className="in" type="number" min={0} max={3650} value={s.notSeenDays} disabled={!canEdit} onChange={(e) => setS({ ...s, notSeenDays: e.target.value })} /></label>
-        </div>
+        </div></div>
         {canEdit && <div style={{ marginTop: 12 }}><button className="btn primary" disabled={busy} onClick={() => void save()}>{busy ? 'Saving…' : 'Save'}</button></div>}
       </Panel>
     </>
