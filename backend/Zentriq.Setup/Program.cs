@@ -434,6 +434,16 @@ internal static class Cli
                     var msg = ex is SetupException se ? se.Message : $"{ex.GetType().Name}: {ex.Message}";
                     log.Error($"{job.JobType} {job.Id} failed: {msg}");
                     await queue.FailAsync(job.Id, workerId, msg, retryable: job.Attempts < job.MaxAttempts, ct);
+                    if (job.JobType == JobTypes.MaintenanceRestore)
+                    {
+                        try
+                        {
+                            await using var n = ds.CreateCommand("INSERT INTO zentriq.notifications (user_id, kind, title, body, link) VALUES (NULL, 'crit', 'Restore failed', @b, '/backup')");
+                            n.Parameters.AddWithValue("b", $"The restore did not complete: {msg}");
+                            await n.ExecuteNonQueryAsync(ct);
+                        }
+                        catch (Exception nex) when (nex is NpgsqlException or PostgresException) { log.Warn("Could not add a console notification: " + nex.Message); }
+                    }
                 }
             }
             return 0;

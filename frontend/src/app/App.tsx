@@ -5,6 +5,7 @@ import { LicensingPage } from '../features/licensing/LicensingPage';
 import { UsersPage } from '../features/users/UsersPage';
 import { AuditPage } from '../features/audit/AuditPage';
 import { SettingsPage } from '../features/settings/SettingsPage';
+import { BackupPage } from '../features/backup/BackupPage';
 import { AgentsPage } from '../features/agents/AgentsPage';
 import { SoftwarePage } from '../features/inventory/SoftwarePage';
 import { HardwarePage } from '../features/inventory/HardwarePage';
@@ -70,6 +71,7 @@ function Routes() {
   if (path === '/users') return <UsersPage />;
   if (path === '/audit') return <AuditPage />;
   if (path === '/settings') return <SettingsPage />;
+  if (path === '/backup') return <BackupPage />;
   if (path === '/account') return <AccountPage />;
   if (path === '/reports' || path === '/modules/reports') return <ReportsPage />;
   if (path === '/reports/new') return <ReportBuilder id={null} />;

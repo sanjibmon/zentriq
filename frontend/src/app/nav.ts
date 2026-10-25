@@ -47,6 +47,7 @@ export const NAV: [string, NavItem[]][] = [
     { id: 'licensing', label: 'Licensing', icon: 'key', path: '/licensing', ready: true, admin: true },
     { id: 'audit', label: 'Audit Logs', icon: 'log', path: '/audit', ready: true, permission: 'audit.view', admin: true },
     { id: 'users', label: 'Users, Roles & Sites', icon: 'users', path: '/users', ready: true, permission: 'users.manage', admin: true },
+    { id: 'backup', label: 'Backup & Restore', icon: 'archive', path: '/backup', ready: true, permission: 'backup.run', admin: true },
     { id: 'settings', label: 'System Settings', icon: 'gear', path: '/settings', ready: true, permission: 'settings.manage', admin: true },
   ]],
 ];
