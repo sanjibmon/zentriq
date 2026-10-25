@@ -442,3 +442,6 @@ details.rs-advanced[open] summary { margin-bottom: 12px; }
 .cl-hits button { text-align: left; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--fg); cursor: pointer; }
 .cl-hits button.on { border-color: var(--accent); background: var(--accent-soft); }
 @media (max-width: 760px) { .cl-pick { grid-template-columns: repeat(2, 1fr); } .cl-stats { grid-template-columns: repeat(3, 1fr); } .cl-accounts { grid-template-columns: 1fr; } }
+.cl-acts { margin-left: auto; display: flex; gap: 6px; flex-wrap: nowrap; }
+.cl-stack { display: grid; gap: 14px; align-content: start; }
+.cl-stack > .panel { margin: 0; }

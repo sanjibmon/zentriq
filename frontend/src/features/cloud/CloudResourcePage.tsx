@@ -78,7 +78,7 @@ export function CloudResourcePage({ id }: { id: string }) {
             ['Resource ID', <span className="mono cl-id">{r.externalId}</span>],
           ]} />
         </Panel>
-        <div>
+        <div className="cl-stack">
           {machine && <Panel title="Inventoried device" right={can('assets.manage') && <button className="btn sm" onClick={() => setLinking(true)}><Icon name="link" size={13} /> {asset ? 'Change' : 'Link'}</button>}>
             {asset ? <KV items={[
               ['Device', <Link to={`/assets/${asset.id}`}><b>{asset.hostname ?? asset.ip}</b></Link>],

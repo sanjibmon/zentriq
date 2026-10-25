@@ -62,7 +62,7 @@ In every case the data folder, the database, users, settings and enrolled agents
 | Discover & inventory | Discovery, IT / non-IT assets, hardware, software, network, IT accessories, agents, activity | ✓ | ✓ | Standard |
 | Insight & admin | Reports, integrations; licensing, users, audit, settings | ✓ | ✓ | Standard |
 | Remote support | Remote desktop, files, terminal, quick support, unattended access | — | optional | Advanced |
-| Infrastructure | Asset lifecycle, Cloud & infrastructure (build 80: part of Standard) | ✓ | ✓ | Standard |
+| Infrastructure | Asset lifecycle (build 80), Cloud & infrastructure — Azure, AWS, vCenter, Hyper-V (build 81); part of Standard | ✓ | ✓ | Standard |
 | Secure & remediate | Vulnerabilities, security configuration, patch management, software deployment | — | optional | Advanced |
 
 - **What you can use** is what is **installed** and **licensed**. The 14-day trial licenses every section.

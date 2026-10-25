@@ -200,8 +200,8 @@ function Resources() {
           <option value="region">Sort: region</option><option value="size">Sort: size</option><option value="findings">Sort: findings</option><option value="lastSeen">Sort: last seen</option>
         </select>
         {accountId && <button type="button" className="btn sm" onClick={() => { reset(); setAccountId(''); }}>One connection ✕</button>}
-        <label className="chk"><input type="checkbox" checked={findings} onChange={(e) => { reset(); setFindings(e.target.checked); }} /> With findings</label>
-        <label className="chk"><input type="checkbox" checked={deleted} onChange={(e) => { reset(); setDeleted(e.target.checked); }} /> Deleted</label>
+        <label className="check-inline"><input type="checkbox" checked={findings} onChange={(e) => { reset(); setFindings(e.target.checked); }} /> With findings</label>
+        <label className="check-inline"><input type="checkbox" checked={deleted} onChange={(e) => { reset(); setDeleted(e.target.checked); }} /> Deleted</label>
         <button className="btn" type="submit">Search</button>
         {chooser}
       </form>
@@ -360,10 +360,11 @@ function Accounts({ tick, onMsg, onAdd }: { tick: number; onMsg: (m: string, ton
                 <h3>{a.name}</h3>
                 <Pill tone={running ? 'info' : statusTone(a.lastStatus)}>{status}</Pill>
                 {!a.enabled && <Pill tone="warn">disabled</Pill>}
-                <span style={{ marginLeft: 'auto' }} />
-                {canSync && a.enabled && <button className="btn sm" disabled={running} onClick={() => void sync(a)}><Icon name="retry" size={13} /> Sync now</button>}
-                {manage && <button className="btn sm" onClick={() => setEdit(a)}><Icon name="edit" size={13} /> Edit</button>}
-                {manage && <button className="btn sm ghost" aria-label={`Delete ${a.name}`} onClick={() => void remove(a)}><Icon name="trash" size={13} /></button>}
+                <div className="cl-acts">
+                  {canSync && a.enabled && <button className="btn sm" disabled={running} onClick={() => void sync(a)}><Icon name="retry" size={13} /> Sync now</button>}
+                  {manage && <button className="btn sm" onClick={() => setEdit(a)}><Icon name="edit" size={13} /> Edit</button>}
+                  {manage && <button className="btn sm ghost" aria-label={`Delete ${a.name}`} onClick={() => void remove(a)}><Icon name="trash" size={13} /></button>}
+                </div>
               </header>
               <p className="muted">{where(a)}</p>
               <dl className="cl-stats">
