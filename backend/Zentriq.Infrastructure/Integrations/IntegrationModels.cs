@@ -26,6 +26,8 @@ public static class EventTypes
         new("lifecycle.loan_overdue", "Loaned asset not returned", "An IT asset on loan passed its return date (Asset Lifecycle).", true),
         new("lifecycle.missing", "IT asset not seen", "An IT asset in use was not seen for the configured days and is now Missing · Not seen (Asset Lifecycle).", true),
         new("lifecycle.retired_seen", "Retired IT asset seen again", "A retired or disposed IT asset was seen on the network again (Asset Lifecycle).", true),
+        new("cloud.finding", "Cloud or virtualization finding", "A new finding on a cloud or virtual resource: open to the internet, public or unencrypted storage, unattached disk, idle IP, machine off for long, old checkpoint, datastore full (Cloud & Infrastructure).", true),
+        new("cloud.sync_failed", "Cloud connection failed", "A sync of an Azure, AWS, vCenter or Hyper-V connection failed (Cloud & Infrastructure).", true),
         new("job.failed", "Background job failed", "A background job (report delivery, feed update, inventory...) failed.", false),
     ];
 

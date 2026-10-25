@@ -14,6 +14,8 @@ import { AssetDetailPage } from '../features/inventory/AssetDetailPage';
 import { AccessoriesPage } from '../features/accessories/AccessoriesPage';
 import { LifecycleAssetPage, LifecyclePage } from '../features/lifecycle/LifecyclePage';
 import { HandoverPage, LabelsPage } from '../features/lifecycle/PrintPages';
+import { CloudPage } from '../features/cloud/CloudPage';
+import { CloudResourcePage } from '../features/cloud/CloudResourcePage';
 import { ModulePage, SectionLockedPage } from '../features/placeholder/ModulePage';
 import { navOfPath } from './nav';
 import { ReportsPage } from '../features/reports/ReportsPage';
@@ -56,6 +58,9 @@ function Routes() {
   if (path === '/lifecycle/handover') return <HandoverPage />;
   const lcMatch = /^\/lifecycle\/assets\/([0-9a-f-]{36})$/i.exec(path);
   if (lcMatch) return <LifecycleAssetPage id={lcMatch[1]!} />;
+  if (path === '/cloud' || path === '/modules/cloud') return <CloudPage />;
+  const cloudMatch = /^\/cloud\/resources\/([0-9a-f-]{36})$/i.exec(path);
+  if (cloudMatch) return <CloudResourcePage key={cloudMatch[1]} id={cloudMatch[1]!} />;
   if (path === '/network') return <NetworkPage />;
   if (path === '/non-it') return <NonItPage />;
   if (path === '/agents') return <AgentsPage />;

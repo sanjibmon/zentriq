@@ -48,6 +48,7 @@ builder.Services.AddScoped<IJobHandler, VulnSyncHandler>();
 builder.Services.AddScoped<IJobHandler, VulnEvaluateHandler>();
 builder.Services.AddScoped<IJobHandler, VulnImportHandler>();
 builder.Services.AddScoped<IJobHandler, SecurityEvaluateHandler>();
+builder.Services.AddScoped<IJobHandler, Zentriq.Worker.Cloud.CloudSyncHandler>();
 builder.Services.AddSingleton<IHostPinger, TcpHostPinger>();
 builder.Services.AddSingleton<Zentriq.Worker.Agentless.AgentlessInventory>();
 
@@ -55,6 +56,7 @@ builder.Services.AddHostedService<JobRunner>();
 builder.Services.AddHostedService<Housekeeping>();
 builder.Services.AddHostedService<Zentriq.Worker.DuplicateCleanup>();
 builder.Services.AddHostedService<Zentriq.Worker.LifecycleAutomation>();
+builder.Services.AddHostedService<Zentriq.Worker.Cloud.CloudScheduler>();
 builder.Services.AddHostedService<Zentriq.Worker.Integrations.IntegrationService>();
 builder.Services.AddHostedService<Zentriq.Worker.Remote.RemoteSupportSync>();
 

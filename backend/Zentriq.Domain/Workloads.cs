@@ -69,6 +69,7 @@ public static class JobTypes
     public const string VulnEvaluate = "vuln.evaluate";
     public const string VulnImport = "vuln.import";
     public const string SecurityEvaluate = "security.evaluate";
+    public const string CloudSync = "cloud.sync";
     public const string UsageSnapshot = "license.usage_snapshot";
     public const string MaintenanceBackup = "maintenance.backup";
 

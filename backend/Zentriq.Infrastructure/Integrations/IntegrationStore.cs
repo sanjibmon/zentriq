@@ -196,6 +196,22 @@ public sealed class IntegrationStore(NpgsqlDataSource ds, CredentialProtector pr
               FROM zentriq.asset_lifecycle_events e JOIN zentriq.assets a ON a.id = e.asset_id JOIN zentriq.asset_lifecycle l ON l.asset_id = a.id
              WHERE e.at > @from AND e.at <= @to AND (e.kind = 'seen_again' OR (e.kind = 'auto' AND e.to_stage = 'missing'))
             """),
+        new("cloud.finding", """
+            SELECT 'cloud.finding', f.severity, 'cloud.finding:' || f.id || ':' || to_char(f.first_seen_at, 'YYYYMMDDHH24MISS'),
+                   f.title || ': ' || COALESCE(r.name, r.external_id),
+                   concat_ws(E'\n', f.detail, 'Connection: ' || c.name, 'Type: ' || r.kind, 'Region / group: ' || concat_ws(' / ', r.region, r.resource_group)),
+                   r.asset_id, jsonb_build_object('findingId', f.id, 'rule', f.rule, 'resourceId', r.id, 'provider', r.provider), '/cloud/resources/' || r.id
+              FROM zentriq.cloud_findings f JOIN zentriq.cloud_resources r ON r.id = f.resource_id JOIN zentriq.cloud_accounts c ON c.id = r.account_id
+             WHERE f.first_seen_at > @from AND f.first_seen_at <= @to AND f.resolved_at IS NULL AND NOT f.ignored AND f.severity <> 'info'
+            """),
+        new("cloud.sync_failed", """
+            SELECT 'cloud.sync_failed', 'medium', 'cloud.sync_failed:' || c.id || ':' || to_char(c.last_error_at, 'YYYYMMDDHH24MISS'),
+                   'Cloud connection failed: ' || c.name,
+                   concat_ws(E'\n', c.last_error, 'Last successful sync: ' || COALESCE(to_char((SELECT max(r.last_seen_at) FROM zentriq.cloud_resources r WHERE r.account_id = c.id), 'YYYY-MM-DD HH24:MI'), 'never')),
+                   NULL::uuid, jsonb_build_object('accountId', c.id, 'provider', c.provider), '/cloud?tab=accounts'
+              FROM zentriq.cloud_accounts c
+             WHERE c.last_error_at > @from AND c.last_error_at <= @to AND c.last_status = 'failed'
+            """),
         new("job.failed", """
             SELECT 'job.failed', 'medium', 'job.failed:' || j.id,
                    'Background job failed: ' || j.job_type,

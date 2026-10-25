@@ -30,7 +30,7 @@ export const NAV: [string, NavItem[]][] = [
     { id: 'remote', label: 'Remote Support', icon: 'remote', path: '/remote', ready: true, permission: 'remote.start' },
   ]],
   ['Infrastructure', [
-    { id: 'cloud', label: 'Cloud & Infrastructure', icon: 'cloud', path: '/modules/cloud', ready: false },
+    { id: 'cloud', label: 'Cloud & Infrastructure', icon: 'cloud', path: '/cloud', ready: true },
     { id: 'lifecycle', label: 'Asset Lifecycle', icon: 'cycle', path: '/lifecycle', ready: true },
   ]],
   ['Secure & remediate', [

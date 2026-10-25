@@ -30,6 +30,10 @@ public static class ReportCatalog
     private const string Ipv6Expr = "COALESCE(CASE WHEN family(a.primary_ip) = 6 THEN host(a.primary_ip) END, (SELECT ip FROM jsonb_array_elements(COALESCE(d.document->'network', '[]'::jsonb)) nic, jsonb_array_elements_text(COALESCE(nic->'ipv6', '[]'::jsonb)) ip WHERE ip NOT ILIKE 'fe80%' AND ip <> '::1' LIMIT 1))";
     private const string StageExpr = "CASE v.stage WHEN 'planned' THEN 'Planned' WHEN 'on_order' THEN 'On order' WHEN 'in_stock' THEN 'In stock' WHEN 'in_use' THEN 'In use' WHEN 'in_maintenance' THEN 'In maintenance' WHEN 'missing' THEN 'Missing' WHEN 'retired' THEN 'Retired' WHEN 'disposed' THEN 'Disposed' END";
     private const string OsExpr = "COALESCE(a.os_name, initcap(a.os_family))";
+    private static string CloudProviderLabel(string col) =>
+        $"CASE {col} WHEN 'azure' THEN 'Microsoft Azure' WHEN 'aws' THEN 'Amazon Web Services' WHEN 'vmware' THEN 'VMware vCenter' WHEN 'hyperv' THEN 'Microsoft Hyper-V' ELSE {col} END";
+    private static string CloudKindLabel(string col) =>
+        $"CASE {col} {string.Join(" ", Zentriq.Infrastructure.Cloud.CloudKinds.Labels.Select(k => $"WHEN '{k.Key}' THEN '{k.Value}'"))} ELSE {col} END";
 
     private static readonly ReportColumn[] DeviceColumns =
     [
@@ -555,6 +559,67 @@ public static class ReportCatalog
                 new("person", "Person", ReportColumnType.Text, "e.person", "Change"),
                 new("reason", "Reason", ReportColumnType.Text, "left(e.reason, 500)", "Change"),
                 new("by", "By", ReportColumnType.Text, "e.actor", "Change"),
+            ]),
+
+        new("cloud_resources", "Cloud and virtual resources", "One row per virtual machine, host, datastore and cloud resource from the Azure, AWS, vCenter and Hyper-V connections.",
+            """
+            zentriq.cloud_resources cr
+            JOIN zentriq.cloud_accounts ca ON ca.id = cr.account_id
+            LEFT JOIN zentriq.assets a ON a.id = cr.asset_id
+            LEFT JOIN zentriq.departments dp ON dp.id = cr.department_id
+            LEFT JOIN zentriq.locations lo ON lo.id = cr.location_id
+            """,
+            [
+                new("provider", "Platform", ReportColumnType.Text, CloudProviderLabel("cr.provider"), "Resource"),
+                new("account", "Connection", ReportColumnType.Text, "ca.name", "Resource"),
+                new("kind", "Type", ReportColumnType.Text, CloudKindLabel("cr.kind"), "Resource"),
+                new("name", "Name", ReportColumnType.Text, "cr.name", "Resource"),
+                new("external_id", "Resource ID", ReportColumnType.Text, "cr.external_id", "Resource"),
+                new("region", "Region / site", ReportColumnType.Text, "cr.region", "Resource"),
+                new("group", "Resource group / VPC / cluster", ReportColumnType.Text, "cr.resource_group", "Resource"),
+                new("state", "State", ReportColumnType.Text, "cr.state", "Resource"),
+                new("state_since", "In this state since", ReportColumnType.Date, "cr.state_since", "Resource"),
+                new("size", "Size / SKU", ReportColumnType.Text, "cr.size", "Resource"),
+                new("os", "Operating system / engine", ReportColumnType.Text, "cr.os", "Resource"),
+                new("hostname", "Host name", ReportColumnType.Text, "cr.hostname", "Network"),
+                new("private_ip", "Private IP", ReportColumnType.Text, "cr.private_ip", "Network"),
+                new("public_ip", "Public IP", ReportColumnType.Text, "cr.public_ip", "Network"),
+                new("cpu", "vCPU", ReportColumnType.Number, "cr.cpu", "Capacity"),
+                new("memory_gb", "Memory (GB)", ReportColumnType.Number, "round(cr.memory_mb / 1024.0, 1)", "Capacity"),
+                new("disk_gb", "Storage (GB)", ReportColumnType.Number, "cr.disk_gb", "Capacity"),
+                new("tags", "Tags", ReportColumnType.Text, "(SELECT string_agg(t.key || '=' || t.value, ', ' ORDER BY t.key) FROM jsonb_each_text(cr.tags) t)", "Ownership"),
+                new("department", "Department", ReportColumnType.Text, "dp.name", "Ownership"),
+                new("location", "Location", ReportColumnType.Text, "lo.name", "Ownership"),
+                new("device", "Inventoried device", ReportColumnType.Text, "COALESCE(a.hostname, a.serial_number)", "Ownership"),
+                new("linked", "Linked to inventory", ReportColumnType.YesNo, "CASE WHEN cr.asset_id IS NULL THEN 'no' ELSE 'yes' END", "Ownership"),
+                new("open_findings", "Open findings", ReportColumnType.Number,
+                    "(SELECT count(*) FROM zentriq.cloud_findings f WHERE f.resource_id = cr.id AND f.resolved_at IS NULL AND NOT f.ignored)", "Findings"),
+                new("created", "Created at provider", ReportColumnType.Date, "cr.created_at_provider", "Dates"),
+                new("first_seen", "First seen", ReportColumnType.Date, "cr.first_seen_at", "Dates"),
+                new("last_seen", "Last seen", ReportColumnType.Date, "cr.last_seen_at", "Dates"),
+                new("deleted", "Deleted", ReportColumnType.YesNo, "CASE WHEN cr.deleted_at IS NULL THEN 'no' ELSE 'yes' END", "Dates"),
+            ]),
+
+        new("cloud_findings", "Cloud and virtualization findings", "One row per finding: exposure to the internet, public or unencrypted storage, idle and unattached resources, old checkpoints, capacity.",
+            """
+            zentriq.cloud_findings f
+            JOIN zentriq.cloud_resources cr ON cr.id = f.resource_id
+            JOIN zentriq.cloud_accounts ca ON ca.id = cr.account_id
+            """,
+            [
+                new("severity", "Severity", ReportColumnType.Text, "initcap(f.severity)", "Finding"),
+                new("severity_rank", "Severity rank", ReportColumnType.Number, "array_position(ARRAY['info','low','medium','high','critical'], f.severity)", "Finding"),
+                new("title", "Finding", ReportColumnType.Text, "f.title", "Finding"),
+                new("detail", "Detail", ReportColumnType.Text, "left(f.detail, 500)", "Finding"),
+                new("rule", "Rule", ReportColumnType.Text, "f.rule", "Finding"),
+                new("status", "Status", ReportColumnType.Text, "CASE WHEN f.resolved_at IS NOT NULL OR cr.deleted_at IS NOT NULL THEN 'Resolved' WHEN f.ignored THEN 'Ignored' ELSE 'Open' END", "Finding"),
+                new("first_seen", "First seen", ReportColumnType.Date, "f.first_seen_at", "Finding"),
+                new("resolved", "Resolved", ReportColumnType.Date, "f.resolved_at", "Finding"),
+                new("resource", "Resource", ReportColumnType.Text, "COALESCE(cr.name, cr.external_id)", "Resource"),
+                new("kind", "Type", ReportColumnType.Text, CloudKindLabel("cr.kind"), "Resource"),
+                new("provider", "Platform", ReportColumnType.Text, CloudProviderLabel("cr.provider"), "Resource"),
+                new("account", "Connection", ReportColumnType.Text, "ca.name", "Resource"),
+                new("region", "Region / site", ReportColumnType.Text, "cr.region", "Resource"),
             ]),
 
         new("discovery", "Discovery results", "One row per address checked by a discovery scan.",

@@ -10,7 +10,6 @@ public static class PendingModuleEndpoints
     [
         ("/patch", "Patch management"),
         ("/deployment", "Software deployment"),
-        ("/cloud", "Cloud & infrastructure connectors"),
     ];
 
     public static void MapPendingModuleEndpoints(this RouteGroupBuilder api)

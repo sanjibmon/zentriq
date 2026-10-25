@@ -57,6 +57,7 @@ public static class DependencyInjection
         services.AddSingleton<Zentriq.Infrastructure.Security.SecurityStore>();
         services.AddSingleton<Zentriq.Infrastructure.Remote.RemoteSupportService>();
         services.AddSingleton<Zentriq.Infrastructure.Integrations.IntegrationStore>();
+        services.AddSingleton<Zentriq.Infrastructure.Cloud.CloudStore>();
         services.AddSingleton<Zentriq.Infrastructure.Integrations.ChannelSender>();
         services.AddScoped<Zentriq.Infrastructure.Inventory.InventoryStore>();
         return services;

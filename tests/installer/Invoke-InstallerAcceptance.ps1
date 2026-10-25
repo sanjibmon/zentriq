@@ -119,7 +119,7 @@ Remove-Item $answer -Force   # contains the administrator password
 
 if (-not $installed) {
     foreach ($t in 'T02 PostgreSQL provisioning', 'T03 Database migration', 'T04 Administrator sign-in', 'T05 API and worker services', 'T06 Trial initialization',
-                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection', 'T68 Live agent connection', 'T69 Locations and IT accessories', 'T70 Manual hardware details', 'T71 Standard and Advanced installation', 'T72 Asset lifecycle') {
+                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection', 'T68 Live agent connection', 'T69 Locations and IT accessories', 'T70 Manual hardware details', 'T71 Standard and Advanced installation', 'T72 Asset lifecycle', 'T73 Cloud and infrastructure') {
         Record $t.Substring(0, 3) $t.Substring(4) 'BLOCKED' 'installation failed'
     }
 } else {
@@ -1665,6 +1665,58 @@ if (-not $installed) {
         Assert ($ownLc.asset.stage -in 'in_use', 'missing') "server record lifecycle: $($ownLc.asset.stage)"
         Api DELETE "/lifecycle/contracts/$($c.id)" -Session $s | Out-Null
         "stock item $($item.tag) (book value below cost, schedule $(@($d.schedule).Count) years); duplicate serial refused; loan without date refused; assigned to CI Person, handover lists it; returned; stale edit 409; contract linked; refresh candidate; QR label; retired; disposal without sanitisation refused, disposed (purge, certificate); history $($kinds.Count) changes; report row(s) $(@($r.rows).Count)"
+    } | Out-Null
+
+    Check 'T73' 'Cloud & infrastructure: connection validation, write-only secret, failed sync recorded with a clear error, resources, findings, changes and reports' {
+        $s = Login
+        function Raw([string] $Method, [string] $Path, $Body) {
+            $p = @{ Uri = "$base/api/v1$Path"; Method = $Method; WebSession = $s; Headers = @{ 'X-Zentriq-Request' = '1' }; ContentType = 'application/json'; SkipHttpErrorCheck = $true }
+            if ($null -ne $Body) { $p.Body = ($Body | ConvertTo-Json -Depth 6) }
+            $resp = Invoke-WebRequest @p
+            $text = if ($resp.Content -is [byte[]]) { [Text.Encoding]::UTF8.GetString($resp.Content) } else { [string]$resp.Content }
+            [pscustomobject]@{ StatusCode = [int]$resp.StatusCode; Content = $text }
+        }
+        $meta = Api GET '/cloud/meta' -Session $s
+        Assert (@($meta.providers).Count -eq 4 -and @($meta.rules).Count -ge 10) "meta: $($meta | ConvertTo-Json -Compress -Depth 3)"
+        $sum = Api GET '/cloud/summary' -Session $s
+        Assert ($null -ne $sum.vms) "summary: $($sum | ConvertTo-Json -Compress -Depth 2)"
+        # Validation
+        $bad = Raw POST '/cloud/accounts' @{ name = 'CI bad'; provider = 'azure'; tenantId = 'not a tenant'; clientId = 'x'; secret = 'x' }
+        Assert ($bad.StatusCode -eq 400 -and $bad.Content -match 'tenant') "bad Azure tenant: $($bad.StatusCode) $($bad.Content)"
+        $bad = Raw POST '/cloud/accounts' @{ name = 'CI bad'; provider = 'aws'; accessKeyId = 'nope'; secret = 'x' }
+        Assert ($bad.StatusCode -eq 400 -and $bad.Content -match 'AKIA') "bad AWS key: $($bad.StatusCode)"
+        $bad = Raw POST '/cloud/accounts' @{ name = 'CI bad'; provider = 'hyperv'; hosts = @('hv01') }
+        Assert ($bad.StatusCode -eq 400 -and $bad.Content -match 'credential') "Hyper-V without a Windows account: $($bad.StatusCode)"
+        # An unreachable vCenter: the sync fails and says why; the secret never comes back.
+        $name = 'CI vCenter ' + (Get-Random -Maximum 99999)
+        $acc = Api POST '/cloud/accounts' @{ name = $name; provider = 'vmware'; host = '127.0.0.1'; port = 9; username = 'ci@vsphere.local'; secret = 'CiVc-Value-73'; skipCertificateCheck = $true; syncHours = 24 } -Session $s
+        Assert ($acc.id -and $acc.jobId) "create: $($acc | ConvertTo-Json -Compress)"
+        $dupe = Raw POST '/cloud/accounts' @{ name = $name; provider = 'vmware'; host = '127.0.0.1'; username = 'x'; secret = 'x' }
+        Assert ($dupe.StatusCode -eq 400) "duplicate name accepted ($($dupe.StatusCode))"
+        $deadline = (Get-Date).AddSeconds(180); $a = $null
+        do { Start-Sleep -Seconds 3; $a = @(Api GET '/cloud/accounts' -Session $s | ForEach-Object { $_ }) | Where-Object id -eq $acc.id } while ($a.lastStatus -notin 'failed', 'succeeded', 'partial' -and (Get-Date) -lt $deadline)
+        Assert ($a.lastStatus -eq 'failed' -and $a.lastError -match '127\.0\.0\.1') "unreachable vCenter: $($a.lastStatus) / $($a.lastError)"
+        $raw = (Raw GET '/cloud/accounts').Content
+        Assert ($raw -notmatch 'CiVc-Value-73' -and $raw -notmatch 'zq-gcm1') 'secret returned by the API'
+        Assert ($a.hasSecret) 'secret not stored'
+        Api PUT "/cloud/accounts/$($acc.id)" @{ name = $name; provider = 'vmware'; host = '127.0.0.1'; port = 9; username = 'ci2@vsphere.local'; enabled = $false; syncHours = 12 } -Session $s | Out-Null
+        $a = @(Api GET '/cloud/accounts' -Session $s | ForEach-Object { $_ }) | Where-Object id -eq $acc.id
+        Assert ($a.hasSecret -and -not $a.enabled -and $a.settings.username -eq 'ci2@vsphere.local' -and $a.syncHours -eq 12) "edit kept secret: $($a | ConvertTo-Json -Compress -Depth 3)"
+        $chg = Raw PUT "/cloud/accounts/$($acc.id)" @{ name = $name; provider = 'aws'; accessKeyId = 'AKIAABCDEFGHIJKLMNOP' }
+        Assert ($chg.StatusCode -eq 400) "platform change accepted ($($chg.StatusCode))"
+        # Lists, findings, changes and the reports
+        $res = Api GET '/cloud/resources?kind=vm&pageSize=10' -Session $s
+        Assert ($null -ne $res.total) 'resources list'
+        Api GET '/cloud/findings?status=all' -Session $s | Out-Null
+        Api GET '/cloud/changes?days=7' -Session $s | Out-Null
+        $r1 = Api POST '/reports/run' @{ dataset = 'cloud_resources'; definition = @{ columns = @('provider', 'account', 'kind', 'name', 'state', 'linked', 'device'); filters = @() } } -Session $s
+        $r2 = Api POST '/reports/run' @{ dataset = 'cloud_findings'; definition = @{ columns = @('severity', 'title', 'resource', 'status', 'severity_rank'); filters = @(@{ column = 'status'; op = 'eq'; value = 'Open' }) } } -Session $s
+        $reports = Raw GET '/reports'
+        Assert ($reports.Content -match 'Virtual machines without inventory' -and $reports.Content -match 'Open cloud and virtualization findings') 'built-in cloud reports missing'
+        Api DELETE "/cloud/accounts/$($acc.id)" -Session $s | Out-Null
+        $gone = Raw GET "/cloud/resources/$([guid]::NewGuid())"
+        Assert ($gone.StatusCode -eq 404) "unknown resource: $($gone.StatusCode)"
+        "validation (Azure tenant, AWS key, Hyper-V account); vCenter 127.0.0.1:9 sync failed: $($a.lastError); secret write-only, kept on edit; platform change refused; reports $(@($r1.rows).Count)/$(@($r2.rows).Count) rows; built-in reports present; deleted"
     } | Out-Null
 
     Check 'T71' 'Installation type: Advanced recorded, change to Standard (Remote support off, section locked) and back with Setup Update' {

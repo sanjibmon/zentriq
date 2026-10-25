@@ -400,3 +400,45 @@ details.rs-advanced[open] summary { margin-bottom: 12px; }
   .form-doc { box-shadow: none; padding: 0; max-width: none; }
   .asset-label { border-color: transparent; break-inside: avoid; }
 }
+
+/* ---- Cloud & Infrastructure ---------------------------------------------------------------------------------- */
+.cl-prov { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; white-space: nowrap; padding: 2px 8px 2px 6px; border-radius: 999px;
+  background: var(--surface-2); border: 1px solid var(--line); color: var(--fg); }
+.cl-prov i { width: 9px; height: 9px; border-radius: 3px; background: var(--c6); }
+.cl-azure i { background: linear-gradient(135deg, #2a8bf2, #0b5cc4); }
+.cl-aws i { background: linear-gradient(135deg, #ffb13d, #e07b00); }
+.cl-vmware i { background: linear-gradient(135deg, #6db33f, #1d8a5a); }
+.cl-hyperv i { background: linear-gradient(135deg, #3fb7e6, #5b5fc7); }
+.cl-empty { text-align: center; padding: 28px 12px 18px; max-width: 760px; margin: 0 auto; }
+.cl-empty h3 { font-size: 19px; margin: 14px 0 6px; }
+.cl-empty-icons { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.cl-howto { text-align: left; display: grid; gap: 4px; margin: 14px auto 18px; max-width: 560px; font-size: 13px; color: var(--muted); }
+.cl-bar { display: inline-block; vertical-align: middle; width: 70px; height: 6px; border-radius: 3px; background: var(--surface-3); margin-left: 8px; overflow: hidden; }
+.cl-bar i { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
+.cl-bar i.ok { background: var(--ok); } .cl-bar i.warn { background: var(--warn); } .cl-bar i.crit { background: var(--crit); }
+.cl-meter { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; } .cl-meter .cl-bar { margin-left: 0; }
+.cl-change { display: inline-flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
+.cl-diff { font-size: 12px; color: var(--muted); } .cl-diff s { color: var(--faint); } .cl-diff b { color: var(--fg); font-weight: 600; }
+.cl-tag { display: inline-block; font: 11.5px var(--mono); background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; margin: 1px 4px 1px 0; }
+.cl-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.cl-id { font-size: 11.5px; word-break: break-all; }
+.cl-sevbar { display: flex; gap: 14px; flex-wrap: wrap; margin: 4px 0 10px; font-size: 13px; color: var(--muted); }
+.cl-accounts { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 14px; margin-bottom: 12px; }
+.cl-account { padding: 14px 16px; }
+.cl-account.off { opacity: .7; }
+.cl-account header { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cl-account h3 { margin: 0; font-size: 15px; }
+.cl-account p { margin: 8px 0 0; }
+.cl-stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 12px 0 4px; }
+.cl-stats dt { font-size: 11.5px; color: var(--muted); } .cl-stats dd { margin: 2px 0 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+.cl-pick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.cl-pick-btn { display: grid; justify-items: start; gap: 3px; text-align: left; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line-strong); background: var(--surface); cursor: pointer; color: var(--fg); }
+.cl-pick-btn i { width: 18px; height: 18px; border-radius: 5px; background: var(--c6); margin-bottom: 4px; }
+.cl-pick-btn.cl-azure i { background: linear-gradient(135deg, #2a8bf2, #0b5cc4); } .cl-pick-btn.cl-aws i { background: linear-gradient(135deg, #ffb13d, #e07b00); }
+.cl-pick-btn.cl-vmware i { background: linear-gradient(135deg, #6db33f, #1d8a5a); } .cl-pick-btn.cl-hyperv i { background: linear-gradient(135deg, #3fb7e6, #5b5fc7); }
+.cl-pick-btn small { color: var(--muted); font-size: 11.5px; }
+.cl-pick-btn.on { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+.cl-hits { display: grid; gap: 4px; max-height: 260px; overflow: auto; }
+.cl-hits button { text-align: left; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--fg); cursor: pointer; }
+.cl-hits button.on { border-color: var(--accent); background: var(--accent-soft); }
+@media (max-width: 760px) { .cl-pick { grid-template-columns: repeat(2, 1fr); } .cl-stats { grid-template-columns: repeat(3, 1fr); } .cl-accounts { grid-template-columns: 1fr; } }
