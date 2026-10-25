@@ -13,6 +13,8 @@
     <PackageReference Include="Microsoft.Extensions.Identity.Core" />
     <PackageReference Include="System.Security.Cryptography.ProtectedData" />
     <PackageReference Include="System.DirectoryServices.Protocols" />
+    <!-- SFTP backup destinations -->
+    <PackageReference Include="SSH.NET" />
   </ItemGroup>
   <ItemGroup>
     <!-- Schema migrations are the single source of truth in /database and are embedded here. -->

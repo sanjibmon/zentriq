@@ -38,13 +38,15 @@ public sealed class GcpCollector(HttpClient? http = null, string tokenUrl = "htt
     }
 
     /// <summary>The signed JWT (RS256) exchanged for an access token.</summary>
-    public static string Assertion(ServiceAccountKey key, string audience, DateTimeOffset now)
+    public const string ReadOnlyScope = "https://www.googleapis.com/auth/cloud-platform.read-only";
+
+    public static string Assertion(ServiceAccountKey key, string audience, DateTimeOffset now, string scope = ReadOnlyScope)
     {
         static string B64(byte[] b) => Convert.ToBase64String(b).TrimEnd('=').Replace('+', '-').Replace('/', '_');
         var header = B64(Encoding.UTF8.GetBytes("""{"alg":"RS256","typ":"JWT"}"""));
         var claims = B64(JsonSerializer.SerializeToUtf8Bytes(new Dictionary<string, object>
         {
-            ["iss"] = key.ClientEmail, ["scope"] = "https://www.googleapis.com/auth/cloud-platform.read-only",
+            ["iss"] = key.ClientEmail, ["scope"] = scope,
             ["aud"] = audience, ["iat"] = now.ToUnixTimeSeconds(), ["exp"] = now.AddMinutes(55).ToUnixTimeSeconds(),
         }));
         using var rsa = RSA.Create();

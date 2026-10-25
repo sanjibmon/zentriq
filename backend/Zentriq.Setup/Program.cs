@@ -27,11 +27,14 @@ internal static class Cli
           verify                         End-to-end health check (services, PostgreSQL, API over HTTPS, trial).
           status                         Short status summary.
           diagnose                       Collect a redacted diagnostics bundle in the Logs folder.
-          backup [--label L] [--keep N]  Create an encrypted backup in the Backups folder.
-          backup-verify <file> [--recovery-key F] [--deep]
+          backup [--label L] [--keep N]  Create an encrypted backup in the Backups folder and copy it to the
+                                         destinations set in the console (Backup & Restore).
+          backup-verify <file> [--recovery-key F | --password | --password-file F] [--deep]
                                          Check a backup can be decrypted (--deep: restore into a scratch database).
-          restore <file> [--recovery-key F] --yes
+          restore <file> [--recovery-key F | --password | --password-file F] --yes
                                          Replace the current data with a backup (a safety backup is taken first).
+                                         On a rebuilt server: install Zentriq, then restore with the backup
+                                         password (or the old server's recovery key file).
           reset-password --email <addr> [--disable-mfa]
                                          Set a new password for a console user (prompted, not echoed),
                                          unlock the account and optionally turn off its MFA.
@@ -98,9 +101,10 @@ internal static class Cli
                 {
                     using var log = new Reporter(paths.Logs, "backup-verify");
                     var key = TakeOption(args, "--recovery-key");
+                    var secret = BackupSecret(args);
                     var deep = TakeFlag(args, "--deep");
                     var file = args.FirstOrDefault() ?? throw new SetupException("backup-verify requires a backup file.");
-                    var ok = await new BackupService(paths, LoadOptions(paths), log).VerifyAsync(file, key, deep, ct);
+                    var ok = await new BackupService(paths, LoadOptions(paths), log).VerifyAsync(file, key, deep, ct, secret);
                     log.Info(ok ? "Backup verification PASSED." : "Backup verification FAILED.");
                     return ok ? 0 : 1;
                 }
@@ -108,10 +112,12 @@ internal static class Cli
                 {
                     using var log = new Reporter(paths.Logs, "restore");
                     var key = TakeOption(args, "--recovery-key");
+                    var secret = BackupSecret(args);
                     var yes = TakeFlag(args, "--yes");
                     var file = args.FirstOrDefault() ?? throw new SetupException("restore requires a backup file.");
                     if (!yes) throw new SetupException("Restore replaces all current Zentriq data.", "Re-run with --yes to confirm.");
-                    await new BackupService(paths, LoadOptions(paths), log).RestoreAsync(file, key, "ZentriqApi", "ZentriqWorker", ct);
+                    await new BackupService(paths, LoadOptions(paths), log).RestoreAsync(file, key, BackupService.ApiService, BackupService.WorkerService, ct, secret,
+                        requestedBy: $"zentriqctl ({Environment.UserName})");
                     return 0;
                 }
                 case "reset-password":
@@ -339,6 +345,14 @@ internal static class Cli
         return 0;
     }
 
+    /// <summary>The backup password from --password-file (first line) or --password (prompted, not echoed); null when neither is given.</summary>
+    private static string? BackupSecret(List<string> args)
+    {
+        var file = TakeOption(args, "--password-file");
+        if (file is not null) return File.ReadLines(file).FirstOrDefault()?.TrimEnd('\r', '\n') ?? throw new SetupException("The password file is empty.");
+        return TakeFlag(args, "--password") ? ReadHidden("Backup password: ") : null;
+    }
+
     private static string ReadHidden(string prompt)
     {
         Console.Write(prompt);
@@ -367,6 +381,25 @@ internal static class Cli
         Reporter? log = null;
         try
         {
+            // Scheduled backups (Backup & Restore › Schedule).
+            try
+            {
+                var store = new Zentriq.Infrastructure.Backup.BackupStore(ds, new CredentialProtector(() => new SecretStore(SecretProtectorFactory.Create()).Read<AppSecrets>(paths.AppSecretsFile)));
+                var settings = await store.LoadSettingsAsync(ct);
+                if (settings.Schedule.IsDue(DateTimeOffset.UtcNow, await store.LastScheduledStartAsync(ct), settings.ScheduleChangedAt))
+                {
+                    log ??= new Reporter(paths.Logs, "maintenance");
+                    log.Info($"Scheduled backup ({settings.Schedule.Describe()}).");
+                    try
+                    {
+                        var r = await new BackupService(paths, options, log).CreateWithCopiesAsync("scheduled", ct);
+                        log.Info($"Scheduled backup {Path.GetFileName(r.File)}: {r.Status}.");
+                    }
+                    catch (Exception ex) when (ex is not OperationCanceledException) { log.Error("Scheduled backup failed: " + (ex is SetupException se ? se.Message : ex.Message)); }
+                }
+            }
+            catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UndefinedTable) { /* schema older than 27: upgrade in progress */ }
+
             for (var i = 0; i < 10; i++)
             {
                 var job = await queue.LeaseNextAsync(workerId, TimeSpan.FromHours(2), maintenance: true, ct);
@@ -378,10 +411,18 @@ internal static class Cli
                     switch (job.JobType)
                     {
                         case JobTypes.MaintenanceBackup:
+                        {
                             await queue.ReportProgressAsync(job.Id, 10, "Creating encrypted backup", ct);
-                            var file = await new BackupService(paths, options, log).CreateAsync("manual", ct, keep: 0);
-                            await queue.CompleteAsync(job.Id, workerId, new { file = Path.GetFileName(file), bytes = new FileInfo(file).Length }, ct);
-                            log.Info($"Backup {file} completed.");
+                            var by = Payload(job, "requestedBy");
+                            var r = await new BackupService(paths, options, log).CreateWithCopiesAsync("manual", ct, requestedBy: by);
+                            await queue.CompleteAsync(job.Id, workerId, new { file = Path.GetFileName(r.File), bytes = r.Size, status = r.Status, copies = r.Destinations }, ct);
+                            log.Info($"Backup {r.File} completed ({r.Status}).");
+                            break;
+                        }
+                        case JobTypes.MaintenanceRestore:
+                            await queue.ReportProgressAsync(job.Id, 5, "Restoring from backup", ct);
+                            // The job row is replaced with the database it is in; the result is noted in the restored database.
+                            await RestoreJobAsync(paths, options, ds, log, job, ct);
                             break;
                         default:
                             await queue.FailAsync(job.Id, workerId, $"Unknown maintenance job type {job.JobType}.", retryable: false, ct);
@@ -398,6 +439,62 @@ internal static class Cli
             return 0;
         }
         finally { log?.Dispose(); }
+    }
+
+    private static string? Payload(LeasedJob job, string name)
+    {
+        using var d = JsonDocument.Parse(job.Payload);
+        return d.RootElement.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
+    }
+
+    /// <summary>
+    /// A restore requested in the console: the backup is an uploaded file (Restore folder), a backup on this server, or one
+    /// at a destination (downloaded first). The console checked the password or recovery key and handed over the data key,
+    /// encrypted with the installation credential key.
+    /// </summary>
+    private static async Task RestoreJobAsync(ZentriqPaths paths, ZentriqOptions options, NpgsqlDataSource ds, Reporter log, LeasedJob job, CancellationToken ct)
+    {
+        var source = Payload(job, "source");
+        var name = Path.GetFileName(Payload(job, "file") ?? throw new SetupException("The restore request names no backup file."));
+        if (!name.EndsWith(".zbak", StringComparison.OrdinalIgnoreCase)) throw new SetupException($"'{name}' is not a backup file name.");
+        var app = new SecretStore(SecretProtectorFactory.Create()).Read<AppSecrets>(paths.AppSecretsFile);
+        var store = new Zentriq.Infrastructure.Backup.BackupStore(ds, new CredentialProtector(() => app));
+        var unlock = Payload(job, "unlock") is { } u ? store.UnprotectUnlock(u) : new Zentriq.Infrastructure.Backup.BackupUnlock();
+        var by = Payload(job, "requestedBy");
+        string file;
+        string? downloaded = null;
+        switch (source)
+        {
+            case "upload":
+                file = Path.Combine(paths.RestoreUploads, name);
+                break;
+            case "local":
+                file = Path.Combine(paths.Backups, name);
+                break;
+            case "destination":
+            {
+                var id = Guid.Parse(Payload(job, "destinationId") ?? throw new SetupException("The restore request names no destination."));
+                var row = await store.DestinationAsync(id, true, ct) ?? throw new SetupException("The backup destination no longer exists.");
+                downloaded = file = Path.Combine(paths.Backups, ".download-" + name);
+                using var target = Zentriq.Infrastructure.Backup.BackupTargets.Create(row.Destination);
+                log.Info($"Downloading {name} from {target.Where}.");
+                await target.DownloadAsync(name, file, ct);
+                break;
+            }
+            default:
+                throw new SetupException($"Unknown restore source '{source}'.");
+        }
+        if (!File.Exists(file)) throw new SetupException($"The backup file {name} was not found.");
+        try
+        {
+            await new BackupService(paths, options, log).RestoreAsync(file, null, BackupService.ApiService, BackupService.WorkerService, ct,
+                unlock.Password, unlock.DataKey, by, unlock.InstallKeys);
+        }
+        finally
+        {
+            if (downloaded is not null) { try { File.Delete(downloaded); } catch (IOException) { } }
+            if (source == "upload") { try { File.Delete(file); } catch (IOException) { } }
+        }
     }
 
     // ---- uninstall ------------------------------------------------------------------------------

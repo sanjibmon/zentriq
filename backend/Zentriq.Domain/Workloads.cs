@@ -72,6 +72,8 @@ public static class JobTypes
     public const string CloudSync = "cloud.sync";
     public const string UsageSnapshot = "license.usage_snapshot";
     public const string MaintenanceBackup = "maintenance.backup";
+    /// <summary>Restore from a backup (console: Backup & Restore); runs in the maintenance task, which stops and restarts the services.</summary>
+    public const string MaintenanceRestore = "maintenance.restore";
 
     /// <summary>Jobs executed by the privileged maintenance task (zentriqctl), never by the worker service.</summary>
     public static bool IsMaintenance(string type) => type.StartsWith("maintenance.", StringComparison.Ordinal);

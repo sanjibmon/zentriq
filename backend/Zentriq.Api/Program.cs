@@ -180,6 +180,7 @@ api.MapLicensingEndpoints();
 api.MapUserEndpoints();
 api.MapAuditEndpoints();
 api.MapSystemEndpoints();
+api.MapBackupEndpoints();
 api.MapOrganizationEndpoints();
 api.MapCredentialEndpoints();
 api.MapDirectoryEndpoints();

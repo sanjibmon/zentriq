@@ -26,6 +26,19 @@ public static class WindowsHost
     /// Replaces the directory ACL with: SYSTEM + Administrators full control, plus the given grants.
     /// Inheritance from the parent is removed so ProgramData's default "Users: read" does not apply.
     /// </summary>
+    /// <summary>Adds an inherited read rule for <paramref name="sid"/> to a folder (other rules stay as they are).</summary>
+    public static void GrantRead(string path, SecurityIdentifier sid)
+    {
+        var di = new DirectoryInfo(path);
+        var sec = di.GetAccessControl();
+        const InheritanceFlags inherit = InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit;
+        var exists = sec.GetAccessRules(true, true, typeof(SecurityIdentifier)).OfType<FileSystemAccessRule>()
+            .Any(r => r.IdentityReference == sid && r.AccessControlType == AccessControlType.Allow && (r.FileSystemRights & FileSystemRights.ReadAndExecute) == FileSystemRights.ReadAndExecute);
+        if (exists) return;
+        sec.AddAccessRule(new FileSystemAccessRule(sid, FileSystemRights.ReadAndExecute, inherit, PropagationFlags.None, AccessControlType.Allow));
+        di.SetAccessControl(sec);
+    }
+
     public static void SecureDirectory(string path, params (SecurityIdentifier Sid, FileSystemRights Rights)[] grants)
     {
         Directory.CreateDirectory(path);

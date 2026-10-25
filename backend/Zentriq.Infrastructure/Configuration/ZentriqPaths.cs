@@ -44,6 +44,10 @@ public sealed class ZentriqPaths
     public string Packages => Path.Combine(Root, "Packages");
     public string Backups => Path.Combine(Root, "Backups");
     public string Exports => Path.Combine(Root, "Exports");
+    /// <summary>Backup files uploaded in the console for a restore (the API writes them, the maintenance task restores them).</summary>
+    public string RestoreUploads => Path.Combine(Root, "Restore");
+    /// <summary>Data folder of the remote support engine (devices, its own certificates and settings).</summary>
+    public string RemoteData => Path.Combine(Root, "Remote", "data");
     public string DataProtectionKeys => Path.Combine(Secrets, "dpkeys");
     public string ConfigFile => Path.Combine(Config, "zentriq.json");
     public string AppSecretsFile => Path.Combine(Secrets, "app.secrets");

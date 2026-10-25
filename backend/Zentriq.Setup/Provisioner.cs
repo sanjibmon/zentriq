@@ -132,7 +132,10 @@ public sealed class Provisioner(ProvisionInput input, ZentriqPaths paths, Report
             WindowsHost.SecureDirectory(paths.Logs, (api, modify), (worker, modify));
         WindowsHost.SecureDirectory(paths.Packages, (worker, read));
         WindowsHost.SecureDirectory(paths.Exports, (api, modify), (worker, modify));
-        WindowsHost.SecureDirectory(paths.Backups); // SYSTEM and Administrators only
+        // Backups: written by SYSTEM (maintenance task); the API may read them so administrators can download a backup.
+        WindowsHost.SecureDirectory(paths.Backups, (api, read));
+        // Backup files uploaded in the console for a restore.
+        WindowsHost.SecureDirectory(paths.RestoreUploads, (api, modify));
         log.Info($"Data root {paths.Root} secured (services: {input.ApiService}, {input.WorkerService}).");
         return Task.CompletedTask;
     }
@@ -594,8 +597,10 @@ public sealed class Provisioner(ProvisionInput input, ZentriqPaths paths, Report
     {
         var exe = Environment.ProcessPath ?? Path.Combine(AppContext.BaseDirectory, "zentriqctl.exe");
         await WindowsHost.RegisterTaskAsync(@"\Zentriq\Maintenance", exe, "maintenance run-pending", "MINUTE", "5", log);
-        await WindowsHost.RegisterTaskAsync(@"\Zentriq\Nightly backup", exe, "backup --label nightly --keep 14", "DAILY", "01:30", log);
-        log.Info("Registered scheduled tasks \\Zentriq\\Maintenance (every 5 min) and \\Zentriq\\Nightly backup (01:30).");
+        // Scheduled backups run from the maintenance task on the schedule set in the console (Backup & Restore); the separate
+        // nightly backup task of earlier builds is replaced by that schedule (default: daily at 01:30, 14 kept).
+        await WindowsHost.RemoveTaskAsync(@"\Zentriq\Nightly backup");
+        log.Info("Registered scheduled task \\Zentriq\\Maintenance (every 5 min; also runs the backup schedule).");
     }
 
     // ---- helpers -------------------------------------------------------------------------------

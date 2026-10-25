@@ -15,6 +15,10 @@
     <ProjectReference Include="..\Zentriq.Worker\Zentriq.Worker.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <!-- ASP.NET Core data protection: backup of the console's key ring (MFA secrets) is tested against the real thing. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
     <Using Include="Xunit" />
   </ItemGroup>
 </Project>
