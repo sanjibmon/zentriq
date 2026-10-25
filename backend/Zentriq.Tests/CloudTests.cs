@@ -222,17 +222,17 @@ public sealed class CloudTests
         IReadOnlyList<IReadOnlyDictionary<string, object?>> Rows(params Dictionary<string, object?>[] r) => r;
         IReadOnlyList<IReadOnlyDictionary<string, object?>> Query(string ns, string wql)
         {
-            if (wql.Contains("Win32_ComputerSystemProduct")) return Rows(new() { ["UUID"] = "4c4c4544-0042-3510-8051-b4c04f4d3232", ["IdentifyingNumber"] = "ABC123" });
-            if (wql.Contains("Win32_ComputerSystem")) return Rows(new() { ["Name"] = "HV01", ["Domain"] = "corp.example.com", ["TotalPhysicalMemory"] = 17179869184L, ["NumberOfLogicalProcessors"] = 16 });
-            if (wql.Contains("Win32_OperatingSystem")) return Rows(new() { ["Caption"] = "Microsoft Windows Server 2012 R2 Datacenter", ["Version"] = "6.3.9600" });
-            if (wql.Contains("Msvm_ComputerSystem")) return Rows(new() { ["Name"] = id, ["ElementName"] = "DC02", ["EnabledState"] = (ushort)2, ["TimeOfLastStateChange"] = new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc) });
+            if (wql.Contains("Win32_ComputerSystemProduct")) return Rows(new Dictionary<string, object?> { ["UUID"] = "4c4c4544-0042-3510-8051-b4c04f4d3232", ["IdentifyingNumber"] = "ABC123" });
+            if (wql.Contains("Win32_ComputerSystem")) return Rows(new Dictionary<string, object?> { ["Name"] = "HV01", ["Domain"] = "corp.example.com", ["TotalPhysicalMemory"] = 17179869184L, ["NumberOfLogicalProcessors"] = 16 });
+            if (wql.Contains("Win32_OperatingSystem")) return Rows(new Dictionary<string, object?> { ["Caption"] = "Microsoft Windows Server 2012 R2 Datacenter", ["Version"] = "6.3.9600" });
+            if (wql.Contains("Msvm_ComputerSystem")) return Rows(new Dictionary<string, object?> { ["Name"] = id, ["ElementName"] = "DC02", ["EnabledState"] = (ushort)2, ["TimeOfLastStateChange"] = new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc) });
             if (wql.Contains("Msvm_VirtualSystemSettingData")) return Rows(
-                new() { ["VirtualSystemIdentifier"] = id, ["VirtualSystemType"] = "Microsoft:Hyper-V:System:Realized", ["BIOSGUID"] = "{11112222-3333-4444-5555-666677778888}", ["VirtualSystemSubType"] = "Microsoft:Hyper-V:SubType:2" },
-                new() { ["VirtualSystemIdentifier"] = id, ["VirtualSystemType"] = "Microsoft:Hyper-V:Snapshot:Realized", ["CreationTime"] = new DateTime(2026, 9, 11, 0, 0, 0, DateTimeKind.Utc) });
-            if (wql.Contains("Msvm_MemorySettingData")) return Rows(new() { ["InstanceID"] = $"Microsoft:{id}\\4764334d-e001-4176-82ee-5594ec9b530e", ["VirtualQuantity"] = 24576UL });
-            if (wql.Contains("Msvm_ProcessorSettingData")) return Rows(new() { ["InstanceID"] = $"Microsoft:{id}\\b637f346-6a0e-4dec-af52-bd70cb80a21d\\0", ["VirtualQuantity"] = 4UL });
-            if (wql.Contains("Msvm_SyntheticEthernetPortSettingData")) return Rows(new() { ["InstanceID"] = $"Microsoft:{id}\\C3F1", ["Address"] = "00155D010203" });
-            if (wql.Contains("Msvm_KvpExchangeComponent")) return Rows(new() { ["SystemName"] = id, ["GuestIntrinsicExchangeItems"] = new[]
+                new Dictionary<string, object?> { ["VirtualSystemIdentifier"] = id, ["VirtualSystemType"] = "Microsoft:Hyper-V:System:Realized", ["BIOSGUID"] = "{11112222-3333-4444-5555-666677778888}", ["VirtualSystemSubType"] = "Microsoft:Hyper-V:SubType:2" },
+                new Dictionary<string, object?> { ["VirtualSystemIdentifier"] = id, ["VirtualSystemType"] = "Microsoft:Hyper-V:Snapshot:Realized", ["CreationTime"] = new DateTime(2026, 9, 11, 0, 0, 0, DateTimeKind.Utc) });
+            if (wql.Contains("Msvm_MemorySettingData")) return Rows(new Dictionary<string, object?> { ["InstanceID"] = $"Microsoft:{id}\\4764334d-e001-4176-82ee-5594ec9b530e", ["VirtualQuantity"] = 24576UL });
+            if (wql.Contains("Msvm_ProcessorSettingData")) return Rows(new Dictionary<string, object?> { ["InstanceID"] = $"Microsoft:{id}\\b637f346-6a0e-4dec-af52-bd70cb80a21d\\0", ["VirtualQuantity"] = 4UL });
+            if (wql.Contains("Msvm_SyntheticEthernetPortSettingData")) return Rows(new Dictionary<string, object?> { ["InstanceID"] = $"Microsoft:{id}\\C3F1", ["Address"] = "00155D010203" });
+            if (wql.Contains("Msvm_KvpExchangeComponent")) return Rows(new Dictionary<string, object?> { ["SystemName"] = id, ["GuestIntrinsicExchangeItems"] = new[]
             {
                 "<INSTANCE CLASSNAME=\"Msvm_KvpExchangeDataItem\"><PROPERTY NAME=\"Data\" TYPE=\"string\"><VALUE>dc02.corp.example.com</VALUE></PROPERTY><PROPERTY NAME=\"Name\" TYPE=\"string\"><VALUE>FullyQualifiedDomainName</VALUE></PROPERTY></INSTANCE>",
                 "<INSTANCE CLASSNAME=\"Msvm_KvpExchangeDataItem\"><PROPERTY NAME=\"Data\" TYPE=\"string\"><VALUE>10.0.0.2;fe80::1</VALUE></PROPERTY><PROPERTY NAME=\"Name\" TYPE=\"string\"><VALUE>NetworkAddressIPv4</VALUE></PROPERTY></INSTANCE>",
