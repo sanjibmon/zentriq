@@ -218,7 +218,7 @@ public sealed class CloudStore(NpgsqlDataSource ds, CredentialProtector protecto
     /// byte-swapped as Windows shows Azure and VMware machines), cloud instance id, MAC address, then host name with a
     /// matching IP address. Links set by hand are kept.
     /// </summary>
-    internal const string LinkSql = """
+    public const string LinkSql = """
         WITH m AS (
             SELECT r.id,
                    COALESCE(
