@@ -87,7 +87,7 @@ function Overview({ tick, onAdd }: { tick: number; onAdd?: () => void }) {
         { label: 'Linked to inventory', value: d.vms ? `${Math.round((d.vmsLinked / d.vms) * 100)}%` : '—', sub: `${d.unlinkedVms} running VM(s) without agent or scan`, to: '/cloud?tab=resources&kind=vm&linked=no' },
         { label: 'Open findings', value: open.toLocaleString(), sub: `${(d.findings.critical ?? 0) + (d.findings.high ?? 0)} critical/high · ${d.idleCost} cost`, to: '/cloud?tab=findings' },
         { label: 'Capacity', value: `${d.vcpu.toLocaleString()} vCPU`, sub: `${d.memoryGb.toLocaleString()} GB memory · ${disk(d.storageGb)} storage` },
-        { label: 'Hosts', value: d.hosts.toLocaleString(), sub: 'Hyper-V and ESXi', to: '/cloud?tab=virtualization' },
+        { label: 'Hosts', value: d.hosts.toLocaleString(), sub: 'hypervisor hosts', to: '/cloud?tab=virtualization' },
         { label: 'Changes (7 days)', value: (ch('created') + ch('changed') + ch('deleted')).toLocaleString(), sub: `${ch('created')} new · ${ch('deleted')} deleted`, to: '/cloud?tab=changes' },
       ]} />
       <div className="grid-2">
@@ -228,8 +228,8 @@ function Virtualization() {
   return (
     <>
       <ErrorBox error={hosts.error ?? stores.error ?? clusters.error} />
-      <Panel title="Hosts" sub="Hyper-V hosts and VMware ESXi hosts, with the virtual machines on them" flush>
-        <DataTable rows={hosts.data?.items ?? []} empty={hosts.loading ? 'Loading…' : 'No hosts. Add a VMware vCenter or Hyper-V connection.'} columns={[
+      <Panel title="Hosts" sub="Hypervisor hosts and the virtual machines on them" flush>
+        <DataTable rows={hosts.data?.items ?? []} empty={hosts.loading ? 'Loading…' : 'No hosts. Add a virtualization connection (vCenter, Hyper-V, Nutanix, Proxmox, XCP-ng or oVirt).'} columns={[
           { key: 'n', label: 'Host', render: (r) => <Link to={`/cloud/resources/${r.id}`}><b>{r.name}</b></Link> },
           { key: 'p', label: 'Platform', render: (r) => <ProviderBadge provider={r.provider} /> },
           { key: 'c', label: 'Cluster / domain', render: (r) => r.group ?? '—' },
@@ -242,7 +242,7 @@ function Virtualization() {
         ]} />
       </Panel>
       <div className="grid-2">
-        <Panel title="Datastores" sub="VMware datastores — free space" flush>
+        <Panel title="Datastores" sub="Datastores and storage pools — free space" flush>
           <DataTable rows={stores.data?.items ?? []} empty="No datastores." columns={[
             { key: 'n', label: 'Datastore', render: (r) => <Link to={`/cloud/resources/${r.id}`}>{r.name}</Link> },
             { key: 't', label: 'Type', render: (r) => r.size ?? '—' },

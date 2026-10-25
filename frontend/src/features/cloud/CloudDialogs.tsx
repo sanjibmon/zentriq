@@ -138,8 +138,8 @@ export function AccountDialog({ account, onClose, onDone }: { account: CloudAcco
         {provider === 'hyperv' && <Field label="Hyper-V hosts" hint="Host names or IP addresses, one per line (each node of a cluster).">
           <textarea className="in mono" rows={3} value={f.hosts} onChange={set('hosts')} required placeholder={'hv01.corp.example.com\nhv02.corp.example.com'} />
         </Field>}
-        {hostBased && <label className="check-inline"><input type="checkbox" checked={f.skip} onChange={(e) => setF({ ...f, skip: e.target.checked })} /> Skip the certificate check (server with its own self-signed certificate)</label>}
-        <label className="check-inline"><input type="checkbox" checked={f.enabled} onChange={(e) => setF({ ...f, enabled: e.target.checked })} /> Enabled (synced on schedule)</label>
+        {hostBased && <label className="row-check"><input type="checkbox" checked={f.skip} onChange={(e) => setF({ ...f, skip: e.target.checked })} /> Skip the certificate check (server with its own self-signed certificate)</label>}
+        <label className="row-check"><input type="checkbox" checked={f.enabled} onChange={(e) => setF({ ...f, enabled: e.target.checked })} /> Enabled (synced on schedule)</label>
       </form>
     </Modal>
   );
