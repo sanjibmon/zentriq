@@ -99,9 +99,10 @@ public sealed class ReportDelivery(NpgsqlDataSource ds, MailService mail)
     /// <summary>Scheduled runs act for the report's owner: a data source with its own permission needs it (or administrator rights).</summary>
     public async Task<bool> OwnerMayUseAsync(Definition def, CancellationToken ct)
     {
-        if (ReportCatalog.Find(def.Dataset) is not { Permission: { } perm } || def.OwnerId is null) return true;
+        if (ReportCatalog.Find(def.Dataset) is not { } dataset || def.OwnerId is null) return true;
+        var perm = ReportCatalog.RequiredPermission(dataset);
         await using var cmd = ds.CreateCommand("""
-            SELECT EXISTS (SELECT 1 FROM zentriq.user_roles ur JOIN zentriq.role_permissions rp ON rp.role_id = ur.role_id
+            SELECT EXISTS (SELECT 1 FROM zentriq.user_role_grants ur JOIN zentriq.role_permissions rp ON rp.role_id = ur.role_id
                              JOIN zentriq.users u ON u.id = ur.user_id AND u.status = 'active'
                             WHERE ur.user_id = @u AND (rp.permission_code = @p OR rp.permission_code = 'settings.manage'))
             """);

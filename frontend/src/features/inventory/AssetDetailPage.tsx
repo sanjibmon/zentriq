@@ -67,7 +67,7 @@ export function AssetDetailPage({ id, section = ASSETS_SECTION }: { id: string; 
 
   if (asset.error) return <ErrorBox error={asset.error} />;
   if (!a) return <Loading />;
-  const lifecycleOn = !!me?.license.sections?.find((x) => x.id === 'infrastructure' && x.installed && (x.enabled || !me.license.featuresEnabled)) || !me?.license.sections;
+  const lifecycleOn = (!!me?.license.sections?.find((x) => x.id === 'infrastructure' && x.installed && (x.enabled || !me.license.featuresEnabled)) || !me?.license.sections) && can('lifecycle.view');
   const tabs: [Tab, string, number?][] = [
     ['overview', 'Overview'], ...(lifecycleOn ? [['lifecycle', 'Lifecycle'] as [Tab, string]] : []), ['hardware', 'Hardware'], ['software', 'Software', sw.length], ['network', 'Network', d?.network.length],
     ['updates', 'Updates', d?.patches.length], ['security', 'Security'], ['services', 'Services', d?.services.length],

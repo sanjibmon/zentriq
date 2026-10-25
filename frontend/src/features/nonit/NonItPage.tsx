@@ -25,7 +25,7 @@ const DUE: [string, string][] = [
 export function NonItPage() {
   const { can } = useAuth();
   const { query, navigate } = useRouter();
-  const canEdit = can('assets.manage');
+  const canEdit = can('nonit.manage');
   const [tab, setTabState] = useState<Tab>((['assets', 'categories', 'departments', 'fields'] as Tab[]).find((t) => t === query.get('tab')) ?? 'assets');
   const setTab = (t: Tab) => { setTabState(t); navigate(`/non-it?tab=${t}`); };
   const [tick, setTick] = useState(0);

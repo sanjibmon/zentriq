@@ -4,6 +4,8 @@ import type { Paged } from '../../api/types';
 import { Link, useRouter } from '../../app/router';
 import { useApi } from '../../app/useApi';
 import { DataTable, ErrorBox, fmt, PageHead, Pager, Panel, Pill } from '../../components/ui';
+import { Icon } from '../../components/Icon';
+import { CsvExportDialog } from '../audit/LogRetention';
 
 export interface ActivityRow {
   id: string; assetId: string; hostname: string | null; ip: string | null; channel: 'agent' | 'agentless'; kind: 'service' | 'uninstall' | 'agent-update' | 'remote-support';
@@ -25,6 +27,7 @@ export function ActivityPage() {
   const [q, setQ] = useState('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [csv, setCsv] = useState(false);
   const data = useApi(() => api.get<Paged<ActivityRow>>('/activity', { kind, status, q: search, assetId, page, pageSize: 50 }), [kind, status, search, assetId, page]);
   const rows = data.data?.items ?? [];
   const pending = rows.some((r) => ['queued', 'sent', 'running'].includes(r.status));
@@ -38,7 +41,9 @@ export function ActivityPage() {
 
   return (
     <>
-      <PageHead title="Activity Log" desc={assetId ? <>Device actions on <b>{host ?? 'this device'}</b> · <Link to="/activity">show all devices</Link></> : undefined} />
+      <PageHead title="Activity Log" desc={assetId ? <>Device actions on <b>{host ?? 'this device'}</b> · <Link to="/activity">show all devices</Link></> : undefined}
+        actions={<button className="btn" onClick={() => setCsv(true)}><Icon name="down" size={14} /> Download CSV</button>} />
+      {csv && <CsvExportDialog what="activity log" path="/activity/export" onClose={() => setCsv(false)} />}
       <form className="toolbar-row" onSubmit={(e) => { e.preventDefault(); setPage(1); setSearch(q); }}>
         <input className="in grow" placeholder="Search device, service, software, user or result…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search activity" />
         <select className="in" value={kind} onChange={(e) => { setPage(1); setKind(e.target.value); }} aria-label="Type">

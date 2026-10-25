@@ -16,7 +16,7 @@ public static class DepartmentEndpoints
 
     public static void MapDepartmentEndpoints(this RouteGroupBuilder api)
     {
-        var g = api.MapGroup("/departments").WithTags("Departments").RequireAuthorization(Permissions.AssetsView);
+        var g = api.MapGroup("/departments").WithTags("Departments").RequireAuthorization(Permissions.AnyAssetView);
 
         g.MapGet("", async (NpgsqlDataSource ds, CancellationToken ct) =>
         {
@@ -52,7 +52,7 @@ public static class DepartmentEndpoints
             catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation) { return Validation.Problem("name", "A department with this name or code already exists."); }
             await rc.AuditAsync("department.create", body.Name.Trim());
             return Results.Created($"/api/v1/departments/{id}", new { id, name = body.Name.Trim() });
-        }).RequireAuthorization(Permissions.AssetsManage);
+        }).RequireAuthorization(Permissions.AnyAssetManage);
 
         g.MapPut("/{id:guid}", async (Guid id, DepartmentBody body, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
         {
@@ -63,7 +63,7 @@ public static class DepartmentEndpoints
             catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation) { return Validation.Problem("name", "A department with this name or code already exists."); }
             await rc.AuditAsync("department.update", body.Name.Trim(), detail: new { id });
             return Results.NoContent();
-        }).RequireAuthorization(Permissions.AssetsManage);
+        }).RequireAuthorization(Permissions.AnyAssetManage);
 
         g.MapDelete("/{id:guid}", async (Guid id, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
         {
@@ -72,7 +72,7 @@ public static class DepartmentEndpoints
             if (await cmd.ExecuteScalarAsync(ct) is not string name) return Results.NotFound();
             await rc.AuditAsync("department.delete", name);
             return Results.NoContent();
-        }).RequireAuthorization(Permissions.AssetsManage);
+        }).RequireAuthorization(Permissions.AnyAssetManage);
 
         // Assign (or clear, with departmentId = null) the department of one or more assets.
         api.MapPost("/assets/department", async (AssignBody body, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>

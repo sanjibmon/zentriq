@@ -134,7 +134,14 @@ public static class AuthEndpoints
 
     public static async Task SignInAsync(HttpContext http, ZentriqDbContext db, User user, CancellationToken ct, bool mfaPending = false)
     {
-        var roleIds = await db.UserRoles.AsNoTracking().Where(r => r.UserId == user.Id).Select(r => r.RoleId).ToListAsync(ct);
+        var principal = await BuildPrincipalAsync(db, user, mfaPending, ct);
+        await http.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, new AuthenticationProperties { IsPersistent = false });
+    }
+
+    /// <summary>The session identity: the user, the roles given directly and through groups, and their permissions.</summary>
+    public static async Task<ClaimsPrincipal> BuildPrincipalAsync(ZentriqDbContext db, User user, bool mfaPending, CancellationToken ct)
+    {
+        var roleIds = await db.Database.SqlQuery<string>($"SELECT DISTINCT role_id AS \"Value\" FROM zentriq.user_role_grants WHERE user_id = {user.Id}").ToListAsync(ct);
         var perms = await db.RolePermissions.AsNoTracking().Where(rp => roleIds.Contains(rp.RoleId)).Select(rp => rp.PermissionCode).Distinct().ToListAsync(ct);
         var claims = new List<Claim>
         {
@@ -142,11 +149,11 @@ public static class AuthEndpoints
             new(ClaimTypes.Email, user.Email),
             new(ClaimTypes.Name, user.DisplayName),
             new(ZentriqClaims.Stamp, user.SecurityStamp.ToString()),
+            new(ZentriqClaims.Access, user.AccessStamp.ToString()),
         };
         claims.AddRange(roleIds.Select(r => new Claim(ZentriqClaims.Role, r)));
         if (mfaPending) claims.Add(new Claim(ZentriqClaims.MfaPending, "1"));
         else claims.AddRange(perms.Select(p => new Claim(ZentriqClaims.Permission, p)));
-        var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme));
-        await http.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, new AuthenticationProperties { IsPersistent = false });
+        return new ClaimsPrincipal(new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme));
     }
 }

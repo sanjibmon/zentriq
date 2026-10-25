@@ -33,13 +33,32 @@ public static class Permissions
     public const string SecurityManage = "security.manage";
     public const string IntegrationsManage = "integrations.manage";
     public const string RemoteManage = "remote.manage";
+    public const string DashboardView = "dashboard.view";
+    public const string ReportsView = "reports.view";
+    public const string ActivityView = "activity.view";
+    public const string NonItView = "nonit.view";
+    public const string NonItManage = "nonit.manage";
+    public const string AccessoriesView = "accessories.view";
+    public const string AccessoriesManage = "accessories.manage";
+    public const string LifecycleView = "lifecycle.view";
+    public const string LifecycleManage = "lifecycle.manage";
+    public const string CloudView = "cloud.view";
+    public const string CloudManage = "cloud.manage";
+
+    /// <summary>Policy: may see at least one asset area (departments and locations are shared by all of them).</summary>
+    public const string AnyAssetView = "any:assets.view";
+    /// <summary>Policy: may change at least one asset area.</summary>
+    public const string AnyAssetManage = "any:assets.manage";
+    public static readonly IReadOnlyList<string> AssetViews = [AssetsView, NonItView, AccessoriesView, LifecycleView, CloudView];
+    public static readonly IReadOnlyList<string> AssetManages = [AssetsManage, NonItManage, AccessoriesManage, LifecycleManage, CloudManage];
 
     public static readonly IReadOnlyList<string> All =
     [
         AssetsView, AssetsManage, ScansRun, ScansProfiles, CredentialsManage, PatchApprove, PatchDeploy,
         DeployRun, RemoteStart, RemoteUnattended, ReportsDesign, ReportsExport, DashboardsShare, VulnExcept,
         JobsView, UsersManage, LicensingManage, BackupRun, SettingsManage, AuditView, AgentsManage, DirectoryManage, AssetsControl, SoftwareUninstall, VulnView, VulnManage,
-        SecurityView, SecurityManage, IntegrationsManage, RemoteManage
+        SecurityView, SecurityManage, IntegrationsManage, RemoteManage, DashboardView, ReportsView, ActivityView, NonItView, NonItManage,
+        AccessoriesView, AccessoriesManage, LifecycleView, LifecycleManage, CloudView, CloudManage
     ];
 }
 

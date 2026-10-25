@@ -9,17 +9,32 @@ namespace Zentriq.Setup;
 /// </summary>
 public sealed class Reporter : IDisposable
 {
-    private readonly StreamWriter? _file;
-    public string? LogPath { get; }
+    private StreamWriter? _file;
+    private readonly string? _directory;
+    private readonly string _name;
+    private string? _path;
+    private bool _opened;
+    /// <summary>The log file (created when first asked for or written to); null when it could not be created.</summary>
+    public string? LogPath { get { Open(); return _path; } }
+    /// <summary>Whether anything was written (the log file is created at the first line).</summary>
+    public bool Wrote { get; private set; }
 
     public Reporter(string? logDirectory, string name)
     {
-        if (logDirectory is null) return;
+        _directory = logDirectory;
+        _name = name;
+    }
+
+    private void Open()
+    {
+        if (_opened || _directory is null) return;
+        _opened = true;
         try
         {
-            Directory.CreateDirectory(logDirectory);
-            LogPath = Path.Combine(logDirectory, $"{name}-{DateTime.UtcNow:yyyyMMdd-HHmmss}.log");
-            _file = new StreamWriter(LogPath, append: true, Encoding.UTF8) { AutoFlush = true };
+            Directory.CreateDirectory(_directory);
+            var path = Path.Combine(_directory, $"{_name}-{DateTime.UtcNow:yyyyMMdd-HHmmss}.log");
+            _file = new StreamWriter(path, append: true, Encoding.UTF8) { AutoFlush = true };
+            _path = path;
         }
         catch { /* fall back to console only */ }
     }
@@ -32,6 +47,8 @@ public sealed class Reporter : IDisposable
 
     private void Write(string level, string message)
     {
+        Open();
+        Wrote = true;
         var line = $"{DateTime.UtcNow:O} {level} {Redactor.Redact(message)}";
         if (level is "STEP" or "PROGRESS") Console.Out.WriteLine($"{level} {Redactor.Redact(message)}");
         else Console.Out.WriteLine(line);

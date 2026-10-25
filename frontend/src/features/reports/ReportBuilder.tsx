@@ -50,6 +50,13 @@ export function ReportBuilder({ id }: { id: string | null }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [saved.data]);
 
+  // A data source the user may not use (for example IT assets for a non-IT role): start with the first one they may.
+  useEffect(() => {
+    if (id || !datasets.data || datasets.data.length === 0 || datasets.data.some((d) => d.key === dataset)) return;
+    setDataset(datasets.data[0]!.key);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [datasets.data, id]);
+
   // New report: start with the dataset's first few columns.
   useEffect(() => {
     if (id || !ds || spec.columns.length > 0) return;

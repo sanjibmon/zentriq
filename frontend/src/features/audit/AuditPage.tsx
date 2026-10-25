@@ -3,8 +3,14 @@ import { api } from '../../api/client';
 import type { AuditEvent, Paged } from '../../api/types';
 import { useApi } from '../../app/useApi';
 import { DataTable, ErrorBox, fmt, PageHead, Pager, Panel, Pill, statusTone } from '../../components/ui';
+import { useRouter } from '../../app/router';
+import { Icon } from '../../components/Icon';
+import { CsvExportDialog, LogRetention } from './LogRetention';
 
 export function AuditPage() {
+  const { query, navigate } = useRouter();
+  const tab = query.get('tab') === 'retention' ? 'retention' : 'log';
+  const [csv, setCsv] = useState(false);
   const [q, setQ] = useState('');
   const [search, setSearch] = useState('');
   const [outcome, setOutcome] = useState('');
@@ -12,7 +18,13 @@ export function AuditPage() {
   const data = useApi(() => api.get<Paged<AuditEvent>>('/audit', { q: search, outcome, page, pageSize: 50 }), [search, outcome, page]);
   return (
     <>
-      <PageHead title="Audit Logs" />
+      <PageHead title="Audit Logs" actions={tab === 'log' ? <button className="btn" onClick={() => setCsv(true)}><Icon name="down" size={14} /> Download CSV</button> : undefined} />
+      <div className="tabs" role="tablist">
+        <button role="tab" aria-selected={tab === 'log'} className={tab === 'log' ? 'on' : ''} onClick={() => navigate('/audit', true)}>Audit log</button>
+        <button role="tab" aria-selected={tab === 'retention'} className={tab === 'retention' ? 'on' : ''} onClick={() => navigate('/audit?tab=retention', true)}>Retention &amp; export</button>
+      </div>
+      {csv && <CsvExportDialog what="audit log" path="/audit/export" onClose={() => setCsv(false)} />}
+      {tab === 'retention' ? <LogRetention /> : <>
       <form className="toolbar-row" onSubmit={(e) => { e.preventDefault(); setPage(1); setSearch(q); }}>
         <input className="in grow" placeholder="Search user, action or target…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search audit log" />
         <select className="in" value={outcome} onChange={(e) => { setPage(1); setOutcome(e.target.value); }} aria-label="Outcome">
@@ -35,6 +47,7 @@ export function AuditPage() {
         ]} />
         {data.data && <Pager page={page} pageSize={50} total={data.data.total} onPage={setPage} />}
       </Panel>
+      </>}
     </>
   );
 }

@@ -17,13 +17,16 @@ public static class ZentriqClaims
     public const string Role = "zq:role";
     /// <summary>Signed in, but MFA is mandatory and not yet set up: no permissions until enrollment is confirmed.</summary>
     public const string MfaPending = "zq:mfa_pending";
+    /// <summary>Changes when the user's roles or their permissions change: the session's permissions are then reloaded.</summary>
+    public const string Access = "zq:access";
 }
 
 public static class SessionEvents
 {
     /// <summary>
     /// API clients get 401/403 instead of redirects. Every request re-validates that the user still
-    /// exists, is active and has the same security stamp (password/role changes revoke sessions).
+    /// exists, is active and has the same security stamp (password changes revoke sessions); when the user's roles or their
+    /// permissions changed (access stamp), the session's permissions are reloaded.
     /// </summary>
     public static CookieAuthenticationEvents Create() => new()
     {
@@ -35,8 +38,15 @@ public static class SessionEvents
             var stamp = ctx.Principal?.FindFirstValue(ZentriqClaims.Stamp);
             if (!Guid.TryParse(uid, out var id) || !Guid.TryParse(stamp, out var st)) { Reject(); return; }
             var db = ctx.HttpContext.RequestServices.GetRequiredService<ZentriqDbContext>();
-            var u = await db.Users.AsNoTracking().Where(x => x.Id == id).Select(x => new { x.Status, x.SecurityStamp }).FirstOrDefaultAsync();
-            if (u is null || u.Status != "active" || u.SecurityStamp != st) Reject();
+            var u = await db.Users.AsNoTracking().Where(x => x.Id == id).FirstOrDefaultAsync();
+            if (u is null || u.Status != "active" || u.SecurityStamp != st) { Reject(); return; }
+            // Roles or role permissions changed since sign-in: reload them, the user stays signed in.
+            if (ctx.Principal?.FindFirstValue(ZentriqClaims.Access) != u.AccessStamp.ToString())
+            {
+                var pending = ctx.Principal?.HasClaim(c => c.Type == ZentriqClaims.MfaPending) == true;
+                ctx.ReplacePrincipal(await Zentriq.Api.Endpoints.AuthEndpoints.BuildPrincipalAsync(db, u, pending, ctx.HttpContext.RequestAborted));
+                ctx.ShouldRenew = true;
+            }
 
             void Reject()
             {

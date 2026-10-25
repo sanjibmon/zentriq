@@ -99,7 +99,7 @@ public static class NonItEndpoints
                       UNION ALL SELECT id, asset_tag, name, 'Maintenance due', next_maintenance FROM live WHERE next_maintenance <= current_date + 30) z
                   ORDER BY dt LIMIT 12) y)
             )::text
-            """, null, ct)).RequireAuthorization(Permissions.AssetsView);
+            """, null, ct)).RequireAuthorization(Permissions.NonItView);
 
         g.MapGet("/assets", async (NpgsqlDataSource ds, string? q, Guid? category, string? group, string? status, Guid? department, string? location, string? due,
             string? sort, string? dir, int? page, int? pageSize, CancellationToken ct) =>
@@ -114,25 +114,25 @@ public static class NonItEndpoints
                   'page', {pg}, 'pageSize', {size},
                   'items', COALESCE((SELECT jsonb_agg(to_jsonb(t)) FROM ({Select} {Where} ORDER BY {order} {desc} NULLS LAST, n.asset_tag LIMIT {size} OFFSET {(pg - 1) * size}) t), '[]'))::text
                 """, c => Filters(c, q, category, group, status, department, location, due), ct);
-        }).RequireAuthorization(Permissions.AssetsView);
+        }).RequireAuthorization(Permissions.NonItView);
 
         g.MapGet("/assets/{id:guid}", async (Guid id, NpgsqlDataSource ds, CancellationToken ct) => await Json(ds, $"""
             SELECT (to_jsonb(t) || jsonb_build_object('history', COALESCE((SELECT jsonb_agg(jsonb_build_object('at', h.at, 'actor', h.actor, 'action', h.action, 'changes', h.changes) ORDER BY h.at DESC)
                                                                    FROM (SELECT * FROM zentriq.nonit_history WHERE asset_id = @id ORDER BY at DESC LIMIT 100) h), '[]')))::text
               FROM ({Select} WHERE n.id = @id) t
-            """, c => c.Parameters.AddWithValue("id", id), ct, notFound: true)).RequireAuthorization(Permissions.AssetsView);
+            """, c => c.Parameters.AddWithValue("id", id), ct, notFound: true)).RequireAuthorization(Permissions.NonItView);
 
         // Barcode scanner / search box: the asset whose barcode, tag or serial number matches exactly.
         g.MapGet("/lookup", async (NpgsqlDataSource ds, string code, CancellationToken ct) => await Json(ds, $"""
             SELECT to_jsonb(t)::text FROM ({Select}
              WHERE n.barcode = @c OR lower(n.asset_tag) = lower(@c) OR lower(n.serial_number) = lower(@c)
              ORDER BY (n.barcode = @c) DESC LIMIT 1) t
-            """, c => c.Parameters.AddWithValue("c", (code ?? "").Trim()), ct, notFound: true)).RequireAuthorization(Permissions.AssetsView);
+            """, c => c.Parameters.AddWithValue("c", (code ?? "").Trim()), ct, notFound: true)).RequireAuthorization(Permissions.NonItView);
 
         g.MapPost("/assets", async (NonItValues body, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
-            await SaveAsync(ds, rc, null, body, ct)).RequireAuthorization(Permissions.AssetsManage);
+            await SaveAsync(ds, rc, null, body, ct)).RequireAuthorization(Permissions.NonItManage);
         g.MapPut("/assets/{id:guid}", async (Guid id, NonItValues body, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
-            await SaveAsync(ds, rc, id, body, ct)).RequireAuthorization(Permissions.AssetsManage);
+            await SaveAsync(ds, rc, id, body, ct)).RequireAuthorization(Permissions.NonItManage);
 
         g.MapPost("/assets/delete", async (IdsBody body, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
         {
@@ -144,7 +144,7 @@ public static class NonItEndpoints
             await using (var r = await cmd.ExecuteReaderAsync(ct)) while (await r.ReadAsync(ct)) tags.Add(r.GetString(0));
             await rc.AuditAsync("nonit.delete", tags.Count == 1 ? tags[0] : $"{tags.Count} non-IT assets", detail: new { tags = tags.Take(200) }, ct: ct);
             return Results.Ok(new { deleted = tags.Count });
-        }).RequireAuthorization(Permissions.AssetsManage);
+        }).RequireAuthorization(Permissions.NonItManage);
 
         // Bulk change: status, location, department, assignee, condition or category of several assets.
         g.MapPost("/assets/bulk", async (BulkBody b, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
@@ -185,14 +185,14 @@ public static class NonItEndpoints
             await tx.CommitAsync(ct);
             await rc.AuditAsync("nonit.bulk-update", $"{ids.Length} non-IT assets", detail: changes, ct: ct);
             return Results.Ok(new { updated = ids.Length });
-        }).RequireAuthorization(Permissions.AssetsManage);
+        }).RequireAuthorization(Permissions.NonItManage);
 
         // ---- Categories and custom fields ----
         g.MapGet("/categories", async (NpgsqlDataSource ds, CancellationToken ct) => await Json(ds, """
             SELECT COALESCE(jsonb_agg(jsonb_build_object('id', c.id, 'name', c.name, 'group', c.group_name, 'builtin', c.builtin,
                    'count', (SELECT count(*) FROM zentriq.nonit_assets n WHERE n.category_id = c.id)) ORDER BY c.group_name, c.name), '[]')::text
               FROM zentriq.nonit_categories c
-            """, null, ct)).RequireAuthorization(Permissions.AssetsView);
+            """, null, ct)).RequireAuthorization(Permissions.NonItView);
 
         g.MapPost("/categories", async (CategoryBody b, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
         {
@@ -215,7 +215,7 @@ public static class NonItEndpoints
             }
             await rc.AuditAsync("nonit.category.create", name, detail: new { group }, ct: ct);
             return Results.Ok(new { id, name, group, builtin = false, count = 0 });
-        }).RequireAuthorization(Permissions.AssetsManage);
+        }).RequireAuthorization(Permissions.NonItManage);
 
         g.MapPut("/categories/{id:guid}", async (Guid id, CategoryBody b, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
         {
@@ -229,7 +229,7 @@ public static class NonItEndpoints
             catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation) { return Validation.Problem("name", $"A category named \"{name}\" already exists."); }
             await rc.AuditAsync("nonit.category.update", name, ct: ct);
             return Results.NoContent();
-        }).RequireAuthorization(Permissions.AssetsManage);
+        }).RequireAuthorization(Permissions.NonItManage);
 
         g.MapDelete("/categories/{id:guid}", async (Guid id, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
         {
@@ -241,7 +241,7 @@ public static class NonItEndpoints
                 return Results.Problem(statusCode: 409, title: "The category is in use. Move its assets to another category first.");
             await rc.AuditAsync("nonit.category.delete", name, ct: ct);
             return Results.NoContent();
-        }).RequireAuthorization(Permissions.AssetsManage);
+        }).RequireAuthorization(Permissions.NonItManage);
 
         // Groups: the top level of categories (Furniture, Vehicles, …). A group can exist before it has categories.
         g.MapGet("/groups", async (NpgsqlDataSource ds, CancellationToken ct) => await Json(ds, """
@@ -250,7 +250,7 @@ public static class NonItEndpoints
                    'count', (SELECT count(*) FROM zentriq.nonit_assets n JOIN zentriq.nonit_categories c ON c.id = n.category_id WHERE lower(c.group_name) = lower(g.name)))
                    ORDER BY lower(g.name)), '[]')::text
               FROM zentriq.nonit_groups g
-            """, null, ct)).RequireAuthorization(Permissions.AssetsView);
+            """, null, ct)).RequireAuthorization(Permissions.NonItView);
 
         g.MapPost("/groups", async (GroupBody b, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
         {
@@ -261,7 +261,7 @@ public static class NonItEndpoints
             if (await cmd.ExecuteScalarAsync(ct) is not Guid id) return Validation.Problem("name", $"A group named \"{name}\" already exists.");
             await rc.AuditAsync("nonit.group.create", name, ct: ct);
             return Results.Ok(new { id, name, builtin = false, categories = 0, count = 0 });
-        }).RequireAuthorization(Permissions.AssetsManage);
+        }).RequireAuthorization(Permissions.NonItManage);
 
         // Rename a group: its categories move with it.
         g.MapPut("/groups/{id:guid}", async (Guid id, GroupBody b, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
@@ -296,7 +296,7 @@ public static class NonItEndpoints
             await tx.CommitAsync(ct);
             await rc.AuditAsync("nonit.group.update", name, detail: new { from = old }, ct: ct);
             return Results.NoContent();
-        }).RequireAuthorization(Permissions.AssetsManage);
+        }).RequireAuthorization(Permissions.NonItManage);
 
         g.MapDelete("/groups/{id:guid}", async (Guid id, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
         {
@@ -309,17 +309,17 @@ public static class NonItEndpoints
                 return Results.Problem(statusCode: 409, title: "The group still has categories. Move or delete them first.");
             await rc.AuditAsync("nonit.group.delete", name, ct: ct);
             return Results.NoContent();
-        }).RequireAuthorization(Permissions.AssetsManage);
+        }).RequireAuthorization(Permissions.NonItManage);
 
         g.MapGet("/fields", async (NpgsqlDataSource ds, CancellationToken ct) => await Json(ds, """
             SELECT COALESCE(jsonb_agg(jsonb_build_object('id', id, 'key', key, 'label', label, 'type', type, 'options', options, 'sort', sort) ORDER BY sort, label), '[]')::text
               FROM zentriq.nonit_fields
-            """, null, ct)).RequireAuthorization(Permissions.AssetsView);
+            """, null, ct)).RequireAuthorization(Permissions.NonItView);
 
         g.MapPost("/fields", async (FieldBody b, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) => await SaveFieldAsync(ds, rc, null, b, ct))
-            .RequireAuthorization(Permissions.AssetsManage);
+            .RequireAuthorization(Permissions.NonItManage);
         g.MapPut("/fields/{id:guid}", async (Guid id, FieldBody b, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) => await SaveFieldAsync(ds, rc, id, b, ct))
-            .RequireAuthorization(Permissions.AssetsManage);
+            .RequireAuthorization(Permissions.NonItManage);
         g.MapDelete("/fields/{id:guid}", async (Guid id, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
         {
             await using var cmd = ds.CreateCommand("DELETE FROM zentriq.nonit_fields WHERE id = @id RETURNING label");
@@ -327,7 +327,7 @@ public static class NonItEndpoints
             if (await cmd.ExecuteScalarAsync(ct) is not string label) return Results.NotFound();
             await rc.AuditAsync("nonit.field.delete", label, ct: ct);
             return Results.NoContent();
-        }).RequireAuthorization(Permissions.AssetsManage);
+        }).RequireAuthorization(Permissions.NonItManage);
 
         // ---- Excel form, bulk upload, export ----
         g.MapGet("/template", async (NpgsqlDataSource ds, CancellationToken ct) =>
@@ -335,7 +335,7 @@ public static class NonItEndpoints
             await using var conn = await ds.OpenConnectionAsync(ct);
             var lk = await NonItStore.LookupsAsync(conn, null, ct);
             return Results.File(NonItStore.Template(lk), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Zentriq-non-IT-assets-form.xlsx");
-        }).RequireAuthorization(Permissions.AssetsView);
+        }).RequireAuthorization(Permissions.NonItView);
 
         g.MapPost("/import", async (HttpContext http, NpgsqlDataSource ds, RequestContext rc, bool? dryRun, bool? update, bool? createCategories, string? name, CancellationToken ct) =>
         {
@@ -354,7 +354,7 @@ public static class NonItEndpoints
             if (!result.DryRun)
                 await rc.AuditAsync("nonit.import", name ?? "upload", detail: new { result.Rows, result.Created, result.Updated, result.Skipped, result.NewCategories }, ct: ct);
             return Results.Ok(result);
-        }).RequireAuthorization(Permissions.AssetsManage).DisableAntiforgery();
+        }).RequireAuthorization(Permissions.NonItManage).DisableAntiforgery();
 
         g.MapGet("/export", async (NpgsqlDataSource ds, string? format, string? q, Guid? category, string? group, string? status, Guid? department, string? location, string? due, CancellationToken ct) =>
         {
@@ -410,7 +410,7 @@ public static class NonItEndpoints
             sheet.Widths.AddRange(headings.Select(h => h.Key is "name" or "notes" ? 32.0 : 18.0));
             sheet.Rows.AddRange(rows);
             return Results.File(XlsxBook.Write(sheet), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"non-IT-assets-{stamp}.xlsx");
-        }).RequireAuthorization(Permissions.AssetsView);
+        }).RequireAuthorization(Permissions.NonItView);
     }
 
     private static async Task<IResult> SaveAsync(NpgsqlDataSource ds, RequestContext rc, Guid? id, NonItValues body, CancellationToken ct)

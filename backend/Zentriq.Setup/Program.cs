@@ -400,6 +400,19 @@ internal static class Cli
             }
             catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UndefinedTable) { /* schema older than 27: upgrade in progress */ }
 
+            // Log retention and scheduled log exports (Audit Logs › Retention & export).
+            try
+            {
+                log ??= new Reporter(paths.Logs, "maintenance");   // the file is created only when something is written
+                await NewLogMaintenance(paths, ds, log).RunAsync(ct);
+            }
+            catch (PostgresException ex) when (ex.SqlState is PostgresErrorCodes.UndefinedTable or PostgresErrorCodes.UndefinedFunction) { /* schema older than 28 */ }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                log ??= new Reporter(paths.Logs, "maintenance");
+                log.Error("Log retention failed: " + ex.Message);
+            }
+
             for (var i = 0; i < 10; i++)
             {
                 var job = await queue.LeaseNextAsync(workerId, TimeSpan.FromHours(2), maintenance: true, ct);
@@ -424,6 +437,13 @@ internal static class Cli
                             // The job row is replaced with the database it is in; the result is noted in the restored database.
                             await RestoreJobAsync(paths, options, ds, log, job, ct);
                             break;
+                        case JobTypes.MaintenanceLogArchive:
+                        {
+                            await queue.ReportProgressAsync(job.Id, 10, "Exporting logs", ct);
+                            var result = await NewLogMaintenance(paths, ds, log).JobAsync(job.Payload, ct);
+                            await queue.CompleteAsync(job.Id, workerId, result, ct);
+                            break;
+                        }
                         default:
                             await queue.FailAsync(job.Id, workerId, $"Unknown maintenance job type {job.JobType}.", retryable: false, ct);
                             break;
@@ -450,6 +470,9 @@ internal static class Cli
         }
         finally { log?.Dispose(); }
     }
+
+    private static LogMaintenance NewLogMaintenance(ZentriqPaths paths, NpgsqlDataSource ds, Reporter log) =>
+        new(paths, ds, new Zentriq.Infrastructure.Backup.BackupStore(ds, new CredentialProtector(() => new SecretStore(SecretProtectorFactory.Create()).Read<AppSecrets>(paths.AppSecretsFile))), log);
 
     private static string? Payload(LeasedJob job, string name)
     {

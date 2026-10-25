@@ -21,7 +21,8 @@ public static partial class IntegrationEndpoints
     public sealed record SettingsBody(int? OfflineHours);
 
     /// <summary>Permissions an API token can carry (read-only data access).</summary>
-    public static readonly string[] TokenPermissions = [Permissions.AssetsView, Permissions.VulnView, Permissions.SecurityView, Permissions.ReportsExport, Permissions.AuditView, Permissions.JobsView];
+    public static readonly string[] TokenPermissions = [Permissions.AssetsView, Permissions.NonItView, Permissions.AccessoriesView, Permissions.LifecycleView, Permissions.CloudView,
+        Permissions.ActivityView, Permissions.ReportsView, Permissions.VulnView, Permissions.SecurityView, Permissions.ReportsExport, Permissions.AuditView, Permissions.JobsView];
 
     [GeneratedRegex(@"^[^@\s,;]+@[^@\s,;]+\.[^@\s,;]+$")]
     private static partial Regex EmailRegex();

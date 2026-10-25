@@ -21,7 +21,7 @@ public static class AccessoryEndpoints
 
     public static void MapAccessoryEndpoints(this RouteGroupBuilder api)
     {
-        var g = api.MapGroup("/accessories").WithTags("IT accessories").RequireModule(Modules.Inventory).RequireAuthorization(Permissions.AssetsView);
+        var g = api.MapGroup("/accessories").WithTags("IT accessories").RequireModule(Modules.Inventory).RequireAuthorization(Permissions.AccessoriesView);
 
         g.MapGet("/summary", async (NpgsqlDataSource ds, CancellationToken ct) =>
         {
@@ -96,7 +96,7 @@ public static class AccessoryEndpoints
             catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation) { return Validation.Problem(ex.ConstraintName?.Contains("sku") == true ? "sku" : "name", ex.ConstraintName?.Contains("sku") == true ? "Another accessory has this SKU / part number." : "An accessory with this name already exists."); }
             await rc.AuditAsync("accessory.item_create", body.Name.Trim());
             return Results.Created($"/api/v1/accessories/items/{id}", new { id, name = body.Name.Trim() });
-        }).RequireAuthorization(Permissions.AssetsManage);
+        }).RequireAuthorization(Permissions.AccessoriesManage);
 
         g.MapPut("/items/{id:guid}", async (Guid id, ItemBody body, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
         {
@@ -124,7 +124,7 @@ public static class AccessoryEndpoints
             await tx.CommitAsync(ct);
             await rc.AuditAsync("accessory.item_update", body.Name.Trim(), detail: new { id });
             return Results.NoContent();
-        }).RequireAuthorization(Permissions.AssetsManage);
+        }).RequireAuthorization(Permissions.AccessoriesManage);
 
         g.MapDelete("/items/{id:guid}", async (Guid id, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
         {
@@ -137,7 +137,7 @@ public static class AccessoryEndpoints
             ex.Parameters.AddWithValue("id", id);
             return await ex.ExecuteScalarAsync(ct) is null ? Results.NotFound()
                 : Results.Problem(statusCode: 409, title: "This accessory has stock history and cannot be deleted. Edit it and untick Active to hide it; the history is kept.");
-        }).RequireAuthorization(Permissions.AssetsManage);
+        }).RequireAuthorization(Permissions.AccessoriesManage);
 
         // ---- stock -------------------------------------------------------------------------------------------
         g.MapGet("/stock", async (NpgsqlDataSource ds, string? q, Guid? locationId, string? category, bool? low, CancellationToken ct) =>
@@ -203,7 +203,7 @@ public static class AccessoryEndpoints
                 _ => "Stock count recorded.",
             };
             return Results.Ok(new { ids, message = what });
-        }).RequireAuthorization(Permissions.AssetsManage);
+        }).RequireAuthorization(Permissions.AccessoriesManage);
 
         g.MapGet("/movements", async (NpgsqlDataSource ds, string? kind, Guid? itemId, Guid? locationId, Guid? departmentId, string? person, int? days, string? q, int? page, int? pageSize, CancellationToken ct) =>
         {

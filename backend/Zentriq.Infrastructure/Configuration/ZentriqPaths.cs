@@ -44,6 +44,8 @@ public sealed class ZentriqPaths
     public string Packages => Path.Combine(Root, "Packages");
     public string Backups => Path.Combine(Root, "Backups");
     public string Exports => Path.Combine(Root, "Exports");
+    /// <summary>Exported audit and activity logs (Audit Logs › Retention &amp; export).</summary>
+    public string LogArchives => Path.Combine(Exports, "LogArchives");
     /// <summary>Backup files uploaded in the console for a restore (the API writes them, the maintenance task restores them).</summary>
     public string RestoreUploads => Path.Combine(Root, "Restore");
     /// <summary>Data folder of the remote support engine (devices, its own certificates and settings).</summary>

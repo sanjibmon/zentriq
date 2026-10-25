@@ -16,7 +16,7 @@ public static class LocationEndpoints
 
     public static void MapLocationEndpoints(this RouteGroupBuilder api)
     {
-        var g = api.MapGroup("/locations").WithTags("Locations").RequireAuthorization(Permissions.AssetsView);
+        var g = api.MapGroup("/locations").WithTags("Locations").RequireAuthorization(Permissions.AnyAssetView);
 
         g.MapGet("", async (NpgsqlDataSource ds, CancellationToken ct) =>
         {
@@ -49,7 +49,7 @@ public static class LocationEndpoints
             catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation) { return Validation.Problem("name", "A location with this name already exists."); }
             await rc.AuditAsync("location.create", body.Name.Trim());
             return Results.Created($"/api/v1/locations/{id}", new { id, name = body.Name.Trim() });
-        }).RequireAuthorization(Permissions.AssetsManage);
+        }).RequireAuthorization(Permissions.AnyAssetManage);
 
         g.MapPut("/{id:guid}", async (Guid id, LocationBody body, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
         {
@@ -60,7 +60,7 @@ public static class LocationEndpoints
             catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation) { return Validation.Problem("name", "A location with this name already exists."); }
             await rc.AuditAsync("location.update", body.Name.Trim(), detail: new { id });
             return Results.NoContent();
-        }).RequireAuthorization(Permissions.AssetsManage);
+        }).RequireAuthorization(Permissions.AnyAssetManage);
 
         g.MapDelete("/{id:guid}", async (Guid id, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
         {
@@ -79,7 +79,7 @@ public static class LocationEndpoints
             if (await cmd.ExecuteScalarAsync(ct) is not string name) return Results.NotFound();
             await rc.AuditAsync("location.delete", name);
             return Results.NoContent();
-        }).RequireAuthorization(Permissions.AssetsManage);
+        }).RequireAuthorization(Permissions.AnyAssetManage);
 
         // Assign (or clear, with locationId = null) the location of one or more assets.
         api.MapPost("/assets/location", async (AssignBody body, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>

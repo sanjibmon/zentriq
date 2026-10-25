@@ -83,7 +83,7 @@ public static class LifecycleEndpoints
 
     public static void MapLifecycleEndpoints(this RouteGroupBuilder api)
     {
-        var g = api.MapGroup("/lifecycle").WithTags("Asset lifecycle").RequireModule(Modules.Lifecycle).RequireAuthorization(Permissions.AssetsView);
+        var g = api.MapGroup("/lifecycle").WithTags("Asset lifecycle").RequireModule(Modules.Lifecycle).RequireAuthorization(Permissions.LifecycleView);
 
         // ---- reference data -------------------------------------------------------------------------------------
         g.MapGet("/meta", async (NpgsqlDataSource ds, CancellationToken ct) =>
@@ -307,7 +307,7 @@ public static class LifecycleEndpoints
             await tx.CommitAsync(ct);
             await rc.AuditAsync("lifecycle.update", tag ?? id.ToString(), detail: new { id, tag, b.PurchaseCost, b.WarrantyEnd });
             return Results.Ok(new { ok = true });
-        }).RequireAuthorization(Permissions.AssetsManage);
+        }).RequireAuthorization(Permissions.LifecycleManage);
 
         async Task<IResult> Change(Guid id, StageChange change, NpgsqlDataSource ds, RequestContext rc, string audit, CancellationToken ct)
         {
@@ -326,11 +326,11 @@ public static class LifecycleEndpoints
         g.MapPost("/assets/{id:guid}/stage", (Guid id, StageBody b, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
             Change(id, new StageChange(b.Stage, b.Status, b.Reason, b.AssignedTo, b.AssignedEmail, b.ExpectedReturn, b.DepartmentId, b.LocationId,
                 b.DisposedOn, null, b.DisposalVendor, b.DisposalValue, b.SanitizationMethod, b.SanitizedBy, b.SanitizedOn, b.CertificateRef), ds, rc,
-                b.Stage == "disposed" ? "lifecycle.dispose" : "lifecycle.stage", ct)).RequireAuthorization(Permissions.AssetsManage);
+                b.Stage == "disposed" ? "lifecycle.dispose" : "lifecycle.stage", ct)).RequireAuthorization(Permissions.LifecycleManage);
 
         g.MapPost("/assets/{id:guid}/return", (Guid id, ReturnBody b, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
             Change(id, new StageChange(b.Stage ?? "in_stock", b.Status, b.Reason ?? "Returned", LocationId: b.LocationId), ds, rc, "lifecycle.return", ct))
-            .RequireAuthorization(Permissions.AssetsManage);
+            .RequireAuthorization(Permissions.LifecycleManage);
 
         g.MapPost("/stage", async (BulkStageBody b, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
         {
@@ -353,7 +353,7 @@ public static class LifecycleEndpoints
             }
             await rc.AuditAsync("lifecycle.stage", $"{changed} asset(s)", detail: new { b.Stage, b.Status, b.Reason, changed, failed = errors.Count });
             return Results.Ok(new { changed, errors });
-        }).RequireAuthorization(Permissions.AssetsManage);
+        }).RequireAuthorization(Permissions.LifecycleManage);
 
         // ---- add to stock / on order (devices Zentriq has not seen yet) -------------------------------------------
         g.MapPost("/stock", async (StockBody b, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
@@ -443,7 +443,7 @@ public static class LifecycleEndpoints
             await tx.CommitAsync(ct);
             await rc.AuditAsync("lifecycle.stock", $"{created.Count} item(s)", detail: new { stage, status, count = created.Count, b.PoNumber, b.Vendor });
             return Results.Ok(new { created, message = $"{created.Count} item(s) added as {LifecycleStore.StageLabel(stage)} · {LifecycleStore.StatusLabel(status)}. When Zentriq sees one (agent or scan, same serial number) it moves to In use by itself." });
-        }).RequireAuthorization(Permissions.AssetsManage);
+        }).RequireAuthorization(Permissions.LifecycleManage);
 
         // ---- tags and labels ------------------------------------------------------------------------------------
         g.MapPost("/tags", async (IdsBody b, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
@@ -464,7 +464,7 @@ public static class LifecycleEndpoints
             await tx.CommitAsync(ct);
             await rc.AuditAsync("lifecycle.tags", $"{tags.Count} asset(s)", detail: new { count = tags.Count });
             return Results.Ok(new { tags });
-        }).RequireAuthorization(Permissions.AssetsManage);
+        }).RequireAuthorization(Permissions.LifecycleManage);
 
         g.MapGet("/labels", async (string ids, HttpContext http, NpgsqlDataSource ds, CancellationToken ct) =>
         {
@@ -609,9 +609,9 @@ public static class LifecycleEndpoints
         }
 
         g.MapPost("/people", (PersonBody b, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) => SavePerson(null, b, ds, rc, ct))
-            .RequireAuthorization(Permissions.AssetsManage);
+            .RequireAuthorization(Permissions.LifecycleManage);
         g.MapPut("/people/{id:guid}", (Guid id, PersonBody b, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) => SavePerson(id, b, ds, rc, ct))
-            .RequireAuthorization(Permissions.AssetsManage);
+            .RequireAuthorization(Permissions.LifecycleManage);
         g.MapDelete("/people/{id:guid}", async (Guid id, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
         {
             await using var cmd = ds.CreateCommand("""
@@ -624,7 +624,7 @@ public static class LifecycleEndpoints
                 return Results.Problem(statusCode: 409, title: "This person still holds IT assets (or no longer exists). Check them in first, or mark the person as Left.");
             await rc.AuditAsync("lifecycle.person_delete", name);
             return Results.NoContent();
-        }).RequireAuthorization(Permissions.AssetsManage);
+        }).RequireAuthorization(Permissions.LifecycleManage);
 
         // ---- bulk upload: IT assets, people, contracts --------------------------------------------------------------
         g.MapGet("/import/{kind}/template", async (string kind, NpgsqlDataSource ds, CancellationToken ct) =>
@@ -654,7 +654,7 @@ public static class LifecycleEndpoints
             if (!result.DryRun && result.Ok)
                 await rc.AuditAsync("lifecycle.import", $"{LifecycleImport.Title(kind)}: {name ?? "upload"}", detail: new { kind, result.Rows, result.Created, result.Updated, result.Skipped });
             return Results.Ok(result);
-        }).RequireAuthorization(Permissions.AssetsManage).DisableAntiforgery();
+        }).RequireAuthorization(Permissions.LifecycleManage).DisableAntiforgery();
 
         // ---- custom fields on IT assets -----------------------------------------------------------------------------
         async Task<IResult> SaveField(Guid? id, FieldBody b, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct)
@@ -784,9 +784,9 @@ public static class LifecycleEndpoints
             return Results.Ok(new { id = saved });
         }
         g.MapPost("/contracts", (ContractBody b, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) => SaveContract(null, b, ds, rc, ct))
-            .RequireAuthorization(Permissions.AssetsManage);
+            .RequireAuthorization(Permissions.LifecycleManage);
         g.MapPut("/contracts/{id:guid}", (Guid id, ContractBody b, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) => SaveContract(id, b, ds, rc, ct))
-            .RequireAuthorization(Permissions.AssetsManage);
+            .RequireAuthorization(Permissions.LifecycleManage);
         g.MapDelete("/contracts/{id:guid}", async (Guid id, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
         {
             await using var cmd = ds.CreateCommand("DELETE FROM zentriq.asset_contracts WHERE id = @id RETURNING name");
@@ -794,7 +794,7 @@ public static class LifecycleEndpoints
             if (await cmd.ExecuteScalarAsync(ct) is not string name) return Results.NotFound();
             await rc.AuditAsync("lifecycle.contract.delete", name, detail: new { id });
             return Results.NoContent();
-        }).RequireAuthorization(Permissions.AssetsManage);
+        }).RequireAuthorization(Permissions.LifecycleManage);
 
         g.MapPost("/contracts/{id:guid}/assets", async (Guid id, ContractAssetsBody b, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
         {
@@ -841,7 +841,7 @@ public static class LifecycleEndpoints
             await tx.CommitAsync(ct);
             await rc.AuditAsync("lifecycle.contract.assets", name, detail: new { id, added, removed });
             return Results.Ok(new { added, removed });
-        }).RequireAuthorization(Permissions.AssetsManage);
+        }).RequireAuthorization(Permissions.LifecycleManage);
 
         // ---- refresh planning -----------------------------------------------------------------------------------
         g.MapGet("/refresh", async (NpgsqlDataSource ds, CancellationToken ct) =>

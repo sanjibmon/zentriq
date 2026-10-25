@@ -268,7 +268,7 @@ function Virtualization() {
 function Findings({ tick, onMsg }: { tick: number; onMsg: (m: string, tone?: 'info' | 'crit') => void }) {
   const { query } = useRouter();
   const { can } = useAuth();
-  const canIgnore = can('assets.manage');
+  const canIgnore = can('cloud.manage');
   const [status, setStatus] = useState('open');
   const [severity, setSeverity] = useState('');
   const [provider, setProvider] = useState('');
@@ -325,7 +325,7 @@ function Findings({ tick, onMsg }: { tick: number; onMsg: (m: string, tone?: 'in
 function Accounts({ tick, onMsg, onAdd }: { tick: number; onMsg: (m: string, tone?: 'info' | 'crit') => void; onAdd?: () => void }) {
   const { can } = useAuth();
   const manage = can('credentials.manage');
-  const canSync = can('scans.run');
+  const canSync = can('cloud.manage');
   const confirm = useConfirm();
   const [local, setLocal] = useState(0);
   const [edit, setEdit] = useState<CloudAccount | null>(null);

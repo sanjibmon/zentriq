@@ -79,7 +79,7 @@ export function CloudResourcePage({ id }: { id: string }) {
           ]} />
         </Panel>
         <div className="cl-stack">
-          {machine && <Panel title="Inventoried device" right={can('assets.manage') && <button className="btn sm" onClick={() => setLinking(true)}><Icon name="link" size={13} /> {asset ? 'Change' : 'Link'}</button>}>
+          {machine && <Panel title="Inventoried device" right={can('cloud.manage') && <button className="btn sm" onClick={() => setLinking(true)}><Icon name="link" size={13} /> {asset ? 'Change' : 'Link'}</button>}>
             {asset ? <KV items={[
               ['Device', <Link to={`/assets/${asset.id}`}><b>{asset.hostname ?? asset.ip}</b></Link>],
               ['IP address', asset.ip], ['Operating system', asset.os], ['Serial number', asset.serial], ['Last seen', fmt.ago(asset.lastSeen)],
@@ -92,7 +92,7 @@ export function CloudResourcePage({ id }: { id: string }) {
               { key: 's', label: 'Severity', render: (f) => <Pill tone={f.resolvedAt ? 'ok' : SEV_TONE[f.severity]}>{f.resolvedAt ? 'resolved' : f.severity}</Pill> },
               { key: 't', label: 'Finding', className: 'wrap', render: (f) => <><b>{f.title}</b>{f.detail && <div className="faint" style={{ fontSize: 12 }}>{f.detail}</div>}{f.ignored && <div className="faint" style={{ fontSize: 11.5 }}>Ignored by {f.ignoredBy}</div>}</> },
               { key: 'd', label: 'Since', render: (f) => fmt.day(f.resolvedAt ?? f.firstSeen) },
-              ...(can('assets.manage') ? [{ key: 'x', label: '', render: (f: Detail['findings'][number]) => f.resolvedAt ? null :
+              ...(can('cloud.manage') ? [{ key: 'x', label: '', render: (f: Detail['findings'][number]) => f.resolvedAt ? null :
                 <button className="btn sm ghost" onClick={() => void ignore(f.id, !f.ignored)}>{f.ignored ? 'Reopen' : 'Ignore'}</button> }] : []),
             ]} />
           </Panel>

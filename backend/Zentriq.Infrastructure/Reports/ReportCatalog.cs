@@ -17,6 +17,20 @@ public sealed record ReportDataset(string Key, string Name, string Description, 
 /// </summary>
 public static class ReportCatalog
 {
+    /// <summary>
+    /// The permission a data source needs: its own (vulnerabilities, security, audit), else the permission of the area its
+    /// rows come from (non-IT assets, IT accessories, lifecycle, cloud, device activity), else the IT asset inventory.
+    /// </summary>
+    public static string RequiredPermission(ReportDataset d) => d.Permission ?? d.Key switch
+    {
+        "nonit_assets" => "nonit.view",
+        "accessory_stock" or "accessory_movements" => "accessories.view",
+        "asset_lifecycle" or "asset_lifecycle_events" => "lifecycle.view",
+        "cloud_resources" or "cloud_findings" => "cloud.view",
+        "activity" => "activity.view",
+        _ => "assets.view",
+    };
+
     private const string LastContact = "GREATEST(ag.last_checkin_at, a.last_seen_at)";
     private const string AgentJoin = """
         LEFT JOIN LATERAL (SELECT r.id, r.agent_version, r.last_checkin_at FROM zentriq.agent_registrations r

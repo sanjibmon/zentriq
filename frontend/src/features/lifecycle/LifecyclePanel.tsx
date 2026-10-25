@@ -33,7 +33,7 @@ export function StageTrack({ stage, meta }: { stage: string; meta: LcMeta }) {
 /** Lifecycle of one IT asset: stage, custody, purchase and depreciation, warranty, contracts, disposal and history. */
 export function LifecyclePanel({ assetId, onMessage }: { assetId: string; onMessage?: (m: string) => void }) {
   const { can } = useAuth();
-  const canEdit = can('assets.manage');
+  const canEdit = can('lifecycle.manage');
   const [tick, setTick] = useState(0);
   const detail = useApi(() => api.get<LcDetail>(`/lifecycle/assets/${assetId}`), [assetId, tick]);
   const meta = useLcMeta();

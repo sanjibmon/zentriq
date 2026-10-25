@@ -32,7 +32,7 @@ public sealed class ApiTokenAuthenticationHandler(IOptionsMonitor<Authentication
 
         await using var cmd = ds.CreateCommand("""
             SELECT t.id, t.name, u.id, u.email, u.display_name,
-                   ARRAY(SELECT DISTINCT rp.permission_code FROM zentriq.user_roles ur JOIN zentriq.role_permissions rp ON rp.role_id = ur.role_id
+                   ARRAY(SELECT DISTINCT rp.permission_code FROM zentriq.user_role_grants ur JOIN zentriq.role_permissions rp ON rp.role_id = ur.role_id
                           WHERE ur.user_id = u.id AND rp.permission_code = ANY(t.permissions)),
                    t.last_used_at IS NULL OR t.last_used_at < now() - interval '1 minute'
               FROM zentriq.api_tokens t JOIN zentriq.users u ON u.id = t.created_by

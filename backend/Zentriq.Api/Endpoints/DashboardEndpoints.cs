@@ -24,7 +24,7 @@ public static class DashboardEndpoints
 
     public static void MapDashboardEndpoints(this RouteGroupBuilder api)
     {
-        var g = api.MapGroup("/dashboards").WithTags("Dashboards").RequireModule(Modules.Dashboards).RequireAuthorization(Permissions.AssetsView);
+        var g = api.MapGroup("/dashboards").WithTags("Dashboards").RequireModule(Modules.Dashboards).RequireAuthorization(Permissions.DashboardView);
 
         g.MapGet("", async (ZentriqDbContext db, RequestContext rc, CancellationToken ct) =>
         {

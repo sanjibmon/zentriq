@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { DashboardPage } from '../features/dashboard/DashboardPage';
 import { AssetsPage } from '../features/assets/AssetsPage';
 import { DiscoveryPage } from '../features/discovery/DiscoveryPage';
@@ -18,7 +19,7 @@ import { HandoverPage, LabelsPage } from '../features/lifecycle/PrintPages';
 import { CloudPage } from '../features/cloud/CloudPage';
 import { CloudResourcePage } from '../features/cloud/CloudResourcePage';
 import { ModulePage, SectionLockedPage } from '../features/placeholder/ModulePage';
-import { navOfPath } from './nav';
+import { ALL_NAV, navOfPath } from './nav';
 import { ReportsPage } from '../features/reports/ReportsPage';
 import { ReportBuilder } from '../features/reports/ReportBuilder';
 import { VulnerabilitiesPage } from '../features/vulnerabilities/VulnerabilitiesPage';
@@ -35,14 +36,29 @@ import { AuthProvider, useAuth } from './auth';
 import { Router, useRouter } from './router';
 import { ConfirmProvider } from '../components/Confirm';
 
+/** The start page for users without the dashboard: the first area they may open. */
+function FirstAllowed() {
+  const { can } = useAuth();
+  const { navigate } = useRouter();
+  const first = ALL_NAV.find((i) => i.ready && i.path !== '/' && (!i.permission || can(i.permission)));
+  useEffect(() => { if (first) navigate(first.path, true); }, [first, navigate]);
+  return first ? null : <NoAccess />;
+}
+
+function NoAccess() {
+  return <div className="empty-state" style={{ padding: 40 }}><h2>No access</h2><p className="muted">Your role does not include this page. Ask an administrator if you need it.</p></div>;
+}
+
 function Routes() {
   const { path } = useRouter();
-  const { me } = useAuth();
+  const { me, can } = useAuth();
   // Sections not installed on this server, or not in the license, show what is needed instead of the page.
   const nav = navOfPath(path);
   const sec = nav && !nav.item.admin ? me?.license.sections?.find((x) => x.id === nav.section) : undefined;
   if (sec && (!sec.installed || (me!.license.featuresEnabled && !sec.enabled))) return <SectionLockedPage section={sec} label={nav!.item.label} />;
-  if (path === '/' || path === '/dashboard') return <DashboardPage />;
+  if (path === '/' || path === '/dashboard') return can('dashboard.view') ? <DashboardPage /> : <FirstAllowed />;
+  // Pages outside the user's roles (opened by address or an old link).
+  if (nav?.item.permission && !can(nav.item.permission)) return <NoAccess />;
   if (path === '/assets') return <AssetsPage />;
   const assetMatch = /^\/assets\/([0-9a-f-]{36})$/i.exec(path);
   if (assetMatch) return <AssetDetailPage id={assetMatch[1]!} />;

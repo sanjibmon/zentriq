@@ -199,6 +199,8 @@ export interface UserRow {
   createdAt: string;
   locked: boolean;
   roles: { id: string; name: string }[];
+  /** Groups the user is in, with the names of the roles each gives. */
+  groups?: { id: string; name: string; roles: string[] }[];
 }
 
 export interface Role {

@@ -102,6 +102,8 @@ builder.Services.AddAuthorization(o =>
 {
     foreach (var p in Permissions.All)
         o.AddPolicy(p, policy => policy.RequireAuthenticatedUser().RequireClaim(ZentriqClaims.Permission, p));
+    o.AddPolicy(Permissions.AnyAssetView, policy => policy.RequireAuthenticatedUser().RequireClaim(ZentriqClaims.Permission, Permissions.AssetViews));
+    o.AddPolicy(Permissions.AnyAssetManage, policy => policy.RequireAuthenticatedUser().RequireClaim(ZentriqClaims.Permission, Permissions.AssetManages));
 });
 
 builder.Services.AddRateLimiter(o =>
@@ -178,9 +180,11 @@ api.MapDashboardEndpoints();
 api.MapOverviewEndpoints();
 api.MapLicensingEndpoints();
 api.MapUserEndpoints();
+api.MapRoleEndpoints();
 api.MapAuditEndpoints();
 api.MapSystemEndpoints();
 api.MapBackupEndpoints();
+api.MapLogEndpoints();
 api.MapOrganizationEndpoints();
 api.MapCredentialEndpoints();
 api.MapDirectoryEndpoints();

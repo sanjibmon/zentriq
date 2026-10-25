@@ -23,7 +23,7 @@ const TABS: [Tab, string][] = [['overview', 'Overview'], ['assets', 'IT assets']
 export function LifecyclePage() {
   const { query, navigate } = useRouter();
   const { can } = useAuth();
-  const canEdit = can('assets.manage');
+  const canEdit = can('lifecycle.manage');
   const tab = (TABS.find(([t]) => t === query.get('tab'))?.[0] ?? 'overview') as Tab;
   const meta = useLcMeta();
   const [tick, setTick] = useState(0);
@@ -125,7 +125,7 @@ type Row = LcAsset & { total?: number };
 function Assets({ meta, tick, onMsg }: { meta: LcMeta; tick: number; onMsg: (m: string) => void }) {
   const { query } = useRouter();
   const { can } = useAuth();
-  const canEdit = can('assets.manage');
+  const canEdit = can('lifecycle.manage');
   const deps = useDepartments();
   const locs = useLocations();
   const [q, setQ] = useState(query.get('q') ?? '');
@@ -244,7 +244,7 @@ function Assets({ meta, tick, onMsg }: { meta: LcMeta; tick: number; onMsg: (m: 
 function People({ meta, tick, onMsg, onUpload }: { meta: LcMeta; tick: number; onMsg: (m: string) => void; onUpload: () => void }) {
   const { query, navigate } = useRouter();
   const { can } = useAuth();
-  const canEdit = can('assets.manage');
+  const canEdit = can('lifecycle.manage');
   const confirm = useConfirm();
   const [q, setQ] = useState('');
   const [search, setSearch] = useState('');
@@ -340,7 +340,7 @@ function PersonHoldings({ person, meta, onBack }: { person: string; meta: LcMeta
 
 function Contracts({ meta, tick, onMsg, onUpload }: { meta: LcMeta; tick: number; onMsg: (m: string) => void; onUpload: () => void }) {
   const { can } = useAuth();
-  const canEdit = can('assets.manage');
+  const canEdit = can('lifecycle.manage');
   const confirm = useConfirm();
   const [local, setLocal] = useState(0);
   const list = useApi(() => api.get<LcContract[]>('/lifecycle/contracts'), [tick, local]);

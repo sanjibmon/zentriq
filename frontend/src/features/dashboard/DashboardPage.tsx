@@ -63,7 +63,7 @@ interface AccStockRow { id: string; item: string; category: string; location: st
 interface VulnSummary { bySeverity: KC[]; aging: { bucket: string; critical: number; high: number; medium: number; low: number }[] }
 
 // ---- Widget registry ---------------------------------------------------------------------------------------
-interface WidgetDef { id: string; title: string; wide?: boolean; full?: boolean; defaultOn: boolean; description: string; chart?: ChartKind }
+interface WidgetDef { id: string; title: string; wide?: boolean; full?: boolean; defaultOn: boolean; description: string; chart?: ChartKind; perm?: string }
 const WIDGETS: WidgetDef[] = [
   { id: 'kpi.tiles', title: 'Summary tiles', full: true, defaultOn: true, description: 'Assets, servers, endpoints, coverage, offline devices, software' },
   { id: 'assets.category', chart: 'share', title: 'Assets by category', defaultOn: true, description: 'Endpoints, servers, network devices · click to list those assets' },
@@ -72,17 +72,17 @@ const WIDGETS: WidgetDef[] = [
   { id: 'assets.trend', title: 'Asset growth', wide: true, defaultOn: true, description: 'Active assets per day, last 30 days' },
   { id: 'assets.department', chart: 'bar', title: 'Assets by department', defaultOn: true, description: 'Devices per department / unit · click to list them' },
   { id: 'assets.location', chart: 'bar', title: 'Assets by location', defaultOn: true, description: 'Devices per office, site or floor · click to list them' },
-  { id: 'accessories.stock', chart: 'bar', title: 'IT accessories in stock', defaultOn: true, description: 'Mouse, keyboard, headset… on hand by category, stock value' },
-  { id: 'accessories.low', title: 'IT accessories to reorder', defaultOn: true, description: 'Accessories at or below their reorder level' },
+  { id: 'accessories.stock', chart: 'bar', title: 'IT accessories in stock', defaultOn: true, description: 'Mouse, keyboard, headset… on hand by category, stock value', perm: 'accessories.view' },
+  { id: 'accessories.low', title: 'IT accessories to reorder', defaultOn: true, description: 'Accessories at or below their reorder level', perm: 'accessories.view' },
   { id: 'changes.hardware', title: 'Hardware changes', wide: true, defaultOn: true, description: 'Devices whose hardware changed in the last 30 days (memory, disks, CPU, serial…)' },
   { id: 'changes.software', title: 'Software changes', wide: true, defaultOn: true, description: 'Devices with software installed, uninstalled or updated in the last 30 days' },
   { id: 'network.types', chart: 'bar', title: 'Network devices', defaultOn: true, description: 'Switches, routers, firewalls, access points · click to list them' },
   { id: 'network.management', chart: 'bar', title: 'Switch management', defaultOn: true, description: 'Managed over SNMP, web interface only, no management, unmanaged switches found behind ports' },
   { id: 'network.ports', title: 'Switch port usage', defaultOn: true, description: 'Ports in use, free and disabled; link speeds; PoE' },
   { id: 'network.attention', title: 'Network attention', defaultOn: false, description: 'Alarms, neighbours down, busy ports, unmanaged switches, port errors, high CPU' },
-  { id: 'nonit.groups', chart: 'bar', title: 'Non-IT assets', defaultOn: true, description: 'Furniture, appliances, vehicles and other items by category group' },
-  { id: 'nonit.value', title: 'Non-IT asset value', defaultOn: true, description: 'Purchase and current value, status of the items' },
-  { id: 'nonit.due', title: 'Non-IT: coming up', defaultOn: true, description: 'Warranty, AMC, insurance and maintenance due' },
+  { id: 'nonit.groups', chart: 'bar', title: 'Non-IT assets', defaultOn: true, description: 'Furniture, appliances, vehicles and other items by category group', perm: 'nonit.view' },
+  { id: 'nonit.value', title: 'Non-IT asset value', defaultOn: true, description: 'Purchase and current value, status of the items', perm: 'nonit.view' },
+  { id: 'nonit.due', title: 'Non-IT: coming up', defaultOn: true, description: 'Warranty, AMC, insurance and maintenance due', perm: 'nonit.view' },
   { id: 'assets.seen', chart: 'bar', title: 'Last contact / offline', defaultOn: true, description: 'Online now … offline more than 30 days' },
   { id: 'assets.os', chart: 'bar', title: 'Operating systems', wide: true, defaultOn: true, description: 'Top operating systems' },
   { id: 'security.posture', title: 'Security posture', defaultOn: true, description: 'Encryption, firewall, Secure Boot, TPM, antivirus' },
@@ -97,15 +97,17 @@ const WIDGETS: WidgetDef[] = [
   { id: 'scans.results', chart: 'share', title: 'Discovery results', defaultOn: true, description: 'Outcome of scans in the last 30 days' },
   { id: 'license.usage', title: 'Licensing', defaultOn: true, description: 'Trial or license and device usage' },
   { id: 'scans.recent', title: 'Recent scans', defaultOn: false, description: 'Last five scans' },
-  { id: 'vuln.severity', chart: 'share', title: 'Open vulnerabilities', defaultOn: false, description: 'Software and Windows findings by severity' },
-  { id: 'vuln.aging', chart: 'column', title: 'Vulnerability aging', defaultOn: false, description: 'How long open findings have been open' },
-  { id: 'security.score', chart: 'column', title: 'Security configuration score', defaultOn: false, description: 'Windows devices per compliance score band' },
-  { id: 'security.failing', chart: 'bar', title: 'Most failed security checks', defaultOn: false, description: 'Configuration checks failing on the most devices' },
+  { id: 'vuln.severity', chart: 'share', title: 'Open vulnerabilities', defaultOn: false, description: 'Software and Windows findings by severity', perm: 'vuln.view' },
+  { id: 'vuln.aging', chart: 'column', title: 'Vulnerability aging', defaultOn: false, description: 'How long open findings have been open', perm: 'vuln.view' },
+  { id: 'security.score', chart: 'column', title: 'Security configuration score', defaultOn: false, description: 'Windows devices per compliance score band', perm: 'security.view' },
+  { id: 'security.failing', chart: 'bar', title: 'Most failed security checks', defaultOn: false, description: 'Configuration checks failing on the most devices', perm: 'security.view' },
 ];
 /** A widget on the dashboard. Saved reports are widgets too (id "report:<id>"). */
 type LayoutItem = { id: string; wide: boolean; chart?: ChartKind; reportId?: string; title?: string | null };
 type Layout = LayoutItem[];
 const DEFAULT_LAYOUT: Layout = WIDGETS.filter((w) => w.defaultOn).map((w) => ({ id: w.id, wide: !!w.wide, chart: w.chart }));
+/** The permission a widget needs: its area's view permission (IT asset widgets: the IT asset inventory). */
+const permOf = (id: string) => WIDGETS.find((w) => w.id === id)?.perm ?? 'assets.view';
 interface DashboardDto {
   id: string; name: string; owned: boolean; filters?: { seenWidgets?: string[] } | null;
   widgets: { type: string; title?: string | null; width: number; settings?: { chart?: ChartKind; reportId?: string } | null }[];
@@ -153,9 +155,11 @@ export function DashboardPage() {
   const { navigate } = useRouter();
   const confirm = useConfirm();
   const [tick, setTick] = useState(0);
-  const ov = useApi(() => api.get<Overview>('/dashboard/overview'), [tick]);
-  const lic = useApi(() => api.get<LicensingStatus>('/licensing/status'), []);
-  const scans = useApi(() => api.get<Paged<Scan>>('/discovery/scans', { pageSize: 5 }), [tick]);
+  // IT asset widgets come from the overview; users without the IT inventory (for example a non-IT asset role) skip it.
+  const itAssets = can('assets.view');
+  const ov = useApi(() => (itAssets ? api.get<Overview>('/dashboard/overview') : Promise.resolve(null)), [tick, itAssets]);
+  const lic = useApi(() => (itAssets ? api.get<LicensingStatus>('/licensing/status') : Promise.resolve(null)), [itAssets]);
+  const scans = useApi(() => (itAssets ? api.get<Paged<Scan>>('/discovery/scans', { pageSize: 5 }) : Promise.resolve(null)), [tick, itAssets]);
   const dashboards = useApi(() => api.get<DashboardDto[]>('/dashboards'), []);
   const org = useApi(() => api.get<{ profile: { name?: string | null } | null }>('/organization'), []);
   const company = org.data?.profile?.name?.trim();
@@ -165,7 +169,8 @@ export function DashboardPage() {
 
   const mine = dashboards.data?.find((d) => d.owned) ?? null;
   const saved: Layout | null = useMemo(() => { const l = fromDto(mine); return l ? withNew(l, mine) : null; }, [mine]);
-  const layout = saved ?? DEFAULT_LAYOUT;
+  // Only the widgets of areas the user may see (saved reports check their own data source when they run).
+  const layout = (saved ?? DEFAULT_LAYOUT).filter((w) => w.reportId || can(permOf(w.id)));
   const wantsVulns = layout.some((w) => w.id.startsWith('vuln.')) && can('vuln.view');
   const vulns = useApi(() => (wantsVulns ? api.get<VulnSummary>('/vulnerabilities/overview') : Promise.resolve(null)), [tick, wantsVulns]);
   const wantsChanges = layout.some((w) => w.id.startsWith('changes.'));
@@ -202,7 +207,14 @@ export function DashboardPage() {
   }
 
   function render(id: string, chart: ChartKind = 'bar'): ReactNode {
-    if (!o || !k) return null;
+    const fromOverview = permOf(id) === 'assets.view' && !id.startsWith('network.') && !id.startsWith('changes.');
+    if (fromOverview && (!o || !k)) return null;
+    return renderArea(id, chart);
+  }
+
+  function renderArea(id: string, chart: ChartKind = 'bar'): ReactNode {
+    // Overview data is there for every widget that uses it (checked above).
+    const o = ov.data!; const k = o?.kpi as Overview['kpi'];
     const C = (data: Slice[], onSelect?: (s: Slice) => void, opts: { centerLabel?: string; color?: string; max?: number } = {}) =>
       <CategoryChart kind={chart} data={data} onSelect={onSelect} {...opts} />;
     switch (id) {
@@ -463,11 +475,11 @@ export function DashboardPage() {
         actions={<>
           <button className="btn" onClick={() => setEditing(true)}>Customize</button>
           {can('scans.run') && <button className="btn" onClick={() => void collectAll()}>Collect inventory now</button>}
-          <Link to="/discovery?new=1" className="btn primary">New scan</Link>
+          {can('scans.run') && <Link to="/discovery?new=1" className="btn primary">New scan</Link>}
         </>} />
       {msg && <Callout icon="info">{msg}</Callout>}
       <ErrorBox error={ov.error} />
-      {!o || !k ? <Loading /> : (
+      {itAssets && (!o || !k) ? <Loading /> : layout.length === 0 ? <Callout icon="info">Nothing to show for your role yet. <b>Customize</b> to add widgets or saved reports.</Callout> : (
         <>
           <div className="dash-grid">
             {layout.map((item) => {
@@ -489,19 +501,19 @@ export function DashboardPage() {
               );
             })}
           </div>
-          <p className="faint" style={{ fontSize: 12 }}>Updated {fmt.ago(o.generatedAt)} · refreshes every minute.</p>
+          <p className="faint" style={{ fontSize: 12 }}>{o ? `Updated ${fmt.ago(o.generatedAt)} · ` : ''}refreshes every minute.</p>
         </>
       )}
-      {editing && <CustomizeDialog layout={layout} onClose={() => setEditing(false)} onSave={saveLayout} />}
+      {editing && <CustomizeDialog layout={layout} allowed={(id) => can(permOf(id))} onClose={() => setEditing(false)} onSave={saveLayout} />}
     </>
   );
 }
 
-function CustomizeDialog({ layout, onClose, onSave }: { layout: Layout; onClose: () => void; onSave: (l: Layout) => Promise<void> }) {
+function CustomizeDialog({ layout, allowed, onClose, onSave }: { layout: Layout; allowed: (id: string) => boolean; onClose: () => void; onSave: (l: Layout) => Promise<void> }) {
   // Visible widgets in their order, then the hidden ones.
   const [items, setItems] = useState<(LayoutItem & { on: boolean })[]>(() => [
     ...layout.map((l) => ({ ...l, chart: l.chart ?? defFor(l)?.chart, on: true })),
-    ...WIDGETS.filter((w) => !layout.some((l) => l.id === w.id)).map((w) => ({ id: w.id, wide: !!w.wide, chart: w.chart, on: false })),
+    ...WIDGETS.filter((w) => allowed(w.id) && !layout.some((l) => l.id === w.id)).map((w) => ({ id: w.id, wide: !!w.wide, chart: w.chart, on: false })),
   ]);
   const [drag, setDrag] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);

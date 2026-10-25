@@ -50,7 +50,7 @@ public static class CloudEndpoints
 
     public static void MapCloudEndpoints(this RouteGroupBuilder api)
     {
-        var g = api.MapGroup("/cloud").WithTags("Cloud & infrastructure").RequireModule(Modules.Cloud).RequireAuthorization(Permissions.AssetsView);
+        var g = api.MapGroup("/cloud").WithTags("Cloud & infrastructure").RequireModule(Modules.Cloud).RequireAuthorization(Permissions.CloudView);
 
         g.MapGet("/meta", () => Results.Ok(new
         {
@@ -143,7 +143,7 @@ public static class CloudEndpoints
             Guid? jobId = null;
             if (body.Enabled ?? true) jobId = await jobs.EnqueueAsync(new EnqueueRequest(JobTypes.CloudSync, new { accountId = id }, MaxAttempts: 1, TimeoutSeconds: 3600, CreatedBy: rc.UserId), ct: ct);
             return Results.Created($"/api/v1/cloud/accounts/{id}", new { id, jobId });
-        }).RequireAuthorization(Permissions.CredentialsManage);
+        }).RequireAuthorization(Permissions.CloudManage);
 
         g.MapPut("/accounts/{id:guid}", async (Guid id, AccountBody body, NpgsqlDataSource ds, CloudStore store, RequestContext rc, CancellationToken ct) =>
         {
@@ -176,7 +176,7 @@ public static class CloudEndpoints
             catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation) { return Validation.Problem("name", "A connection with this name already exists."); }
             await rc.AuditAsync("cloud.account_update", body.Name, detail: new { body.Provider, body.TenantId, body.ClientId, body.AccessKeyId, body.Host, body.Username, body.Hosts, secretChanged = newSecret });
             return Results.Ok(new { id });
-        }).RequireAuthorization(Permissions.CredentialsManage);
+        }).RequireAuthorization(Permissions.CloudManage);
 
         g.MapDelete("/accounts/{id:guid}", async (Guid id, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
         {
@@ -185,7 +185,7 @@ public static class CloudEndpoints
             if (await cmd.ExecuteScalarAsync(ct) is not string name) return Results.NotFound();
             await rc.AuditAsync("cloud.account_delete", name);
             return Results.NoContent();
-        }).RequireAuthorization(Permissions.CredentialsManage);
+        }).RequireAuthorization(Permissions.CloudManage);
 
         g.MapPost("/accounts/{id:guid}/sync", async (Guid id, NpgsqlDataSource ds, JobQueue jobs, RequestContext rc, CancellationToken ct) =>
         {
@@ -205,7 +205,7 @@ public static class CloudEndpoints
             var jobId = await jobs.EnqueueAsync(new EnqueueRequest(JobTypes.CloudSync, new { accountId = id }, MaxAttempts: 1, TimeoutSeconds: 3600, CreatedBy: rc.UserId), ct: ct);
             await rc.AuditAsync("cloud.sync_requested", name);
             return Results.Accepted($"/api/v1/jobs/{jobId}", new { jobId });
-        }).RequireAuthorization(Permissions.ScansRun);
+        }).RequireAuthorization(Permissions.CloudManage);
 
         // ---- resources -----------------------------------------------------------------------------------------------
         g.MapGet("/resources", async (string? provider, string? kind, Guid? accountId, string? state, string? q, string? linked, bool? deleted, bool? findings,
@@ -319,7 +319,7 @@ public static class CloudEndpoints
             }
             await rc.AuditAsync("cloud.resource_link", name, detail: new { assetId = body.AssetId, automatic = auto });
             return Results.Ok(new { id });
-        }).RequireAuthorization(Permissions.AssetsManage);
+        }).RequireAuthorization(Permissions.CloudManage);
 
         // ---- findings and changes ---------------------------------------------------------------------------------
         g.MapGet("/findings", async (string? status, string? severity, string? provider, string? rule, Guid? accountId, string? q, NpgsqlDataSource ds, CancellationToken ct) =>
@@ -356,7 +356,7 @@ public static class CloudEndpoints
             if (await cmd.ExecuteScalarAsync(ct) is not string title) return Results.NotFound();
             await rc.AuditAsync(body.Ignored ? "cloud.finding_ignore" : "cloud.finding_unignore", title, detail: new { id });
             return Results.Ok(new { id, ignored = body.Ignored });
-        }).RequireAuthorization(Permissions.AssetsManage);
+        }).RequireAuthorization(Permissions.CloudManage);
 
         g.MapGet("/changes", async (int? days, Guid? accountId, string? change, string? kind, NpgsqlDataSource ds, CancellationToken ct) =>
         {

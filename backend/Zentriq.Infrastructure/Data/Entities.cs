@@ -73,6 +73,8 @@ public sealed class User
     public bool MfaEnabled { get; set; }
     public string? MfaSecretProtected { get; set; }
     public Guid SecurityStamp { get; set; }
+    /// <summary>Changes when the user's roles or their permissions change (sessions then reload their permissions).</summary>
+    public Guid AccessStamp { get; set; } = Guid.NewGuid();
     public DateTimeOffset PasswordChangedAt { get; set; }
     public DateTimeOffset? LastLoginAt { get; set; }
     public DateTimeOffset CreatedAt { get; set; }

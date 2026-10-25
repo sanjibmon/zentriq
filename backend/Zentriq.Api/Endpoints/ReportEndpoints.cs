@@ -23,7 +23,7 @@ public static class ReportEndpoints
 
     public static void MapReportEndpoints(this RouteGroupBuilder api)
     {
-        var g = api.MapGroup("/reports").WithTags("Reports").RequireModule(Modules.Reports).RequireAuthorization(Permissions.AssetsView);
+        var g = api.MapGroup("/reports").WithTags("Reports").RequireModule(Modules.Reports).RequireAuthorization(Permissions.ReportsView);
 
         g.MapGet("/datasets", (RequestContext rc) => Results.Ok(new
         {
@@ -296,8 +296,8 @@ public static class ReportEndpoints
         return null;
     }
 
-    /// <summary>Data sources with their own permission (vulnerabilities, audit trail) need it, or administrator rights.</summary>
-    internal static bool CanUse(ReportDataset d, RequestContext rc) => d.Permission is null || rc.Has(d.Permission) || rc.Has(Permissions.SettingsManage);
+    /// <summary>A data source needs the permission of its area (see ReportCatalog.RequiredPermission), or administrator rights.</summary>
+    internal static bool CanUse(ReportDataset d, RequestContext rc) => rc.Has(ReportCatalog.RequiredPermission(d)) || rc.Has(Permissions.SettingsManage);
 
     private static IResult? Denied(string dataset, RequestContext rc) =>
         ReportCatalog.Find(dataset) is { } d && !CanUse(d, rc) ? Results.Problem(statusCode: 403, title: $"You do not have permission to use the {d.Name} data source.") : null;

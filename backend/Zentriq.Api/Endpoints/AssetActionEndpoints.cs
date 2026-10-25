@@ -258,7 +258,7 @@ public static class AssetActionEndpoints
                     requestedAt = r.GetFieldValue<DateTimeOffset>(12), completedAt = r.IsDBNull(13) ? (DateTimeOffset?)null : r.GetFieldValue<DateTimeOffset>(13), requestedBy = S(14),
                 });
             return Results.Ok(new { items, total, page = p, pageSize = ps });
-        }).WithTags("Assets").RequireModule(Modules.Inventory).RequireAuthorization(Permissions.AssetsView);
+        }).WithTags("Assets").RequireModule(Modules.Inventory).RequireAuthorization(Permissions.ActivityView);
 
         // Uninstall one application from selected devices, or from every device that has it. Runs through the agent only.
         api.MapPost("/software/uninstall", async (UninstallBody body, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>

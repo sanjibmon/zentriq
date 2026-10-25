@@ -18,7 +18,7 @@ type Tab = 'stock' | 'issued' | 'movements' | 'catalogue';
 export function AccessoriesPage() {
   const { can } = useAuth();
   const { query, navigate } = useRouter();
-  const canEdit = can('assets.manage');
+  const canEdit = can('accessories.manage');
   const [tab, setTabState] = useState<Tab>((['stock', 'issued', 'movements', 'catalogue'] as Tab[]).find((t) => t === query.get('tab')) ?? 'stock');
   const setTab = (t: Tab) => { setTabState(t); navigate(`/accessories?tab=${t}`, true); };
   const [tick, setTick] = useState(0);

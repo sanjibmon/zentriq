@@ -341,3 +341,14 @@ fieldset.plain { border: 0; padding: 0; margin: 0; min-width: 0; }
 .restore-info { padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg-soft, transparent); }
 .form-v .btn.self-start, .form-v button.self-start { justify-self: start; align-self: flex-start; width: auto; }
 .row-actions { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: nowrap; }
+
+/* Roles and groups */
+.perm-table td { vertical-align: top; }
+.perm-table th:nth-child(2), .perm-table th:nth-child(3) { width: 110px; }
+.perm-box { display: inline-flex !important; align-items: center; gap: 6px; font-weight: 400 !important; font-size: 12.5px; white-space: nowrap; }
+.perm-extras { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.access-list { margin: 0; padding-left: 16px; font-size: 12.5px; line-height: 1.5; }
+.field-title { font-size: 13px; font-weight: 500; margin-bottom: 5px; }
+.text-crit { color: var(--crit); }
+.row-actions .row-check, .form-v .row-actions label.row-check { display: inline-flex; gap: 6px; align-items: center; font-weight: 400; }
+.btn.disabled { pointer-events: none; opacity: .5; }
