@@ -1,12 +1,17 @@
 import type { Tone } from '../../components/ui';
 
-export type Provider = 'azure' | 'aws' | 'vmware' | 'hyperv';
+export type Provider = 'azure' | 'aws' | 'gcp' | 'vmware' | 'hyperv' | 'nutanix' | 'proxmox' | 'xenserver' | 'ovirt';
 
 export const PROVIDERS: { id: Provider; label: string; short: string; kind: 'cloud' | 'virtual' }[] = [
   { id: 'azure', label: 'Microsoft Azure', short: 'Azure', kind: 'cloud' },
   { id: 'aws', label: 'Amazon Web Services', short: 'AWS', kind: 'cloud' },
+  { id: 'gcp', label: 'Google Cloud', short: 'GCP', kind: 'cloud' },
   { id: 'vmware', label: 'VMware vCenter', short: 'vCenter', kind: 'virtual' },
   { id: 'hyperv', label: 'Microsoft Hyper-V', short: 'Hyper-V', kind: 'virtual' },
+  { id: 'nutanix', label: 'Nutanix AHV', short: 'Nutanix', kind: 'virtual' },
+  { id: 'proxmox', label: 'Proxmox VE', short: 'Proxmox', kind: 'virtual' },
+  { id: 'xenserver', label: 'XCP-ng / Citrix Hypervisor', short: 'XCP-ng', kind: 'virtual' },
+  { id: 'ovirt', label: 'oVirt / Red Hat Virtualization', short: 'oVirt / RHV', kind: 'virtual' },
 ];
 export const providerLabel = (p: string) => PROVIDERS.find((x) => x.id === p)?.label ?? p;
 export const providerShort = (p: string) => PROVIDERS.find((x) => x.id === p)?.short ?? p;
@@ -20,8 +25,8 @@ export const kindLabel = (k: string) => KIND_LABEL[k] ?? k;
 export const SEVERITIES = ['critical', 'high', 'medium', 'low', 'info'] as const;
 export const SEV_TONE: Record<string, Tone> = { critical: 'crit', high: 'crit', medium: 'warn', low: 'info', info: '' };
 
-const RUNNING = ['running', 'poweredon', 'powered_on', 'active', 'available', 'succeeded', 'ready', 'connected', 'powered on'];
-const STOPPED = ['stopped', 'deallocated', 'off', 'poweredoff', 'powered_off', 'saved', 'suspended', 'paused', 'unattached', 'unassociated'];
+const RUNNING = ['running', 'poweredon', 'powered_on', 'active', 'available', 'succeeded', 'ready', 'connected', 'powered on', 'up', 'online', 'runnable', 'in use', 'enabled'];
+const STOPPED = ['stopped', 'deallocated', 'off', 'poweredoff', 'powered_off', 'saved', 'suspended', 'paused', 'unattached', 'unassociated', 'terminated', 'halted', 'down', 'reserved', 'maintenance'];
 export function stateTone(s: string | null | undefined): Tone {
   const v = (s ?? '').toLowerCase();
   if (RUNNING.includes(v)) return 'ok';
@@ -52,7 +57,7 @@ export interface CloudChange {
 export interface CloudAccount {
   id: string; name: string; provider: Provider;
   settings: { tenantId?: string; clientId?: string; subscriptions?: string[]; accessKeyId?: string; regions?: string[]; host?: string; port?: number | null;
-    username?: string; skipCertificateCheck?: boolean; hosts?: string[] };
+    username?: string; skipCertificateCheck?: boolean; hosts?: string[]; projects?: string[]; clientEmail?: string };
   hasSecret: boolean; credentialId: string | null; credentialName: string | null; enabled: boolean; syncHours: number; lastSyncAt: string | null;
   lastStatus: string | null; lastError: string | null; lastErrorAt: string | null; lastWarnings: string[]; createdAt: string; resources: number;
   lastCounts: { resources?: number; byKind?: Record<string, number>; created?: number; changed?: number; deleted?: number; linked?: number; findings?: number; newFindings?: number; identity?: string };

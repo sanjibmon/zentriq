@@ -31,7 +31,7 @@ public static class ReportCatalog
     private const string StageExpr = "CASE v.stage WHEN 'planned' THEN 'Planned' WHEN 'on_order' THEN 'On order' WHEN 'in_stock' THEN 'In stock' WHEN 'in_use' THEN 'In use' WHEN 'in_maintenance' THEN 'In maintenance' WHEN 'missing' THEN 'Missing' WHEN 'retired' THEN 'Retired' WHEN 'disposed' THEN 'Disposed' END";
     private const string OsExpr = "COALESCE(a.os_name, initcap(a.os_family))";
     private static string CloudProviderLabel(string col) =>
-        $"CASE {col} WHEN 'azure' THEN 'Microsoft Azure' WHEN 'aws' THEN 'Amazon Web Services' WHEN 'vmware' THEN 'VMware vCenter' WHEN 'hyperv' THEN 'Microsoft Hyper-V' ELSE {col} END";
+        $"CASE {col} {string.Join(" ", Zentriq.Infrastructure.Cloud.CloudProviders.All.Select(p => $"WHEN '{p}' THEN '{Zentriq.Infrastructure.Cloud.CloudProviders.Title(p)}'"))} ELSE {col} END";
     private static string CloudKindLabel(string col) =>
         $"CASE {col} {string.Join(" ", Zentriq.Infrastructure.Cloud.CloudKinds.Labels.Select(k => $"WHEN '{k.Key}' THEN '{k.Value}'"))} ELSE {col} END";
 

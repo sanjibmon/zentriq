@@ -32,7 +32,6 @@ export function CloudPage() {
   return (
     <>
       <PageHead title="Cloud & Infrastructure" icon="cloud"
-        desc="Virtual machines, hosts and cloud resources from Azure, AWS, VMware vCenter and Hyper-V — read-only, matched to the devices in your inventory."
         actions={manage && <button className="btn primary" onClick={() => setAdding(true)}><Icon name="plus" size={13} /> Add connection</button>} />
       <div className="tabs" role="tablist">
         {TABS.map(([t, l]) => <button key={t} role="tab" aria-selected={tab === t} className={tab === t ? 'on' : ''} onClick={() => navigate(`/cloud?tab=${t}`, true)}>{l}</button>)}
@@ -66,8 +65,13 @@ function Overview({ tick, onAdd }: { tick: number; onAdd?: () => void }) {
         <ul className="cl-howto">
           <li><b>Azure</b> — an app registration with the <i>Reader</i> role on the subscriptions.</li>
           <li><b>AWS</b> — an IAM user access key with the <i>ReadOnlyAccess</i> policy.</li>
+          <li><b>Google Cloud</b> — a service account JSON key with the <i>Viewer</i> role on the projects.</li>
           <li><b>VMware</b> — a vCenter 6.5+ user with the <i>Read-only</i> role.</li>
           <li><b>Hyper-V</b> — the host names and a saved Windows credential (Hyper-V Administrators).</li>
+          <li><b>Nutanix</b> — a Prism Central or Prism Element user with the <i>Viewer</i> role.</li>
+          <li><b>Proxmox VE</b> — an API token with the <i>PVEAuditor</i> role.</li>
+          <li><b>XCP-ng / Citrix Hypervisor</b> — a pool user with the <i>Read Only</i> role, on the pool master.</li>
+          <li><b>oVirt / RHV / OLVM</b> — an engine user with a read-only role.</li>
         </ul>
         {onAdd ? <button className="btn primary" onClick={onAdd}><Icon name="plus" size={13} /> Add connection</button> : <p className="muted">Ask an administrator to add a connection.</p>}
       </div>
@@ -340,7 +344,9 @@ function Accounts({ tick, onMsg, onAdd }: { tick: number; onMsg: (m: string, ton
     switch (a.provider) {
       case 'azure': return <>Tenant <span className="mono">{s.tenantId}</span>{s.subscriptions?.length ? ` · ${s.subscriptions.length} subscription(s)` : ' · all subscriptions'}</>;
       case 'aws': return <>Key <span className="mono">{s.accessKeyId}</span>{s.regions?.length ? ` · ${s.regions.join(', ')}` : ' · all regions'}</>;
-      case 'vmware': return <><span className="mono">{s.host}{s.port ? `:${s.port}` : ''}</span> as {s.username}</>;
+      case 'gcp': return <>{s.clientEmail ? <span className="mono">{s.clientEmail}</span> : 'Service account'}{s.projects?.length ? ` · ${s.projects.join(', ')}` : ' · all projects it can see'}</>;
+      case 'vmware': case 'nutanix': case 'proxmox': case 'xenserver': case 'ovirt':
+        return <><span className="mono">{s.host}{s.port ? `:${s.port}` : ''}</span> as {s.username}</>;
       default: return <>{(s.hosts ?? []).join(', ')}{a.credentialName ? <> · as {a.credentialName}</> : null}</>;
     }
   };

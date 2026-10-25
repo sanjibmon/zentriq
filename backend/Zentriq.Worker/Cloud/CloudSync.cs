@@ -36,6 +36,11 @@ public sealed class CloudSyncHandler(NpgsqlDataSource ds, CloudStore store, Cred
                 CloudProviders.Azure => await new AzureCollector().CollectAsync(account.Settings, account.Secret, ct),
                 CloudProviders.Aws => await new AwsCollector().CollectAsync(account.Settings, account.Secret, ct),
                 CloudProviders.VMware => await new VmwareCollector().CollectAsync(account.Settings, account.Secret, ct),
+                CloudProviders.Gcp => await new GcpCollector().CollectAsync(account.Settings, account.Secret, ct),
+                CloudProviders.Nutanix => await new NutanixCollector().CollectAsync(account.Settings, account.Secret, ct),
+                CloudProviders.Proxmox => await new ProxmoxCollector().CollectAsync(account.Settings, account.Secret, ct),
+                CloudProviders.XenServer => await new XenServerCollector().CollectAsync(account.Settings, account.Secret, ct),
+                CloudProviders.Ovirt => await new OvirtCollector().CollectAsync(account.Settings, account.Secret, ct),
                 CloudProviders.HyperV => await HyperVAsync(account, context, ct),
                 _ => throw new CloudException($"Unknown platform '{account.Provider}'."),
             };

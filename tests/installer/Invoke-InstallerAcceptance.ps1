@@ -1677,7 +1677,7 @@ if (-not $installed) {
             [pscustomobject]@{ StatusCode = [int]$resp.StatusCode; Content = $text }
         }
         $meta = Api GET '/cloud/meta' -Session $s
-        Assert (@($meta.providers).Count -eq 4 -and @($meta.rules).Count -ge 10) "meta: $($meta | ConvertTo-Json -Compress -Depth 3)"
+        Assert (@($meta.providers).Count -eq 9 -and @($meta.rules).Count -ge 10) "meta: $($meta | ConvertTo-Json -Compress -Depth 3)"
         $sum = Api GET '/cloud/summary' -Session $s
         Assert ($null -ne $sum.vms) "summary: $($sum | ConvertTo-Json -Compress -Depth 2)"
         # Validation
@@ -1687,6 +1687,12 @@ if (-not $installed) {
         Assert ($bad.StatusCode -eq 400 -and $bad.Content -match 'AKIA') "bad AWS key: $($bad.StatusCode)"
         $bad = Raw POST '/cloud/accounts' @{ name = 'CI bad'; provider = 'hyperv'; hosts = @('hv01') }
         Assert ($bad.StatusCode -eq 400 -and $bad.Content -match 'credential') "Hyper-V without a Windows account: $($bad.StatusCode)"
+        $bad = Raw POST '/cloud/accounts' @{ name = 'CI bad'; provider = 'gcp'; secret = '{"type":"authorized_user"}' }
+        Assert ($bad.StatusCode -eq 400 -and $bad.Content -match 'JSON key') "Google Cloud with a non service-account key: $($bad.StatusCode)"
+        $bad = Raw POST '/cloud/accounts' @{ name = 'CI bad'; provider = 'proxmox'; host = 'pve01'; username = 'root'; secret = 'x' }
+        Assert ($bad.StatusCode -eq 400 -and $bad.Content -match 'token') "Proxmox without a token ID: $($bad.StatusCode)"
+        # An unreachable Proxmox node fails cleanly too.
+        $px = Api POST '/cloud/accounts' @{ name = 'CI Proxmox ' + (Get-Random -Maximum 99999); provider = 'proxmox'; host = '127.0.0.1'; port = 9; username = 'zentriq@pve!ci'; secret = 'ci-token'; skipCertificateCheck = $true } -Session $s
         # An unreachable vCenter: the sync fails and says why; the secret never comes back.
         $name = 'CI vCenter ' + (Get-Random -Maximum 99999)
         $acc = Api POST '/cloud/accounts' @{ name = $name; provider = 'vmware'; host = '127.0.0.1'; port = 9; username = 'ci@vsphere.local'; secret = 'CiVc-Value-73'; skipCertificateCheck = $true; syncHours = 24 } -Session $s
@@ -1713,10 +1719,14 @@ if (-not $installed) {
         $r2 = Api POST '/reports/run' @{ dataset = 'cloud_findings'; definition = @{ columns = @('severity', 'title', 'resource', 'status', 'severity_rank'); filters = @(@{ column = 'status'; op = 'eq'; value = 'Open' }) } } -Session $s
         $reports = Raw GET '/reports'
         Assert ($reports.Content -match 'Virtual machines without inventory' -and $reports.Content -match 'Open cloud and virtualization findings') 'built-in cloud reports missing'
+        $deadline = (Get-Date).AddSeconds(120); $pa = $null
+        do { Start-Sleep -Seconds 3; $pa = @(Api GET '/cloud/accounts' -Session $s | ForEach-Object { $_ }) | Where-Object id -eq $px.id } while ($pa.lastStatus -notin 'failed', 'succeeded', 'partial' -and (Get-Date) -lt $deadline)
+        Assert ($pa.lastStatus -eq 'failed' -and $pa.lastError -match '127\.0\.0\.1') "unreachable Proxmox: $($pa.lastStatus) / $($pa.lastError)"
+        Api DELETE "/cloud/accounts/$($px.id)" -Session $s | Out-Null
         Api DELETE "/cloud/accounts/$($acc.id)" -Session $s | Out-Null
         $gone = Raw GET "/cloud/resources/$([guid]::NewGuid())"
         Assert ($gone.StatusCode -eq 404) "unknown resource: $($gone.StatusCode)"
-        "validation (Azure tenant, AWS key, Hyper-V account); vCenter 127.0.0.1:9 sync failed: $($a.lastError); secret write-only, kept on edit; platform change refused; reports $(@($r1.rows).Count)/$(@($r2.rows).Count) rows; built-in reports present; deleted"
+        "validation (Azure tenant, AWS key, Hyper-V account, Google key, Proxmox token); 9 platforms; unreachable Proxmox failed cleanly; vCenter 127.0.0.1:9 sync failed: $($a.lastError); secret write-only, kept on edit; platform change refused; reports $(@($r1.rows).Count)/$(@($r2.rows).Count) rows; built-in reports present; deleted"
     } | Out-Null
 
     Check 'T71' 'Installation type: Advanced recorded, change to Standard (Remote support off, section locked) and back with Setup Update' {

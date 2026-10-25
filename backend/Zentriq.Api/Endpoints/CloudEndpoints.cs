@@ -18,7 +18,7 @@ namespace Zentriq.Api.Endpoints;
 public static class CloudEndpoints
 {
     public sealed record AccountBody(string Name, string Provider, string? TenantId, string? ClientId, string[]? Subscriptions, string? AccessKeyId, string[]? Regions,
-        string? Host, int? Port, string? Username, bool? SkipCertificateCheck, string[]? Hosts, string? Secret, Guid? CredentialId, bool? Enabled, int? SyncHours);
+        string? Host, int? Port, string? Username, bool? SkipCertificateCheck, string[]? Hosts, string[]? Projects, string? Secret, Guid? CredentialId, bool? Enabled, int? SyncHours);
     public sealed record LinkBody(Guid? AssetId, bool? Automatic);
     public sealed record IgnoreBody(bool Ignored);
 
@@ -158,7 +158,9 @@ public static class CloudEndpoints
             if (err is not null) return Validation.Problem(err.Value.Field, err.Value.Message);
             var newSecret = !string.IsNullOrEmpty(body.Secret);
             await using var cmd = ds.CreateCommand($"""
-                UPDATE zentriq.cloud_accounts SET name = @n, settings = @s, credential_id = @cred, enabled = @en, sync_hours = @h, updated_at = now()
+                UPDATE zentriq.cloud_accounts SET name = @n,
+                       settings = @s || CASE WHEN @keepEmail THEN jsonb_strip_nulls(jsonb_build_object('clientEmail', settings->'clientEmail')) ELSE '{}'::jsonb END,
+                       credential_id = @cred, enabled = @en, sync_hours = @h, updated_at = now()
                        {(newSecret ? ", secret_protected = @sec" : "")}
                  WHERE id = @id
                 """);
@@ -166,6 +168,7 @@ public static class CloudEndpoints
             cmd.Parameters.AddWithValue("n", body.Name.Trim());
             cmd.Parameters.Add(new NpgsqlParameter("s", NpgsqlDbType.Jsonb) { Value = Settings(body).ToJson() });
             if (newSecret) cmd.Parameters.AddWithValue("sec", store.ProtectSecret(id, body.Secret!));
+            cmd.Parameters.AddWithValue("keepEmail", body.Provider == CloudProviders.Gcp && !newSecret);
             cmd.Parameters.Add(U("cred", body.Provider == CloudProviders.HyperV ? body.CredentialId : null));
             cmd.Parameters.AddWithValue("en", body.Enabled ?? true);
             cmd.Parameters.AddWithValue("h", Math.Clamp(body.SyncHours ?? 6, 1, 168));
@@ -380,7 +383,9 @@ public static class CloudEndpoints
         {
             CloudProviders.Azure => new CloudSettings { TenantId = b.TenantId?.Trim(), ClientId = b.ClientId?.Trim(), Subscriptions = L(b.Subscriptions) },
             CloudProviders.Aws => new CloudSettings { AccessKeyId = b.AccessKeyId?.Trim(), Regions = L(b.Regions).Select(r => r.ToLowerInvariant()).ToList() },
-            CloudProviders.VMware => new CloudSettings { Host = b.Host?.Trim(), Port = b.Port is > 0 and < 65536 ? b.Port : null, Username = b.Username?.Trim(), SkipCertificateCheck = b.SkipCertificateCheck ?? false },
+            CloudProviders.Gcp => new CloudSettings { Projects = L(b.Projects), ClientEmail = GcpCollector.ParseKey(b.Secret)?.ClientEmail },
+            CloudProviders.VMware or CloudProviders.Nutanix or CloudProviders.Proxmox or CloudProviders.XenServer or CloudProviders.Ovirt =>
+                new CloudSettings { Host = b.Host?.Trim(), Port = b.Port is > 0 and < 65536 ? b.Port : null, Username = b.Username?.Trim(), SkipCertificateCheck = b.SkipCertificateCheck ?? false },
             _ => new CloudSettings { Hosts = L(b.Hosts) },
         };
     }
@@ -390,7 +395,7 @@ public static class CloudEndpoints
     internal static async Task<(string Field, string Message)?> ValidateAsync(AccountBody b, bool create, NpgsqlDataSource ds, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(b.Name) || b.Name.Trim().Length > 200) return ("name", "Enter a name (max 200 characters).");
-        if (!CloudProviders.All.Contains(b.Provider)) return ("provider", "Choose Azure, AWS, VMware vCenter or Hyper-V.");
+        if (!CloudProviders.All.Contains(b.Provider)) return ("provider", "Choose a platform: Azure, AWS, Google Cloud, VMware vCenter, Hyper-V, Nutanix, Proxmox VE, XCP-ng / Citrix Hypervisor or oVirt / RHV.");
         if (b.SyncHours is < 1 or > 168) return ("syncHours", "Sync every 1 to 168 hours.");
         var needSecret = create && b.Provider != CloudProviders.HyperV;
         var s = Settings(b);
@@ -408,12 +413,28 @@ public static class CloudEndpoints
                 if (s.Regions.FirstOrDefault(x => !Regex.IsMatch(x, @"^[a-z]{2}(-[a-z]+)+-\d$")) is { } badRegion) return ("regions", $"'{badRegion}' is not an AWS region (for example ap-south-1). Leave empty for every enabled region.");
                 if (needSecret && string.IsNullOrEmpty(b.Secret)) return ("secret", "Enter the secret access key.");
                 break;
-            case CloudProviders.VMware:
-                if (string.IsNullOrWhiteSpace(s.Host) || s.Host.Any(char.IsWhiteSpace) || s.Host.Contains('/')) return ("host", "Enter the vCenter host name or IP address, e.g. vcenter.corp.example.com.");
-                if (b.Port is { } p && (p < 1 || p > 65535)) return ("port", "Port must be 1-65535 (443 by default).");
-                if (string.IsNullOrWhiteSpace(s.Username)) return ("username", "Enter the vCenter user, e.g. zentriq@vsphere.local or CORP\\svc-zentriq.");
-                if (needSecret && string.IsNullOrEmpty(b.Secret)) return ("secret", "Enter the password.");
+            case CloudProviders.Gcp:
+                if (s.Projects.FirstOrDefault(x => !Regex.IsMatch(x, "^[a-z][a-z0-9-]{4,28}[a-z0-9]$")) is { } badProject) return ("projects", $"'{badProject}' is not a project ID (for example contoso-prod-123456). Leave empty for every project the key can see.");
+                if (!string.IsNullOrEmpty(b.Secret) && GcpCollector.ParseKey(b.Secret) is null) return ("secret", "Paste the whole JSON key file of a service account (it contains \"type\": \"service_account\", client_email and private_key).");
+                if (needSecret && string.IsNullOrEmpty(b.Secret)) return ("secret", "Paste the service account's JSON key file.");
                 break;
+            case CloudProviders.VMware or CloudProviders.Nutanix or CloudProviders.Proxmox or CloudProviders.XenServer or CloudProviders.Ovirt:
+            {
+                var (what, userHint) = b.Provider switch
+                {
+                    CloudProviders.Nutanix => ("Prism Central or Prism Element", "admin or a Prism user with the Viewer role"),
+                    CloudProviders.Proxmox => ("Proxmox VE", "the API token ID, e.g. zentriq@pve!inventory"),
+                    CloudProviders.XenServer => ("pool master", "root or a pool user with the Read Only role"),
+                    CloudProviders.Ovirt => ("oVirt / RHV engine", "e.g. zentriq@internal"),
+                    _ => ("vCenter", "e.g. zentriq@vsphere.local or CORP\\svc-zentriq"),
+                };
+                if (string.IsNullOrWhiteSpace(s.Host) || s.Host.Any(char.IsWhiteSpace) || s.Host.Contains('/')) return ("host", $"Enter the {what} host name or IP address.");
+                if (b.Port is { } p && (p < 1 || p > 65535)) return ("port", "Port must be 1-65535.");
+                if (string.IsNullOrWhiteSpace(s.Username)) return ("username", $"Enter the user — {userHint}.");
+                if (b.Provider == CloudProviders.Proxmox && !Regex.IsMatch(s.Username, @"^[^@\s]+@[^!\s]+![\w.-]+$")) return ("username", "Enter the API token ID in the form user@realm!tokenname, for example zentriq@pve!inventory.");
+                if (needSecret && string.IsNullOrEmpty(b.Secret)) return ("secret", b.Provider == CloudProviders.Proxmox ? "Enter the API token secret." : "Enter the password.");
+                break;
+            }
             case CloudProviders.HyperV:
                 if (s.Hosts.Count == 0) return ("hosts", "Enter at least one Hyper-V host name or IP address (each node of a cluster).");
                 if (s.Hosts.Count > 64) return ("hosts", "At most 64 hosts per connection.");

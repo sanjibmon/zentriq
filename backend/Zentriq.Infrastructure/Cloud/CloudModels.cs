@@ -9,8 +9,19 @@ public static class CloudProviders
     public const string Aws = "aws";
     public const string VMware = "vmware";
     public const string HyperV = "hyperv";
-    public static readonly string[] All = [Azure, Aws, VMware, HyperV];
-    public static string Title(string p) => p switch { Azure => "Microsoft Azure", Aws => "Amazon Web Services", VMware => "VMware vCenter", HyperV => "Microsoft Hyper-V", _ => p };
+    public const string Gcp = "gcp";
+    public const string Nutanix = "nutanix";
+    public const string Proxmox = "proxmox";
+    public const string XenServer = "xenserver";
+    public const string Ovirt = "ovirt";
+    public static readonly string[] All = [Azure, Aws, Gcp, VMware, HyperV, Nutanix, Proxmox, XenServer, Ovirt];
+    /// <summary>Public clouds (billing, tags); the others are virtualization platforms.</summary>
+    public static bool IsCloud(string p) => p is Azure or Aws or Gcp;
+    public static string Title(string p) => p switch
+    {
+        Azure => "Microsoft Azure", Aws => "Amazon Web Services", Gcp => "Google Cloud", VMware => "VMware vCenter", HyperV => "Microsoft Hyper-V",
+        Nutanix => "Nutanix AHV", Proxmox => "Proxmox VE", XenServer => "XCP-ng / Citrix Hypervisor", Ovirt => "oVirt / Red Hat Virtualization", _ => p,
+    };
 }
 
 public static class CloudKinds
@@ -38,6 +49,9 @@ public sealed class CloudSettings
     [JsonPropertyName("port")] public int? Port { get; set; }
     [JsonPropertyName("username")] public string? Username { get; set; }
     [JsonPropertyName("skipCertificateCheck")] public bool SkipCertificateCheck { get; set; }
+    // Google Cloud: projects to read (empty = the key's own project); the service account e-mail, for display
+    [JsonPropertyName("projects")] public List<string> Projects { get; set; } = [];
+    [JsonPropertyName("clientEmail")] public string? ClientEmail { get; set; }
     // Hyper-V: host names or addresses (each host, or the nodes of a cluster), with a saved Windows credential
     [JsonPropertyName("hosts")] public List<string> Hosts { get; set; } = [];
 

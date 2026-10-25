@@ -445,3 +445,9 @@ details.rs-advanced[open] summary { margin-bottom: 12px; }
 .cl-acts { margin-left: auto; display: flex; gap: 6px; flex-wrap: nowrap; }
 .cl-stack { display: grid; gap: 14px; align-content: start; }
 .cl-stack > .panel { margin: 0; }
+.cl-gcp i, .cl-pick-btn.cl-gcp i { background: conic-gradient(#ea4335 0 25%, #fbbc04 0 50%, #34a853 0 75%, #4285f4 0); }
+.cl-nutanix i, .cl-pick-btn.cl-nutanix i { background: linear-gradient(135deg, #7855fa, #024da1); }
+.cl-proxmox i, .cl-pick-btn.cl-proxmox i { background: linear-gradient(135deg, #f7a54b, #e57000); }
+.cl-xenserver i, .cl-pick-btn.cl-xenserver i { background: linear-gradient(135deg, #2bb3d9, #0f5c8a); }
+.cl-ovirt i, .cl-pick-btn.cl-ovirt i { background: linear-gradient(135deg, #e04a4a, #8f1d1d); }
+.cl-pick { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }

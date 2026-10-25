@@ -23,7 +23,7 @@ public static class CloudRules
     public static List<CloudFinding> Evaluate(string provider, IReadOnlyList<CloudItem> items, Func<CloudItem, DateTimeOffset?> since, DateTimeOffset now)
     {
         var list = new List<CloudFinding>();
-        var cloud = provider is CloudProviders.Azure or CloudProviders.Aws;
+        var cloud = CloudProviders.IsCloud(provider);
         foreach (var i in items)
         {
             void Add(string rule, string severity, string? detail) => list.Add(new(i.ExternalId, rule, severity, RuleTitles[rule], detail));
@@ -38,7 +38,7 @@ public static class CloudRules
                     break;
                 case "vm":
                     var state = (i.State ?? "").ToLowerInvariant();
-                    if (state is "stopped" or "deallocated" or "off" or "poweredoff" or "powered_off" or "saved")
+                    if (state is "stopped" or "deallocated" or "off" or "poweredoff" or "powered_off" or "saved" or "terminated" or "halted" or "down" or "suspended")
                     {
                         var s = since(i);
                         if (s is { } from && (now - from).TotalDays >= OffDays)
