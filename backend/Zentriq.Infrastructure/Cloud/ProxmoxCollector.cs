@@ -114,7 +114,7 @@ public sealed class ProxmoxCollector(HttpClient? http = null) : ICloudCollector
                     var item = new CloudItem
                     {
                         Kind = "vm", ExternalId = $"{type}/{vmid}", Name = Str(r, "name") ?? $"{type} {vmid}", State = Str(r, "status"), ParentId = "node/" + node, Group = node,
-                        Cpu = (int?)Long(r, "maxcpu"), MemoryMb = Long(r, "maxmem") is { } m ? m / 1048576 : null, DiskGb = Long(r, "maxdisk") is > 0 and var md ? Gb(md.Value) : null,
+                        Cpu = (int?)Long(r, "maxcpu"), MemoryMb = Long(r, "maxmem") is { } m ? m / 1048576 : null, DiskGb = Long(r, "maxdisk") is > 0 and var md ? Gb(md) : null,
                         Hostname = Str(cfg, "hostname") ?? Str(r, "name"),
                         Os = type == "lxc" ? $"Linux container ({Str(cfg, "ostype") ?? "linux"})" : OsType(Str(cfg, "ostype")),
                     };
