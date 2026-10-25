@@ -88,7 +88,7 @@ public sealed class AwsCollector(HttpClient? http = null, Func<string, string, s
     internal static string? V(XElement? e, string name) => e is null ? null : (e.Name.LocalName == name ? e : Child(e, name) ?? e.Descendants().FirstOrDefault(x => x.Name.LocalName == name))?.Value is { Length: > 0 } v ? v : null;
     private static IEnumerable<XElement> SetItems(XElement? e, string set) => Child(e, set)?.Elements().Where(x => x.Name.LocalName is "item" or "member" or "Tag") ?? [];
     private static Dictionary<string, string> Tags(XElement e) =>
-        SetItems(e, "tagSet").Concat(SetItems(e, "TagList")).Where(t => V(t, "key") ?? V(t, "Key") is not null)
+        SetItems(e, "tagSet").Concat(SetItems(e, "TagList")).Where(t => (V(t, "key") ?? V(t, "Key")) is not null)
             .GroupBy(t => (V(t, "key") ?? V(t, "Key"))!).ToDictionary(g => g.Key, g => V(g.First(), "value") ?? V(g.First(), "Value") ?? "", StringComparer.OrdinalIgnoreCase);
 
     internal static void ParseInstances(IEnumerable<XDocument> pages, string region, CloudSnapshot snap)
