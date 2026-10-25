@@ -68,6 +68,7 @@ function Library() {
           { key: 'n', label: 'Report', className: 'wrap', render: (r) => <>
             <Link to={`/reports/${r.id}`}><b>{r.name}</b></Link>{r.system && <> <Pill tone="info">Built-in</Pill></>}{!r.system && r.shared && <> <Pill>Shared</Pill></>}
             {r.description && <div className="faint" style={{ fontSize: 12 }}>{r.description}</div>}
+            {r.period && <div className="faint" style={{ fontSize: 12 }}><Icon name="calendar" size={11} /> {r.period}</div>}
           </> },
           { key: 'd', label: 'Data source', render: (r) => dsName[r.dataset] ?? r.dataset },
           { key: 's', label: 'Schedule', className: 'wrap', render: (r) => r.scheduleText

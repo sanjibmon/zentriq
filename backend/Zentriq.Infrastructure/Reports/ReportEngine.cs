@@ -42,10 +42,88 @@ public sealed class ReportSpec
     [JsonPropertyName("dateBucket")] public string? DateBucket { get; set; }
     /// <summary>How the console draws a summary (share bar, pie, bar, column, line; "donut" from older reports); kept with the report for dashboards and PDF.</summary>
     [JsonPropertyName("chart")] public string? Chart { get; set; }
+    /// <summary>Time period: only records whose date column falls in the range (from / to dates or a relative range).</summary>
+    [JsonPropertyName("period")] public ReportPeriod? Period { get; set; }
 
     public static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     public static ReportSpec Parse(string json) => JsonSerializer.Deserialize<ReportSpec>(json, Json) ?? new ReportSpec();
     public string ToJson() => JsonSerializer.Serialize(this, Json);
+}
+
+/// <summary>
+/// A report's time period on one of its date columns. Relative ranges (last month, this year …) are resolved when the report
+/// runs, so a scheduled report always covers the latest period; "custom" uses the From / To dates (both inclusive, either
+/// may be empty). Dates are calendar days in the server's time zone (the same zone report schedules use).
+/// </summary>
+public sealed class ReportPeriod
+{
+    [JsonPropertyName("column")] public string Column { get; set; } = "";
+    [JsonPropertyName("range")] public string Range { get; set; } = "custom";
+    [JsonPropertyName("from")] public string? From { get; set; }
+    [JsonPropertyName("to")] public string? To { get; set; }
+
+    public static readonly string[] Ranges =
+        ["today", "yesterday", "last_7_days", "last_30_days", "last_90_days", "this_week", "last_week", "this_month", "last_month",
+         "this_quarter", "last_quarter", "this_year", "last_year", "custom"];
+
+    public static DateOnly? ParseDate(string? s) =>
+        DateOnly.TryParseExact(s?.Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) ? d : null;
+
+    /// <summary>The first and last calendar day (inclusive; null = open).</summary>
+    public (DateOnly? First, DateOnly? Last) Days(DateTimeOffset now, TimeZoneInfo zone)
+    {
+        var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(now, zone).DateTime);
+        var monday = today.AddDays(-(((int)today.DayOfWeek + 6) % 7));
+        var month = new DateOnly(today.Year, today.Month, 1);
+        var quarter = new DateOnly(today.Year, (today.Month - 1) / 3 * 3 + 1, 1);
+        var year = new DateOnly(today.Year, 1, 1);
+        return Range switch
+        {
+            "today" => (today, today),
+            "yesterday" => (today.AddDays(-1), today.AddDays(-1)),
+            "last_7_days" => (today.AddDays(-6), today),
+            "last_30_days" => (today.AddDays(-29), today),
+            "last_90_days" => (today.AddDays(-89), today),
+            "this_week" => (monday, monday.AddDays(6)),
+            "last_week" => (monday.AddDays(-7), monday.AddDays(-1)),
+            "this_month" => (month, month.AddMonths(1).AddDays(-1)),
+            "last_month" => (month.AddMonths(-1), month.AddDays(-1)),
+            "this_quarter" => (quarter, quarter.AddMonths(3).AddDays(-1)),
+            "last_quarter" => (quarter.AddMonths(-3), quarter.AddDays(-1)),
+            "this_year" => (year, year.AddYears(1).AddDays(-1)),
+            "last_year" => (year.AddYears(-1), year.AddDays(-1)),
+            _ => (ParseDate(From), ParseDate(To)),
+        };
+    }
+
+    /// <summary>The range as instants: from (inclusive) and to (exclusive, the start of the day after the last day).</summary>
+    public (DateTimeOffset? From, DateTimeOffset? To) Resolve(DateTimeOffset now, TimeZoneInfo zone)
+    {
+        var (first, last) = Days(now, zone);
+        DateTimeOffset At(DateOnly d)
+        {
+            var local = d.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
+            // A day that starts inside a daylight-saving gap starts at the end of the gap.
+            while (zone.IsInvalidTime(local)) local = local.AddMinutes(30);
+            return new DateTimeOffset(local, zone.GetUtcOffset(local)).ToUniversalTime();
+        }
+        return (first is { } f ? At(f) : null, last is { } l ? At(l.AddDays(1)) : null);
+    }
+
+    /// <summary>"1 Sep 2026 – 30 Sep 2026", "from 1 Sep 2026", "until 30 Sep 2026".</summary>
+    public string Describe(DateTimeOffset now, TimeZoneInfo zone)
+    {
+        var (first, last) = Days(now, zone);
+        static string D(DateOnly d) => d.ToString("d MMM yyyy", CultureInfo.InvariantCulture);
+        return (first, last) switch
+        {
+            ({ } f, { } l) when f == l => D(f),
+            ({ } f, { } l) => $"{D(f)} – {D(l)}",
+            ({ } f, null) => $"from {D(f)}",
+            (null, { } l) => $"until {D(l)}",
+            _ => "all dates",
+        };
+    }
 }
 
 public sealed record ReportResultColumn(string Key, string Label, string Type);
@@ -117,6 +195,21 @@ public static class ReportEngine
                     throw new ReportValidationException($"Enter a date (yyyy-mm-dd) for {col.Label}.");
             }
         }
+        if (spec.Period is { } period)
+        {
+            var col = ds.Column(period.Column) ?? throw new ReportValidationException($"Unknown date column '{period.Column}' for the time period.");
+            if (col.Type != ReportColumnType.Date) throw new ReportValidationException($"The time period needs a date column ({col.Label} is not a date).");
+            if (!ReportPeriod.Ranges.Contains(period.Range)) throw new ReportValidationException($"Unknown time period '{period.Range}'.");
+            if (period.Range == "custom")
+            {
+                var from = ReportPeriod.ParseDate(period.From);
+                var to = ReportPeriod.ParseDate(period.To);
+                if (!string.IsNullOrWhiteSpace(period.From) && from is null) throw new ReportValidationException("Enter the From date as yyyy-mm-dd.");
+                if (!string.IsNullOrWhiteSpace(period.To) && to is null) throw new ReportValidationException("Enter the To date as yyyy-mm-dd.");
+                if (from is null && to is null) throw new ReportValidationException("Enter a From date, a To date or both.");
+                if (from > to) throw new ReportValidationException("The From date is after the To date.");
+            }
+        }
         foreach (var s in spec.Sort ?? [])
         {
             var ok = s.Column == "count" ? grouped
@@ -127,13 +220,14 @@ public static class ReportEngine
     }
 
     /// <summary>Builds the SQL; column keys are validated identifiers, every value is a parameter.</summary>
-    public static (string Sql, string CountSql, List<NpgsqlParameter> Params, List<ReportResultColumn> Columns) Build(ReportDataset ds, ReportSpec spec, int limit)
+    public static (string Sql, string CountSql, List<NpgsqlParameter> Params, List<ReportResultColumn> Columns) Build(ReportDataset ds, ReportSpec spec, int limit,
+        DateTimeOffset? now = null, TimeZoneInfo? zone = null)
     {
         Validate(ds, spec);
         var grouped = spec.GroupBy is { Count: > 0 };
         var aggs = grouped ? spec.Aggregates ?? [] : [];
         var needed = spec.Columns.Concat(spec.GroupBy ?? []).Concat(spec.Filters.Select(f => f.Column)).Concat((spec.Sort ?? []).Select(s => s.Column))
-            .Concat(aggs.Select(a => a.Column)).Where(c => c != "count" && ds.Column(c) is not null).Distinct().ToList();
+            .Concat(aggs.Select(a => a.Column)).Concat(spec.Period is { } pc ? new[] { pc.Column } : Array.Empty<string>()).Where(c => c != "count" && ds.Column(c) is not null).Distinct().ToList();
         var inner = $"SELECT {string.Join(", ", needed.Select(k => $"{ds.Column(k)!.Expr} AS \"{k}\""))} FROM {ds.From}";
 
         var ps = new List<NpgsqlParameter>();
@@ -156,6 +250,14 @@ public static class ReportEngine
                 "older_days" => $"({c} IS NULL OR {c} < now() - make_interval(days => {P(int.Parse(f.Value!, CultureInfo.InvariantCulture), NpgsqlDbType.Integer)}))",
                 _ => Compare(col, c, f, P),
             });
+        }
+
+        if (spec.Period is { } period)
+        {
+            var (from, to) = period.Resolve(now ?? DateTimeOffset.UtcNow, zone ?? TimeZoneInfo.Local);
+            var c = $"t.\"{period.Column}\"";
+            if (from is { } f) { var n = "p" + ps.Count; ps.Add(new NpgsqlParameter(n, NpgsqlDbType.TimestampTz) { Value = f }); where.Add($"{c} >= @{n}"); }
+            if (to is { } t) { var n = "p" + ps.Count; ps.Add(new NpgsqlParameter(n, NpgsqlDbType.TimestampTz) { Value = t }); where.Add($"{c} < @{n}"); }
         }
 
         string select, groupClause = "", order;
@@ -240,10 +342,24 @@ public static class ReportEngine
     private static string Escape(string s) => s.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
     private static ReportResultColumn Col(ReportColumn c) => new(c.Key, c.Label, c.Type switch { ReportColumnType.Number => "number", ReportColumnType.Date => "date", ReportColumnType.YesNo => "yesno", _ => "text" });
 
-    public static async Task<ReportResult> RunAsync(NpgsqlDataSource ds, string dataset, ReportSpec spec, int limit, CancellationToken ct)
+    /// <summary>"Purchase date: 1 Sep 2026 – 30 Sep 2026" for files and e-mails; null without a time period.</summary>
+    public static string? PeriodText(string dataset, ReportSpec spec, DateTimeOffset? now = null, TimeZoneInfo? zone = null) =>
+        spec.Period is { } p && ReportCatalog.Find(dataset)?.Column(p.Column) is { } col
+            ? $"{col.Label}: {p.Describe(now ?? DateTimeOffset.UtcNow, zone ?? TimeZoneInfo.Local)}"
+            : null;
+
+    /// <summary>The date column a new time period starts with: the dataset's main event date, else its first date column.</summary>
+    public static string? DefaultPeriodColumn(ReportDataset ds) =>
+        new[] { "at", "occurred", "detected", "requested_at", "started", "recorded", "evaluated", "first_seen", "added", "purchase_date", "assigned_at",
+                "stage_changed", "enrolled", "last_contact", "last_seen", "collected", "installed_on" }
+            .FirstOrDefault(k => ds.Column(k)?.Type == ReportColumnType.Date)
+        ?? ds.Columns.FirstOrDefault(c => c.Type == ReportColumnType.Date)?.Key;
+
+    public static async Task<ReportResult> RunAsync(NpgsqlDataSource ds, string dataset, ReportSpec spec, int limit, CancellationToken ct,
+        DateTimeOffset? now = null, TimeZoneInfo? zone = null)
     {
         var d = ReportCatalog.Find(dataset) ?? throw new ReportValidationException($"Unknown dataset '{dataset}'.");
-        var (sql, countSql, ps, cols) = Build(d, spec, limit);
+        var (sql, countSql, ps, cols) = Build(d, spec, limit, now, zone);
         await using var conn = await ds.OpenConnectionAsync(ct);
         var rows = new List<object?[]>();
         await using (var cmd = new NpgsqlCommand(sql, conn) { CommandTimeout = 120 })

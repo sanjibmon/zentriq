@@ -38,6 +38,7 @@ export function ScheduleDialog({ report, onClose, onSaved }: { report: Target; o
         <div className="body form-v">
           {error && <Callout tone="crit" icon="alert">{error}</Callout>}
           <label className="row-check"><input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} /> Deliver this report by e-mail on a schedule</label>
+          <small className="muted">Each delivery covers the report's time period. Choose a moving period in the report (for example <i>Last week</i> or <i>Last month</i>) so every e-mail covers the latest period.</small>
           <div className="form-grid">
             <label>Frequency
               <select className="in" value={frequency} onChange={(e) => setFrequency(e.target.value as ReportSchedule['frequency'])} disabled={!enabled}>

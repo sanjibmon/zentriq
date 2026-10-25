@@ -133,7 +133,9 @@ public sealed class ReportDelivery(NpgsqlDataSource ds, MailService mail)
             if (!await OwnerMayUseAsync(def, ct))
                 throw new ReportValidationException("The report's owner no longer has permission to use this data source; the report was not run.");
             var result = await ReportEngine.RunAsync(ds, def.Dataset, def.Spec, MaxExportRows, ct);
-            var (content, fileName, contentType) = Render(def.Name, def.Format, result, def.Description is null ? null : $"{def.Description} · {result.Rows.Count:N0} row(s) · generated {DateTime.Now:yyyy-MM-dd HH:mm}", def.Spec.Chart);
+            var period = ReportEngine.PeriodText(def.Dataset, def.Spec);
+            var subtitle = string.Join(" · ", new[] { def.Description, period, $"{result.Rows.Count:N0} row(s)", $"generated {DateTime.Now:yyyy-MM-dd HH:mm}" }.Where(x => !string.IsNullOrEmpty(x)));
+            var (content, fileName, contentType) = Render(def.Name, def.Format, result, subtitle, def.Spec.Chart);
             string message;
             var status = "succeeded";
             if (def.Recipients.Length == 0) message = $"{result.Rows.Count} row(s); no recipients, kept in the run history.";
@@ -151,12 +153,14 @@ public sealed class ReportDelivery(NpgsqlDataSource ds, MailService mail)
                     var text = new StringBuilder()
                         .AppendLine($"Zentriq report: {def.Name}")
                         .AppendLine(def.Description ?? "")
+                        .AppendLine(period is null ? "" : $"Period: {period}")
                         .AppendLine()
                         .AppendLine($"{result.Rows.Count} row(s){(result.Truncated ? $" (first {result.Rows.Count} of {result.Total})" : "")}, generated {DateTime.Now:yyyy-MM-dd HH:mm}.")
                         .AppendLine($"The {(def.Format switch { "csv" => "CSV", "pdf" => "PDF", _ => "Excel" })} file is attached.")
                         .ToString();
                     var html = $"<p><b>Zentriq report: {WebUtility.HtmlEncode(def.Name)}</b></p>"
                                + (def.Description is null ? "" : $"<p>{WebUtility.HtmlEncode(def.Description)}</p>")
+                               + (period is null ? "" : $"<p>Period: {WebUtility.HtmlEncode(period)}</p>")
                                + $"<p>{result.Rows.Count} row(s), generated {DateTime.Now:yyyy-MM-dd HH:mm}. The file is attached.</p>"
                                + PreviewTable(result);
                     foreach (var to in def.Recipients)

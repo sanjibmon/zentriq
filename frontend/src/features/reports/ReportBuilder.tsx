@@ -7,8 +7,9 @@ import { CategoryChart, CHART_KINDS, type ChartKind } from '../../components/cha
 import { Icon } from '../../components/Icon';
 import { Callout, ErrorBox, PageHead, Panel, Pill } from '../../components/ui';
 import { pinReportToDashboard } from '../dashboard/DashboardPage';
+import { PeriodPicker } from './PeriodPicker';
 import { ScheduleDialog } from './ScheduleDialog';
-import { AGGREGATES, aggKey, cellText, DATE_BUCKETS, errorText, OPERATORS, type DatasetCatalog, type DatasetColumn, type ReportAggregate, type ReportDetail, type ReportFilter, type ReportFormat, type ReportSpec, type RunResult } from './types';
+import { AGGREGATES, aggKey, cellText, DATE_BUCKETS, errorText, OPERATORS, type DatasetCatalog, type DatasetColumn, type ReportAggregate, type ReportDetail, type ReportFilter, type ReportFormat, type ReportPeriod, type ReportSpec, type RunResult } from './types';
 
 const EMPTY: ReportSpec = { columns: [], filters: [], groupBy: null, sort: null };
 
@@ -129,6 +130,13 @@ export function ReportBuilder({ id }: { id: string | null }) {
     setBusy(true); setMsg(null);
     try { await api.downloadJson('/reports/export', { dataset, definition: spec, format, name: name.trim() || ds?.name }, `report.${format}`); }
     catch (e) { setMsg({ tone: 'crit', text: errorText(e) }); } finally { setBusy(false); }
+  }
+
+  // A new period runs the preview straight away (custom dates once at least one date is entered).
+  function changePeriod(p: ReportPeriod | null) {
+    const next = { ...spec, period: p };
+    setSpec(next);
+    if (!p || p.range !== 'custom' || p.from || p.to) void run(dataset, next);
   }
 
   const sort = spec.sort?.[0] ?? null;
@@ -279,8 +287,9 @@ export function ReportBuilder({ id }: { id: string | null }) {
         </div>
 
         <div className="report-main">
-          <Panel title="Preview" sub={result ? `${result.total.toLocaleString()} ${grouped ? 'group(s)' : 'row(s)'}${result.truncated ? ' · first 500 shown — export for all rows' : ''}` : 'Run the report to see the result'}
+          <Panel title="Preview" sub={result ? `${result.total.toLocaleString()} ${grouped ? 'group(s)' : 'row(s)'}${result.period ? ` · ${result.period}` : ''}${result.truncated ? ' · first 500 shown — export for all rows' : ''}` : 'Run the report to see the result'}
             right={<button className="btn primary sm" disabled={running || !ds} onClick={() => void run()}><Icon name="play" size={12} /> {running ? 'Running…' : 'Run'}</button>} flush>
+            <PeriodPicker ds={ds} value={spec.period} onChange={changePeriod} />
             {grouped && result && result.rows.length > 0 && <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--line)' }}>
               <div className="seg" style={{ marginBottom: 8 }} aria-label="Chart type (saved with the report)">{CHART_KINDS.map(([k, l]) => <button key={k} type="button" className={chart === k ? 'on' : ''} onClick={() => setChart(k)}>{l}</button>)}</div>
               <CategoryChart kind={chart} data={chartData} centerLabel="records" />

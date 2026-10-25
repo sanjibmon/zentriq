@@ -31,7 +31,9 @@ public static class ReportEndpoints
             {
                 d.Key, d.Name, d.Description,
                 columns = d.Columns.Select(c => new { c.Key, c.Label, type = c.Type.ToString().ToLowerInvariant(), group = c.Group }),
+                defaultDate = ReportEngine.DefaultPeriodColumn(d),
             }),
+            periods = ReportPeriod.Ranges,
             aggregates = ReportEngine.AggregateFunctions,
             dateBuckets = ReportEngine.DateBuckets,
             charts = ReportEngine.Charts,
@@ -43,7 +45,7 @@ public static class ReportEndpoints
             await using var cmd = ds.CreateCommand("""
                 SELECT r.id, r.name, r.description, r.dataset, r.shared, r.system, r.owner_id = @me, u.display_name, r.updated_at,
                        r.schedule::text, r.recipients, r.format, r.next_run_at, r.last_run_at,
-                       (SELECT x.status FROM zentriq.report_runs x WHERE x.report_id = r.id ORDER BY x.started_at DESC LIMIT 1)
+                       (SELECT x.status FROM zentriq.report_runs x WHERE x.report_id = r.id ORDER BY x.started_at DESC LIMIT 1), r.definition::text
                   FROM zentriq.report_definitions r LEFT JOIN zentriq.users u ON u.id = r.owner_id
                  WHERE r.system OR r.shared OR r.owner_id = @me
                  ORDER BY r.system DESC, r.name
@@ -64,6 +66,7 @@ public static class ReportEndpoints
                     nextRunAt = r.IsDBNull(12) ? (DateTimeOffset?)null : r.GetFieldValue<DateTimeOffset>(12),
                     lastRunAt = r.IsDBNull(13) ? (DateTimeOffset?)null : r.GetFieldValue<DateTimeOffset>(13),
                     lastStatus = r.IsDBNull(14) ? null : r.GetString(14),
+                    period = ReportEngine.PeriodText(r.GetString(3), ReportSpec.Parse(r.GetString(15))),
                 });
             }
             return Results.Ok(list);
@@ -89,7 +92,8 @@ public static class ReportEndpoints
         });
 
         // Data of a saved report for scripts, BI tools and SIEM pulls (works with read-only API tokens).
-        g.MapGet("/{id:guid}/data", async (Guid id, string? format, int? limit, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
+        // ?from=yyyy-mm-dd&to=yyyy-mm-dd (or ?range=last_month) sets the time period for this call; ?dateColumn= picks the date column.
+        g.MapGet("/{id:guid}/data", async (Guid id, string? format, int? limit, string? from, string? to, string? range, string? dateColumn, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
         {
             await using var cmd = ds.CreateCommand("""
                 SELECT name, dataset, definition::text FROM zentriq.report_definitions WHERE id = @id AND (system OR shared OR owner_id = @me)
@@ -103,8 +107,17 @@ public static class ReportEndpoints
                 (name, dataset, definition) = (r.GetString(0), r.GetString(1), r.GetString(2));
             }
             if (Denied(dataset, rc) is { } denied) return denied;
+            var spec = ReportSpec.Parse(definition);
+            if (from is not null || to is not null || range is not null || dateColumn is not null)
+            {
+                var column = dateColumn ?? spec.Period?.Column ?? (ReportCatalog.Find(dataset) is { } dsx ? ReportEngine.DefaultPeriodColumn(dsx) : null);
+                if (column is null) return Validation.Problem("dateColumn", "This data source has no date column.");
+                spec.Period = range is null && from is null && to is null && spec.Period is { } keep
+                    ? new ReportPeriod { Column = column, Range = keep.Range, From = keep.From, To = keep.To }
+                    : new ReportPeriod { Column = column, Range = range ?? "custom", From = from, To = to };
+            }
             ReportResult result;
-            try { result = await ReportEngine.RunAsync(ds, dataset, ReportSpec.Parse(definition), Math.Clamp(limit ?? ReportDelivery.MaxExportRows, 1, ReportDelivery.MaxExportRows), ct); }
+            try { result = await ReportEngine.RunAsync(ds, dataset, spec, Math.Clamp(limit ?? ReportDelivery.MaxExportRows, 1, ReportDelivery.MaxExportRows), ct); }
             catch (ReportValidationException ex) { return Validation.Problem("definition", ex.Message); }
             await rc.AuditAsync("report.data", name, detail: new { format = format ?? "json", rows = result.Rows.Count });
             if (format == "csv") return Results.File(ReportEngine.ToCsv(result), "text/csv; charset=utf-8", $"{name}.csv");
@@ -114,7 +127,7 @@ public static class ReportEndpoints
                 for (var i = 0; i < result.Columns.Count; i++) o[result.Columns[i].Key] = row[i];
                 return o;
             });
-            return Results.Ok(new { report = name, dataset, columns = result.Columns, rows, total = result.Total, truncated = result.Truncated, generatedAt = DateTimeOffset.UtcNow });
+            return Results.Ok(new { report = name, dataset, period = ReportEngine.PeriodText(dataset, spec), columns = result.Columns, rows, total = result.Total, truncated = result.Truncated, generatedAt = DateTimeOffset.UtcNow });
         }).RequireAuthorization(Permissions.ReportsExport);
 
         g.MapPost("/run", async (RunBody body, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
@@ -123,7 +136,7 @@ public static class ReportEndpoints
             try
             {
                 var result = await ReportEngine.RunAsync(ds, body.Dataset, body.Definition, Math.Clamp(body.Limit ?? 500, 1, 5000), ct);
-                return Results.Ok(new { columns = result.Columns, rows = result.Rows, total = result.Total, truncated = result.Truncated });
+                return Results.Ok(new { columns = result.Columns, rows = result.Rows, total = result.Total, truncated = result.Truncated, period = ReportEngine.PeriodText(body.Dataset, body.Definition) });
             }
             catch (ReportValidationException ex) { return Validation.Problem("definition", ex.Message); }
         });
@@ -136,7 +149,9 @@ public static class ReportEndpoints
             ReportResult result;
             try { result = await ReportEngine.RunAsync(ds, body.Dataset, body.Definition, format == "pdf" ? PdfWriter.MaxPdfRows : ReportDelivery.MaxExportRows, ct); }
             catch (ReportValidationException ex) { return Validation.Problem("definition", ex.Message); }
-            var (content, fileName, contentType) = ReportDelivery.Render(name, format, result, chart: body.Definition.Chart);
+            var period = ReportEngine.PeriodText(body.Dataset, body.Definition);
+            var (content, fileName, contentType) = ReportDelivery.Render(name, format, result,
+                period is null ? null : $"{period} · {result.Rows.Count:N0} row(s) · generated {DateTime.Now:yyyy-MM-dd HH:mm}", body.Definition.Chart);
             await rc.AuditAsync("report.export", name, detail: new { body.Dataset, format, rows = result.Rows.Count });
             return Results.File(content, contentType, fileName);
         }).RequireAuthorization(Permissions.ReportsExport);
