@@ -1733,7 +1733,9 @@ if (-not $installed) {
         $s = Login
         function Raw([string] $Method, [string] $Path, $Body, [string] $ContentType = 'application/json') {
             $p = @{ Uri = "$base/api/v1$Path"; Method = $Method; WebSession = $s; Headers = @{ 'X-Zentriq-Request' = '1' }; ContentType = $ContentType; SkipHttpErrorCheck = $true }
-            if ($null -ne $Body) { $p.Body = if ($Body -is [string]) { [Text.Encoding]::UTF8.GetBytes($Body) } else { ($Body | ConvertTo-Json -Depth 6) } }
+            # Assign the byte array directly: an if-expression would unroll it into object[] and send numbers.
+            if ($Body -is [string]) { [byte[]] $bytes = [Text.Encoding]::UTF8.GetBytes($Body); $p.Body = $bytes }
+            elseif ($null -ne $Body) { $p.Body = ($Body | ConvertTo-Json -Depth 6) }
             $resp = Invoke-WebRequest @p
             $text = if ($resp.Content -is [byte[]]) { [Text.Encoding]::UTF8.GetString($resp.Content) } else { [string]$resp.Content }
             [pscustomobject]@{ StatusCode = [int]$resp.StatusCode; Content = $text }
