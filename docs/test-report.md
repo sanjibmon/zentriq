@@ -1,19 +1,22 @@
 # Test report
 
-Latest: GitHub Actions run 40181618111, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
-10.0.20348** VM. Release: `v1.1.1-build.84` (pre-release, **unsigned**), package version **1.1.1.84**. Results: unit +
-PostgreSQL integration tests **295 PASS, 2 skipped** (live remote support and SNMP tests run in ci-quick: PASS, 297/297);
-installer acceptance **64 passed, 0 failed**; in-place updates PASS (database migration V0026, schema 26).
+Latest: GitHub Actions run 40197369473, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
+10.0.20348** VM. Release: `v1.1.1-build.85` (pre-release, **unsigned**), package version **1.1.1.85**. Results: unit +
+PostgreSQL integration tests **332 PASS, 2 skipped** (live remote support and SNMP tests run in ci-quick: PASS, 334/334);
+installer acceptance **65 passed, 0 failed**; in-place updates PASS (database migration V0027, schema 27).
 
-New in build 83/84 (build 83's release run failed only in the new acceptance check T74, whose script sent the CSV body
-incorrectly; fixed in build 84): Asset Lifecycle **own asset tags** (automatic in the organisation's format, or manual),
-**custom fields**, a **People** directory with add / edit / bulk upload, **＋ Add new** for departments, locations and
-people, and **Excel-template bulk upload** for IT assets, people and contracts (check first, all or nothing).
+New in build 85: **report time period** (From – to dates or a moving period such as last month, on any date column, saved
+with the report and used by schedules, exports, dashboards and the data API), and **Backup & Restore** in the console:
+backups of the whole installation (database, configuration, secrets, console certificate and CA, agent CA, MFA keys,
+remote support data, report files), always encrypted, with an optional backup password; schedule (daily / weekdays /
+monthly) and retention; destinations: local disk, SMB share, FTP/FTPS, SFTP, Azure Blob, Amazon S3 / S3-compatible,
+Google Cloud Storage; history and download; restore from an uploaded file, this server or a destination.
 
 | ID | Test | Result | Detail |
 |---|---|---|---|
-| T74 | Own asset tags, people and bulk upload | **PASS** | format without {SEQ} refused; format CI-{PREFIX}-{SEQ:5} from 100 → CI-LAP-00100; own tag kept; duplicate employee ID refused; templates x3; check saved nothing; bad file all-or-nothing; 2 assets uploaded with person, new location and custom list field; manual mode: no automatic tag, typed tag kept; settings restored |
-| — | Unit / PostgreSQL tests | **PASS** | tag format validation, rendering and counters per prefix / year / location; manual mode; asset upload check, all-or-nothing and update by tag / serial; people and contracts upload; templates read back; all earlier tests |
+| T75 | Backup and restore | **PASS** | password and weekly schedule (validation); folder test OK; SMB share test OK; unreachable S3 refused; overview never shows a password; back up now copied to the folder and the SMB share (format 2, password, MFA key file); folder keeps 2 of 3; download; `backup-verify --password-file`; restored from the SMB share with the password: marker back, last restore and run history correct |
+| T11 | Encrypted backup and deep restore validation | **PASS** | new file name, format 2 |
+| — | Unit / PostgreSQL tests | **PASS** | report periods (relative ranges, custom inclusive dates, time zones, parameters only, DB filtering, summaries); backup crypto (install key or password, wrong password, no password, tampering and truncation, format 1 still opens); schedule slots and catch-up; file names and retention; folder, Azure (Shared Key signature recomputed), S3 (single and multipart, path-style, errors) and GCS (resumable pieces) targets; validation; data protection key ring through backup and restore on Windows (DPAPI); settings, destinations (encrypted secrets), history, unlock hand-off |
 
 ## Build and packaging
 
@@ -32,11 +35,11 @@ replaced) and the trial's 30-device total cap.
 ## Release artifacts (SHA-256)
 
 ```
-f32b48dfe58ad5b4536458aafb390d0df25478aa42d3f47d413e697ad92de3cb  Zentriq-1.1.1-docs.zip
-006c9999828a04aa74d11e373f3c84431cb676e83b5c1cc1c6d2b53b03d2fb32  Zentriq-1.1.1-msi-offline-kit.zip
-08cf441fc3e20890702ca76ec72a7fa7be571a20323546564afd88deed0bf2ef  Zentriq-Setup-x64.exe
-aec0ffd46dd3731d0d6cead7cbd240dfe0d932e82e7c77ce3901d72e4b9e3a09  Zentriq.msi
-af5cc7ece8b6f33e03dceadce2ede27195cf57f3c09acae9be5546df82a7aa4a  ZentriqAgent-x64.msi
+44bebfd8f8889f520d0c640ce93991bbce2d5bd815cfe043a8974bdd9bc8e1ee  Zentriq-1.1.1-docs.zip
+a984a256f02732d2f4930fc1f048eebe1b87c694fb33252c16a3d2c0fdc45ad7  Zentriq-1.1.1-msi-offline-kit.zip
+ba0cc35d6c1928eb91ae6dd228c2d4f3088d1bc0c34fcbf55f31b0774e1680d3  Zentriq-Setup-x64.exe
+fd5e0905e5b469284c1d37b1a2393d88c7f04c50fff383d5ef6427f3861ba8c8  Zentriq.msi
+68469f74122e677c26953e3ccedb500956408098d52500796c850a477ad36e4c  ZentriqAgent-x64.msi
 ```
 
 ## Installer acceptance (tests/installer/Invoke-InstallerAcceptance.ps1)
