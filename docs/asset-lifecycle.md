@@ -77,7 +77,7 @@ It follows ISO/IEC 19770-1 (IT asset management) and the ITIL 4 IT Asset Managem
 - **Contracts:** AMC, support, lease, insurance or warranty extension covering many assets, with a reminder N days before the end.
 - **Disposal:** date, method, vendor, value recovered, sanitisation method, who and when, certificate reference.
 
-## Asset tags (build 83)
+## Asset tags (build 84)
 
 *Policies › Asset tags*:
 
@@ -90,13 +90,13 @@ It follows ISO/IEC 19770-1 (IT asset management) and the ITIL 4 IT Asset Managem
 
 Tags are up to 40 characters. Existing tags never change when the format changes.
 
-## Custom fields (build 83)
+## Custom fields (build 84)
 
 *Policies › Custom fields*: your own fields on IT assets — text, number, date, list of values or yes / no, optionally required.
 They appear on the asset's Lifecycle panel and in *Details*, are columns of the bulk upload template (with drop-down lists),
 and are checked by type on save and upload. Deleting a field removes its values.
 
-## People (build 83)
+## People (build 84)
 
 The **People** tab is a directory of the people IT assets are assigned to: name, e-mail, employee ID, job title, phone,
 department, location, manager, status (Active / Left) and notes, with the IT assets, loans, accessories and book value
@@ -109,7 +109,7 @@ each person holds.
 - Name, e-mail and employee ID are unique in the directory. Everyone who held an asset before build 83 was added.
 - Department and location boxes everywhere offer **＋ Add new …**.
 
-## Bulk upload (build 83)
+## Bulk upload (build 84)
 
 **Asset Lifecycle › Bulk upload** (IT assets), **People › Bulk upload**, **Contracts › Bulk upload**:
 

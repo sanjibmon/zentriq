@@ -1,17 +1,19 @@
 # Test report
 
-Latest: GitHub Actions run 40170754088, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
-10.0.20348** VM. Release: `v1.1.1-build.82` (pre-release, **unsigned**), package version **1.1.1.82**. Results: unit +
-PostgreSQL integration tests **279 PASS, 2 skipped** (live remote support and SNMP tests run in ci-quick: PASS, 281/281);
-installer acceptance **63 passed, 0 failed**; in-place updates PASS (database migration V0025, schema 25).
+Latest: GitHub Actions run 40181618111, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
+10.0.20348** VM. Release: `v1.1.1-build.84` (pre-release, **unsigned**), package version **1.1.1.84**. Results: unit +
+PostgreSQL integration tests **295 PASS, 2 skipped** (live remote support and SNMP tests run in ci-quick: PASS, 297/297);
+installer acceptance **64 passed, 0 failed**; in-place updates PASS (database migration V0026, schema 26).
 
-New in build 82: Cloud & Infrastructure adds **Google Cloud**, **Nutanix AHV** (Prism), **Proxmox VE**, **XCP-ng / Citrix
-Hypervisor** and **oVirt / Red Hat Virtualization / OLVM** (9 platforms in all); the page header has no tagline.
+New in build 83/84 (build 83's release run failed only in the new acceptance check T74, whose script sent the CSV body
+incorrectly; fixed in build 84): Asset Lifecycle **own asset tags** (automatic in the organisation's format, or manual),
+**custom fields**, a **People** directory with add / edit / bulk upload, **＋ Add new** for departments, locations and
+people, and **Excel-template bulk upload** for IT assets, people and contracts (check first, all or nothing).
 
 | ID | Test | Result | Detail |
 |---|---|---|---|
-| T73 | Cloud & infrastructure (9 platforms) | **PASS** | validation (Azure tenant ID, AWS access key, Hyper-V Windows account, Google Cloud JSON key, Proxmox token ID); 9 platforms listed; unreachable Proxmox node and vCenter fail with "Could not reach 127.0.0.1"; secret write-only and kept on edit; platform change refused; APIs and report datasets; connections deleted |
-| — | Unit / PostgreSQL tests | **PASS** | Google service-account key read and JWT (RS256) verified with the public key; Compute Engine, disks, addresses, firewall rules, Cloud SQL and Cloud Functions mapping; disabled API = warning, key's own project used; Nutanix v3 lists (Prism Central entry skipped, categories as tags, CD-ROM not counted); Proxmox cluster resources, config (MAC, SMBIOS UUID, container IP), snapshots and guest agent; XCP-ng records (dom0, templates and snapshots skipped, guest metrics, SR free space); oVirt REST (topology, reported IPs, stop time, snapshots, storage domains); all build 81 tests |
+| T74 | Own asset tags, people and bulk upload | **PASS** | format without {SEQ} refused; format CI-{PREFIX}-{SEQ:5} from 100 → CI-LAP-00100; own tag kept; duplicate employee ID refused; templates x3; check saved nothing; bad file all-or-nothing; 2 assets uploaded with person, new location and custom list field; manual mode: no automatic tag, typed tag kept; settings restored |
+| — | Unit / PostgreSQL tests | **PASS** | tag format validation, rendering and counters per prefix / year / location; manual mode; asset upload check, all-or-nothing and update by tag / serial; people and contracts upload; templates read back; all earlier tests |
 
 ## Build and packaging
 
@@ -30,11 +32,11 @@ replaced) and the trial's 30-device total cap.
 ## Release artifacts (SHA-256)
 
 ```
-aec6228ac49868777314053e4fe9a683f8d1b7d81259b53e8c1dc0f794d3bce8  Zentriq-1.1.1-docs.zip
-392a076e6a5e8e88fd159254047b1d5aeda094617dd2a9bd113c4ae7340be224  Zentriq-1.1.1-msi-offline-kit.zip
-61c8ad4bc3b8223f16b1586eb428a62da4393b420ebd7ba391c36a57d1743ef1  Zentriq-Setup-x64.exe
-43df224bae386c31395310481eb81a32f77ae0523971a3547588a0b4adf15f6f  Zentriq.msi
-812174adf1582355555e040cfaed210ffb3ad0819e0cad5f144c3827a84db210  ZentriqAgent-x64.msi
+f32b48dfe58ad5b4536458aafb390d0df25478aa42d3f47d413e697ad92de3cb  Zentriq-1.1.1-docs.zip
+006c9999828a04aa74d11e373f3c84431cb676e83b5c1cc1c6d2b53b03d2fb32  Zentriq-1.1.1-msi-offline-kit.zip
+08cf441fc3e20890702ca76ec72a7fa7be571a20323546564afd88deed0bf2ef  Zentriq-Setup-x64.exe
+aec0ffd46dd3731d0d6cead7cbd240dfe0d932e82e7c77ce3901d72e4b9e3a09  Zentriq.msi
+af5cc7ece8b6f33e03dceadce2ede27195cf57f3c09acae9be5546df82a7aa4a  ZentriqAgent-x64.msi
 ```
 
 ## Installer acceptance (tests/installer/Invoke-InstallerAcceptance.ps1)
