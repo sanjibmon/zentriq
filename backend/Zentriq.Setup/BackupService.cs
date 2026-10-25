@@ -405,6 +405,8 @@ public sealed class BackupService(ZentriqPaths paths, ZentriqOptions options, Re
             foreach (var svc in new[] { apiService, workerService, RemoteService })
             {
                 if (!WindowsHost.ServiceExists(svc)) continue;
+                // Remote support is started again only when it was running (it is disabled on Standard installations).
+                if (svc == RemoteService && WindowsHost.ServiceStatus(svc) != "Running") continue;
                 WindowsHost.StopAndWait(svc, TimeSpan.FromMinutes(2));
                 stopped.Add(svc);
             }
@@ -515,7 +517,9 @@ public sealed class BackupService(ZentriqPaths paths, ZentriqOptions options, Re
         {
             await using var ds = OwnerDataSource(owner);
             await using var cmd = ds.CreateCommand("""
-                UPDATE zentriq.backup_runs SET status = CASE WHEN file_name = @f THEN 'succeeded' ELSE 'interrupted' END, finished_at = COALESCE(finished_at, now())
+                -- The run that made this backup was still "running" when the database was dumped.
+                UPDATE zentriq.backup_runs SET status = CASE WHEN file_name = @f OR started_at <= @created THEN 'succeeded' ELSE 'interrupted' END,
+                       finished_at = COALESCE(finished_at, @created)
                  WHERE status = 'running';
                 UPDATE zentriq.jobs SET status = 'cancelled', finished_at = now(), lease_owner = NULL, lease_expires_at = NULL, last_error = 'Cancelled by a restore from backup.'
                  WHERE job_type LIKE 'maintenance.%' AND status IN ('queued', 'running');
@@ -529,6 +533,7 @@ public sealed class BackupService(ZentriqPaths paths, ZentriqOptions options, Re
             cmd.Parameters.AddWithValue("note", $"Zentriq was restored from the backup of {header.CreatedAt.ToLocalTime():yyyy-MM-dd HH:mm} ({header.Machine}, version {header.ProductVersion}).");
             cmd.Parameters.AddWithValue("fp", Fingerprint(owner.BackupKey));
             cmd.Parameters.AddWithValue("f", file);
+            cmd.Parameters.AddWithValue("created", header.CreatedAt);
             cmd.Parameters.AddWithValue("v", JsonSerializer.Serialize(new
             {
                 at = DateTimeOffset.UtcNow, file, backupCreatedAt = header.CreatedAt, fromVersion = header.ProductVersion, fromMachine = header.Machine,

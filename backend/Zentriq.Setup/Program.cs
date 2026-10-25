@@ -485,7 +485,9 @@ internal static class Cli
             {
                 var id = Guid.Parse(Payload(job, "destinationId") ?? throw new SetupException("The restore request names no destination."));
                 var row = await store.DestinationAsync(id, true, ct) ?? throw new SetupException("The backup destination no longer exists.");
-                downloaded = file = Path.Combine(paths.Backups, ".download-" + name);
+                var dir = Path.Combine(paths.Backups, ".download-" + Guid.NewGuid().ToString("N"));
+                Directory.CreateDirectory(dir);
+                downloaded = file = Path.Combine(dir, name);
                 using var target = Zentriq.Infrastructure.Backup.BackupTargets.Create(row.Destination);
                 log.Info($"Downloading {name} from {target.Where}.");
                 await target.DownloadAsync(name, file, ct);
@@ -502,7 +504,7 @@ internal static class Cli
         }
         finally
         {
-            if (downloaded is not null) { try { File.Delete(downloaded); } catch (IOException) { } }
+            if (downloaded is not null) { try { Directory.Delete(Path.GetDirectoryName(downloaded)!, true); } catch (IOException) { } }
             if (source == "upload") { try { File.Delete(file); } catch (IOException) { } }
         }
     }

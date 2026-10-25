@@ -119,7 +119,7 @@ Remove-Item $answer -Force   # contains the administrator password
 
 if (-not $installed) {
     foreach ($t in 'T02 PostgreSQL provisioning', 'T03 Database migration', 'T04 Administrator sign-in', 'T05 API and worker services', 'T06 Trial initialization',
-                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection', 'T68 Live agent connection', 'T69 Locations and IT accessories', 'T70 Manual hardware details', 'T71 Standard and Advanced installation', 'T72 Asset lifecycle', 'T73 Cloud and infrastructure', 'T74 Own asset tags, people and bulk upload') {
+                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection', 'T68 Live agent connection', 'T69 Locations and IT accessories', 'T70 Manual hardware details', 'T71 Standard and Advanced installation', 'T72 Asset lifecycle', 'T73 Cloud and infrastructure', 'T74 Own asset tags, people and bulk upload', 'T75 Backup and restore') {
         Record $t.Substring(0, 3) $t.Substring(4) 'BLOCKED' 'installation failed'
     }
 } else {
@@ -1783,6 +1783,105 @@ if (-not $installed) {
         Api DELETE "/lifecycle/fields/$($field.id)" -Session $s | Out-Null
         Api DELETE "/lifecycle/people/$($p.id)" -Session $s | Out-Null
         "format CI-{PREFIX}-{SEQ:5} → $($a1.assetTag); own tag kept; templates x3; check saved nothing; bad file all-or-nothing ($(@($failed.errors).Count) problem(s)); 2 uploaded with person, new location, custom field; manual mode: no automatic tag, typed tag kept; settings restored"
+    } | Out-Null
+
+    Check 'T75' 'Backup & Restore: password, schedule, folder and SMB share destinations, back up now, retention, history, download, restore from a destination with the password' {
+        $s = Login
+        function Raw75([string] $Method, [string] $Path, $Body) {
+            $p = @{ Uri = "$base/api/v1$Path"; Method = $Method; WebSession = $s; Headers = @{ 'X-Zentriq-Request' = '1' }; ContentType = 'application/json'; SkipHttpErrorCheck = $true }
+            if ($null -ne $Body) { $p.Body = ($Body | ConvertTo-Json -Depth 6) }
+            $r = Invoke-WebRequest @p
+            [pscustomobject]@{ StatusCode = [int]$r.StatusCode; Content = (Body $r) }
+        }
+        $bkPass = 'Zq-Backup-' + [Guid]::NewGuid().ToString('N').Substring(0, 12)
+        $shareUser = 'zqbk' + (Get-Random -Maximum 99999)
+        $sharePass = 'Sh-' + [Guid]::NewGuid().ToString('N').Substring(0, 14) + '-9a'
+        $folder = 'C:\ZqBackupDest'
+        $shareDir = 'C:\ZqShare'
+        try {
+            # Backup password and schedule (validation first).
+            $short = Raw75 PUT '/backup/password' @{ password = 'short' }
+            Assert ($short.StatusCode -eq 400) "short password accepted: $($short.StatusCode)"
+            Api PUT '/backup/password' @{ password = $bkPass; confirm = $bkPass } -Session $s | Out-Null
+            $badTime = Raw75 PUT '/backup/settings' @{ schedule = @{ enabled = $true; frequency = 'daily'; time = '25:00'; weekdays = @(0); day = 1 } }
+            Assert ($badTime.StatusCode -eq 400) "time 25:00 accepted: $($badTime.StatusCode)"
+            $sch = Api PUT '/backup/settings' @{ schedule = @{ enabled = $true; frequency = 'weekly'; time = '02:15'; weekdays = @(3, 1); day = 1 }; keepLocal = 20 } -Session $s
+            Assert ($sch.scheduleText -eq 'Every Monday, Wednesday at 02:15') "schedule: $($sch.scheduleText)"
+
+            # Destinations: a folder on this server and an SMB share (local account) on this machine.
+            New-LocalUser -Name $shareUser -Password (ConvertTo-SecureString $sharePass -AsPlainText -Force) -PasswordNeverExpires -AccountNeverExpires | Out-Null
+            New-Item -ItemType Directory -Force -Path $shareDir | Out-Null
+            & icacls $shareDir /grant "${shareUser}:(OI)(CI)M" | Out-Null
+            New-SmbShare -Name 'ZqBackups' -Path $shareDir -ChangeAccess "$env:COMPUTERNAME\$shareUser" | Out-Null
+            $badSmb = Raw75 POST '/backup/destinations' @{ name = 'bad'; kind = 'smb'; settings = @{ path = 'localhost/ZqBackups' } }
+            Assert ($badSmb.StatusCode -eq 400 -and $badSmb.Content -match 'server') "bad UNC accepted: $($badSmb.StatusCode)"
+            $fd = Api POST '/backup/destinations' @{ name = 'CI folder'; kind = 'folder'; keep = 2; settings = @{ path = $folder } } -Session $s
+            $sd = Api POST '/backup/destinations' @{ name = 'CI share'; kind = 'smb'; keep = 5; settings = @{ path = '\\localhost\ZqBackups\zentriq'; user = "$env:COMPUTERNAME\$shareUser" }; password = $sharePass } -Session $s
+            $ft = Api POST "/backup/destinations/$($fd.id)/test" -Session $s
+            Assert $ft.ok "folder test: $($ft.message)"
+            $st = Api POST "/backup/destinations/$($sd.id)/test" -Session $s
+            $offline = Api POST '/backup/destinations/test' @{ name = 'nowhere'; kind = 's3'; keep = 3; settings = @{ bucket = 'zq-ci'; endpoint = 'https://127.0.0.1:9'; pathStyle = $true; user = 'AKID' }; password = 'x' } -Session $s
+            Assert (-not $offline.ok) 'unreachable S3 endpoint reported OK'
+            $ovRaw = Raw75 GET '/backup'
+            Assert ($ovRaw.Content -notmatch [regex]::Escape($sharePass) -and $ovRaw.Content -notmatch [regex]::Escape($bkPass)) 'overview exposes a password'
+            $ov = $ovRaw.Content | ConvertFrom-Json
+            Assert ($ov.password.set -and @($ov.destinations).Count -eq 2) "overview: password $($ov.password.set), $(@($ov.destinations).Count) destination(s)"
+
+            # A marker that exists in the first backup only.
+            $marker = 'CI Backup Marker ' + (Get-Random -Maximum 999999)
+            $mp = Api POST '/lifecycle/people' @{ name = $marker } -Session $s
+            $job = Api POST '/backup/run' -Session $s
+            & $ctl maintenance run-pending | Out-Host
+            $runs = Api GET '/backup/runs' -Session $s
+            $first = @($runs.items)[0]
+            Assert ($first.status -eq 'succeeded' -and $first.trigger -eq 'manual' -and $first.passwordProtected) "run: $($first | ConvertTo-Json -Compress -Depth 4)"
+            Assert (@($first.destinations | Where-Object status -eq 'ok').Count -eq 2) "copies: $($first.destinations | ConvertTo-Json -Compress)"
+            Assert ($first.contents.certificates.Count -ge 2 -and $first.contents.dataProtectionKeys -ge 1) "contents: $($first.contents | ConvertTo-Json -Compress)"
+            Assert (Test-Path (Join-Path $folder $first.file)) 'not copied to the folder'
+            Assert (Test-Path (Join-Path "$shareDir\zentriq" $first.file)) 'not copied to the share'
+            $hdr = Get-Content (Join-Path $folder $first.file) -TotalCount 2 | Select-Object -Last 1 | ConvertFrom-Json
+            Assert ($hdr.Format -eq 2 -and @($hdr.Keys | Where-Object Type -eq 'password').Count -eq 1) "header: $($hdr | ConvertTo-Json -Compress -Depth 4)"
+            $dl = Invoke-WebRequest "$base/api/v1/backup/files/$($first.file)" -WebSession $s -OutFile (Join-Path $env:TEMP 'zq-dl.zbak') -PassThru
+            Assert ($dl.StatusCode -eq 200 -and (Get-Item (Join-Path $env:TEMP 'zq-dl.zbak')).Length -eq $first.sizeBytes) 'download differs'
+            $pwFile = Join-Path $env:TEMP 'zq-bk-pass.txt'
+            Set-Content $pwFile $bkPass -NoNewline
+            & $ctl backup-verify (Join-Path $folder $first.file) --password-file $pwFile | Out-Host
+            Assert ($LASTEXITCODE -eq 0) "backup-verify exit $LASTEXITCODE"
+
+            # Retention: the folder keeps 2.
+            & $ctl backup | Out-Host; Assert ($LASTEXITCODE -eq 0) "backup 2 exit $LASTEXITCODE"
+            & $ctl backup | Out-Host; Assert ($LASTEXITCODE -eq 0) "backup 3 exit $LASTEXITCODE"
+            $inFolder = @(Get-ChildItem $folder -Filter 'zentriq-*.zbak')
+            Assert ($inFolder.Count -eq 2) "folder holds $($inFolder.Count) backups (keep 2)"
+            Assert (@(Get-ChildItem "$shareDir\zentriq" -Filter 'zentriq-*.zbak').Count -eq 3) 'share does not hold 3 backups'
+
+            # Restore the first backup from the share with the password: the marker comes back.
+            Api DELETE "/lifecycle/people/$($mp.id)" -Session $s | Out-Null
+            $files = Api GET "/backup/destinations/$($sd.id)/files" -Session $s
+            Assert (@($files | Where-Object name -eq $first.file).Count -eq 1) "share listing: $(($files | ForEach-Object name) -join ', ')"
+            $noConfirm = Raw75 POST '/backup/restore' @{ source = 'destination'; destinationId = $sd.id; file = $first.file; password = $bkPass; confirm = 'yes' }
+            Assert ($noConfirm.StatusCode -eq 400) "restore without RESTORE accepted: $($noConfirm.StatusCode)"
+            Api POST '/backup/restore' @{ source = 'destination'; destinationId = $sd.id; file = $first.file; password = $bkPass; confirm = 'RESTORE' } -Session $s | Out-Null
+            & $ctl maintenance run-pending | Out-Host
+            Wait-Ready 300 | Out-Null
+            $s = Login
+            $back = @(Api GET "/lifecycle/people?q=$([uri]::EscapeDataString($marker))" -Session $s | ForEach-Object { $_ } | Where-Object person -eq $marker)
+            Assert ($back.Count -eq 1) 'marker not restored'
+            $after = Api GET '/backup' -Session $s
+            Assert ($after.lastRestore.file -eq $first.file -or $after.lastRestore.file -like "*$($first.file)") "last restore: $($after.lastRestore | ConvertTo-Json -Compress)"
+            $restoredRun = @((Api GET '/backup/runs' -Session $s).items | Where-Object file -eq $first.file)[0]
+            Assert ($restoredRun.status -eq 'succeeded') "the backup's own run after restore: $($restoredRun.status)"
+            Api DELETE "/lifecycle/people/$((@($back)[0]).id)" -Session $s | Out-Null
+            "password + weekly schedule; folder test OK; share test $(if ($st.ok) { 'OK' } else { 'FAILED: ' + $st.message }); unreachable S3 refused; backup copied to 2 destinations (format 2, password, $($first.contents.dataProtectionKeys) MFA key file(s)); folder keeps 2 of 3; download; CLI verify with the password; restored from the share: marker back"
+        } finally {
+            $s = Login
+            foreach ($d in @(Api GET '/backup' -Session $s).destinations) { Api DELETE "/backup/destinations/$($d.id)" -Session $s | Out-Null }
+            Api DELETE '/backup/password' -Session $s | Out-Null
+            Api PUT '/backup/settings' @{ schedule = @{ enabled = $true; frequency = 'daily'; time = '01:30'; weekdays = @(0); day = 1 }; keepLocal = 14 } -Session $s | Out-Null
+            Remove-SmbShare -Name 'ZqBackups' -Force -ErrorAction SilentlyContinue
+            Remove-LocalUser -Name $shareUser -ErrorAction SilentlyContinue
+            Remove-Item $folder, $shareDir, (Join-Path $env:TEMP 'zq-dl.zbak'), (Join-Path $env:TEMP 'zq-bk-pass.txt') -Recurse -Force -ErrorAction SilentlyContinue
+        }
     } | Out-Null
 
     Check 'T71' 'Installation type: Advanced recorded, change to Standard (Remote support off, section locked) and back with Setup Update' {
