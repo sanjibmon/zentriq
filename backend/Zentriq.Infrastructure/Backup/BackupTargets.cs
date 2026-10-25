@@ -176,7 +176,7 @@ public static class BackupTargets
     internal static bool IsBackupName(string name) => name.StartsWith("zentriq-", StringComparison.OrdinalIgnoreCase) && name.EndsWith(".zbak", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Runs an operation up to three times when it fails for a passing reason (network, 5xx, throttling).</summary>
-    internal static async Task<T> RetryAsync<T>(Func<Task<T>> op, CancellationToken ct)
+    public static async Task<T> RetryAsync<T>(Func<Task<T>> op, CancellationToken ct)
     {
         for (var attempt = 1; ; attempt++)
         {
