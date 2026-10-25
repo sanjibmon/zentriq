@@ -34,12 +34,12 @@ export const NAV: [string, NavItem[]][] = [
     { id: 'lifecycle', label: 'Asset Lifecycle', icon: 'cycle', path: '/lifecycle', ready: true, permission: 'lifecycle.view' },
   ]],
   ['Secure & remediate', [
-    { id: 'patch', label: 'Patch Management', icon: 'patch', path: '/modules/patch', ready: false },
+    { id: 'patch', label: 'Patch Management', icon: 'patch', path: '/modules/patch', ready: false, permission: 'assets.view' },
     { id: 'vuln', label: 'Vulnerability Management', icon: 'bug', path: '/vulnerabilities', ready: true, permission: 'vuln.view' },
     { id: 'config', label: 'Security Configuration', icon: 'sliders', path: '/security', ready: true, permission: 'security.view' },
-    { id: 'deploy', label: 'Software Deployment', icon: 'package', path: '/modules/deploy', ready: false },
-    { id: 'licenses', label: 'Software Licenses', icon: 'key', path: '/modules/licenses', ready: false },
-    { id: 'webapps', label: 'Web Apps & Accounts', icon: 'globe', path: '/modules/webapps', ready: false },
+    { id: 'deploy', label: 'Software Deployment', icon: 'package', path: '/modules/deploy', ready: false, permission: 'assets.view' },
+    { id: 'licenses', label: 'Software Licenses', icon: 'key', path: '/modules/licenses', ready: false, permission: 'assets.view' },
+    { id: 'webapps', label: 'Web Apps & Accounts', icon: 'globe', path: '/modules/webapps', ready: false, permission: 'assets.view' },
   ]],
   ['Insight & admin', [
     { id: 'reports', label: 'Reports & Analytics', icon: 'report', path: '/reports', ready: true, permission: 'reports.view' },

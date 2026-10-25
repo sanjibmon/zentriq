@@ -114,7 +114,7 @@ export function GroupDialog({ group, roles, users, onClose, onSaved }: { group: 
         <div className="grid-2">
           <div>
             <div className="field-title">Roles of the group</div>
-            <div className="check-list">
+            <div className="check-list" style={{ maxHeight: 300 }}>
               {roles.map((r) => (
                 <label key={r.id}><input type="checkbox" checked={picked.includes(r.id)} onChange={(e) => setPicked((p) => (e.target.checked ? [...p, r.id] : p.filter((x) => x !== r.id)))} />
                   <span><b>{r.name}</b> <span className="muted">· {r.description}</span></span></label>
@@ -124,7 +124,7 @@ export function GroupDialog({ group, roles, users, onClose, onSaved }: { group: 
           <div>
             <div className="field-title">Members ({members.length})</div>
             <input className="in" placeholder="Find a user…" value={q} onChange={(e) => setQ(e.target.value)} style={{ width: '100%', marginBottom: 6 }} aria-label="Find a user" />
-            <div className="check-list">
+            <div className="check-list" style={{ maxHeight: 256 }}>
               {shown.map((u) => (
                 <label key={u.id}><input type="checkbox" checked={members.includes(u.id)} onChange={(e) => setMembers((m) => (e.target.checked ? [...m, u.id] : m.filter((x) => x !== u.id)))} />
                   <span><b>{u.displayName}</b> <span className="muted">· {u.email}</span></span></label>

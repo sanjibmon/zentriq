@@ -169,8 +169,12 @@ export function DashboardPage() {
 
   const mine = dashboards.data?.find((d) => d.owned) ?? null;
   const saved: Layout | null = useMemo(() => { const l = fromDto(mine); return l ? withNew(l, mine) : null; }, [mine]);
-  // Only the widgets of areas the user may see (saved reports check their own data source when they run).
-  const layout = (saved ?? DEFAULT_LAYOUT).filter((w) => w.reportId || can(permOf(w.id)));
+  // Only the widgets of areas the user may see; saved reports only when their data source is allowed (the report list
+  // contains only those).
+  const pinned = (saved ?? []).some((w) => w.reportId);
+  const usable = useApi(() => (pinned && can('reports.view') ? api.get<{ id: string }[]>('/reports') : Promise.resolve([] as { id: string }[])), [pinned]);
+  const usableIds = new Set((usable.data ?? []).map((r) => r.id));
+  const layout = (saved ?? DEFAULT_LAYOUT).filter((w) => (w.reportId ? usableIds.has(w.reportId) : can(permOf(w.id))));
   const wantsVulns = layout.some((w) => w.id.startsWith('vuln.')) && can('vuln.view');
   const vulns = useApi(() => (wantsVulns ? api.get<VulnSummary>('/vulnerabilities/overview') : Promise.resolve(null)), [tick, wantsVulns]);
   const wantsChanges = layout.some((w) => w.id.startsWith('changes.'));
