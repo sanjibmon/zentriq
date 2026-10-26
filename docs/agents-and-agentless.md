@@ -190,24 +190,63 @@ Intune command-line arguments, the Configuration Manager install command. Zentri
   presents the pinned key, and keeps using the address that answered — so an agent finds the server again after a
   DHCP change of the server's address. Setup adds the firewall rule for UDP 8444 (local subnet).
 
-### Uninstall protection
+### Tamper protection (uninstall, stop, disable)
 
-* *Agents › Settings › Require an uninstall code to remove the agent* (on by default). Each device then keeps its
-  protection data readable by **SYSTEM only** (`HKLM\SOFTWARE\Zentriq\Agent\Protection`).
-* To remove protected agents, create the **uninstall code**: *Agents › Uninstall code*. It is **one random code for all
-  devices** (16 characters, `ABCD-EFGH-JKMN-PQRS`), valid for **one hour**; creating a new one replaces the previous
-  code, and *Cancel code* withdraws it. Creating it is audited. Online agents receive it within seconds over their live
-  connection (only its hash, readable by SYSTEM), others when they next connect; agents of earlier versions need
-  updating first. Then on the device, as administrator: `"C:\Program Files\Zentriq Agent\ZentriqAgent.exe" --uninstall <code>`, or
-  *Apps › Zentriq Agent › Modify › Remove* and enter the code, or `msiexec /x {product} UNINSTALLCODE=<code>`.
-  (`--uninstall` starts the removal from a temporary copy and returns at once; Windows Installer shows the progress and
-  the result is logged in `%TEMP%\ZentriqAgent-uninstall.log`.)
-* Without a valid code Windows Installer refuses the removal (the code is checked as SYSTEM against the device's key),
-  and while protected administrators cannot stop, reconfigure or delete the agent service. Agent updates from the
-  console keep working. Turning protection off removes the key and the restriction at the next check-in; a revoked
-  agent drops its protection.
-* This protects against users and casual removal. A determined local administrator can still take ownership of the
-  registry or kill the process (the service restarts it); combine with your EDR/tamper protection where required.
+* *Agents › Settings › Require a code to uninstall, stop or disable the agent* (on by default). Each device then keeps
+  its protection data readable by **SYSTEM only** (`HKLM\SOFTWARE\Zentriq\Agent\Protection`), and nobody on the device —
+  users, local administrators and domain administrators alike — can remove, stop or disable the agent without a code:
+  * the agent **service** grants administrators query and start only: *Stop* and *Startup type* in Services,
+    `sc stop` / `sc config`, `Stop-Service` / `Set-Service` are refused;
+  * its **registry key** (`HKLM\SYSTEM\CurrentControlSet\Services\ZentriqAgent`) and its **program folder** are
+    read-only for administrators, so the startup type cannot be changed in the registry and the program cannot be
+    replaced or renamed;
+  * every two minutes the agent checks that this is still so. A change made behind its back (an administrator can take
+    ownership of an object) is **undone** and reported: *Agents* shows **Tampering blocked** on the device, the audit
+    log records `agent.tamper`, and administrators get a notification (at most one per device every 30 minutes);
+  * a **watchdog task** (`\Zentriq\Zentriq Agent watchdog`, SYSTEM, at startup and every 15 minutes) sets the startup
+    type back to Automatic and starts the service if it was disabled behind its back and the device restarted;
+  * Windows Installer runs as SYSTEM, so agent **updates** from the console keep working.
+* **Codes.** *Agents › Agent code* creates **one random code for all devices** (16 characters, `ABCD-EFGH-JKMN-PQRS`),
+  valid for **one hour**; creating a new one replaces it, *Cancel code* withdraws it. *Agents › Agent… › Show a one-hour
+  code* gives a code that works on **that device only**. Both are audited. Online agents receive the code for all within
+  seconds (only its hash), others when they next connect. On the device, as administrator
+  (`"C:\Program Files\Zentriq Agent\ZentriqAgent.exe"`):
+
+  | Command | Effect |
+  |---|---|
+  | `--uninstall <code>` | removes the agent (or *Apps › Zentriq Agent › Modify › Remove* and enter the code, or `msiexec /x {product} UNINSTALLCODE=<code>`) |
+  | `--stop <code>` | stops the agent service until the device restarts (or until started again) |
+  | `--disable <code>` | sets the service to Disabled and stops it; the device stays offline in the console |
+  | `--pause <code>` | turns protection off for one hour, so Services can stop or disable the agent |
+  | `--enable` | sets the service back to Automatic and starts it (no code needed) |
+  | `--protection` | shows whether protection is on, paused or off |
+
+  The command hands the code to the running service over a local pipe (administrators only); the service checks it as
+  SYSTEM against the device's key or the code for all. Five wrong codes block further attempts for 15 minutes; every
+  refused code is reported like tampering. Stopping, disabling and pausing with a code are recorded in the audit log
+  (`agent.local_control`). When the agent starts again, protection returns by itself.
+* **From the console** you can always act on an agent: *Agents › Agent…* → **Pause protection** for 1–24 hours (then
+  administrators on the device can stop or disable it in Services; protection returns by itself), **Resume protection
+  now**, **Restart agent**, or **Disable agent** (the device stays offline until the service is enabled on the device
+  with `--enable` or the agent is reinstalled). Online agents act within seconds; each request is in the *Activity Log*
+  (*Agent control*) and the audit log.
+* Turning protection off removes the key and all restrictions at the next check-in; a revoked agent drops its
+  protection.
+* This protects against users and administrators on the device. It is not a kernel-level protection: an attacker with
+  full control of the machine can still interfere (and is reported when the agent can see it); combine it with your
+  EDR's tamper protection where required.
+
+### Automatic agent updates
+
+* *Agents › Settings › Update agents automatically when this server has a newer agent* (off by default). When it is on
+  and Zentriq on the server has been updated, every agent older than the agent package on the server **updates itself
+  at its next check-in** — the same secure path as *Update* in the list: it downloads the package from this server over
+  its mutually authenticated connection, checks the SHA-256 the server sent and installs it silently; the service
+  restarts for a few seconds and the enrollment, certificate and history are kept.
+* *At most N agents update at the same time* (default 25) spreads a large rollout over several check-ins. A failed
+  update is not retried for 24 hours. Agents never downgrade.
+* Automatic updates show as **Automatic update to … requested** in *Agents* and in the *Activity Log* (no requesting
+  user). Agents installed before self-update existed still need the new MSI once.
 
 ### How it works
 
@@ -218,7 +257,7 @@ Intune command-line arguments, the Configuration Manager install command. Zentri
   refreshed at every check-in (so a renewed self-signed certificate is picked up while the old one is still valid).
 * *Revoke* in the console blocks the agent immediately (its certificate is no longer accepted) and the agent removes
   its certificate. Uninstall removes the certificate and state (logs are kept in `C:\ProgramData\Zentriq\Agent\Logs`).
-* Troubleshooting: `ZentriqAgent.exe --status` (server, other addresses, schedule, offline since, protection), `--once`,
+* Troubleshooting: `ZentriqAgent.exe --status` (server, other addresses, schedule, offline since, protection), `--protection`, `--once`,
   `--collect-now`, `--collect inventory.json` (local only).
 
 ### Agent limitations (this release)

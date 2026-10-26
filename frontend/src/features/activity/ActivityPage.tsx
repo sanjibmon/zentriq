@@ -8,7 +8,7 @@ import { Icon } from '../../components/Icon';
 import { CsvExportDialog } from '../audit/LogRetention';
 
 export interface ActivityRow {
-  id: string; assetId: string; hostname: string | null; ip: string | null; channel: 'agent' | 'agentless'; kind: 'service' | 'uninstall' | 'agent-update' | 'remote-support';
+  id: string; assetId: string; hostname: string | null; ip: string | null; channel: 'agent' | 'agentless'; kind: 'service' | 'uninstall' | 'agent-update' | 'remote-support' | 'agent-control';
   target: string; argument: string | null; operation: string; status: string; detail: string | null; resultState: string | null;
   requestedAt: string; completedAt: string | null; requestedBy: string | null;
 }
@@ -16,6 +16,7 @@ export interface ActivityRow {
 const STATUS: Record<string, ['ok' | 'crit' | 'warn' | '', string]> = {
   succeeded: ['ok', 'Succeeded'], failed: ['crit', 'Failed'], queued: ['warn', 'Waiting for device'], sent: ['warn', 'Sent to agent'], running: ['warn', 'In progress'], expired: ['', 'Expired'],
 };
+const CONTROL: Record<string, string> = { pause: 'Pause tamper protection', resume: 'Resume tamper protection', restart: 'Restart agent', disable: 'Disable agent' };
 const OP: Record<string, string> = { start: 'Start service', stop: 'Stop service', restart: 'Restart service', uninstall: 'Uninstall software', update: 'Update agent' };
 
 /** Every service start/stop/restart and software uninstall requested from the console, across all devices. */
@@ -52,6 +53,7 @@ export function ActivityPage() {
           <option value="uninstall">Software uninstalls</option>
           <option value="agent-update">Agent updates</option>
           <option value="remote-support">Remote support agent</option>
+          <option value="agent-control">Agent control</option>
         </select>
         <select className="in" value={status} onChange={(e) => { setPage(1); setStatus(e.target.value); }} aria-label="Result">
           <option value="">Any result</option>
@@ -66,7 +68,7 @@ export function ActivityPage() {
         <DataTable rows={rows} empty={data.loading ? 'Loading…' : 'No device actions yet. Start, stop or restart a service from an asset, or uninstall software from Software Inventory.'} columns={[
           { key: 't', label: 'Requested', render: (r) => <span title={fmt.date(r.requestedAt)}>{fmt.date(r.requestedAt)}</span> },
           { key: 'h', label: 'Device', render: (r) => <Link to={`/assets/${r.assetId}`}><b>{r.hostname ?? r.ip ?? '—'}</b></Link> },
-          { key: 'a', label: 'Action', render: (r) => <>{r.kind === 'remote-support' ? (r.operation === 'install' ? 'Install remote support' : 'Remove remote support') : OP[r.operation] ?? fmt.label(r.operation)}<div className="faint mono" style={{ fontSize: 11.5 }}>{r.kind === 'agent-update' ? `to ${r.target}` : r.kind === 'remote-support' ? 'Zentriq Remote Support agent' : `${r.target}${r.argument ? ` ${r.argument}` : ''}`}</div></> },
+          { key: 'a', label: 'Action', render: (r) => <>{r.kind === 'remote-support' ? (r.operation === 'install' ? 'Install remote support' : 'Remove remote support') : r.kind === 'agent-control' ? CONTROL[r.operation] ?? fmt.label(r.operation) : OP[r.operation] ?? fmt.label(r.operation)}<div className="faint mono" style={{ fontSize: 11.5 }}>{r.kind === 'agent-update' ? `to ${r.target}` : r.kind === 'remote-support' ? 'Zentriq Remote Support agent' : r.kind === 'agent-control' ? 'Zentriq Agent' : `${r.target}${r.argument ? ` ${r.argument}` : ''}`}</div></> },
           { key: 'c', label: 'Via', render: (r) => r.channel === 'agent' ? 'Zentriq Agent' : 'WinRM / WMI' },
           { key: 's', label: 'Result', render: (r) => <Pill tone={STATUS[r.status]?.[0] ?? ''}>{STATUS[r.status]?.[1] ?? fmt.label(r.status)}</Pill> },
           { key: 'd', label: 'Detail', className: 'wrap', render: (r) => <span style={{ fontSize: 12.5 }}>{r.detail ?? (r.status === 'queued' ? 'Runs at the device’s next check-in.' : '')}{r.completedAt ? <span className="faint"> · {fmt.ago(r.completedAt)}</span> : null}</span> },

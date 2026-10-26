@@ -323,7 +323,11 @@ export interface AgentRow {
   canSelfUpdate?: boolean;
   updateAvailable?: boolean;
   latestVersion?: string | null;
-  update?: { status: string; target: string; detail: string | null; requestedAt: string; completedAt: string | null } | null;
+  update?: { status: string; target: string; detail: string | null; requestedAt: string; completedAt: string | null; automatic?: boolean } | null;
+  /** Tamper protection on the device (state reported by the agent) and the last change it undid or refused. */
+  tamper?: { state: 'on' | 'pending' | 'paused' | 'off' | null; until: string | null; lastAt: string | null; last: string | null };
+  /** The agent can be paused, restarted or disabled from the console. */
+  canControl?: boolean;
 }
 
 export interface EnrollmentToken {
@@ -519,5 +523,5 @@ export interface Overview {
   generatedAt: string;
 }
 
-export interface AgentSettings { checkinMinutes: number; inventoryMinutes: number; uninstallProtection: boolean }
+export interface AgentSettings { checkinMinutes: number; inventoryMinutes: number; uninstallProtection: boolean; autoUpdate: boolean; autoUpdateMax: number }
 export interface AgentSettingsResponse { settings: AgentSettings; checkinChoices: number[]; inventoryChoices: number[] }

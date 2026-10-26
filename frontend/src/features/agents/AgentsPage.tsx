@@ -49,6 +49,7 @@ export function AgentsPage() {
   const [picked, setPicked] = useState<string[]>([]);
   const [schedule, setSchedule] = useState<{ ids: string[] | 'all' } | null>(null);
   const [uninstallOpen, setUninstallOpen] = useState(false);
+  const [control, setControl] = useState<AgentRow | null>(null);
   const [created, setCreated] = useState<NewEnrollmentToken | null>(null);
   const [newOpen, setNewOpen] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -139,7 +140,7 @@ export function AgentsPage() {
       <PageHead title="Agents"
         actions={<>
           {pkg.data?.package && <a className="btn" href={pkg.data.package.url} download>Download agent</a>}
-          {manage && <button className="btn" onClick={() => setUninstallOpen(true)}><Icon name="key" size={13} /> Uninstall code</button>}
+          {manage && <button className="btn" onClick={() => setUninstallOpen(true)}><Icon name="key" size={13} /> Agent code</button>}
           {manage && <button className="btn primary" onClick={() => setNewOpen(true)}>New enrollment code</button>}
         </>} />
       {msg && <Callout>{msg}</Callout>}
@@ -194,7 +195,7 @@ export function AgentsPage() {
           <DataTable rows={rows} empty={agents.loading ? 'Loading…' : 'No agents yet. Create an enrollment code and install the agent MSI on a device.'} columns={[
             ...(manage ? [{ key: 'sel', label: <input type="checkbox" aria-label="Select all" checked={rows.length > 0 && picked.length === rows.filter((x) => x.status === 'active').length} onChange={(e) => setPicked(e.target.checked ? rows.filter((x) => x.status === 'active').map((x) => x.id) : [])} />,
               render: (r: AgentRow) => r.status === 'active' ? <input type="checkbox" aria-label={`Select ${r.hostname ?? r.id}`} checked={picked.includes(r.id)} onChange={() => setPicked(picked.includes(r.id) ? picked.filter((x) => x !== r.id) : [...picked, r.id])} /> : null }] : []),
-            { key: 'h', label: 'Device', render: (r) => r.assetId ? <Link to={`/assets/${r.assetId}`}><b>{r.hostname ?? r.id}</b></Link> : <b>{r.hostname ?? r.id}</b> },
+            { key: 'h', label: 'Device', render: (r) => <>{r.assetId ? <Link to={`/assets/${r.assetId}`}><b>{r.hostname ?? r.id}</b></Link> : <b>{r.hostname ?? r.id}</b>}<TamperState r={r} /></> },
             { key: 'os', label: 'Operating system', className: 'wrap', render: (r) => r.osName ?? <span className="faint">—</span> },
             { key: 'ip', label: 'IP address', render: (r) => r.lastIp ? <span className="mono">{r.lastIp}</span> : <span className="faint">—</span> },
             { key: 's', label: 'Connection', render: (r) => r.health === 'online'
@@ -205,7 +206,7 @@ export function AgentsPage() {
             { key: 'sch', label: 'Schedule', render: (r) => r.status === 'active' ? <span className="faint" style={{ fontSize: 12.5 }}>check-in {every(r.checkinMinutes)}<br />inventory {every(r.inventoryMinutes)}</span> : '' },
             { key: 'c', label: 'Last contact', render: (r) => <span className="faint" style={{ fontSize: 12.5 }}><span title={fmt.date(r.lastCheckinAt)}>{r.online ? 'now' : fmt.ago(r.lastCheckinAt)}</span><br /><span title={`Last inventory ${fmt.date(r.lastInventoryAt)}`}>inventory {fmt.ago(r.lastInventoryAt)}</span></span> },
             { key: 'v', label: 'Version', render: (r) => <span title={r.certificateExpires ? `Certificate expires ${fmt.day(r.certificateExpires)}` : ''}>{r.version}<UpdateState r={r} /></span> },
-            { key: 'x', label: '', render: (r) => manage && r.status === 'active' ? <div style={{ display: 'flex', gap: 6, flexWrap: 'nowrap', justifyContent: 'flex-end' }}>{r.status === 'active' && r.updateAvailable && r.canSelfUpdate && !(r.update && ['queued', 'sent', 'running'].includes(r.update.status)) && <button className="btn sm primary" onClick={() => void update([r])}>Update</button>}{r.status === 'active' && r.updateAvailable && !r.canSelfUpdate && <button className="btn sm" onClick={() => void manualUpdate(r)}>Update…</button>}<button className="btn sm" title="Collect inventory now" onClick={() => void collect(r)}>Collect</button><button className="btn sm danger" onClick={() => void revoke(r)}>Revoke</button></div> : null },
+            { key: 'x', label: '', render: (r) => manage && r.status === 'active' ? <div style={{ display: 'flex', gap: 6, flexWrap: 'nowrap', justifyContent: 'flex-end' }}>{r.status === 'active' && r.updateAvailable && r.canSelfUpdate && !(r.update && ['queued', 'sent', 'running'].includes(r.update.status)) && <button className="btn sm primary" onClick={() => void update([r])}>Update</button>}{r.status === 'active' && r.updateAvailable && !r.canSelfUpdate && <button className="btn sm" onClick={() => void manualUpdate(r)}>Update…</button>}<button className="btn sm" title="Collect inventory now" onClick={() => void collect(r)}>Collect</button><button className="btn sm" title="Tamper protection, device code, restart or disable" onClick={() => setControl(r)}>Agent…</button><button className="btn sm danger" onClick={() => void revoke(r)}>Revoke</button></div> : null },
           ]} />
         </Panel>
       ) : (
@@ -238,6 +239,7 @@ export function AgentsPage() {
       )}
       {schedule && <ScheduleDialog ids={schedule.ids} onClose={() => setSchedule(null)} onDone={(m) => { setSchedule(null); setMsg(m); setPicked([]); agents.reload(); }} />}
       {uninstallOpen && <UninstallCodeDialog onClose={() => setUninstallOpen(false)} />}
+      {control && <AgentControlDialog agent={control} onClose={() => setControl(null)} onDone={(m) => { setControl(null); setMsg(m); agents.reload(); }} />}
       {newOpen && <NewCodeDialog defaultUrl={suggestedUrl(pkg.data)} onClose={() => setNewOpen(false)} onCreated={(t) => { setNewOpen(false); setCreated(t); setTab('codes'); tokens.reload(); }} />}
     </>
   );
@@ -301,8 +303,8 @@ function NewCodeDialog({ defaultUrl, onClose, onCreated }: { defaultUrl: string;
 function UpdateState({ r }: { r: AgentRow }) {
   const u = r.update;
   if (r.status !== 'active') return null;
-  if (u && ['queued', 'sent'].includes(u.status)) return <div><Pill tone="warn">Update to {u.target} requested</Pill></div>;
-  if (u && u.status === 'running') return <div><Pill tone="warn">Updating to {u.target}…</Pill></div>;
+  if (u && ['queued', 'sent'].includes(u.status)) return <div><Pill tone="warn">{u.automatic ? 'Automatic update' : 'Update'} to {u.target} requested</Pill></div>;
+  if (u && u.status === 'running') return <div><Pill tone="warn">Updating to {u.target}{u.automatic ? ' (automatic)' : ''}…</Pill></div>;
   if (u && u.status === 'failed' && r.updateAvailable) return <div title={u.detail ?? ''}><Pill tone="crit">Update failed</Pill></div>;
   if (r.updateAvailable) return <div className="faint" style={{ fontSize: 11.5 }} title={r.canSelfUpdate ? '' : 'This agent predates console updates: install the new MSI once.'}>{r.latestVersion} available{r.canSelfUpdate ? '' : ' · install MSI once'}</div>;
   return null;
@@ -374,7 +376,7 @@ function UninstallCodeDialog({ onClose }: { onClose: () => void }) {
     try { await api.del('/agents/uninstall-code'); state.reload(); } catch (e) { setErr(e instanceof Error ? e.message : String(e)); } finally { setBusy(false); }
   }
   return (
-    <Modal title="Uninstall code" onClose={onClose} footer={<>
+    <Modal title="Agent code (uninstall, stop, disable)" onClose={onClose} footer={<>
       {c?.active && <button className="btn danger" style={{ marginRight: 'auto' }} disabled={busy} onClick={() => void cancel()}>Cancel code</button>}
       <button className="btn" onClick={onClose}>Close</button>
       <button className="btn primary" disabled={busy || !c} onClick={() => void create()}>{c?.active ? 'Create new code' : 'Create code'}</button>
@@ -382,13 +384,15 @@ function UninstallCodeDialog({ onClose }: { onClose: () => void }) {
       <div className="form-v">
         <ErrorBox error={state.error} />
         {err && <Callout tone="crit" icon="alert">{err}</Callout>}
-        {c && c.protection === false && <Callout tone="info" icon="info">Uninstall protection is off (Agents › Settings): agents can be removed without a code.</Callout>}
+        {c && c.protection === false && <Callout tone="info" icon="info">Tamper protection is off (Agents › Settings): agents can be removed, stopped and disabled without a code.</Callout>}
         {c && (c.active && c.code ? <>
           <div className="big-code" aria-label="Uninstall code">{c.code}</div>
           <p style={{ margin: 0 }}>Works on <b>all devices</b> until <b>{fmt.date(c.expiresAt)}</b> (one hour){c.createdBy ? ` · created by ${c.createdBy}` : ''}.</p>
-          <label>On the device, as administrator<CopyBox value={`${UNINSTALL_EXE} --uninstall ${c.code}`} label="Uninstall command" rows={2} /></label>
-          <small className="muted">Or Apps &gt; Zentriq Agent &gt; Modify &gt; Remove, and enter the code. Online devices receive the code within seconds, others when they next connect. Agents of earlier versions need updating first (Update in the agents list).</small>
-        </> : <p className="muted" style={{ margin: 0 }}>No uninstall code is active. Create one to remove the agent from devices: a random 16-character code that works on every device for one hour, then expires.</p>)}
+          <label>Remove the agent (on the device, as administrator)<CopyBox value={`${UNINSTALL_EXE} --uninstall ${c.code}`} label="Uninstall command" rows={2} /></label>
+          <label>Stop the agent until the device restarts<CopyBox value={`${UNINSTALL_EXE} --stop ${c.code}`} label="Stop command" /></label>
+          <label>Disable the agent (until enabled again with --enable)<CopyBox value={`${UNINSTALL_EXE} --disable ${c.code}`} label="Disable command" /></label>
+          <small className="muted">Or Apps &gt; Zentriq Agent &gt; Modify &gt; Remove, and enter the code. <span className="mono">--pause {'<code>'}</span> turns tamper protection off for one hour so the Services console can stop or disable the agent. Online devices receive the code within seconds, others when they next connect. For one device only, use <b>Agent… › Code for this device</b> in the agents list.</small>
+        </> : <p className="muted" style={{ margin: 0 }}>No code is active. Create one to remove, stop or disable the agent on devices: a random 16-character code that works on every device for one hour, then expires.</p>)}
       </div>
     </Modal>
   );
@@ -423,13 +427,86 @@ function SettingsTab({ onSaved, onAll }: { onSaved: (msg: string) => void; onAll
           </div>
         </div>
       </Panel>
-      <Panel title="Uninstall protection" sub="Stops users and local administrators from removing the agent">
+      <Panel title="Tamper protection" sub="Stops users and local or domain administrators from removing, stopping or disabling the agent">
         <div className="form-v">
-          <label className="row-check"><input type="checkbox" checked={f.uninstallProtection} onChange={(e) => setF({ ...f, uninstallProtection: e.target.checked })} /> Require an uninstall code to remove the agent</label>
-          <p className="muted" style={{ margin: 0, fontSize: 13 }}>To remove agents, create an uninstall code (Agents › Uninstall code): one random code for all devices, valid for one hour. While protected, the agent service cannot be stopped or reconfigured by administrators. Updates from the console keep working.</p>
+          <label className="row-check"><input type="checkbox" checked={f.uninstallProtection} onChange={(e) => setF({ ...f, uninstallProtection: e.target.checked })} /> Require a code to uninstall, stop or disable the agent</label>
+          <ul className="plain muted" style={{ margin: 0, fontSize: 13 }}>
+            <li>The agent service cannot be stopped, disabled or reconfigured in Services, with <span className="mono">sc</span> or PowerShell; its registry key and program folder are read-only for administrators.</li>
+            <li>A change made behind its back (for example after taking ownership) is undone within two minutes and reported here and in the audit log; a watchdog task starts the agent again after a restart.</li>
+            <li>On the device, a one-hour code (Agents › Agent code, or Agent… › Code for this device) allows <span className="mono">--uninstall</span>, <span className="mono">--stop</span>, <span className="mono">--disable</span> or <span className="mono">--pause</span>.</li>
+            <li>From here you can always pause protection, restart or disable an agent (Agent… in the list). Updates from the console keep working.</li>
+          </ul>
+          <div><button className="btn primary" disabled={busy} onClick={() => void save()}>Save</button></div>
+        </div>
+      </Panel>
+      <Panel title="Automatic updates" sub="Keep agents at the version of this server">
+        <div className="form-v">
+          <label className="row-check"><input type="checkbox" checked={f.autoUpdate} onChange={(e) => setF({ ...f, autoUpdate: e.target.checked })} /> Update agents automatically when this server has a newer agent</label>
+          <label>At most this many agents update at the same time
+            <input className="in" type="number" min={1} max={1000} value={f.autoUpdateMax} disabled={!f.autoUpdate} onChange={(e) => setF({ ...f, autoUpdateMax: Number(e.target.value) || 1 })} style={{ maxWidth: 140 }} /></label>
+          <p className="muted" style={{ margin: 0, fontSize: 13 }}>After Zentriq on this server is updated, each older agent updates itself at its next check-in: it downloads the package from this server over its secure connection, checks the checksum and installs it silently (the service restarts for a few seconds; enrollment and history are kept). A failed update is retried after 24 hours. Agents installed before self-update existed need the new MSI once. Off: update agents with the Update button.</p>
           <div><button className="btn primary" disabled={busy} onClick={() => void save()}>Save</button></div>
         </div>
       </Panel>
     </div>
+  );
+}
+
+/** Tamper protection state and the last tampering the agent undid or refused (under the device name). */
+function TamperState({ r }: { r: AgentRow }) {
+  const t = r.tamper;
+  if (r.status !== 'active' || !t) return null;
+  const recent = t.lastAt && Date.now() - new Date(t.lastAt).getTime() < 7 * 86400000;
+  return <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 2 }}>
+    {t.state === 'paused' && <Pill tone="warn">Protection paused{t.until ? ` until ${new Date(t.until).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}` : ''}</Pill>}
+    {recent && <span title={`${fmt.date(t.lastAt)}: ${t.last ?? ''}`}><Pill tone="crit">Tampering blocked · {fmt.ago(t.lastAt)}</Pill></span>}
+  </div>;
+}
+
+/** Console control of one agent: its own code, pause / resume tamper protection, restart, disable. */
+function AgentControlDialog({ agent, onClose, onDone }: { agent: AgentRow; onClose: () => void; onDone: (msg: string) => void }) {
+  const confirm = useConfirm();
+  const [code, setCode] = useState<{ code: string; expiresAt: string } | null>(null);
+  const [hours, setHours] = useState(1);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const name = agent.hostname ?? agent.id;
+  const t = agent.tamper;
+  const state = !agent.uninstallProtected ? 'Off' : t?.state === 'paused' ? `Paused${t.until ? ` until ${fmt.date(t.until)}` : ''}` : t?.state === 'pending' ? 'Being applied' : 'On';
+  async function getCode() {
+    setBusy(true); setErr(null);
+    try { setCode(await api.post<{ code: string; expiresAt: string }>(`/agents/${agent.id}/code`)); } catch (e) { setErr(e instanceof Error ? e.message : String(e)); } finally { setBusy(false); }
+  }
+  async function run(operation: 'pause' | 'resume' | 'restart' | 'disable') {
+    if (operation === 'disable' && !(await confirm({
+      title: `Disable the agent on ${name}?`, danger: true, confirmLabel: 'Disable agent',
+      message: <>The agent service is set to Disabled and stops. The device stays <b>offline</b> here — no inventory, actions, updates or remote support — until someone enables the service on the device (<span className="mono">ZentriqAgent.exe --enable</span> as administrator) or reinstalls the agent.</>,
+    }))) return;
+    setBusy(true); setErr(null);
+    try { const r = await api.post<{ message: string }>(`/agents/${agent.id}/control`, { operation, hours }); onDone(r.message); }
+    catch (e) { setErr(e instanceof Error ? e.message : String(e)); } finally { setBusy(false); }
+  }
+  return (
+    <Modal title={`Agent on ${name}`} onClose={onClose} footer={<button className="btn" onClick={onClose}>Close</button>}>
+      <div className="form-v">
+        {err && <Callout tone="crit" icon="alert">{err}</Callout>}
+        <p style={{ margin: 0 }}>Tamper protection on this device: <b>{state}</b>{t?.lastAt ? <> · last tampering blocked {fmt.date(t.lastAt)}<br /><span className="muted" style={{ fontSize: 12.5 }}>{t.last}</span></> : null}</p>
+        {!agent.canControl && <Callout tone="warn" icon="alert">This agent ({agent.version}) predates console control. Update it first; uninstall codes work already.</Callout>}
+        <div className="field-title">Code for this device</div>
+        {code ? <><div className="big-code" aria-label="Device code">{code.code}</div>
+          <small className="muted">Valid on {name} only, until {fmt.date(code.expiresAt)}. On the device as administrator: <span className="mono">ZentriqAgent.exe --uninstall | --stop | --disable | --pause {code.code}</span></small></>
+          : <div><button className="btn" disabled={busy || !agent.uninstallProtected} onClick={() => void getCode()}><Icon name="key" size={13} /> Show a one-hour code</button></div>}
+        <div className="field-title">From the console</div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          {t?.state === 'paused'
+            ? <button className="btn" disabled={busy || !agent.canControl} onClick={() => void run('resume')}>Resume protection now</button>
+            : <><button className="btn" disabled={busy || !agent.canControl || !agent.uninstallProtected} onClick={() => void run('pause')}>Pause protection for</button>
+              <select className="in" value={hours} onChange={(e) => setHours(Number(e.target.value))} aria-label="Pause for" style={{ width: 'auto' }}>{[1, 2, 4, 8, 24].map((h) => <option key={h} value={h}>{h} hour{h > 1 ? 's' : ''}</option>)}</select></>}
+          <button className="btn" disabled={busy || !agent.canControl} onClick={() => void run('restart')}>Restart agent</button>
+          <button className="btn danger" disabled={busy || !agent.canControl} onClick={() => void run('disable')}>Disable agent…</button>
+        </div>
+        <small className="muted">While paused, administrators on the device can stop or disable the agent in Services; protection returns by itself afterwards. Online agents act within seconds, others at their next check-in.</small>
+      </div>
+    </Modal>
   );
 }

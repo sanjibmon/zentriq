@@ -119,7 +119,7 @@ Remove-Item $answer -Force   # contains the administrator password
 
 if (-not $installed) {
     foreach ($t in 'T02 PostgreSQL provisioning', 'T03 Database migration', 'T04 Administrator sign-in', 'T05 API and worker services', 'T06 Trial initialization',
-                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection', 'T68 Live agent connection', 'T69 Locations and IT accessories', 'T70 Manual hardware details', 'T71 Standard and Advanced installation', 'T72 Asset lifecycle', 'T73 Cloud and infrastructure', 'T74 Own asset tags, people and bulk upload', 'T75 Backup and restore', 'T76 Roles and groups', 'T77 Log retention and export') {
+                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection', 'T68 Live agent connection', 'T69 Locations and IT accessories', 'T70 Manual hardware details', 'T71 Standard and Advanced installation', 'T72 Asset lifecycle', 'T73 Cloud and infrastructure', 'T74 Own asset tags, people and bulk upload', 'T75 Backup and restore', 'T76 Roles and groups', 'T77 Log retention and export', 'T78 Agent stop and disable protection', 'T79 Automatic agent update') {
         Record $t.Substring(0, 3) $t.Substring(4) 'BLOCKED' 'installation failed'
     }
 } else {
@@ -533,6 +533,61 @@ if (-not $installed) {
             Start-Sleep 10
             $p2b = Start-Process msiexec.exe -ArgumentList '/x', $product, '/qn', "UNINSTALLCODE=$($first.code)", '/l*v', "`"$(Join-Path $OutDir 'agent-uninstall-oldcode.log')`"" -Wait -PassThru
             Assert ($p2b.ExitCode -ne 0 -and (Get-Service ZentriqAgent -ErrorAction SilentlyContinue)) "the replaced code still removed the agent (exit $($p2b.ExitCode))"
+            # ---- T78: stopping and disabling need a code too (checked here while protection is on) ----
+            Check 'T78' 'Agent stop and disable protection: Services, sc and the registry refused; wrong code refused and reported; stop / disable / enable with a code; console pause, resume and per-device code' {
+                $svcKey = 'HKLM:\SYSTEM\CurrentControlSet\Services\ZentriqAgent'
+                function Svc { Get-CimInstance Win32_Service -Filter "Name='ZentriqAgent'" }
+                function WaitFor([scriptblock] $Cond, [int] $Seconds, [string] $What) {
+                    $deadline = (Get-Date).AddSeconds($Seconds)
+                    while (-not (& $Cond) -and (Get-Date) -lt $deadline) { Start-Sleep 3 }
+                    Assert (& $Cond) "timed out: $What"
+                }
+                function Refused([scriptblock] $Do) { try { & $Do; $false } catch { $true } }
+                function Hardened { ((& sc.exe sdshow ZentriqAgent) -join '') -match [regex]::Escape('(A;;CCLCSWRPLOCRRC;;;BA)') }
+                # Wait for the agent to have applied tamper protection (registry key read-only for administrators).
+                WaitFor { Refused { Set-ItemProperty $svcKey -Name Description -Value 'x' -ErrorAction Stop } } 180 'service registry key still writable for administrators'
+                Assert (Refused { Set-Service ZentriqAgent -StartupType Disabled -ErrorAction Stop }) 'an administrator could disable the protected service'
+                & sc.exe config ZentriqAgent start= disabled | Out-Null
+                Assert ((Svc).StartMode -eq 'Auto') "startup type changed with sc.exe: $((Svc).StartMode)"
+                Assert (Refused { Set-ItemProperty $svcKey -Name Start -Value 4 -ErrorAction Stop }) 'the Start value could be set to Disabled in the registry'
+                Assert (Get-ScheduledTask -TaskPath '\Zentriq\' -TaskName 'Zentriq Agent watchdog' -ErrorAction SilentlyContinue) 'watchdog task missing'
+                $folderWritable = -not (Refused { Set-Content (Join-Path $env:ProgramFiles 'Zentriq Agent\zq-test.txt') 'x' -ErrorAction Stop })
+                Assert (-not $folderWritable) 'the agent program folder is writable for administrators'
+                # A wrong code is refused and reported to the console.
+                & $exe --stop ABCD-EFGH-JKMN-PQRS 2>&1 | Out-Null
+                Assert ($LASTEXITCODE -ne 0 -and (Get-Service ZentriqAgent).Status -eq 'Running') 'a wrong code stopped the agent'
+                WaitFor { $a = @(Api GET '/agents' -Session $s | ForEach-Object { $_ }) | Where-Object id -eq $script:agentId; $a.tamper.lastAt } 120 'refused code not reported to the console'
+                $aud = Api GET '/audit?action=agent.tamper' -Session $s
+                Assert ($aud.total -ge 1) 'agent.tamper not in the audit log'
+                # Stop with this device's own code; enable again.
+                $dev = Api POST "/agents/$($script:agentId)/code" -Session $s
+                & $exe --stop $dev.code | Out-Host
+                Assert ($LASTEXITCODE -eq 0) "--stop with the device code exit $LASTEXITCODE"
+                WaitFor { (Get-Service ZentriqAgent).Status -eq 'Stopped' } 60 'agent did not stop with the device code'
+                & $exe --enable | Out-Host
+                WaitFor { (Get-Service ZentriqAgent).Status -eq 'Running' } 60 'agent did not start with --enable'
+                WaitFor { Hardened } 120 'protection not back after the agent started again'
+                # Disable with the code for all agents; enable again.
+                & $exe --disable $code.code | Out-Host
+                Assert ($LASTEXITCODE -eq 0) "--disable exit $LASTEXITCODE"
+                WaitFor { (Get-Service ZentriqAgent).Status -eq 'Stopped' -and (Svc).StartMode -eq 'Disabled' } 60 'agent not disabled with the code'
+                & $exe --enable | Out-Host
+                WaitFor { (Get-Service ZentriqAgent).Status -eq 'Running' -and (Svc).StartMode -eq 'Auto' } 60 'agent not enabled again'
+                WaitFor { Hardened } 120 'protection not back after enable'
+                # From the console: pause (Services may stop it), then resume (refused again).
+                Api POST "/agents/$($script:agentId)/control" @{ operation = 'pause'; hours = 1 } -Session $s | Out-Null
+                WaitFor { -not (Hardened) } 180 'console pause did not relax the service permissions'
+                Stop-Service ZentriqAgent -ErrorAction Stop   # allowed while paused
+                Start-Service ZentriqAgent
+                WaitFor { $a = @(Api GET '/agents' -Session $s | ForEach-Object { $_ }) | Where-Object id -eq $script:agentId; $a.tamper.state -eq 'paused' -and $a.online } 180 'paused state not reported'
+                Api POST "/agents/$($script:agentId)/control" @{ operation = 'resume' } -Session $s | Out-Null
+                WaitFor { Hardened } 180 'console resume did not restore protection'
+                Assert (Refused { Stop-Service ZentriqAgent -ErrorAction Stop }) 'the service could be stopped after resume'
+                $acts = Api GET '/activity?kind=agent-control' -Session $s
+                Assert (@($acts.items | Where-Object status -eq 'succeeded').Count -ge 2) 'console pause / resume not completed in the Activity log'
+                "Services, sc.exe and the registry refused; program folder read-only; watchdog task present; wrong code refused and reported (audit + agents list); stop with the device code and --enable; disable with the code for all and --enable; protection back each time; console pause allowed Stop-Service, resume refused it again"
+            } | Out-Null
+
             $p3 = Start-Process $exe -ArgumentList '--uninstall', $code.code -Wait -PassThru
             Assert ($p3.ExitCode -eq 0) "--uninstall did not start the removal (exit $($p3.ExitCode))"
             $deadline = (Get-Date).AddMinutes(3)
@@ -2066,10 +2121,39 @@ if (-not $installed) {
                 foreach ($e in $arp) { Start-Process msiexec.exe -ArgumentList '/x', $e.PSChildName, '/qn' -Wait | Out-Null }
                 "$($before.version) -> $($a.version) in place (same registration and certificate, one Apps entry); Activity log: $($a.update.detail)"
             } | Out-Null
+            Check 'T79' 'Automatic agent update: off by default; when on, an older agent updates itself to the server version without a console request' {
+                $s = Login
+                $st = Api GET '/agents/settings' -Session $s
+                Assert (-not $st.settings.autoUpdate) 'automatic updates are on by default'
+                Api PUT '/agents/settings' @{ checkinMinutes = 30; inventoryMinutes = 180; uninstallProtection = $false; autoUpdate = $true; autoUpdateMax = 5 } -Session $s | Out-Null
+                $tok = Api POST '/agents/enrollment-tokens' @{ name = 'ci-autoupdate'; validDays = 1; maxUses = 1; serverUrl = 'https://localhost:8444' } -Session $s
+                $p = Start-Process msiexec.exe -ArgumentList '/i', "`"$agentMsi`"", '/qn', "SERVERURL=https://localhost:8444", "ENROLLMENTCODE=$($tok.code)", 'CHECKININTERVAL=2', 'INVENTORYINTERVAL=30', '/l*v', "`"$(Join-Path $OutDir 'agent-install-autoupdate.log')`"" -Wait -PassThru
+                Assert ($p.ExitCode -eq 0) "agent MSI exit $($p.ExitCode)"
+                try {
+                    $deadline = (Get-Date).AddMinutes(12)
+                    do {
+                        Start-Sleep 15
+                        $a = @(Api GET '/agents' -Session $s | ForEach-Object { $_ }) | Where-Object { $_.status -eq 'active' -and $_.assetId -and $_.enrollmentCode -eq 'ci-autoupdate' } | Select-Object -First 1
+                    } while (-not ($a -and $a.version -eq $a.latestVersion -and $a.update -and $a.update.status -eq 'succeeded') -and (Get-Date) -lt $deadline)
+                    if (-not ($a -and $a.update -and $a.update.status -eq 'succeeded')) {
+                        Get-ChildItem 'C:\ProgramData\Zentriq\Agent\Logs' -ErrorAction SilentlyContinue | Copy-Item -Destination $OutDir -ErrorAction SilentlyContinue
+                        throw "no automatic update: agent $(if ($a) { "$($a.version), latest $($a.latestVersion), update $($a.update | ConvertTo-Json -Compress)" } else { 'not enrolled' })"
+                    }
+                    Assert ($a.update.automatic) 'the update was not marked automatic'
+                    $act = Api GET '/activity?kind=agent-update' -Session $s
+                    Assert (@($act.items | Where-Object { $_.status -eq 'succeeded' -and $_.target -eq $a.version -and -not $_.requestedBy }).Count -ge 1) 'automatic update not in the Activity log'
+                    "agent installed at the older version updated itself to $($a.version) without a console request ($($a.update.detail))"
+                } finally {
+                    Api PUT '/agents/settings' @{ checkinMinutes = 30; inventoryMinutes = 180; uninstallProtection = $false; autoUpdate = $false; autoUpdateMax = 25 } -Session $s | Out-Null
+                    $arp = @(Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*' -ErrorAction SilentlyContinue | Where-Object { $_.PSObject.Properties['DisplayName'] -and $_.DisplayName -eq 'Zentriq Agent' })
+                    foreach ($e in $arp) { Start-Process msiexec.exe -ArgumentList '/x', $e.PSChildName, '/qn' -Wait | Out-Null }
+                }
+            } | Out-Null
         } else { Record 'T47' 'Agent update from the console' 'BLOCKED' 'agent package from T26 not available' }
     } else {
         Record 'T13' 'Upgrade to the next release' 'NOT RUN' 'no -UpgradeBundle supplied'
         Record 'T47' 'Agent update from the console' 'NOT RUN' 'needs -UpgradeBundle (a newer agent package on the server)'
+        Record 'T79' 'Automatic agent update' 'NOT RUN' 'needs -UpgradeBundle (a newer agent package on the server)'
     }
 
     Check 'T14' 'Logs contain no administrator password or connection-string passwords' {

@@ -40,15 +40,26 @@ public static class AgentEndpoints
     public sealed record PresenceRequest(string? UninstallCodeHash = null);
     public sealed record RenewRequest(string Csr);
     public sealed record CheckinRequest(string? AgentVersion, string? Hostname, string? OsName, string? LastError, string[]? Capabilities = null,
-        DateTimeOffset? OfflineSince = null, bool? UninstallProtected = null);
+        DateTimeOffset? OfflineSince = null, bool? UninstallProtected = null, List<AgentEvent>? Events = null, TamperReport? TamperProtection = null);
+    /// <summary>Reported by the agent: "tamper" (a change it undid, a wrong code) or "control" (stopped, disabled, paused with a code).</summary>
+    public sealed record AgentEvent(string? Kind, DateTimeOffset? At, string? Text);
+    /// <summary>Tamper protection on the device: on, pending, paused (until) or off.</summary>
+    public sealed record TamperReport(string? State, DateTimeOffset? Until);
+    public sealed record ControlRequest(string? Operation, int? Hours);
 
     /// <summary>System-wide agent settings (Agents › Settings).</summary>
     public sealed class AgentSettings
     {
         public int CheckinMinutes { get; set; } = 30;
         public int InventoryMinutes { get; set; } = 180;
-        /// <summary>Uninstalling the agent needs a one-hour code from the console.</summary>
+        /// <summary>
+        /// Tamper protection: uninstalling, stopping or disabling the agent on the device needs a one-hour code from the console.
+        /// </summary>
         public bool UninstallProtection { get; set; } = true;
+        /// <summary>Agents older than the package on this server update themselves at their next check-in.</summary>
+        public bool AutoUpdate { get; set; }
+        /// <summary>At most this many automatic updates run at the same time (the rest follow at later check-ins).</summary>
+        public int AutoUpdateMax { get; set; } = 25;
     }
 
     public static int? ValidCheckin(int? m) => m is >= MinCheckinMinutes and <= MaxCheckinMinutes ? m : null;
@@ -243,7 +254,7 @@ public static class AgentEndpoints
         }).AllowAnonymous();
 
         g.MapPost("/checkin", async (CheckinRequest req, HttpContext http, NpgsqlDataSource ds, AgentServer server,
-            Zentriq.Infrastructure.Secrets.CredentialProtector protector, ILoggerFactory lf, CancellationToken ct) =>
+            Zentriq.Infrastructure.Secrets.CredentialProtector protector, ILoggerFactory lf, AuditWriter audit, IWebHostEnvironment env, CancellationToken ct) =>
         {
             var (agent, error) = await AuthenticateAsync(http, ds, server, ct);
             if (agent is null) return error!;
@@ -258,12 +269,16 @@ public static class AgentEndpoints
                        online_until = CASE WHEN 'presence' = ANY(COALESCE(@cap, ARRAY[]::text[])) THEN online_until
                                            ELSE now() + make_interval(mins => checkin_minutes * 2 + 5) END,
                        last_outage_from = COALESCE(@off, last_outage_from), last_outage_to = CASE WHEN @off::timestamptz IS NULL THEN last_outage_to ELSE now() END,
-                       uninstall_protected = COALESCE(@up, uninstall_protected)
+                       uninstall_protected = COALESCE(@up, uninstall_protected),
+                       tamper_state = COALESCE(@ts, tamper_state), tamper_until = CASE WHEN @ts::text IS NULL THEN tamper_until ELSE @tu END
                  WHERE id = @id
                 RETURNING last_inventory_at, cert_not_after, checkin_minutes, inventory_minutes, uninstall_key_protected
                 """);
             cmd.Parameters.Add(new NpgsqlParameter("off", NpgsqlDbType.TimestampTz) { Value = (object?)outageFrom ?? DBNull.Value });
             cmd.Parameters.Add(new NpgsqlParameter("up", NpgsqlDbType.Boolean) { Value = (object?)req.UninstallProtected ?? DBNull.Value });
+            var ts = req.TamperProtection?.State is "on" or "pending" or "paused" or "off" ? req.TamperProtection.State : null;
+            cmd.Parameters.Add(Text("ts", ts));
+            cmd.Parameters.Add(new NpgsqlParameter("tu", NpgsqlDbType.TimestampTz) { Value = ts == "paused" && req.TamperProtection!.Until is { } tu ? tu : DBNull.Value });
             cmd.Parameters.AddWithValue("id", agent.Id);
             cmd.Parameters.Add(new NpgsqlParameter("ip", NpgsqlDbType.Inet) { Value = (object?)ClientIp(http) ?? DBNull.Value });
             cmd.Parameters.Add(Text("v", Trunc(req.AgentVersion, 40)));
@@ -297,6 +312,7 @@ public static class AgentEndpoints
                     await k.ExecuteNonQueryAsync(ct);
                 }
             }
+            if (req.Events is { Count: > 0 }) await RecordEventsAsync(ds, audit, agent.Id, req.Hostname, ClientIp(http)?.ToString(), req.Events, ct);
             var inventoryDue = lastInv is null || lastInv < DateTimeOffset.UtcNow.AddMinutes(-inventory) || await RequestedAsync(ds, agent.Id, ct);
             // Pending device actions (service start/stop/restart). Actions older than 1 hour are not handed out any more.
             var actions = new List<object>();
@@ -306,7 +322,10 @@ public static class AgentEndpoints
             if (caps.Contains("software-uninstall")) kinds.Add("uninstall");
             if (caps.Contains("self-update")) kinds.Add("agent-update");
             if (caps.Contains("remote-support")) kinds.Add("remote-support");
+            if (caps.Contains("tamper-protection")) kinds.Add("agent-control");
             await CompleteUpdatesAsync(ds, agent.Id, req.AgentVersion, ct);
+            if (settings.AutoUpdate && caps.Contains("self-update") && agent.AssetId is not null)
+                await QueueAutoUpdateAsync(ds, env, agent.Id, agent.AssetId.Value, req.AgentVersion, settings.AutoUpdateMax, ct);
             if (kinds.Count > 0)
             {
                 // Hand out new actions, and re-send ones whose result never arrived (e.g. the device restarted mid-action).
@@ -467,9 +486,9 @@ public static class AgentEndpoints
                        r.cert_not_after, r.asset_id, a.hostname, r.revoked_at, t.name, r.capabilities,
                        u.status, u.target, u.detail, u.requested_at, u.completed_at,
                        r.checkin_minutes, r.inventory_minutes, COALESCE(r.online_until > now(), false), r.last_outage_from, r.last_outage_to, r.uninstall_protected,
-                       zentriq.asset_ipv4(r.asset_id)
+                       zentriq.asset_ipv4(r.asset_id), r.tamper_state, r.tamper_until, r.last_tamper_at, r.last_tamper, COALESCE(u.automatic, false)
                   FROM zentriq.agent_registrations r
-                  LEFT JOIN LATERAL (SELECT x.status, x.target, x.detail, x.requested_at, x.completed_at FROM zentriq.asset_actions x
+                  LEFT JOIN LATERAL (SELECT x.status, x.target, x.detail, x.requested_at, x.completed_at, x.automatic FROM zentriq.asset_actions x
                                       WHERE x.agent_id = r.id AND x.kind = 'agent-update' ORDER BY x.requested_at DESC LIMIT 1) u ON true
                   LEFT JOIN zentriq.assets a ON a.id = r.asset_id
                   LEFT JOIN zentriq.agent_enrollment_tokens t ON t.id = r.token_id
@@ -495,7 +514,9 @@ public static class AgentEndpoints
                     canSelfUpdate = !r.IsDBNull(14) && r.GetFieldValue<string[]>(14).Contains("self-update"),
                     updateAvailable = status == "active" && IsOlder(r.GetString(2), latest),
                     latestVersion = latest,
-                    update = r.IsDBNull(15) ? null : new { status = r.GetString(15), target = r.GetString(16), detail = S(17), requestedAt = r.GetFieldValue<DateTimeOffset>(18), completedAt = D(19) },
+                    update = r.IsDBNull(15) ? null : new { status = r.GetString(15), target = r.GetString(16), detail = S(17), requestedAt = r.GetFieldValue<DateTimeOffset>(18), completedAt = D(19), automatic = r.GetBoolean(31) },
+                    tamper = new { state = S(27), until = D(28), lastAt = D(29), last = S(30) },
+                    canControl = !r.IsDBNull(14) && r.GetFieldValue<string[]>(14).Contains("tamper-protection"),
                     checkinMinutes = r.GetInt32(20), inventoryMinutes = r.GetInt32(21), online = r.GetBoolean(22),
                     lastOutage = D(23) is { } of ? new { from = of, to = D(24) } : null, uninstallProtected = r.GetBoolean(25),
                     live = !r.IsDBNull(14) && r.GetFieldValue<string[]>(14).Contains("presence"),
@@ -529,6 +550,78 @@ public static class AgentEndpoints
             await rc.AuditAsync("agent.collect_requested", id.ToString());
             AgentPresence.Instance.Nudge();
             return Results.Accepted(value: new { message = "Inventory requested: an agent that is online sends it within a minute, otherwise at its next check-in." });
+        }).RequireAuthorization(Permissions.AgentsManage);
+
+        // Control the agent itself from the console: pause / resume tamper protection on the device, restart the agent
+        // service, or disable it (the device then stays offline until the service is enabled on the device).
+        g.MapPost("/{id:guid}/control", async (Guid id, ControlRequest body, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
+        {
+            var op = body.Operation?.Trim().ToLowerInvariant();
+            if (op is not ("pause" or "resume" or "restart" or "disable")) return Validation.Problem("operation", "Choose pause, resume, restart or disable.");
+            var hours = Math.Clamp(body.Hours ?? 1, 1, 24);
+            await using var q = ds.CreateCommand("""
+                SELECT r.asset_id, COALESCE(r.hostname, a.hostname), COALESCE('tamper-protection' = ANY(r.capabilities), false)
+                  FROM zentriq.agent_registrations r LEFT JOIN zentriq.assets a ON a.id = r.asset_id
+                 WHERE r.id = @id AND r.status = 'active'
+                """);
+            q.Parameters.AddWithValue("id", id);
+            Guid? asset = null; string? host = null; var capable = false;
+            await using (var r = await q.ExecuteReaderAsync(ct))
+            {
+                if (!await r.ReadAsync(ct)) return Results.NotFound();
+                asset = r.IsDBNull(0) ? null : r.GetGuid(0); host = r.IsDBNull(1) ? null : r.GetString(1); capable = r.GetBoolean(2);
+            }
+            if (!capable) return Results.Problem(statusCode: 409, title: "This agent is too old for console control. Update it first (Agents › Update).");
+            if (asset is null) return Results.Problem(statusCode: 409, title: "This agent has not sent inventory yet.");
+            await using (var ins = ds.CreateCommand("""
+                INSERT INTO zentriq.asset_actions (asset_id, agent_id, channel, kind, target, operation, argument, requested_by, detail)
+                VALUES (@as, @ag, 'agent', 'agent-control', 'Zentriq Agent', @op, @arg, @by, @d)
+                """))
+            {
+                ins.Parameters.AddWithValue("as", asset.Value);
+                ins.Parameters.AddWithValue("ag", id);
+                ins.Parameters.AddWithValue("op", op);
+                ins.Parameters.Add(Text("arg", op == "pause" ? hours.ToString(System.Globalization.CultureInfo.InvariantCulture) : null));
+                ins.Parameters.Add(new NpgsqlParameter("by", NpgsqlDbType.Uuid) { Value = (object?)rc.UserId ?? DBNull.Value });
+                ins.Parameters.AddWithValue("d", op switch
+                {
+                    "pause" => $"Pause tamper protection for {hours} hour(s) requested.",
+                    "resume" => "Resume tamper protection requested.",
+                    "restart" => "Restart of the agent service requested.",
+                    _ => "Disable the agent service requested.",
+                });
+                await ins.ExecuteNonQueryAsync(ct);
+            }
+            AgentPresence.Instance.Nudge();
+            await rc.AuditAsync("agent.control", host ?? id.ToString(), detail: new { operation = op, hours = op == "pause" ? hours : (int?)null });
+            return Results.Accepted(value: new { message = op switch
+            {
+                "pause" => $"{host}: tamper protection pauses for {hours} hour(s) as soon as the agent receives the request (within seconds when it is online).",
+                "resume" => $"{host}: tamper protection is turned on again when the agent receives the request.",
+                "restart" => $"{host}: the agent service restarts when it receives the request.",
+                _ => $"{host}: the agent service is disabled when it receives the request. The device stays offline until the service is enabled on the device (ZentriqAgent.exe --enable).",
+            } });
+        }).RequireAuthorization(Permissions.AgentsManage);
+
+        // A one-hour code for one device only (its own key): uninstall, stop or disable the agent on that device.
+        g.MapPost("/{id:guid}/code", async (Guid id, NpgsqlDataSource ds, RequestContext rc, Zentriq.Infrastructure.Secrets.CredentialProtector protector, CancellationToken ct) =>
+        {
+            var settings = await LoadSettingsAsync(ds, ct);
+            if (!settings.UninstallProtection) return Results.Problem(statusCode: 409, title: "Tamper protection is off: no code is needed.");
+            await using var q = ds.CreateCommand("SELECT r.uninstall_key_protected, r.uninstall_protected, COALESCE(r.hostname, a.hostname) FROM zentriq.agent_registrations r LEFT JOIN zentriq.assets a ON a.id = r.asset_id WHERE r.id = @id AND r.status = 'active'");
+            q.Parameters.AddWithValue("id", id);
+            string? keyProtected = null, host = null; var held = false;
+            await using (var r = await q.ExecuteReaderAsync(ct))
+            {
+                if (!await r.ReadAsync(ct)) return Results.NotFound();
+                keyProtected = r.IsDBNull(0) ? null : r.GetString(0); held = r.GetBoolean(1); host = r.IsDBNull(2) ? null : r.GetString(2);
+            }
+            var key = keyProtected is null ? null : UnprotectKey(protector, id, keyProtected);
+            if (key is null || !held) return Results.Problem(statusCode: 409, title: "This device has not received its protection key yet (it gets it at its next check-in). Use the code for all agents instead.");
+            var expires = DateTime.UtcNow.Add(AgentCodes.UninstallValidity);
+            var code = AgentCodes.Group(AgentCodes.UninstallCode(key, expires), 4);
+            await rc.AuditAsync("agent.device_code", host ?? id.ToString(), detail: new { expires });
+            return Results.Ok(new { code, expiresAt = new DateTimeOffset(expires, TimeSpan.Zero), hostname = host });
         }).RequireAuthorization(Permissions.AgentsManage);
 
         // Update agents to the package served by this server. Agents of earlier builds without the self-update
@@ -617,6 +710,7 @@ public static class AgentEndpoints
         {
             if (ValidCheckin(body.CheckinMinutes) is null) return Validation.Problem("checkinMinutes", "Choose a check-in interval.");
             if (ValidInventory(body.InventoryMinutes) is null || body.InventoryMinutes < body.CheckinMinutes) return Validation.Problem("inventoryMinutes", "Choose an inventory interval at least as long as the check-in interval.");
+            if (body.AutoUpdateMax is < 1 or > 1000) return Validation.Problem("autoUpdateMax", "Choose between 1 and 1000 agents updating at the same time.");
             await using var cmd = ds.CreateCommand("""
                 INSERT INTO zentriq.system_settings (key, value) VALUES ('agents.settings', @v::jsonb)
                 ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()
@@ -835,6 +929,68 @@ public static class AgentEndpoints
             _hash = (path, info.LastWriteTimeUtc, info.Length, sha);
             return sha;
         }
+    }
+
+    /// <summary>
+    /// Events the agent reports at check-in: written to the audit log; tampering is also kept on the agent and raised as a
+    /// console notification (at most one per agent every 30 minutes).
+    /// </summary>
+    private static async Task RecordEventsAsync(NpgsqlDataSource ds, AuditWriter audit, Guid agentId, string? hostname, string? ip, List<AgentEvent> events, CancellationToken ct)
+    {
+        var host = Trunc(hostname, 255) ?? agentId.ToString();
+        DateTimeOffset? lastAt = null; string? last = null;
+        foreach (var e in events.Take(20))
+        {
+            var text = Trunc(e.Text, 500) ?? "";
+            var tamper = e.Kind == "tamper";
+            await audit.WriteAsync(new AuditActor(null, $"Zentriq Agent on {host}", ip), tamper ? "agent.tamper" : "agent.local_control", host,
+                tamper ? "Denied" : "Success", new { text, at = e.At, agentId }, ct: ct);
+            if (tamper) { lastAt = e.At is { } at && at <= DateTimeOffset.UtcNow.AddMinutes(5) ? at : DateTimeOffset.UtcNow; last = text; }
+        }
+        if (last is null) return;
+        await using (var u = ds.CreateCommand("UPDATE zentriq.agent_registrations SET last_tamper_at = @at, last_tamper = @t WHERE id = @id"))
+        {
+            u.Parameters.AddWithValue("id", agentId);
+            u.Parameters.AddWithValue("at", lastAt!.Value);
+            u.Parameters.AddWithValue("t", last);
+            await u.ExecuteNonQueryAsync(ct);
+        }
+        await using var n = ds.CreateCommand("""
+            INSERT INTO zentriq.notifications (user_id, kind, title, body, link)
+            SELECT NULL, 'crit', 'Agent tampering on ' || @h, @b, '/agents'
+             WHERE NOT EXISTS (SELECT 1 FROM zentriq.notifications WHERE title = 'Agent tampering on ' || @h AND created_at > now() - interval '30 minutes')
+            """);
+        n.Parameters.AddWithValue("h", host);
+        n.Parameters.AddWithValue("b", last);
+        await n.ExecuteNonQueryAsync(ct);
+    }
+
+    /// <summary>
+    /// Automatic update (Agents › Settings): an agent older than the package on this server gets an update action at its
+    /// check-in, unless one is in progress, one failed in the last 24 hours, or the limit of simultaneous updates is reached.
+    /// </summary>
+    private static async Task QueueAutoUpdateAsync(NpgsqlDataSource ds, IWebHostEnvironment env, Guid agentId, Guid assetId, string? version, int max, CancellationToken ct)
+    {
+        var latest = PackageVersion(env);
+        if (latest is null || !IsOlder(version, latest)) return;
+        var file = env.WebRootFileProvider.GetFileInfo(PackagePath);
+        if (!file.Exists || file.PhysicalPath is null) return;
+        await using var ins = ds.CreateCommand("""
+            INSERT INTO zentriq.asset_actions (asset_id, agent_id, channel, kind, target, operation, argument, detail, automatic)
+            SELECT @as, @ag, 'agent', 'agent-update', @t, 'update', @sha, @d, true
+             WHERE NOT EXISTS (SELECT 1 FROM zentriq.asset_actions x WHERE x.agent_id = @ag AND x.kind = 'agent-update'
+                                 AND (x.status IN ('queued','sent','running') AND x.requested_at > now() - interval '24 hours'
+                                      OR x.status = 'failed' AND x.target = @t AND x.requested_at > now() - interval '24 hours'))
+               AND (SELECT count(*) FROM zentriq.asset_actions x WHERE x.kind = 'agent-update' AND x.automatic
+                       AND x.status IN ('queued','sent','running') AND x.requested_at > now() - interval '24 hours') < @max
+            """);
+        ins.Parameters.AddWithValue("as", assetId);
+        ins.Parameters.AddWithValue("ag", agentId);
+        ins.Parameters.AddWithValue("t", latest);
+        ins.Parameters.AddWithValue("sha", PackageSha256(file.PhysicalPath));
+        ins.Parameters.AddWithValue("d", $"Automatic update {version} -> {latest}.");
+        ins.Parameters.AddWithValue("max", (long)Math.Max(1, max));
+        await ins.ExecuteNonQueryAsync(ct);
     }
 
     /// <summary>
