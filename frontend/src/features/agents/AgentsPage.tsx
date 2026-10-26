@@ -303,7 +303,7 @@ function NewCodeDialog({ defaultUrl, onClose, onCreated }: { defaultUrl: string;
 function UpdateState({ r }: { r: AgentRow }) {
   const u = r.update;
   if (r.status !== 'active') return null;
-  if (u && ['queued', 'sent'].includes(u.status)) return <div><Pill tone="warn">{u.automatic ? 'Automatic update' : 'Update'} to {u.target} requested</Pill></div>;
+  if (u && ['queued', 'sent'].includes(u.status)) return <div><Pill tone="warn">{u.automatic ? `Auto-update to ${u.target}` : `Update to ${u.target} requested`}</Pill></div>;
   if (u && u.status === 'running') return <div><Pill tone="warn">Updating to {u.target}{u.automatic ? ' (automatic)' : ''}…</Pill></div>;
   if (u && u.status === 'failed' && r.updateAvailable) return <div title={u.detail ?? ''}><Pill tone="crit">Update failed</Pill></div>;
   if (r.updateAvailable) return <div className="faint" style={{ fontSize: 11.5 }} title={r.canSelfUpdate ? '' : 'This agent predates console updates: install the new MSI once.'}>{r.latestVersion} available{r.canSelfUpdate ? '' : ' · install MSI once'}</div>;
