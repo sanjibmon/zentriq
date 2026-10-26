@@ -431,9 +431,6 @@ details.rs-advanced[open] summary { margin-bottom: 12px; }
 .cl-account p { margin: 8px 0 0; }
 .cl-stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 12px 0 4px; }
 .cl-stats dt { font-size: 11.5px; color: var(--muted); } .cl-stats dd { margin: 2px 0 0; font-weight: 600; font-variant-numeric: tabular-nums; }
-.cl-pick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-.cl-pick-btn { display: grid; justify-items: start; gap: 3px; text-align: left; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line-strong); background: var(--surface); cursor: pointer; color: var(--fg); }
-.cl-pick-btn i { width: 18px; height: 18px; border-radius: 5px; background: var(--c6); margin-bottom: 4px; }
 .cl-pick-btn.cl-azure i { background: linear-gradient(135deg, #2a8bf2, #0b5cc4); } .cl-pick-btn.cl-aws i { background: linear-gradient(135deg, #ffb13d, #e07b00); }
 .cl-pick-btn.cl-vmware i { background: linear-gradient(135deg, #6db33f, #1d8a5a); } .cl-pick-btn.cl-hyperv i { background: linear-gradient(135deg, #3fb7e6, #5b5fc7); }
 .cl-pick-btn small { color: var(--muted); font-size: 11.5px; }
@@ -441,7 +438,7 @@ details.rs-advanced[open] summary { margin-bottom: 12px; }
 .cl-hits { display: grid; gap: 4px; max-height: 260px; overflow: auto; }
 .cl-hits button { text-align: left; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--fg); cursor: pointer; }
 .cl-hits button.on { border-color: var(--accent); background: var(--accent-soft); }
-@media (max-width: 760px) { .cl-pick { grid-template-columns: repeat(2, 1fr); } .cl-stats { grid-template-columns: repeat(3, 1fr); } .cl-accounts { grid-template-columns: 1fr; } }
+@media (max-width: 760px) { .cl-stats { grid-template-columns: repeat(3, 1fr); } .cl-accounts { grid-template-columns: 1fr; } }
 .cl-acts { margin-left: auto; display: flex; gap: 6px; flex-wrap: nowrap; }
 .cl-stack { display: grid; gap: 14px; align-content: start; }
 .cl-stack > .panel { margin: 0; }
@@ -459,3 +456,36 @@ details.rs-advanced[open] summary { margin-bottom: 12px; }
 .lc-tagmode button.on { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); background: color-mix(in srgb, var(--accent) 5%, var(--surface)); }
 .lc-tagmode button:disabled { cursor: default; }
 @media (max-width: 760px) { .lc-tagmode { grid-template-columns: 1fr; } }
+
+/* Add / edit connection: numbered sections on one grid. */
+.cl-form { display: grid; }
+.cl-form > .callout { margin-bottom: 14px; }
+.cl-sec { display: grid; gap: 12px; padding: 18px 0; }
+.cl-sec:first-of-type { padding-top: 2px; }
+.cl-sec + .cl-sec { border-top: 1px solid var(--line); }
+.cl-sec:last-child { padding-bottom: 2px; }
+.cl-sec-h { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0; font-size: 14px; font-weight: 600; }
+.cl-sec-h small { font-size: 12px; font-weight: 400; }
+.cl-sec-n { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-size: 12px; font-weight: 700; flex: none; }
+.cl-sec label { display: grid; gap: 5px; align-content: start; font-size: 13px; font-weight: 500; }
+.cl-sec label small { font-weight: 400; font-size: 11.5px; }
+.cl-sec label.row-check { display: flex; gap: 8px; align-items: center; font-weight: 400; }
+.cl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; align-items: start; }
+.cl-grid .span-2, .cl-grid > .row-check { grid-column: 1 / -1; }
+.cl-grid.cl-host { grid-template-columns: 1fr 104px; gap: 12px; }
+.cl-pick-group { display: grid; gap: 6px; }
+.cl-pick-kind { font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.cl-pick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.cl-pick-btn { display: flex; align-items: center; gap: 10px; min-height: 46px; text-align: left; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line-strong); background: var(--surface); cursor: pointer; color: var(--fg); font-size: 13px; line-height: 1.25; }
+.cl-pick-btn b { font-weight: 600; }
+.cl-pick-btn:hover { border-color: var(--accent); }
+.cl-pick-btn i, .cl-dot i { width: 20px; height: 20px; border-radius: 6px; background: var(--c6); flex: none; display: block; }
+.cl-platform { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13.5px; }
+.cl-dot.cl-azure i { background: linear-gradient(135deg, #2a8bf2, #0b5cc4); } .cl-dot.cl-aws i { background: linear-gradient(135deg, #ffb13d, #e07b00); }
+.cl-dot.cl-vmware i { background: linear-gradient(135deg, #6db33f, #1d8a5a); } .cl-dot.cl-hyperv i { background: linear-gradient(135deg, #3fb7e6, #5b5fc7); }
+.cl-help .callout { margin: 0; }
+.cl-sync { display: flex; align-items: flex-end; gap: 28px; flex-wrap: wrap; }
+.cl-sync .row-check { padding-bottom: 9px; }
+.cl-unit { display: inline-flex; align-items: center; gap: 8px; font-weight: 400; }
+.cl-unit .in { width: 90px; }
+@media (max-width: 760px) { .cl-pick { grid-template-columns: repeat(2, 1fr); } .cl-grid, .cl-grid.cl-host { grid-template-columns: 1fr; } }

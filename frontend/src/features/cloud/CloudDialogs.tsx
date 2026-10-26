@@ -83,65 +83,115 @@ export function AccountDialog({ account, onClose, onDone }: { account: CloudAcco
     } catch (x) { setError(err(x)); } finally { setBusy(false); }
   }
 
+  const platform = PROVIDERS.find((p) => p.id === provider)!;
+  const scoped = provider === 'azure' || provider === 'aws' || provider === 'gcp';
+  const secretField = provider !== 'hyperv' && provider !== 'gcp' && (
+    <Field label={secretLabel} hint={account?.hasSecret ? 'Saved (encrypted). Leave empty to keep it.' : 'Stored encrypted; never shown again.'}>
+      <input className="in" type="password" value={f.secret} onChange={set('secret')} required={!account} autoComplete="new-password" />
+    </Field>
+  );
+  const signInTitle = provider === 'azure' ? 'App registration' : provider === 'aws' ? 'Access key' : provider === 'gcp' ? 'Service account'
+    : provider === 'hyperv' ? 'Hosts and sign-in' : provider === 'proxmox' ? 'API token' : 'Sign-in';
+
   return (
     <Modal title={account ? `Connection — ${account.name}` : 'Add a cloud or virtualization connection'} wide onClose={onClose} footer={<>
       <button type="button" className="btn" onClick={onClose} disabled={busy}>Cancel</button>
       <button type="submit" form="cl-form" className="btn primary" disabled={busy}>{busy ? 'Saving…' : account ? 'Save' : 'Add and sync'}</button>
     </>}>
-      <form id="cl-form" className="form-v" onSubmit={(e) => void submit(e)}>
+      <form id="cl-form" className="cl-form" onSubmit={(e) => void submit(e)}>
         {error && <Callout tone="crit" icon="alert">{error}</Callout>}
-        {!account && <div className="cl-pick" role="radiogroup" aria-label="Platform">
-          {PROVIDERS.map((p) => (
-            <button key={p.id} type="button" role="radio" aria-checked={provider === p.id} className={`cl-pick-btn cl-${p.id}${provider === p.id ? ' on' : ''}`} onClick={() => setProvider(p.id)}>
-              <i /><b>{p.label}</b><small>{p.kind === 'cloud' ? 'Public cloud' : 'Virtualization'}</small>
-            </button>
-          ))}
-        </div>}
-        <Callout icon="info">{HELP[provider]}</Callout>
-        <div className="grid-2 tight">
-          <Field label="Name"><input className="in" value={f.name} onChange={set('name')} required maxLength={200} placeholder={NAME[provider]} /></Field>
-          <Field label="Sync every (hours)"><input className="in" type="number" min={1} max={168} value={f.syncHours} onChange={set('syncHours')} /></Field>
-          {provider === 'azure' && <>
-            <Field label="Directory (tenant) ID"><input className="in mono" value={f.tenantId} onChange={set('tenantId')} required placeholder="00000000-0000-0000-0000-000000000000" /></Field>
-            <Field label="Application (client) ID"><input className="in mono" value={f.clientId} onChange={set('clientId')} required placeholder="00000000-0000-0000-0000-000000000000" /></Field>
-          </>}
-          {provider === 'aws' && <>
-            <Field label="Access key ID"><input className="in mono" value={f.accessKeyId} onChange={set('accessKeyId')} required placeholder="AKIA…" /></Field>
-            <Field label="Regions" hint="Empty = every enabled region."><input className="in mono" value={f.regions} onChange={set('regions')} placeholder="ap-south-1, us-east-1" /></Field>
-          </>}
-          {hostBased && <>
-            <Field label={hp[0]}><input className="in mono" value={f.host} onChange={set('host')} required placeholder={hp[1]} /></Field>
-            <Field label="Port" hint={`${hp[2]} by default.`}><input className="in" type="number" min={1} max={65535} value={f.port} onChange={set('port')} placeholder={hp[2]} /></Field>
-            <Field label={provider === 'proxmox' ? 'API token ID' : 'User'}><input className="in" value={f.username} onChange={set('username')} required placeholder={hp[3]} autoComplete="off" /></Field>
-          </>}
-          {provider !== 'hyperv' && provider !== 'gcp' && <Field label={secretLabel} hint={account?.hasSecret ? 'Saved (encrypted). Leave empty to keep it.' : 'Stored encrypted; never shown again.'}>
-            <input className="in" type="password" value={f.secret} onChange={set('secret')} required={!account} autoComplete="new-password" />
+
+        <Section n={1} title="Platform">
+          {account ? <div className="cl-platform"><span className={`cl-dot cl-${provider}`}><i /></span><b>{platform.label}</b>
+            <span className="muted">· {platform.kind === 'cloud' ? 'Public cloud' : 'Virtualization'} · cannot be changed</span></div>
+            : (['cloud', 'virtual'] as const).map((kind) => (
+              <div key={kind} className="cl-pick-group">
+                <div className="cl-pick-kind">{kind === 'cloud' ? 'Public cloud' : 'Virtualization'}</div>
+                <div className="cl-pick" role="radiogroup" aria-label={kind === 'cloud' ? 'Public cloud platforms' : 'Virtualization platforms'}>
+                  {PROVIDERS.filter((p) => p.kind === kind).map((p) => (
+                    <button key={p.id} type="button" role="radio" aria-checked={provider === p.id} className={`cl-pick-btn cl-${p.id}${provider === p.id ? ' on' : ''}`} onClick={() => setProvider(p.id)}>
+                      <i /><b>{p.label}</b>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          <div className="cl-help"><Callout icon="info">{HELP[provider]}</Callout></div>
+        </Section>
+
+        <Section n={2} title="Connection">
+          <div className="cl-grid">
+            <Field label="Connection name" hint="Shown in lists and reports."><input className="in" value={f.name} onChange={set('name')} required maxLength={200} placeholder={NAME[provider]} /></Field>
+            {hostBased && <div className="cl-grid cl-host">
+              <Field label={hp[0]}><input className="in mono" value={f.host} onChange={set('host')} required placeholder={hp[1]} /></Field>
+              <Field label="Port" hint={`Default ${hp[2]}`}><input className="in" type="number" min={1} max={65535} value={f.port} onChange={set('port')} placeholder={hp[2]} /></Field>
+            </div>}
+            {hostBased && <label className="row-check span-2"><input type="checkbox" checked={f.skip} onChange={(e) => setF({ ...f, skip: e.target.checked })} /> Skip the certificate check (server with its own self-signed certificate)</label>}
+          </div>
+        </Section>
+
+        <Section n={3} title={signInTitle}>
+          <div className="cl-grid">
+            {provider === 'azure' && <>
+              <Field label="Directory (tenant) ID"><input className="in mono" value={f.tenantId} onChange={set('tenantId')} required placeholder="00000000-0000-0000-0000-000000000000" /></Field>
+              <Field label="Application (client) ID"><input className="in mono" value={f.clientId} onChange={set('clientId')} required placeholder="00000000-0000-0000-0000-000000000000" /></Field>
+              {secretField}
+            </>}
+            {provider === 'aws' && <>
+              <Field label="Access key ID"><input className="in mono" value={f.accessKeyId} onChange={set('accessKeyId')} required placeholder="AKIA…" /></Field>
+              {secretField}
+            </>}
+            {hostBased && <>
+              <Field label={provider === 'proxmox' ? 'API token ID' : 'User'}><input className="in" value={f.username} onChange={set('username')} required placeholder={hp[3]} autoComplete="off" /></Field>
+              {secretField}
+            </>}
+            {provider === 'gcp' && <div className="span-2"><Field label="Service account JSON key" hint={account?.hasSecret ? `Saved (encrypted)${account.settings.clientEmail ? ` for ${account.settings.clientEmail}` : ''}. Leave empty to keep it.` : 'Paste the whole file. Stored encrypted; never shown again.'}>
+              <textarea className="in mono" rows={6} value={f.secret} onChange={set('secret')} required={!account} spellCheck={false} placeholder={'{\n  "type": "service_account",\n  "project_id": "…",\n  "private_key": "-----BEGIN PRIVATE KEY-----…",\n  "client_email": "zentriq@….iam.gserviceaccount.com", …\n}'} />
+            </Field></div>}
+            {provider === 'hyperv' && <>
+              <Field label="Hyper-V hosts" hint="Host names or IP addresses, one per line (each node of a cluster).">
+                <textarea className="in mono" rows={3} value={f.hosts} onChange={set('hosts')} required placeholder={'hv01.corp.example.com\nhv02.corp.example.com'} />
+              </Field>
+              <Field label="Windows credential" hint={windows.length === 0 && !creds.loading ? 'No Windows credential saved yet — add one in Discovery › Credentials.' : 'Saved credentials (Discovery › Credentials).'}>
+                <select className="in" value={f.credentialId} onChange={set('credentialId')} required>
+                  <option value="">Choose…</option>
+                  {windows.map((c) => <option key={c.id} value={c.id}>{c.name}{c.username ? ` (${c.username})` : ''}</option>)}
+                </select>
+              </Field>
+            </>}
+          </div>
+        </Section>
+
+        {scoped && <Section n={4} title="Scope" sub="Optional — leave empty to read everything the account can see.">
+          {provider === 'azure' && <Field label="Subscription IDs" hint="One per line. Empty = every subscription the app has the Reader role on.">
+            <textarea className="in mono" rows={2} value={f.subscriptions} onChange={set('subscriptions')} placeholder="00000000-0000-0000-0000-000000000000" />
           </Field>}
-          {provider === 'hyperv' && <Field label="Windows credential" hint={windows.length === 0 && !creds.loading ? 'No Windows credential saved yet — add one in Discovery › Credentials.' : 'Saved credentials (Discovery › Credentials).'}>
-            <select className="in" value={f.credentialId} onChange={set('credentialId')} required>
-              <option value="">Choose…</option>
-              {windows.map((c) => <option key={c.id} value={c.id}>{c.name}{c.username ? ` (${c.username})` : ''}</option>)}
-            </select>
+          {provider === 'aws' && <Field label="Regions" hint="Comma-separated. Empty = every enabled region.">
+            <input className="in mono" value={f.regions} onChange={set('regions')} placeholder="ap-south-1, us-east-1" />
           </Field>}
-        </div>
-        {provider === 'azure' && <Field label="Subscription IDs" hint="Empty = every subscription the app has the Reader role on. One per line.">
-          <textarea className="in mono" rows={2} value={f.subscriptions} onChange={set('subscriptions')} />
-        </Field>}
-        {provider === 'gcp' && <>
-          <Field label="Service account JSON key" hint={account?.hasSecret ? `Saved (encrypted)${account.settings.clientEmail ? ` for ${account.settings.clientEmail}` : ''}. Leave empty to keep it.` : 'Paste the whole file. Stored encrypted; never shown again.'}>
-            <textarea className="in mono" rows={5} value={f.secret} onChange={set('secret')} required={!account} spellCheck={false} placeholder={'{\n  "type": "service_account",\n  "project_id": "…",\n  "private_key": "-----BEGIN PRIVATE KEY-----…",\n  "client_email": "zentriq@….iam.gserviceaccount.com", …\n}'} />
-          </Field>
-          <Field label="Project IDs" hint="Empty = every project the service account can see (or the key's own project). One per line.">
-            <textarea className="in mono" rows={2} value={f.projects} onChange={set('projects')} />
-          </Field>
-        </>}
-        {provider === 'hyperv' && <Field label="Hyper-V hosts" hint="Host names or IP addresses, one per line (each node of a cluster).">
-          <textarea className="in mono" rows={3} value={f.hosts} onChange={set('hosts')} required placeholder={'hv01.corp.example.com\nhv02.corp.example.com'} />
-        </Field>}
-        {hostBased && <label className="row-check"><input type="checkbox" checked={f.skip} onChange={(e) => setF({ ...f, skip: e.target.checked })} /> Skip the certificate check (server with its own self-signed certificate)</label>}
-        <label className="row-check"><input type="checkbox" checked={f.enabled} onChange={(e) => setF({ ...f, enabled: e.target.checked })} /> Enabled (synced on schedule)</label>
+          {provider === 'gcp' && <Field label="Project IDs" hint="One per line. Empty = every project the service account can see (or the key's own project).">
+            <textarea className="in mono" rows={2} value={f.projects} onChange={set('projects')} placeholder="my-project-123" />
+          </Field>}
+        </Section>}
+
+        <Section n={scoped ? 5 : 4} title="Synchronisation">
+          <div className="cl-sync">
+            <Field label="Sync every"><span className="cl-unit"><input className="in" type="number" min={1} max={168} value={f.syncHours} onChange={set('syncHours')} aria-label="Sync interval in hours" /> hours</span></Field>
+            <label className="row-check"><input type="checkbox" checked={f.enabled} onChange={(e) => setF({ ...f, enabled: e.target.checked })} /> Enabled — sync on this schedule</label>
+          </div>
+        </Section>
       </form>
     </Modal>
+  );
+}
+
+/** A numbered section of the connection form. */
+function Section({ n, title, sub, children }: { n: number; title: string; sub?: string; children: ReactNode }) {
+  return (
+    <section className="cl-sec">
+      <h3 className="cl-sec-h"><span className="cl-sec-n">{n}</span>{title}{sub && <small className="muted">{sub}</small>}</h3>
+      {children}
+    </section>
   );
 }
 
