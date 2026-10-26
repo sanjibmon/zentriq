@@ -1,10 +1,13 @@
 # Test report
 
-Latest: GitHub Actions run 40212734306, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
-10.0.20348** VM. Release: `v1.1.1-build.87` (pre-release, **unsigned**), package version **1.1.1.87**. Results: unit +
+Latest: GitHub Actions run 40356298073, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
+10.0.20348** VM. Release: `v1.1.1-build.88` (pre-release, **unsigned**), package version **1.1.1.88**. Results: unit +
 PostgreSQL integration tests **343 PASS, 2 skipped** (live remote support and SNMP tests run in ci-quick: PASS, 345/345);
-installer acceptance **67 passed, 0 failed**; in-place updates PASS (database migration V0028, schema 28). Build 86 stopped
-at T55 (an API token with *Export reports* could no longer reach report data); fixed in build 87.
+installer acceptance **67 passed, 0 failed**; in-place updates PASS (schema 28).
+
+New in build 88: the *Cloud & Infrastructure › Add connection* dialog is laid out in numbered sections (Platform grouped
+into Public cloud and Virtualization, Connection, Sign-in, Scope, Synchronisation) on one aligned two-column grid, checked
+for all nine platforms at desktop and narrow widths. No API or database change.
 
 New in build 87: **role-based access per area** (dashboard, IT inventory, non-IT inventory, IT accessories, lifecycle, cloud,
 activity log, reports each with their own see / change permissions; menus, pages, dashboard widgets, report data sources and
@@ -38,11 +41,11 @@ replaced) and the trial's 30-device total cap.
 ## Release artifacts (SHA-256)
 
 ```
-6ee9a00e99d607dc30ef236c97f52b876ab59852ec2f244e664e5f28629f7858  Zentriq-1.1.1-docs.zip
-6add656393deed647f342a2237ac7d8c93f3592d20576a07208564a124130272  Zentriq-1.1.1-msi-offline-kit.zip
-f1388d7611673eeaca9d326e2642b0775ec34c5fadc7d76553b54213c713dea8  Zentriq-Setup-x64.exe
-86c8efa85808bebde418cf2e0c123cd0c2a7e7e5d6cda0194fdc499e5d6092bd  Zentriq.msi
-68c8afebd1ed4b53564a83ba4c4747b746ae3cb64c42a5f6c18dfd3c8bd8bbc9  ZentriqAgent-x64.msi
+1e3d01961aa1a2f4da0139f8dc99b8d779bd21964b31ae24e70bed7f79a2d8dc  Zentriq-1.1.1-docs.zip
+f109b02ebd9f3c971cca84f48c57f232a8cd94bbc0936c8d27ef863209b924e1  Zentriq-1.1.1-msi-offline-kit.zip
+48a2f5165ca537c1c930d608b763b29561960fc1a8338741c5f4b9343d670f43  Zentriq-Setup-x64.exe
+ea6b8d750b4477b4f34c0ed29f598cd4e550493ca83b8f2dae7f59f460c19700  Zentriq.msi
+bebf783046a7faa15673b040c96040b8d9a45e7b035c45bf4c8a128b4d1a4a23  ZentriqAgent-x64.msi
 ```
 
 ## Installer acceptance (tests/installer/Invoke-InstallerAcceptance.ps1)
