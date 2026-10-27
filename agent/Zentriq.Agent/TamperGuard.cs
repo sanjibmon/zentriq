@@ -551,7 +551,7 @@ internal static class TamperGuard
             return ok ? 0 : 1;
         }
         catch (UnauthorizedAccessException) { Console.Error.WriteLine("Run this command as administrator."); return 1; }
-        catch (TimeoutException) { Console.Error.WriteLine("The Zentriq Agent service did not answer. Try again in a minute."); return 1; }
+        catch (System.TimeoutException) { Console.Error.WriteLine("The Zentriq Agent service did not answer. Try again in a minute."); return 1; }
     }
 
     /// <summary>--enable: startup type Automatic and start (after a stop or disable with a code).</summary>
