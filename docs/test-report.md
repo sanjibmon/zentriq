@@ -1,9 +1,23 @@
 # Test report
 
-Latest: GitHub Actions run 40356298073, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
-10.0.20348** VM. Release: `v1.1.1-build.88` (pre-release, **unsigned**), package version **1.1.1.88**. Results: unit +
+Latest: GitHub Actions run 40424954541, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
+10.0.20348** VM. Release: `v1.1.1-build.90` (pre-release, **unsigned**), package version **1.1.1.90**. Results: unit +
 PostgreSQL integration tests **343 PASS, 2 skipped** (live remote support and SNMP tests run in ci-quick: PASS, 345/345);
-installer acceptance **67 passed, 0 failed**; in-place updates PASS (schema 28).
+installer acceptance **69 passed, 0 failed**; in-place updates PASS (database migration V0029, schema 29). Build 89 was
+cancelled (it was built without the agent changes).
+
+New in build 90: **agent tamper protection for stop and disable** — while protection is on, nobody on the device (local
+or domain administrators included) can stop, disable or reconfigure the agent service, change its registry key or its
+program folder; changes made behind its back are undone and reported; a watchdog task restarts it after a reboot;
+`--stop`, `--disable`, `--pause <code>` with a one-hour code (device code or code for all), `--enable`; console control per
+agent (pause / resume protection, restart, disable, one-hour device code). **Automatic agent updates** (optional, off by
+default, limit of simultaneous updates).
+
+| ID | Test | Result | Detail |
+|---|---|---|---|
+| T78 | Agent stop and disable protection | **PASS** | Services, sc.exe and the registry refused; program folder read-only; watchdog task present; wrong code refused and reported (audit + agents list); stop with the device code and `--enable`; disable with the code for all and `--enable`; protection back each time; console pause allowed Stop-Service, resume refused it again |
+| T79 | Automatic agent update | **PASS** | off by default; an agent installed at the older version updated itself to 1.1.2.90 without a console request |
+| T67 / T47 / T29 | Uninstall protection, console update, revocation | **PASS** | unchanged behaviour |
 
 New in build 88: the *Cloud & Infrastructure › Add connection* dialog is laid out in numbered sections (Platform grouped
 into Public cloud and Virtualization, Connection, Sign-in, Scope, Synchronisation) on one aligned two-column grid, checked
@@ -41,11 +55,11 @@ replaced) and the trial's 30-device total cap.
 ## Release artifacts (SHA-256)
 
 ```
-1e3d01961aa1a2f4da0139f8dc99b8d779bd21964b31ae24e70bed7f79a2d8dc  Zentriq-1.1.1-docs.zip
-f109b02ebd9f3c971cca84f48c57f232a8cd94bbc0936c8d27ef863209b924e1  Zentriq-1.1.1-msi-offline-kit.zip
-48a2f5165ca537c1c930d608b763b29561960fc1a8338741c5f4b9343d670f43  Zentriq-Setup-x64.exe
-ea6b8d750b4477b4f34c0ed29f598cd4e550493ca83b8f2dae7f59f460c19700  Zentriq.msi
-bebf783046a7faa15673b040c96040b8d9a45e7b035c45bf4c8a128b4d1a4a23  ZentriqAgent-x64.msi
+708cf3417e2e751887b395b0e7a5aa6e164c7f2814c139ecb0c74dfbfc059aed  Zentriq-1.1.1-docs.zip
+695c2ecc83d882e3feca6c327cb794b03179e38dbb1c6ea4ea760cf7e5705dbd  Zentriq-1.1.1-msi-offline-kit.zip
+26f2d04889bbc8e972fd3efdb41d87781e98f935f9fe473998d51c8df71db182  Zentriq-Setup-x64.exe
+78bb2970c3b671adbcd9c642ef2e6dc0cfb505448e49f1f340ed50fa8720c4fc  Zentriq.msi
+c6d56b0e9456ddc74a7225359805c0cb0d2653c611ce442985f6edc3c455f682  ZentriqAgent-x64.msi
 ```
 
 ## Installer acceptance (tests/installer/Invoke-InstallerAcceptance.ps1)
