@@ -220,28 +220,11 @@ internal static class UninstallProtection
     }
 }
 
-/// <summary>
-/// While uninstall protection is on, administrators can query and start the agent service but not stop, reconfigure or
-/// delete it (Windows Installer, running as SYSTEM, still can, so updates keep working).
-/// </summary>
+/// <summary>Kept for the callers above: tamper protection (see <see cref="TamperGuard"/>) follows uninstall protection.</summary>
 internal static class ServiceHardening
 {
-    private const string Default = "D:(A;;CCLCSWRPWPDTLOCRRC;;;SY)(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;BA)(A;;CCLCSWLOCRRC;;;IU)(A;;CCLCSWLOCRRC;;;SU)";
-    private const string Hardened = "D:(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;SY)(A;;CCLCSWRPLOCRRC;;;BA)(A;;CCLCSWLOCRRC;;;IU)(A;;CCLCSWLOCRRC;;;SU)";
-    private static bool? _applied;
-
     public static void Apply(bool hardened)
     {
-        if (_applied == hardened) return;
-        try
-        {
-            var psi = new System.Diagnostics.ProcessStartInfo(System.IO.Path.Combine(Environment.SystemDirectory, "sc.exe"), $"sdset {Program.ServiceName} {(hardened ? Hardened : Default)}")
-            { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
-            using var p = System.Diagnostics.Process.Start(psi)!;
-            p.WaitForExit(15000);
-            if (p.ExitCode == 0) _applied = hardened;
-            else Log.Warn($"Could not {(hardened ? "protect" : "unprotect")} the agent service (sc sdset exit {p.ExitCode}).");
-        }
-        catch (Exception ex) { Log.Warn("Could not change the agent service permissions: " + ex.Message); }
+        if (hardened) TamperGuard.Sync(); else TamperGuard.Set(false);
     }
 }

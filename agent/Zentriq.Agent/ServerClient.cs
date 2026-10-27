@@ -173,12 +173,15 @@ internal sealed class ServerClient : IDisposable
     public Task<HelloResponse> HelloAsync(string codeId, string nonce, CancellationToken ct) =>
         PostJsonAsync<HelloResponse>("api/agent/v1/enroll/hello", new Dictionary<string, object?> { ["codeId"] = codeId, ["nonce"] = nonce }, ct);
 
-    public Task<CheckinResponse> CheckinAsync(string hostname, string osName, string? lastError, DateTime? offlineSince, bool? uninstallProtected, CancellationToken ct) =>
+    public Task<CheckinResponse> CheckinAsync(string hostname, string osName, string? lastError, DateTime? offlineSince, bool? uninstallProtected, CancellationToken ct,
+        List<Dictionary<string, object?>>? events = null) =>
         PostJsonAsync<CheckinResponse>("api/agent/v1/checkin", new Dictionary<string, object?>
         {
             ["agentVersion"] = Program.Version, ["hostname"] = hostname, ["osName"] = osName, ["lastError"] = lastError,
-            ["capabilities"] = new[] { "service-control", "software-uninstall", "self-update", "remote-support", "schedule", "uninstall-protection", "presence" },
+            ["capabilities"] = new[] { "service-control", "software-uninstall", "self-update", "remote-support", "schedule", "uninstall-protection", "presence", "tamper-protection" },
             ["offlineSince"] = offlineSince?.ToString("o"), ["uninstallProtected"] = uninstallProtected,
+            ["events"] = events is { Count: > 0 } ? events : null,
+            ["tamperProtection"] = TamperGuard.ReportedState(),
         }, ct);
 
     /// <summary>The live connection (held open by the server for about 25 seconds; see <see cref="Presence"/>).</summary>

@@ -81,6 +81,17 @@ internal static class Program
                 }
                 case "--uninstall":
                     return Uninstall(args.Length > 1 ? args[1] : null);
+                case "--stop":
+                case "--disable":
+                case "--pause":
+                    if (args.Length < 2 && UninstallProtectedFlag()) { Console.Error.WriteLine($"Usage: ZentriqAgent.exe {cmd} <code>   (a one-hour code from the Zentriq console)"); return 2; }
+                    return TamperGuard.Client(cmd.Substring(2), args.Length > 1 ? args[1] : null);
+                case "--enable":
+                    return TamperGuard.Enable();
+                case "--protection":
+                    return TamperGuard.Client("status", null);
+                case "--watchdog":
+                    return TamperGuard.Watchdog();
                 case "--uninstall-run":
                     return UninstallRun(args.Length > 1 ? args[1] : null);
                 case "--run":
@@ -96,7 +107,12 @@ internal static class Program
                         "  --status             show enrollment and last check-in\n" +
                         "  --enroll <code> --server <address> [--checkin <min>] [--inventory <min>]\n" +
                         "                       enroll with an enrollment code from the console (Agents page)\n" +
-                        "  --uninstall <code>   remove the agent (uninstall code from the console, valid for 1 hour)\n" +
+                        "  --uninstall <code>   remove the agent (code from the console, valid for 1 hour)\n" +
+                        "  --stop <code>        stop the agent service until the device restarts (code from the console)\n" +
+                        "  --disable <code>     disable and stop the agent service (code from the console)\n" +
+                        "  --pause <code>       pause tamper protection for 1 hour (Services can then stop or disable it)\n" +
+                        "  --enable             set the agent service to Automatic and start it\n" +
+                        "  --protection         show whether tamper protection is on\n" +
                         "  --once               run one check-in cycle now\n" +
                         "  --collect-now        check in and send inventory now\n" +
                         "  --collect <file>     write this device's inventory to a JSON file (nothing is sent)\n" +
@@ -127,6 +143,8 @@ internal static class Program
             hklm.DeleteSubKeyTree(AgentState.KeyPath, false);
         }
         catch (Exception ex) { Console.Error.WriteLine("Registry cleanup: " + ex.Message); }
+        try { TamperGuard.RemoveWatchdog(); }
+        catch (Exception ex) { Console.Error.WriteLine("Watchdog task cleanup: " + ex.Message); }
         try { if (Directory.Exists(AgentPaths.Queue)) Directory.Delete(AgentPaths.Queue, true); }
         catch (Exception ex) { Console.Error.WriteLine("Queue cleanup: " + ex.Message); }
         Console.WriteLine("Zentriq Agent state removed (logs kept in " + Log.Directory + ").");
@@ -212,6 +230,18 @@ internal static class Program
         return null;
     }
 
+    /// <summary>Whether protection is on (readable by administrators; the key itself is SYSTEM only).</summary>
+    private static bool UninstallProtectedFlag()
+    {
+        try
+        {
+            using var hklm = Microsoft.Win32.RegistryKey.OpenBaseKey(Microsoft.Win32.RegistryHive.LocalMachine, Microsoft.Win32.RegistryView.Registry64);
+            using var k = hklm.OpenSubKey(AgentState.KeyPath, false);
+            return k?.GetValue("UninstallProtected") is int i && i == 1;
+        }
+        catch (Exception) { return false; }
+    }
+
     private static int Status()
     {
         var s = AgentState.Load();
@@ -226,7 +256,8 @@ internal static class Program
         Console.WriteLine($"Inventory every: {s.InventoryMinutes} min");
         Console.WriteLine($"Other addresses: {(s.ServerUrls.Count == 0 ? "-" : string.Join(", ", s.ServerUrls))}");
         if (s.OfflineSinceUtc is { } off) Console.WriteLine($"Offline since:   {off:u} (the server has not answered since then)");
-        Console.WriteLine($"Uninstall code:  {(UninstallProtection.Enabled ? "required (get one from the Zentriq console)" : "not required")}");
+        Console.WriteLine($"Uninstall code:  {(UninstallProtectedFlag() ? "required (get one from the Zentriq console)" : "not required")}");
+        Console.WriteLine($"Stop / disable:  {(UninstallProtectedFlag() ? "need a code from the Zentriq console (--stop / --disable <code>)" : "allowed")}");
         Console.WriteLine($"Pending code:    {(string.IsNullOrEmpty(s.EnrollmentCode) ? "no" : "yes")}");
         if (!string.IsNullOrEmpty(s.LastError)) Console.WriteLine($"Last error:      {s.LastError}");
         return s.Enrolled ? 0 : 1;
@@ -251,7 +282,7 @@ internal sealed class AgentService : ServiceBase
     internal static readonly AutoResetEvent Wake = new AutoResetEvent(false);
     /// <summary>Set by the live connection: the server has work for this agent, or the connection came back after a gap.</summary>
     internal static readonly AutoResetEvent ServerWake = new AutoResetEvent(false);
-    private Thread? _presence;
+    private Thread? _presence, _guard, _pipe;
 
     internal static void RequestServerWake() => ServerWake.Set();
     private static DateTime _lastWake;
@@ -276,6 +307,7 @@ internal sealed class AgentService : ServiceBase
         try { Process.GetCurrentProcess().PriorityClass = ProcessPriorityClass.BelowNormal; } catch (Exception) { }
         AgentState.Secure();
         Log.Info($"Zentriq Agent {Program.Version} starting.");
+        TamperGuard.OnServiceStart();
         _cts = new CancellationTokenSource();
         var initial = TimeSpan.FromSeconds(new Random().Next(10, 60));
         if (!string.IsNullOrEmpty(AgentState.Load().EnrollmentCode)) initial = TimeSpan.FromSeconds(2); // just installed
@@ -286,6 +318,11 @@ internal sealed class AgentService : ServiceBase
         var token = _cts.Token;
         _presence = new Thread(() => { try { Presence.Loop(token); } catch (Exception ex) { Log.Error("Live connection stopped", ex); } }) { IsBackground = true, Name = "presence" };
         _presence.Start();
+        // Tamper protection: periodic check and the local pipe for --stop / --disable / --pause with a code.
+        _guard = new Thread(() => { try { TamperGuard.Loop(token); } catch (Exception ex) { Log.Error("Tamper protection check stopped", ex); } }) { IsBackground = true, Name = "guard" };
+        _guard.Start();
+        _pipe = new Thread(() => { try { TamperGuard.PipeLoop(token); } catch (Exception ex) { Log.Error("Local control pipe stopped", ex); } }) { IsBackground = true, Name = "pipe" };
+        _pipe.Start();
     }
 
     protected override void OnStop()

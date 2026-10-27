@@ -157,7 +157,9 @@ internal sealed class AgentWorker
             var client = new ServerClient(url, state.ServerPins, cert, state.ProxyUrl, timeout: ConnectTimeout);
             try
             {
-                var resp = client.CheckinAsync(host, os, state.LastError, state.OfflineSinceUtc, UninstallProtection.CanManage ? UninstallProtection.Enabled : (bool?)null, ct).GetAwaiter().GetResult();
+                var events = UninstallProtection.CanManage ? TamperGuard.PendingEvents() : null;
+                var resp = client.CheckinAsync(host, os, state.LastError, state.OfflineSinceUtc, UninstallProtection.CanManage ? UninstallProtection.Enabled : (bool?)null, ct, events).GetAwaiter().GetResult();
+                if (events is { Count: > 0 }) TamperGuard.ClearEvents(events.Count);
                 if (!string.Equals(url.TrimEnd('/'), state.ServerUrl?.TrimEnd('/'), StringComparison.OrdinalIgnoreCase))
                 {
                     Log.Info($"The server answers at {url} (not at {state.ServerUrl}); using it from now on.");
@@ -405,10 +407,11 @@ internal sealed class AgentWorker
     /// <summary>Runs console-requested service actions and reports each result. Failures never stop the check-in.</summary>
     private static void RunActions(ServerClient client, List<AgentAction> actions, CancellationToken ct)
     {
-        AgentAction? update = null;
+        AgentAction? update = null, control = null;
         foreach (var a in actions)
         {
             if (a.Kind == "agent-update") { update = a; continue; }
+            if (a.Kind == "agent-control") { control = a; continue; }
             bool ok; string? st; string msg;
             try
             {
@@ -424,6 +427,8 @@ internal sealed class AgentWorker
             try { client.ReportActionAsync(a.Id, ok, st, msg, ct).GetAwaiter().GetResult(); }
             catch (Exception ex) { Log.Warn("Could not report action result: " + ex.Message); }
         }
+        // Console control of the agent itself (pause / resume protection, restart, disable): the result is reported first.
+        if (control is not null) RunControl(client, control, ct);
         // The agent update runs last: Windows Installer stops this service while it replaces the files.
         if (update is not null)
         {
@@ -434,6 +439,55 @@ internal sealed class AgentWorker
             if (st != "started") try { client.ReportActionAsync(update.Id, ok, st, msg, ct).GetAwaiter().GetResult(); }
             catch (Exception ex) { Log.Warn("Could not report the update result: " + ex.Message); }
         }
+    }
+
+    private static void RunControl(ServerClient client, AgentAction a, CancellationToken ct)
+    {
+        bool ok = true; string msg; Action? after = null;
+        try
+        {
+            if (!UninstallProtection.CanManage) throw new InvalidOperationException("The agent is not running as a service.");
+            switch (a.Operation)
+            {
+                case "pause":
+                    var hours = int.TryParse(a.Argument, out var h) ? Math.Max(1, Math.Min(24, h)) : 1;
+                    msg = UninstallProtection.Enabled ? TamperGuard.Perform("pause", "from the Zentriq console", TimeSpan.FromHours(hours)) : "Tamper protection is off for all agents; nothing to pause.";
+                    break;
+                case "resume":
+                    msg = TamperGuard.Perform("resume", "from the Zentriq console");
+                    break;
+                case "restart":
+                    msg = "The agent service restarts now.";
+                    after = () => RestartService();
+                    break;
+                case "disable":
+                    msg = "The agent service is disabled and stops now; the device stays offline until it is enabled on the device ('ZentriqAgent.exe --enable').";
+                    after = () => { if (UninstallProtection.Enabled) TamperGuard.Perform("disable", "from the Zentriq console"); else DisableService(); };
+                    break;
+                default:
+                    ok = false; msg = "Unknown agent control " + a.Operation + "."; break;
+            }
+        }
+        catch (Exception ex) { ok = false; msg = ex.Message; }
+        Log.Info($"Agent control {a.Operation}: {(ok ? "OK" : "FAILED")} - {msg}");
+        try { client.ReportActionAsync(a.Id, ok, ok ? a.Operation : null, msg, ct).GetAwaiter().GetResult(); }
+        catch (Exception ex) { Log.Warn("Could not report the agent control result: " + ex.Message); }
+        if (ok) after?.Invoke();
+    }
+
+    private static void RestartService()
+    {
+        // A separate process stops and starts this service (this process ends with the stop).
+        var cmd = Path.Combine(Environment.SystemDirectory, "cmd.exe");
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(cmd, $"/c ping -n 3 127.0.0.1 >nul & net stop {Program.ServiceName} & net start {Program.ServiceName}")
+        { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = Path.GetTempPath() });
+    }
+
+    private static void DisableService()
+    {
+        var sc = Path.Combine(Environment.SystemDirectory, "sc.exe");
+        using (var p = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(sc, $"config {Program.ServiceName} start= disabled") { UseShellExecute = false, CreateNoWindow = true })) p?.WaitForExit(15000);
+        try { using var svc = new System.ServiceProcess.ServiceController(Program.ServiceName); svc.Stop(); } catch (Exception ex) { Log.Warn("Could not stop the agent service: " + ex.Message); }
     }
 
     public static byte[] Collect(out string summary)
