@@ -1,10 +1,19 @@
 # Test report
 
-Latest: GitHub Actions run 40424954541, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
-10.0.20348** VM. Release: `v1.1.1-build.90` (pre-release, **unsigned**), package version **1.1.1.90**. Results: unit +
+Latest: GitHub Actions run 40919318368, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
+10.0.20348** VM. Release: `v1.1.1-build.92` (pre-release, **unsigned**), package version **1.1.1.92**. Results: unit +
 PostgreSQL integration tests **343 PASS, 2 skipped** (live remote support and SNMP tests run in ci-quick: PASS, 345/345);
-installer acceptance **69 passed, 0 failed**; in-place updates PASS (database migration V0029, schema 29). Build 89 was
-cancelled (it was built without the agent changes).
+installer acceptance **70 passed, 0 failed**; in-place updates PASS (schema 29). Build 91 stopped at T80 (`--diagnose`
+read the server certificate after the handshake had released it); fixed in build 92.
+
+New in build 92: the product is named **Zentriq Asset Intelligence** (console, installer artwork and package
+description); **Re-run** for finished scans (a new scan with the same targets, exclusions, credentials and options);
+agent commands on the device: `--checkin-now`, `--collect-now`, `--diagnose`, `--restart`.
+
+| ID | Test | Result | Detail |
+|---|---|---|---|
+| T80 | Agent check-in and diagnosis commands | **PASS** | `--checkin-now`: Checked in (last check-in updated in the console); `--diagnose`: no problem (server key matches); `--restart`: running again |
+| T34 | Scan re-run and history | **PASS** | re-run started a new scan with the same name and targets, the original kept; delete single and by age |
 
 New in build 90: **agent tamper protection for stop and disable** — while protection is on, nobody on the device (local
 or domain administrators included) can stop, disable or reconfigure the agent service, change its registry key or its
@@ -55,11 +64,11 @@ replaced) and the trial's 30-device total cap.
 ## Release artifacts (SHA-256)
 
 ```
-708cf3417e2e751887b395b0e7a5aa6e164c7f2814c139ecb0c74dfbfc059aed  Zentriq-1.1.1-docs.zip
-695c2ecc83d882e3feca6c327cb794b03179e38dbb1c6ea4ea760cf7e5705dbd  Zentriq-1.1.1-msi-offline-kit.zip
-26f2d04889bbc8e972fd3efdb41d87781e98f935f9fe473998d51c8df71db182  Zentriq-Setup-x64.exe
-78bb2970c3b671adbcd9c642ef2e6dc0cfb505448e49f1f340ed50fa8720c4fc  Zentriq.msi
-c6d56b0e9456ddc74a7225359805c0cb0d2653c611ce442985f6edc3c455f682  ZentriqAgent-x64.msi
+ef10dbd02e8df7f5ae28b80d36e9cd9cb7756729b36b0b4b50e8fe96958c8ccd  Zentriq-1.1.1-docs.zip
+01bca6bb0ffe4b36936a09945da2b46c478ed0e741b3f60f4fb41507162c8bb7  Zentriq-1.1.1-msi-offline-kit.zip
+0894c212c7934fb889f93e8e9662cfef918fa4cb41d1998936607e6b8e52e55a  Zentriq-Setup-x64.exe
+3f86f469b14ad147ffb9ccd428a4e7fafb98fbfc9f6ab3c3285c87499f773e79  Zentriq.msi
+97755acab4c8dbbd702f81bb37c7b0e874c84eecd686ed1b2478ccba8236cbe3  ZentriqAgent-x64.msi
 ```
 
 ## Installer acceptance (tests/installer/Invoke-InstallerAcceptance.ps1)
