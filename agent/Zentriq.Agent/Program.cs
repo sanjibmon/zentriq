@@ -73,12 +73,13 @@ internal static class Program
                     return r.Ok ? 0 : 1;
                 }
                 case "--once":
+                case "--checkin-now":
                 case "--collect-now":
-                {
-                    var r = new AgentWorker().RunOnce(CancellationToken.None, forceInventory: cmd == "--collect-now");
-                    Console.WriteLine(r.Message);
-                    return r.Ok ? 0 : 1;
-                }
+                    return Diagnostics.CheckinNow(inventory: cmd == "--collect-now");
+                case "--diagnose":
+                    return Diagnostics.Diagnose();
+                case "--restart":
+                    return TamperGuard.Client("restart", null);
                 case "--uninstall":
                     return Uninstall(args.Length > 1 ? args[1] : null);
                 case "--stop":
@@ -113,8 +114,10 @@ internal static class Program
                         "  --pause <code>       pause tamper protection for 1 hour (Services can then stop or disable it)\n" +
                         "  --enable             set the agent service to Automatic and start it\n" +
                         "  --protection         show whether tamper protection is on\n" +
-                        "  --once               run one check-in cycle now\n" +
-                        "  --collect-now        check in and send inventory now\n" +
+                        "  --checkin-now        contact the server now (also --once); shows the result\n" +
+                        "  --collect-now        contact the server now and send inventory\n" +
+                        "  --diagnose           check service, enrollment, certificate, DNS, port and server key\n" +
+                        "  --restart            restart the agent service (no code needed)\n" +
                         "  --collect <file>     write this device's inventory to a JSON file (nothing is sent)\n" +
                         "  --run                run in the foreground (troubleshooting)\n" +
                         "Logs: " + Log.Directory);
@@ -285,6 +288,36 @@ internal sealed class AgentService : ServiceBase
     private Thread? _presence, _guard, _pipe;
 
     internal static void RequestServerWake() => ServerWake.Set();
+
+    private static int _forceInventory;
+    private static readonly object OutcomeGate = new object();
+    private static DateTime _outcomeAt;
+    private static AgentWorker.Outcome? _outcome;
+
+    /// <summary>Runs a check-in cycle now (asked for on the device: --checkin-now) and waits for its result.</summary>
+    internal static AgentWorker.Outcome? RunNow(bool inventory, TimeSpan timeout)
+    {
+        var since = DateTime.UtcNow;
+        if (inventory) Interlocked.Exchange(ref _forceInventory, 1);
+        Presence.Retry.Set();
+        ServerWake.Set();
+        var until = since + timeout;
+        lock (OutcomeGate)
+        {
+            while (_outcomeAt <= since)
+            {
+                var left = until - DateTime.UtcNow;
+                if (left <= TimeSpan.Zero) return null;
+                Monitor.Wait(OutcomeGate, left);
+            }
+            return _outcome;
+        }
+    }
+
+    private static void SetOutcome(AgentWorker.Outcome r)
+    {
+        lock (OutcomeGate) { _outcome = r; _outcomeAt = DateTime.UtcNow; Monitor.PulseAll(OutcomeGate); }
+    }
     private static DateTime _lastWake;
 
     internal static void RequestWake(string why)
@@ -345,10 +378,11 @@ internal sealed class AgentService : ServiceBase
         while (!ct.IsCancellationRequested)
         {
             AgentWorker.Outcome r;
-            try { r = worker.RunOnce(ct); }
+            try { r = worker.RunOnce(ct, forceInventory: Interlocked.Exchange(ref _forceInventory, 0) == 1); }
             catch (OperationCanceledException) { return; }
             catch (Exception ex) { Log.Error("Unexpected error", ex); r = new AgentWorker.Outcome { NextRun = TimeSpan.FromMinutes(5) }; }
             Log.Info($"{r.Message} Next run in {(int)r.NextRun.TotalMinutes} min.");
+            SetOutcome(r);
             // Wait for the next run, or run early when the network changes / the device resumes (the network needs a
             // few seconds to settle first).
             // Work queued by the server runs at once (at most every 10 seconds).

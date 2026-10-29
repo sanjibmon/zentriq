@@ -1,6 +1,6 @@
 # Zentriq Console
 
-Self-hosted IT asset intelligence, endpoint management and IT operations platform for Windows Server.
+Self-hosted asset intelligence, endpoint management and IT operations platform for Windows Server.
 
 ```
 backend/      ASP.NET Core API (Zentriq.Api), Worker service, Application/Domain/Infrastructure, zentriqctl (Zentriq.Setup), tests

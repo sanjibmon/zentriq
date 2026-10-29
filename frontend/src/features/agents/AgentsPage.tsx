@@ -237,6 +237,17 @@ export function AgentsPage() {
           </ul>
         </Panel>
       )}
+      {tab === 'agents' && rows.length > 0 && (
+        <details className="panel agent-help">
+          <summary><b>A device is not contacting the server?</b> <span className="muted">Commands to run on the device</span></summary>
+          <p className="muted" style={{ margin: '8px 0' }}>In an elevated Command Prompt or PowerShell on the device:</p>
+          <label>Contact the server now and show the result<CopyBox value={`${UNINSTALL_EXE} --checkin-now`} label="Check in now" /></label>
+          <label>Also send inventory now<CopyBox value={`${UNINSTALL_EXE} --collect-now`} label="Collect now" /></label>
+          <label>Find out why it cannot reach the server (service, enrollment, certificate, DNS, port, server key)<CopyBox value={`${UNINSTALL_EXE} --diagnose`} label="Diagnose" /></label>
+          <label>Restart the agent service (no code needed, also with tamper protection)<CopyBox value={`${UNINSTALL_EXE} --restart`} label="Restart" /></label>
+          <small className="muted">If the service was stopped or disabled with a code, start it again with <span className="mono">--enable</span>. The log is in <span className="mono">C:\ProgramData\Zentriq\Agent\Logs\agent.log</span>.</small>
+        </details>
+      )}
       {schedule && <ScheduleDialog ids={schedule.ids} onClose={() => setSchedule(null)} onDone={(m) => { setSchedule(null); setMsg(m); setPicked([]); agents.reload(); }} />}
       {uninstallOpen && <UninstallCodeDialog onClose={() => setUninstallOpen(false)} />}
       {control && <AgentControlDialog agent={control} onClose={() => setControl(null)} onDone={(m) => { setControl(null); setMsg(m); agents.reload(); }} />}

@@ -21,7 +21,7 @@
            Language="1033"
            Compressed="yes">
 
-    <SummaryInformation Description="Zentriq $(var.ProductVersion) — IT Asset Intelligence" />
+    <SummaryInformation Description="Zentriq $(var.ProductVersion) — Asset Intelligence" />
 
     <MajorUpgrade Schedule="afterInstallInitialize"
                   AllowSameVersionUpgrades="yes"

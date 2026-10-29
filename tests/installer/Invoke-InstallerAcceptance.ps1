@@ -119,7 +119,7 @@ Remove-Item $answer -Force   # contains the administrator password
 
 if (-not $installed) {
     foreach ($t in 'T02 PostgreSQL provisioning', 'T03 Database migration', 'T04 Administrator sign-in', 'T05 API and worker services', 'T06 Trial initialization',
-                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection', 'T68 Live agent connection', 'T69 Locations and IT accessories', 'T70 Manual hardware details', 'T71 Standard and Advanced installation', 'T72 Asset lifecycle', 'T73 Cloud and infrastructure', 'T74 Own asset tags, people and bulk upload', 'T75 Backup and restore', 'T76 Roles and groups', 'T77 Log retention and export', 'T78 Agent stop and disable protection', 'T79 Automatic agent update') {
+                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection', 'T68 Live agent connection', 'T69 Locations and IT accessories', 'T70 Manual hardware details', 'T71 Standard and Advanced installation', 'T72 Asset lifecycle', 'T73 Cloud and infrastructure', 'T74 Own asset tags, people and bulk upload', 'T75 Backup and restore', 'T76 Roles and groups', 'T77 Log retention and export', 'T78 Agent stop and disable protection', 'T79 Automatic agent update', 'T80 Agent check-in and diagnosis commands') {
         Record $t.Substring(0, 3) $t.Substring(4) 'BLOCKED' 'installation failed'
     }
 } else {
@@ -292,6 +292,27 @@ if (-not $installed) {
         "$($a.hostname): 20-character code; check-in every $($a.checkinMinutes) min, inventory every $($a.inventoryMinutes) min (chosen at installation); $(@($inv.software).Count) applications, $([math]::Round($inv.document.hardware.memoryBytes/1GB)) GB RAM; MSI signature: $($sig.Status)"
     }
     if ($agentInstalled) {
+        Check 'T80' 'Agent commands on the device: --checkin-now contacts the server at once, --diagnose finds no problem, --restart' {
+            $s = Login
+            $exe = Join-Path $env:ProgramFiles 'Zentriq Agent\ZentriqAgent.exe'
+            $before = (@(Api GET '/agents' -Session $s) | Where-Object { $_.id -eq $script:agentId } | Select-Object -First 1).lastCheckinAt
+            Start-Sleep 2
+            $out = & $exe --checkin-now 2>&1 | Out-String
+            Assert ($LASTEXITCODE -eq 0 -and $out -match 'Checked in') "--checkin-now exit $LASTEXITCODE`: $out"
+            $after = (@(Api GET '/agents' -Session $s) | Where-Object { $_.id -eq $script:agentId } | Select-Object -First 1).lastCheckinAt
+            Assert ([datetime]$after -gt [datetime]$before) "last check-in not updated ($before -> $after)"
+            $diag = & $exe --diagnose 2>&1 | Out-String
+            Set-Content (Join-Path $OutDir 'agent-diagnose.txt') $diag
+            Assert ($LASTEXITCODE -eq 0 -and $diag -match 'No problem found' -and $diag -match 'server key matches') "--diagnose exit $LASTEXITCODE (see agent-diagnose.txt)"
+            & $exe --restart | Out-Host
+            Assert ($LASTEXITCODE -eq 0) "--restart exit $LASTEXITCODE"
+            $deadline = (Get-Date).AddSeconds(90)
+            do { Start-Sleep 3; $st = (Get-Service ZentriqAgent).Status } while ($st -ne 'Running' -and (Get-Date) -lt $deadline)
+            Start-Sleep 10
+            Assert ((Get-Service ZentriqAgent).Status -eq 'Running') 'agent not running after --restart'
+            "--checkin-now: $(($out -split "`n" | Where-Object { $_ -match 'Checked in' } | Select-Object -First 1).Trim()); --diagnose: no problem; --restart: running again"
+        } | Out-Null
+
         Check 'T68' 'Live agent connection: online within seconds, offline the moment the agent stops, queued work picked up at once; installer interval lists in order' {
             $s = Login
             function AgentNow { @(Api GET '/agents' -Session $s) | Where-Object { $_.id -eq $script:agentId } | Select-Object -First 1 }
@@ -669,12 +690,20 @@ if (-not $installed) {
         "code shown again; revoked code refused (410); list does not expose codes; active code not deletable (409); revoked codes deleted (bulk: $($bulk.deleted))"
     } | Out-Null
 
-    Check 'T34' 'Scan history can be deleted (single and by age); assets are kept' {
+    Check 'T34' 'Scan history: re-run with the same settings; delete (single and by age); assets are kept' {
         $s = Login
         $ip = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -match '^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)' -and $_.PrefixOrigin -ne 'WellKnown' } | Select-Object -First 1).IPAddress
         $scan = Api POST '/discovery/scans' @{ name = 'ci-delete-me'; scanType = 'single'; targetsText = $ip } -Session $s
         $deadline = (Get-Date).AddMinutes(3)
         do { Start-Sleep 3; $d = Api GET "/discovery/scans/$($scan.id)" -Session $s } while ($d.scan.status -in 'queued', 'running' -and (Get-Date) -lt $deadline)
+        # Re-run: a new scan with the same name and targets; the original is kept.
+        $again = Api POST "/discovery/scans/$($scan.id)/rerun" -Session $s
+        Assert ($again.id -ne $scan.id -and $again.name -eq 'ci-delete-me') "re-run: $($again | ConvertTo-Json -Compress)"
+        $deadline = (Get-Date).AddMinutes(3)
+        do { Start-Sleep 3; $d2 = Api GET "/discovery/scans/$($again.id)" -Session $s } while ($d2.scan.status -in 'queued', 'running' -and (Get-Date) -lt $deadline)
+        Assert ($d2.scan.status -notin 'queued', 'running' -and $d2.scan.totalTargets -eq $d.scan.totalTargets) "re-run scan: $($d2.scan.status), $($d2.scan.totalTargets) target(s)"
+        Assert ((Invoke-WebRequest "$base/api/v1/discovery/scans/$($scan.id)" -WebSession $s -SkipHttpErrorCheck).StatusCode -eq 200) 'original scan gone after re-run'
+        Invoke-WebRequest "$base/api/v1/discovery/scans/$($again.id)" -Method Delete -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } -SkipHttpErrorCheck | Out-Null
         $r = Invoke-WebRequest "$base/api/v1/discovery/scans/$($scan.id)" -Method Delete -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } -SkipHttpErrorCheck
         Assert ($r.StatusCode -eq 204) "delete returned $($r.StatusCode)"
         $g = Invoke-WebRequest "$base/api/v1/discovery/scans/$($scan.id)" -WebSession $s -SkipHttpErrorCheck
@@ -682,7 +711,7 @@ if (-not $installed) {
         $bulk = Api POST '/discovery/scans/delete' @{ olderThanDays = 3650 } -Session $s
         Assert ($null -ne $bulk.deleted) 'bulk delete returned no count'
         $assets = (Api GET '/assets/summary' -Session $s).total
-        "single delete 204, then 404; bulk delete ok ($($bulk.deleted)); assets kept ($assets)"
+        "re-run started a new scan with the same settings ($($d2.scan.status)); single delete 204, then 404; bulk delete ok ($($bulk.deleted)); assets kept ($assets)"
     } | Out-Null
 
     Check 'T35' 'Authenticator-app MFA: QR enrollment, sign-in requires the code, disable' {

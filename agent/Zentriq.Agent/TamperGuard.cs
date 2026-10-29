@@ -474,6 +474,21 @@ internal static class TamperGuard
         var action = doc.RootElement.TryGetProperty("action", out var a) ? a.GetString() ?? "" : "";
         var code = doc.RootElement.TryGetProperty("code", out var c) ? c.GetString() : null;
         if (action == "status") return Reply(true, Wanted ? "on" : "off", Status());
+        // Contacting the server and restarting need no code (they never weaken the protection).
+        if (action == "checkin" || action == "collect")
+        {
+            var r = AgentService.RunNow(action == "collect", TimeSpan.FromSeconds(150));
+            return r is null ? Reply(false, "The agent did not finish contacting the server within 2½ minutes. Run 'ZentriqAgent.exe --diagnose'.")
+                : Reply(r.Ok, r.Message + (r.Ok ? "" : " Run 'ZentriqAgent.exe --diagnose' for details."));
+        }
+        if (action == "restart")
+        {
+            Record("control", "Agent service restart requested on the device.");
+            var cmd = Path.Combine(Environment.SystemDirectory, "cmd.exe");
+            Process.Start(new ProcessStartInfo(cmd, $"/c ping -n 3 127.0.0.1 >nul & net stop {Program.ServiceName} & net start {Program.ServiceName}")
+            { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = Path.GetTempPath() });
+            return Reply(true, "The Zentriq Agent service restarts now and contacts the server within a minute.");
+        }
         if (action != "stop" && action != "disable" && action != "pause") return Reply(false, "Unknown request.");
         if (UninstallProtection.Enabled)
         {

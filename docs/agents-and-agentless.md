@@ -257,8 +257,25 @@ Intune command-line arguments, the Configuration Manager install command. Zentri
   refreshed at every check-in (so a renewed self-signed certificate is picked up while the old one is still valid).
 * *Revoke* in the console blocks the agent immediately (its certificate is no longer accepted) and the agent removes
   its certificate. Uninstall removes the certificate and state (logs are kept in `C:\ProgramData\Zentriq\Agent\Logs`).
-* Troubleshooting: `ZentriqAgent.exe --status` (server, other addresses, schedule, offline since, protection), `--protection`, `--once`,
-  `--collect-now`, `--collect inventory.json` (local only).
+* Troubleshooting: `ZentriqAgent.exe --status` (server, other addresses, schedule, offline since, protection), `--protection`,
+  `--collect inventory.json` (local only), and the commands below.
+
+### A device is not contacting the server
+
+Run these on the device in an elevated Command Prompt or PowerShell (`"C:\Program Files\Zentriq Agent\ZentriqAgent.exe" …`).
+They work with tamper protection on and need no code (the *Agents* page shows them under *A device is not contacting
+the server?*):
+
+| Command | What it does |
+|---|---|
+| `--checkin-now` (also `--once`) | asks the running agent service to contact the server **now** (live connection and check-in, queued console work) and prints the result, e.g. *Checked in.* or the reason it failed |
+| `--collect-now` | the same, and sends inventory now |
+| `--diagnose` | checks the service and its startup type, enrollment, the agent certificate, each known server address (name resolution, TCP port, TLS and the pinned server key), tamper protection, then checks in; ends with *What to fix* |
+| `--restart` | restarts the agent service (allowed with tamper protection; it contacts the server within a minute) |
+| `--enable` | sets the service to Automatic and starts it after it was stopped or disabled with a code |
+
+When the service is not running, `--checkin-now` and `--collect-now` check in from the command window instead. The
+log is `C:\ProgramData\Zentriq\Agent\Logs\agent.log`.
 
 ### Agent limitations (this release)
 

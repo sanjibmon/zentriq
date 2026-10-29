@@ -24,6 +24,6 @@ export function LogoMark({ size = 28, className }: { size?: number; className?: 
 export const PRODUCT = {
   name: 'Zentriq',
   full: 'Zentriq Web Console',
-  tagline: 'IT Asset Intelligence',
+  tagline: 'Asset Intelligence',
   strap: 'Discover, inventory, secure and manage every device in your estate — self-hosted, on your own servers.',
 };

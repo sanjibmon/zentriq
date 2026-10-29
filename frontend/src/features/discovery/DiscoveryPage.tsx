@@ -36,6 +36,12 @@ export function DiscoveryPage() {
     scans.reload();
   }
   const finished = (sc: Scan) => !['queued', 'running', 'cancelling'].includes(sc.status);
+  async function rerun(sc: Scan) {
+    if (!(await confirm({ title: `Re-run scan "${sc.name || `#${sc.number}`}"?`, confirmLabel: 'Re-run scan', message: 'A new scan starts with the same targets, exclusions, credentials and options. This scan and its results are kept.' }))) return;
+    try { await api.post(`/discovery/scans/${sc.id}/rerun`); setNote({ tone: 'ok', text: `Scan "${sc.name || `#${sc.number}`}" started again.` }); setPage(1); }
+    catch (e) { setNote({ tone: 'crit', text: errorText(e) }); }
+    scans.reload();
+  }
   async function removeOne(sc: Scan) {
     if (!(await confirm({ title: `Delete scan "${sc.name || `#${sc.number}`}"?`, danger: true, message: 'The scan, its per-device results and its log are deleted. Devices it found stay in the asset inventory.' }))) return;
     try { await api.del(`/discovery/scans/${sc.id}`); setNote({ tone: 'ok', text: 'Scan deleted.' }); } catch (e) { setNote({ tone: 'crit', text: errorText(e) }); }
@@ -87,6 +93,7 @@ export function DiscoveryPage() {
           { key: 't', label: 'Started', render: (r) => fmt.date(r.startedAt ?? r.createdAt) },
           { key: 'x', label: '', render: (r) => <div style={{ display: 'flex', gap: 6 }}>
             {can('scans.run') && ['queued', 'running'].includes(r.status) && <button className="btn sm" onClick={() => void cancel(r.id)}>Cancel</button>}
+            {can('scans.run') && finished(r) && <button className="btn sm" title="Start this scan again with the same settings" onClick={() => void rerun(r)}>Re-run</button>}
             {can('scans.run') && finished(r) && <button className="btn sm" onClick={() => void removeOne(r)}>Delete</button>}
           </div> },
         ]} />

@@ -126,6 +126,21 @@ public static class DiscoveryEndpoints
             return Results.Ok(new { deleted = victims.Count });
         }).RequireAuthorization(Permissions.ScansRun);
 
+        // Re-run a finished scan with the same targets, exclusions, credentials and options (a new scan; the old one is kept).
+        g.MapPost("/scans/{id:guid}/rerun", async (Guid id, ZentriqDbContext db, JobQueue jobs, RequestContext rc, CancellationToken ct) =>
+        {
+            var s = await db.DiscoveryScans.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
+            if (s is null) return Results.NotFound();
+            if (s.Status is "queued" or "running" or "cancelling") return Results.Problem(statusCode: 409, title: "The scan is still running. Wait for it to finish, or cancel it first.");
+            var cfg = JsonSerializer.Deserialize<ScanConfig>(s.Config, JsonOpts)!;
+            var req = new ScanRequest(s.Name, cfg.ScanType, cfg.TargetsText, cfg.ExcludeText, cfg.Concurrency, cfg.TimeoutMs, cfg.Ports, cfg.CredentialIds,
+                cfg.Directory, cfg.SnmpPublic, cfg.FollowNeighbors);
+            var (scan, error) = await CreateScanAsync(req, s.ProfileId, db, jobs, rc, ct);
+            if (error is not null) return error;
+            await rc.AuditAsync("scan.rerun", s.Name, detail: new { from = s.Id, scan = scan!.Id });
+            return Results.Accepted($"/api/v1/discovery/scans/{scan.Id}", ScanDto(scan, null));
+        }).RequireAuthorization(Permissions.ScansRun);
+
         g.MapPost("/scans/{id:guid}/retry", async (Guid id, ZentriqDbContext db, JobQueue jobs, RequestContext rc, CancellationToken ct) =>
         {
             var s = await db.DiscoveryScans.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);

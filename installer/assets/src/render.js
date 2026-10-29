@@ -57,8 +57,8 @@ const page = (w, h, body, bg = '#fff') => `<!doctype html><html><head><style>
 </style></head><body>${body}</body></html>`;
 
 // Setup shows only the brand: "Zentriq" and the tagline.
-const product = { server: { mark: MARK, title: 'Zentriq', tag: 'IT Asset Intelligence', bg: '#061C26', bg2: '#0E5566', accent: '#5EE6F2' },
-                  agent: { mark: AGENT, title: 'Zentriq', tag: 'IT Asset Intelligence', bg: '#0C1B33', bg2: '#1F4A7A', accent: '#F59E0B' } };
+const product = { server: { mark: MARK, title: 'Zentriq', tag: 'Asset Intelligence', bg: '#061C26', bg2: '#0E5566', accent: '#5EE6F2' },
+                  agent: { mark: AGENT, title: 'Zentriq', tag: 'Asset Intelligence', bg: '#0C1B33', bg2: '#1F4A7A', accent: '#F59E0B' } };
 // Wizard bitmaps are rendered at 2x: Windows scales them to the dialog, so they stay sharp at 150-200 % display scaling.
 const S = 2;
 
