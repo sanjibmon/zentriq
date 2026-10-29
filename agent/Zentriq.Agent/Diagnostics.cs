@@ -112,10 +112,10 @@ internal static class Diagnostics
             Ok($"    port {u.Port} reachable ({sw.ElapsedMilliseconds} ms)");
             try
             {
-                X509Certificate? seen = null;
-                using var ssl = new SslStream(tcp.GetStream(), false, (_, c, _, _) => { seen = c; return true; });
+                byte[]? seen = null;   // copied inside the callback: the certificate object is released after the handshake
+                using var ssl = new SslStream(tcp.GetStream(), false, (_, c, _, _) => { if (c is not null) seen = c.GetRawCertData(); return true; });
                 ssl.AuthenticateAsClient(u.Host);
-                var pin = seen is null ? null : AgentProtocol.SpkiSha256(seen.GetRawCertData());
+                var pin = seen is null ? null : AgentProtocol.SpkiSha256(seen);
                 if (pin is not null && s.ServerPins.Contains(pin)) { Ok("    server key matches the pinned Zentriq server key"); anyOk = true; }
                 else if (s.ServerPins.Count == 0) { Info("    no pinned server key yet (set at enrollment)"); anyOk = true; }
                 else Bad("    the server presented a different key than the pinned Zentriq server (another server, a TLS-inspecting proxy, or a replaced certificate)",
