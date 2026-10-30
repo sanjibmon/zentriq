@@ -1,10 +1,22 @@
 # Test report
 
-Latest: GitHub Actions run 40919318368, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
-10.0.20348** VM. Release: `v1.1.1-build.92` (pre-release, **unsigned**), package version **1.1.1.92**. Results: unit +
-PostgreSQL integration tests **343 PASS, 2 skipped** (live remote support and SNMP tests run in ci-quick: PASS, 345/345);
-installer acceptance **70 passed, 0 failed**; in-place updates PASS (schema 29). Build 91 stopped at T80 (`--diagnose`
-read the server certificate after the handshake had released it); fixed in build 92.
+Latest: GitHub Actions run 41104678134, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
+10.0.20348** VM. Release: `v1.1.1-build.93` (pre-release, **unsigned**), package version **1.1.1.93**. Results: unit +
+PostgreSQL integration tests **352 PASS, 2 skipped** (live remote support and SNMP tests run in ci-quick: PASS, 354/354);
+license server tests (ci-quick, PostgreSQL) **8/8 PASS**; installer acceptance **71 passed, 0 failed**; in-place updates
+PASS (schema 30).
+
+New in build 93: licensing by **IT devices** (per device, network devices included), **non-IT packs** (250 / 500 / 1,000 /
+2,000 / 4,000 / unlimited), **cloud and VM instances** and **remote support technicians**; IT accessories unlimited.
+Trial 30 / 50 / 10 / 1; **free tier** 25 / 25 / 5 / none (Standard edition). Subscriptions for 1, 3 or 5 years, perpetual
+licenses with yearly (multi-year) support. **Online activation** with a license key, daily check-ins with a 30-day lease,
+deactivation; offline activation kept for air-gapped servers. New **Zentriq License Server** (`licensing/`, released as
+`Zentriq-LicenseServer-1.1.1.zip`): activation API, offline activation page, license portal.
+
+| ID | Test | Result | Detail |
+|---|---|---|---|
+| T81 | Licensing plans and online activation | **PASS** | plans and metrics reported; bad key 400, http address 400, unreachable server 502 with a clear message; still Trial |
+| T24 | Trial limits | **PASS** | limits: devices 30, nonit_assets 50, cloud_instances 10, technicians 1 |
 
 New in build 92: the product is named **Zentriq Asset Intelligence** (console, installer artwork and package
 description); **Re-run** for finished scans (a new scan with the same targets, exclusions, credentials and options);
@@ -64,11 +76,12 @@ replaced) and the trial's 30-device total cap.
 ## Release artifacts (SHA-256)
 
 ```
-ef10dbd02e8df7f5ae28b80d36e9cd9cb7756729b36b0b4b50e8fe96958c8ccd  Zentriq-1.1.1-docs.zip
-01bca6bb0ffe4b36936a09945da2b46c478ed0e741b3f60f4fb41507162c8bb7  Zentriq-1.1.1-msi-offline-kit.zip
-0894c212c7934fb889f93e8e9662cfef918fa4cb41d1998936607e6b8e52e55a  Zentriq-Setup-x64.exe
-3f86f469b14ad147ffb9ccd428a4e7fafb98fbfc9f6ab3c3285c87499f773e79  Zentriq.msi
-97755acab4c8dbbd702f81bb37c7b0e874c84eecd686ed1b2478ccba8236cbe3  ZentriqAgent-x64.msi
+d2c4a3b129e5d9f370db8aee8f7b7f8e78a9f89a98f78dc33382feb965a19b4d  Zentriq-1.1.1-docs.zip
+bb05b5a1175abd0e0e1439f3cec0d44839181f7932ab29183d27a0eace7c386b  Zentriq-1.1.1-msi-offline-kit.zip
+a0e4289732fe90f567d137b25f3df2de335f46e4f552904191c8c4ccaa7a883c  Zentriq-Setup-x64.exe
+c9df62b40abb90366d535b1b5cba62333a1ad457ae1212b4c8c4a698d7cb3ef6  Zentriq.msi
+766d07786c9bffa6ec6ae3c30d0e920e41e751ae5b8a71d6389ce396d7e2eb7a  ZentriqAgent-x64.msi
+b70586777a2e7f34104a6bed07c492b5bf9de1755cffda2a8bcc87d725eb2147  Zentriq-LicenseServer-1.1.1.zip
 ```
 
 ## Installer acceptance (tests/installer/Invoke-InstallerAcceptance.ps1)
