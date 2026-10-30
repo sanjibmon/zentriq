@@ -574,7 +574,7 @@ public sealed class Provisioner(ProvisionInput input, ZentriqPaths paths, Report
         var status = await http.GetFromJsonAsync<JsonElement>("/api/v1/setup/status", ct);
         if (!status.GetProperty("initialized").GetBoolean()) throw new SetupException("Setup status reports the installation is not initialized.");
         var mode = status.GetProperty("licenseMode").GetString();
-        if (mode is not ("Trial" or "Licensed" or "LicensedGrace" or "TrialExpired" or "LicenseExpired"))
+        if (mode is not ("Trial" or "Licensed" or "LicensedGrace" or "TrialExpired" or "LicenseExpired" or "Free" or "FreeOverLimit" or "LeaseExpired" or "SupportExpired"))
             throw new SetupException($"Unexpected license state after setup: {mode}.");
         if (status.TryGetProperty("trialExpiresAt", out var te) && te.ValueKind == JsonValueKind.String) _result.TrialExpiresAt = te.GetDateTimeOffset();
 

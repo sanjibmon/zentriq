@@ -2,4 +2,9 @@
   <PropertyGroup>
     <RootNamespace>Zentriq.Domain</RootNamespace>
   </PropertyGroup>
+  <ItemGroup>
+    <!-- Release date of this build (perpetual licenses: support must cover it). CI passes -p:ZentriqReleaseDate=yyyy-MM-dd. -->
+    <AssemblyMetadata Include="ZentriqReleaseDate" Value="$([System.DateTime]::UtcNow.ToString('yyyy-MM-dd'))" Condition="'$(ZentriqReleaseDate)' == ''" />
+    <AssemblyMetadata Include="ZentriqReleaseDate" Value="$(ZentriqReleaseDate)" Condition="'$(ZentriqReleaseDate)' != ''" />
+  </ItemGroup>
 </Project>

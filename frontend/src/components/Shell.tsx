@@ -113,8 +113,12 @@ function LicenseBadge({ mode, days, onClick }: { mode: string; days: number | nu
     : mode === 'TrialExpired' ? 'Trial expired'
     : mode === 'LicenseExpired' ? 'License expired'
     : mode === 'ClockRollback' ? 'Clock problem'
+    : mode === 'Free' ? 'Free edition'
+    : mode === 'FreeOverLimit' ? 'Over free limits'
+    : mode === 'LeaseExpired' ? 'License not refreshed'
+    : mode === 'SupportExpired' ? 'Support expired'
     : mode;
-  const tone = mode === 'Licensed' ? 'ok' : mode === 'Trial' && (days ?? 0) > 3 ? 'info' : mode === 'Trial' || mode === 'LicensedGrace' ? 'warn' : 'crit';
+  const tone = mode === 'Licensed' ? 'ok' : mode === 'Free' ? 'info' : mode === 'Trial' && (days ?? 0) > 3 ? 'info' : mode === 'Trial' || mode === 'LicensedGrace' ? 'warn' : 'crit';
   return (
     <button className={`health-pill lic-${tone}`} onClick={onClick} title="Licensing">
       <i />

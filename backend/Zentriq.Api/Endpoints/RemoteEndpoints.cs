@@ -118,8 +118,11 @@ public static class RemoteEndpoints
         });
 
         // A short-lived sign-in link that opens the device in the remote support console.
-        g.MapPost("/sessions", async (SessionBody body, NpgsqlDataSource ds, RemoteSupportService remote, RequestContext rc, HttpContext http, ZentriqPaths paths, CancellationToken ct) =>
+        g.MapPost("/sessions", async (SessionBody body, NpgsqlDataSource ds, RemoteSupportService remote, RequestContext rc, HttpContext http, ZentriqPaths paths,
+            Zentriq.Infrastructure.Licensing.LicensingService licensing, CancellationToken ct) =>
         {
+            // Licensed per technician: refuse while more users hold the remote support right than the license covers.
+            await licensing.EnsureMetricAsync(Zentriq.Domain.Workloads.Technicians, 0, await rc.LicenseAsync(ct), ct: ct);
             if (body.View is not ("desktop" or "terminal" or "files" or "device" or "console")) return Validation.Problem("view", "Choose desktop, terminal, files, device or console.");
             if (rc.UserId is not { } uid) return Results.Unauthorized();
             string? nodeId = null, device = null;

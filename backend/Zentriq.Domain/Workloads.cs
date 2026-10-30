@@ -17,10 +17,29 @@ public static class Workloads
 
     public static readonly IReadOnlyList<string> All = [Endpoint, Server, NetworkDevice, Other];
 
-    /// <summary>Limit key for a total device cap across all workloads (used by the trial policy; also allowed in licenses).</summary>
+    /// <summary>
+    /// IT devices: every endpoint, server, network device (switch, router, firewall, access point …), printer and other
+    /// device counts as one, whatever its type. Virtual machines read from a cloud or virtualization connection count as
+    /// <see cref="CloudInstances"/> instead (also when an agent or scan found them).
+    /// </summary>
     public const string TotalDevices = "devices";
+    /// <summary>Non-IT assets (records that are not disposed), licensed in packs of 250, 500, 1000, 2000, 4000 or unlimited.</summary>
+    public const string NonItAssets = "nonit_assets";
+    /// <summary>Virtual machines / cloud instances from the cloud and virtualization connections (not deleted).</summary>
+    public const string CloudInstances = "cloud_instances";
+    /// <summary>Remote support technicians: active users who may start remote sessions.</summary>
+    public const string Technicians = "technicians";
 
-    public static bool IsLimitKey(string key) => key == TotalDevices || All.Contains(key);
+    /// <summary>The licensed metrics, in display order. A metric that a license does not list is unlimited.</summary>
+    public static readonly IReadOnlyList<string> Metrics = [TotalDevices, NonItAssets, CloudInstances, Technicians];
+
+    public static bool IsLimitKey(string key) => Metrics.Contains(key) || All.Contains(key);
+
+    public static string Title(string key) => key switch
+    {
+        TotalDevices => "IT devices", NonItAssets => "Non-IT assets", CloudInstances => "Cloud & virtual instances", Technicians => "Remote support technicians",
+        Endpoint => "Endpoints", Server => "Servers", NetworkDevice => "Network devices", _ => "Other devices",
+    };
 
     public static string FromAssetCategory(string category) => category switch
     {

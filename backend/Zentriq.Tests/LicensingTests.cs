@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Zentriq.Application.Licensing;
+using Zentriq.Domain;
 using Zentriq.Domain.Licensing;
 
 namespace Zentriq.Tests;
@@ -118,8 +119,12 @@ public sealed class TrialAndEvaluatorTests
     public void Trial_is_active_for_14_days_then_expires()
     {
         Assert.Equal(LicenseMode.Trial, Eval(Start.AddDays(13.9)).Mode);
-        Assert.Equal(LicenseMode.TrialExpired, Eval(Start.AddDays(14).AddMinutes(1)).Mode);
-        Assert.False(Eval(Start.AddDays(15)).FeaturesEnabled);
+        // Afterwards the free tier applies (Standard modules), as long as the installation stays within its limits.
+        var after = Eval(Start.AddDays(14).AddMinutes(1));
+        Assert.Equal(LicenseMode.Free, after.Mode);
+        Assert.True(after.ModuleEnabled(Modules.Inventory));
+        Assert.False(after.ModuleEnabled(Modules.Remote));
+        Assert.Equal(25, after.Limits[Workloads.TotalDevices]);
     }
 
     [Fact]
@@ -128,10 +133,14 @@ public sealed class TrialAndEvaluatorTests
         // Clock moved back beyond tolerance: features blocked.
         Assert.Equal(LicenseMode.ClockRollback, Eval(Start.AddDays(5), lastSeen: Start.AddDays(20)).Mode);
         // Within tolerance, expiry is computed against the high-water mark.
-        Assert.Equal(LicenseMode.TrialExpired, Eval(Start.AddDays(14).AddHours(-1), lastSeen: Start.AddDays(14).AddHours(2)).Mode);
+        Assert.Equal(LicenseMode.Free, Eval(Start.AddDays(14).AddHours(-1), lastSeen: Start.AddDays(14).AddHours(2)).Mode);
     }
 
     [Fact]
-    public void Tampered_trial_record_does_not_grant_features() =>
-        Assert.False(Eval(Start.AddDays(1), integrity: false).FeaturesEnabled);
+    public void Tampered_trial_record_gives_only_the_free_tier()
+    {
+        var s = Eval(Start.AddDays(1), integrity: false);
+        Assert.Equal(LicenseMode.Free, s.Mode);
+        Assert.False(s.ModuleEnabled(Modules.Vulnerability));
+    }
 }

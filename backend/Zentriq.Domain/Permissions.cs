@@ -156,5 +156,7 @@ public static class Editions
     public static IReadOnlyList<string> Expand(string? edition, IReadOnlyList<string> modules) =>
         modules.Contains("*") ? ["*"] : ModulesOf(edition).Concat(modules).Distinct().ToList();
 
-    public static string Title(string? edition) => edition?.Trim().ToLowerInvariant() switch { Standard => "Standard", Advanced => "Advanced", _ => "Custom" };
+    public const string Free = "free";
+
+    public static string Title(string? edition) => edition?.Trim().ToLowerInvariant() switch { Standard => "Standard", Advanced => "Advanced", Free => "Free", "trial" => "Trial", _ => "Custom" };
 }

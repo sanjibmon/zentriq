@@ -135,6 +135,12 @@ public sealed class LicenseVerifier(ILicensePublicKeyStore keys)
             if (qty is < 0 or > 10_000_000) return $"Entitlement for '{workload}' is out of range.";
         }
         if (p.SchemaVersion < 2 && p.Licensee is not null) return "Licensee details require license schema 2.";
+        if (p.SchemaVersion < 3 && (p.LicenseType ?? p.Activation ?? (object?)p.LeaseUntil ?? p.SupportUntil) is not null) return "License type, support and activation require license schema 3.";
+        if (p.LicenseType is { } lt && lt is not (LicenseFormats.Subscription or LicenseFormats.Perpetual)) return $"Unknown license type '{lt}'.";
+        if (p.Activation is { } act && act is not (LicenseFormats.Online or LicenseFormats.Offline)) return $"Unknown activation mode '{act}'.";
+        if (p.LicenseType == LicenseFormats.Perpetual && p.SupportUntil is null) return "A perpetual license must state its support end.";
+        if (p.TermYears is { } ty && ty is < 1 or > 10) return "Subscription term is out of range.";
+        if (p.LeaseUntil is { } lu && lu < p.IssuedAt) return "The lease ends before the license was issued.";
         if (p.Licensee is { } l && (string.IsNullOrWhiteSpace(l.Company) || l.Company.Length > 200)) return "Licensee company is missing or too long.";
         return null;
     }

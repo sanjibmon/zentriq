@@ -54,6 +54,7 @@ builder.Services.AddSingleton<Zentriq.Worker.Agentless.AgentlessInventory>();
 
 builder.Services.AddHostedService<JobRunner>();
 builder.Services.AddHostedService<Housekeeping>();
+builder.Services.AddHostedService<Zentriq.Worker.LicenseCheckin>();
 builder.Services.AddHostedService<Zentriq.Worker.DuplicateCleanup>();
 builder.Services.AddHostedService<Zentriq.Worker.LifecycleAutomation>();
 builder.Services.AddHostedService<Zentriq.Worker.Cloud.CloudScheduler>();

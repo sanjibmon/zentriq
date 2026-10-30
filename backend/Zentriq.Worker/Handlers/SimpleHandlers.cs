@@ -28,8 +28,9 @@ public sealed class UsageSnapshotHandler(LicensingService licensing, NpgsqlDataS
     {
         var status = await licensing.GetStatusAsync(ct);
         var counts = await licensing.CountBillableAsync(null, null, ct);
+        foreach (var (k, v) in await licensing.CountUsageAsync(null, null, ct)) counts[k] = v;
         var source = JsonDocument.Parse(context.Job.Payload).RootElement.TryGetProperty("source", out var s) ? s.GetString() ?? "scheduled" : "scheduled";
-        foreach (var w in Workloads.All)
+        foreach (var w in Workloads.Metrics.Concat(Workloads.All))
         {
             await using var cmd = ds.CreateCommand("INSERT INTO zentriq.workload_usage_snapshots (workload, billable, entitled, source, details) VALUES (@w, @b, @e, @s, @d::jsonb)");
             cmd.Parameters.AddWithValue("w", w);

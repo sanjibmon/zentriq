@@ -12,7 +12,8 @@ namespace Zentriq.Worker.Cloud;
 /// Reads one cloud or virtualization connection (Azure, AWS, vCenter, Hyper-V hosts) and stores what it found:
 /// resources, changes, links to inventoried devices and findings. Read-only towards the platform.
 /// </summary>
-public sealed class CloudSyncHandler(NpgsqlDataSource ds, CloudStore store, CredentialProtector protector, ILogger<CloudSyncHandler> logger) : IJobHandler
+public sealed class CloudSyncHandler(NpgsqlDataSource ds, CloudStore store, CredentialProtector protector, Zentriq.Infrastructure.Licensing.LicensingService licensing,
+    ILogger<CloudSyncHandler> logger) : IJobHandler
 {
     public string JobType => JobTypes.CloudSync;
 
@@ -59,6 +60,22 @@ public sealed class CloudSyncHandler(NpgsqlDataSource ds, CloudStore store, Cred
         }
         if (snap.Identity is not null) await context.LogAsync($"Signed in: {snap.Identity}.", ct: ct);
         foreach (var w in snap.Warnings.Take(20)) await context.LogAsync(w, "warn", ct);
+        // Licensed per cloud / virtual instance: the virtual machines of all connections after this sync must fit.
+        var license = await licensing.GetStatusAsync(ct);
+        if (license.Limits.TryGetValue(Zentriq.Domain.Workloads.CloudInstances, out var vmLimit))
+        {
+            await using var others = ds.CreateCommand("SELECT count(*)::int FROM zentriq.cloud_resources WHERE kind = 'vm' AND deleted_at IS NULL AND account_id <> @a");
+            others.Parameters.AddWithValue("a", id);
+            var total = (int)(await others.ExecuteScalarAsync(ct))! + snap.Items.Count(i => i.Kind == "vm");
+            var grace = license.ExactLimits ? 0 : await licensing.GetSettingAsync("licensing.overage_grace_percent", 5, ct);
+            if (total > vmLimit + (int)Math.Floor(vmLimit * grace / 100.0))
+            {
+                var msg = new Zentriq.Infrastructure.Licensing.WorkloadLimitExceededException(Zentriq.Domain.Workloads.CloudInstances, vmLimit).Message
+                          + $" This sync found {snap.Items.Count(i => i.Kind == "vm")} instance(s); with the other connections that makes {total}. Nothing was changed.";
+                await store.SetStatusAsync(id, "failed", msg, null, null, ct);
+                throw new PermanentJobException(msg);
+            }
+        }
         await context.ProgressAsync(80, $"Saving {snap.Items.Count} resources", ct);
 
         var result = await store.SaveSnapshotAsync(id, account.Provider, snap, DateTimeOffset.UtcNow, ct);

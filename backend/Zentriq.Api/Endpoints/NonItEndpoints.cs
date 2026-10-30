@@ -129,8 +129,13 @@ public static class NonItEndpoints
              ORDER BY (n.barcode = @c) DESC LIMIT 1) t
             """, c => c.Parameters.AddWithValue("c", (code ?? "").Trim()), ct, notFound: true)).RequireAuthorization(Permissions.NonItView);
 
-        g.MapPost("/assets", async (NonItValues body, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
-            await SaveAsync(ds, rc, null, body, ct)).RequireAuthorization(Permissions.NonItManage);
+        g.MapPost("/assets", async (NonItValues body, NpgsqlDataSource ds, RequestContext rc, Zentriq.Infrastructure.Licensing.LicensingService licensing, CancellationToken ct) =>
+        {
+            // Licensed in packs (250 … 4000 or unlimited): a new record that is not disposed needs room in the pack.
+            if (!string.Equals(body.Status, "disposed", StringComparison.Ordinal))
+                await licensing.EnsureMetricAsync(Workloads.NonItAssets, 1, await rc.LicenseAsync(ct), ct: ct);
+            return await SaveAsync(ds, rc, null, body, ct);
+        }).RequireAuthorization(Permissions.NonItManage);
         g.MapPut("/assets/{id:guid}", async (Guid id, NonItValues body, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
             await SaveAsync(ds, rc, id, body, ct)).RequireAuthorization(Permissions.NonItManage);
 
@@ -337,7 +342,7 @@ public static class NonItEndpoints
             return Results.File(NonItStore.Template(lk), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Zentriq-non-IT-assets-form.xlsx");
         }).RequireAuthorization(Permissions.NonItView);
 
-        g.MapPost("/import", async (HttpContext http, NpgsqlDataSource ds, RequestContext rc, bool? dryRun, bool? update, bool? createCategories, string? name, CancellationToken ct) =>
+        g.MapPost("/import", async (HttpContext http, NpgsqlDataSource ds, RequestContext rc, Zentriq.Infrastructure.Licensing.LicensingService licensing, bool? dryRun, bool? update, bool? createCategories, string? name, CancellationToken ct) =>
         {
             if (http.Features.Get<IHttpMaxRequestBodySizeFeature>() is { IsReadOnly: false } size) size.MaxRequestBodySize = 25 * 1024 * 1024;
             using var ms = new MemoryStream();
@@ -350,6 +355,12 @@ public static class NonItEndpoints
                 return Validation.Problem("file", "The file could not be read: " + ex.Message);
             }
             await using var conn = await ds.OpenConnectionAsync(ct);
+            if (dryRun == false)
+            {
+                // New records count against the non-IT pack: check with a dry run first (nothing is written when it does not fit).
+                var preview = await NonItImporter.RunAsync(conn, rows, new ImportOptions(update != false, createCategories == true, true), rc.UserName, ct);
+                if (preview.Created > 0) await licensing.EnsureMetricAsync(Workloads.NonItAssets, preview.Created, await rc.LicenseAsync(ct), ct: ct);
+            }
             var result = await NonItImporter.RunAsync(conn, rows, new ImportOptions(update != false, createCategories == true, dryRun != false), rc.UserName, ct);
             if (!result.DryRun)
                 await rc.AuditAsync("nonit.import", name ?? "upload", detail: new { result.Rows, result.Created, result.Updated, result.Skipped, result.NewCategories }, ct: ct);

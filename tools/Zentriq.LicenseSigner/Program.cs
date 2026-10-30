@@ -17,7 +17,9 @@ using Zentriq.Domain.Licensing;
 //           [--license-id <id>] --out <license.zlic>
 //           Licensee details (schema 2, shown to the customer): [--company <legal name>] [--contact-name ..]
 //           [--contact-email ..] [--contact-phone ..] [--address ..] [--country ..] [--tax-id ..]
-//           A total cap across all device types can be given with --entitle devices=<n>.
+//           Metrics: --entitle devices=<IT devices> --entitle nonit_assets=<250|500|1000|2000|4000> (leave out = unlimited)
+//           --entitle cloud_instances=<n> --entitle technicians=<n>
+//           Schema 3: [--type subscription|perpetual] [--years 1|3|5] [--support-until <yyyy-mm-dd>] (perpetual: --expires is ignored)
 //
 //   inspect --license <file.zlic> --public <public.pem>
 //       Verifies the signature and prints the payload.
@@ -75,7 +77,7 @@ internal static class Signer
         {
             var parts = e.Split('=', 2);
             if (parts.Length != 2 || !int.TryParse(parts[1], out var qty) || qty < 0) throw new ArgumentException($"Bad --entitle '{e}' (use workload=quantity).");
-            if (!Workloads.IsLimitKey(parts[0])) throw new ArgumentException($"Unknown workload '{parts[0]}'. Known: {string.Join(", ", Workloads.All)}, {Workloads.TotalDevices}.");
+            if (!Workloads.IsLimitKey(parts[0])) throw new ArgumentException($"Unknown metric '{parts[0]}'. Known: {string.Join(", ", Workloads.Metrics.Concat(Workloads.All))}.");
             entitlements[parts[0]] = qty;
         }
         if (entitlements.Count == 0) throw new ArgumentException("At least one --entitle is required.");
@@ -87,6 +89,12 @@ internal static class Signer
 
         var now = DateTimeOffset.UtcNow;
         var customer = One(o, "customer");
+        var type = (Opt(o, "type") ?? LicenseFormats.Subscription).ToLowerInvariant();
+        if (type is not (LicenseFormats.Subscription or LicenseFormats.Perpetual)) throw new ArgumentException("--type is subscription or perpetual.");
+        var perpetual = type == LicenseFormats.Perpetual;
+        DateTimeOffset? supportUntil = Opt(o, "support-until") is { } su ? DateTimeOffset.Parse(su + "T23:59:59Z") : null;
+        if (perpetual && supportUntil is null) throw new ArgumentException("A perpetual license needs --support-until.");
+        var expires = perpetual ? LicenseFormats.PerpetualExpiry : DateTimeOffset.Parse(One(o, "expires") + "T23:59:59Z");
         var licensee = new Licensee(Opt(o, "company") ?? customer, Opt(o, "contact-name"), Opt(o, "contact-email"),
             Opt(o, "contact-phone"), Opt(o, "address"), Opt(o, "country"), Opt(o, "tax-id"));
         var payload = new LicensePayload(
@@ -96,24 +104,22 @@ internal static class Signer
             InstallationId: request.InstallationId,
             IssuedAt: now,
             NotBefore: Opt(o, "not-before") is { } nb ? DateTimeOffset.Parse(nb + "T00:00:00Z") : now.AddMinutes(-5),
-            ExpiresAt: DateTimeOffset.Parse(One(o, "expires") + "T23:59:59Z"),
-            GraceDays: int.Parse(Opt(o, "grace") ?? "14"),
+            ExpiresAt: expires,
+            GraceDays: perpetual ? 0 : int.Parse(Opt(o, "grace") ?? "14"),
             Modules: modules,
             Entitlements: entitlements,
             RequestId: request.RequestId,
             Licensee: licensee,
-            Edition: edition);
+            Edition: edition,
+            LicenseType: type,
+            TermYears: perpetual ? null : (Opt(o, "years") is { } y ? int.Parse(y) : null),
+            SupportUntil: perpetual ? supportUntil : expires,
+            Activation: LicenseFormats.Offline);
 
-        var payloadBytes = JsonSerializer.SerializeToUtf8Bytes(payload);
-        using var key = ECDsa.Create();
-        key.ImportFromPem(File.ReadAllText(One(o, "key")));
-        if (key.KeySize != 256) throw new CryptographicException("Signing key must be ECDSA P-256.");
-        var signature = key.SignData(payloadBytes, HashAlgorithmName.SHA256, DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
-        var doc = new SignedDocument(LicenseFormats.License, One(o, "key-id"), LicenseFormats.Algorithm,
-            Convert.ToBase64String(payloadBytes), Convert.ToBase64String(signature));
+        using var key = Zentriq.Application.Licensing.LicenseSigning.LoadPrivateKey(File.ReadAllText(One(o, "key")));
         var outFile = One(o, "out");
-        File.WriteAllText(outFile, JsonSerializer.Serialize(doc, Pretty));
-        Console.WriteLine($"Issued {payload.LicenseId} for {payload.Customer} (installation {payload.InstallationId}), expires {payload.ExpiresAt:yyyy-MM-dd}: {outFile}");
+        File.WriteAllText(outFile, Zentriq.Application.Licensing.LicenseSigning.Sign(payload, key, One(o, "key-id")));
+        Console.WriteLine($"Issued {payload.LicenseId} for {payload.Customer} (installation {payload.InstallationId}), {type}{(perpetual ? $", support until {supportUntil:yyyy-MM-dd}" : $", expires {payload.ExpiresAt:yyyy-MM-dd}")}: {outFile}");
         return 0;
     }
 

@@ -108,17 +108,7 @@ public static class OrganizationEndpoints
     }
 
     /// <summary>Fills empty profile fields from the signed licensee block (never overwrites administrator edits).</summary>
-    public static void ApplyLicensee(Organization org, Licensee l)
-    {
-        org.LegalName ??= l.Company;
-        org.ContactName ??= l.ContactName;
-        org.ContactEmail ??= l.ContactEmail;
-        org.ContactPhone ??= l.ContactPhone;
-        org.AddressLine1 ??= l.Address;
-        org.Country ??= l.Country;
-        org.TaxId ??= l.TaxId;
-        org.UpdatedAt = DateTimeOffset.UtcNow;
-    }
+    public static void ApplyLicensee(Organization org, Licensee l) => Zentriq.Infrastructure.Licensing.LicenseImporter.ApplyLicensee(org, l);
 
     private static object ToDto(Organization o) => new
     {

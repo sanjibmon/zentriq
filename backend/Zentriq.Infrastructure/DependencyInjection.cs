@@ -43,6 +43,9 @@ public static class DependencyInjection
         services.AddSingleton(_ => EmbeddedPublicKeys.Load());
         services.AddSingleton<LicenseVerifier>();
         services.AddScoped<LicensingService>();
+        services.AddScoped<LicenseImporter>();
+        services.AddScoped<OnlineLicensing>();
+        services.AddSingleton(_ => LicenseServerHttp.CreateDefault());
         services.AddScoped<InitializationService>();
         services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
         services.AddSingleton<AuditWriter>();
