@@ -27,6 +27,11 @@ function Meter({ u, exact }: { u: WorkloadUsage; exact: boolean }) {
   );
 }
 
+const MODE_LABEL: Record<string, string> = {
+  Trial: 'Trial', Licensed: 'Licensed', LicensedGrace: 'Licensed (grace period)', Free: 'Free tier', FreeOverLimit: 'Free tier – over limit',
+  LeaseExpired: 'Check-in overdue', SupportExpired: 'Support expired', TrialExpired: 'Trial ended', LicenseExpired: 'License expired', ClockRollback: 'Clock moved back',
+};
+
 function planText(d: LicensingStatus): string {
   if (d.mode.startsWith('Trial')) return 'Trial (all sections)';
   if (d.mode.startsWith('Free')) return 'Free tier (Standard)';
@@ -108,7 +113,7 @@ export function LicensingPage() {
           {d.mode === 'FreeOverLimit' && <Callout tone="crit" icon="alert">This server uses more than the free tier allows, so licensed features are paused. Activate a license, or reduce the records below the free limits. No data has been deleted.</Callout>}
           {d.revoked && !d.license && <Callout tone="crit" icon="alert">License {d.revoked.licenseId} ({d.revoked.customerName}) is no longer valid on this server (revoked, suspended or deactivated at the license server). Contact Zentriq, or activate another license.</Callout>}
           <Kpis items={[
-            { label: 'State', value: <Pill tone={statusTone(d.mode)}>{fmt.label(d.mode)}</Pill> },
+            { label: 'State', value: <Pill tone={statusTone(d.mode)}>{MODE_LABEL[d.mode] ?? fmt.label(d.mode)}</Pill> },
             { label: 'Plan', value: planText(d) },
             d.licenseType === 'perpetual'
               ? { label: 'Support until', value: fmt.day(d.supportUntil ?? null), sub: 'Versions released until then can be installed' }
@@ -118,7 +123,7 @@ export function LicensingPage() {
           ]} />
 
           <div className="grid-2">
-            <Panel title="Usage" sub="What the plan counts. IT accessories are always unlimited." flush>
+            <div className="lic-span"><Panel title="Usage" sub="What the plan counts. IT accessories are always unlimited." flush>
               <DataTable rows={metrics.map((u) => ({ ...u, id: u.workload }))} columns={[
                 { key: 'w', label: 'Counted', render: (r) => <><b>{r.title || fmt.label(r.workload)}</b><div className="faint lic-help">{METRIC_HELP[r.workload]}</div></> },
                 { key: 'b', label: 'In use', render: (r) => r.billable.toLocaleString() },
@@ -128,7 +133,7 @@ export function LicensingPage() {
                 IT accessories: unlimited.{types.length > 0 && <> IT devices by type: {types.filter((t) => t.billable > 0).map((t) => `${t.title || fmt.label(t.workload)} ${t.billable.toLocaleString()}`).join(' · ') || 'none yet'}.</>}
                 {' '}Devices count when active and seen in the last 30 days; virtual machines from cloud connections count as cloud instances instead.
               </small></div>
-            </Panel>
+            </Panel></div>
 
             <Panel title={isOnline ? 'Online activation' : 'Activate'} sub={isOnline ? `License server ${online?.serverUrl ?? ''}` : 'With the license key from your order'}>
               {isOnline ? (
@@ -149,7 +154,7 @@ export function LicensingPage() {
               ) : manage ? (
                 <>
                   <label className="field"><span>License key</span>
-                    <input className="mono" value={key} placeholder="ZQL-XXXXX-XXXXX-XXXXX-XXXXX" onChange={(e) => setKey(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && key && void activate()} />
+                    <input className="in mono" value={key} placeholder="ZQL-XXXXX-XXXXX-XXXXX-XXXXX" onChange={(e) => setKey(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && key && void activate()} />
                   </label>
                   <div className="row-actions lic-actions">
                     <button className="btn primary" disabled={!key.trim() || !!busy} onClick={() => void activate()}>{busy === 'activate' ? 'Activating…' : 'Activate online'}</button>
@@ -166,7 +171,7 @@ export function LicensingPage() {
                   <li>On a computer with internet access, open <span className="mono">{offlinePage}</span> and upload the request with your license key (or send it to Zentriq).</li>
                   <li>Import the license file (.zlic) you receive.</li>
                 </ol>
-                <div className="row-actions">
+                <div className="row-actions lic-actions">
                   <button className="btn" onClick={() => void exportRequest()}>Download activation request</button>
                   <button className="btn primary" disabled={!!busy} onClick={() => fileRef.current?.click()}>Import license file…</button>
                   <input ref={fileRef} type="file" accept=".zlic,.json,application/json" hidden onChange={(e) => e.target.files?.[0] && void importLicense(e.target.files[0])} />
@@ -185,7 +190,7 @@ export function LicensingPage() {
                   <dt>License</dt><dd className="mono">{d.license.licenseId}</dd>
                   <dt>Customer</dt><dd>{d.license.customerName}</dd>
                   {d.licenseType === 'perpetual'
-                    ? <><dt>License</dt><dd>Perpetual; support until {fmt.day(d.supportUntil ?? null)}</dd></>
+                    ? <><dt>Type</dt><dd>Perpetual; support until {fmt.day(d.supportUntil ?? null)}</dd></>
                     : <><dt>Valid until</dt><dd>{fmt.day(d.license.expiresAt)} (+{d.license.graceDays} days grace)</dd></>}
                 </>}
               </dl>
@@ -229,7 +234,7 @@ export function LicensingPage() {
             {manage && (
               <Panel title="License server" sub="Only change this when Zentriq asks you to">
                 <label className="field"><span>Address</span>
-                  <input value={serverUrl ?? online?.serverUrl ?? ''} onChange={(e) => setServerUrl(e.target.value)} placeholder="https://license.zentriq.com" />
+                  <input className="in" value={serverUrl ?? online?.serverUrl ?? ''} onChange={(e) => setServerUrl(e.target.value)} placeholder="https://license.zentriq.com" />
                 </label>
                 <div className="row-actions">
                   <button className="btn" disabled={serverUrl == null || !!busy} onClick={() => void saveServer()}>Save</button>

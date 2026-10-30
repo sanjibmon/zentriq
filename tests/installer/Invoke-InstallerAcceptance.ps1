@@ -119,7 +119,7 @@ Remove-Item $answer -Force   # contains the administrator password
 
 if (-not $installed) {
     foreach ($t in 'T02 PostgreSQL provisioning', 'T03 Database migration', 'T04 Administrator sign-in', 'T05 API and worker services', 'T06 Trial initialization',
-                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection', 'T68 Live agent connection', 'T69 Locations and IT accessories', 'T70 Manual hardware details', 'T71 Standard and Advanced installation', 'T72 Asset lifecycle', 'T73 Cloud and infrastructure', 'T74 Own asset tags, people and bulk upload', 'T75 Backup and restore', 'T76 Roles and groups', 'T77 Log retention and export', 'T78 Agent stop and disable protection', 'T79 Automatic agent update', 'T80 Agent check-in and diagnosis commands') {
+                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection', 'T68 Live agent connection', 'T69 Locations and IT accessories', 'T70 Manual hardware details', 'T71 Standard and Advanced installation', 'T72 Asset lifecycle', 'T73 Cloud and infrastructure', 'T74 Own asset tags, people and bulk upload', 'T75 Backup and restore', 'T76 Roles and groups', 'T77 Log retention and export', 'T78 Agent stop and disable protection', 'T79 Automatic agent update', 'T80 Agent check-in and diagnosis commands', 'T81 Licensing plans and online activation') {
         Record $t.Substring(0, 3) $t.Substring(4) 'BLOCKED' 'installation failed'
     }
 } else {
@@ -240,6 +240,33 @@ if (-not $installed) {
         Assert ($st.limits.devices -eq 30) "device limit $($st.limits.devices)"
         Assert (@($st.usage | Where-Object workload -eq 'devices').Count -eq 1) 'no total devices usage row'
         "limits: $($st.limits | ConvertTo-Json -Compress)"
+    } | Out-Null
+    Check 'T81' 'Licensing plans: trial 30/50/10/1, free 25/25/5/0, four usage metrics, online activation errors are clear' {
+        $s = Login
+        $st = Api GET '/licensing/status' -Session $s
+        Assert ($st.plans.trial.devices -eq 30 -and $st.plans.trial.nonit_assets -eq 50 -and $st.plans.trial.cloud_instances -eq 10 -and $st.plans.trial.technicians -eq 1) "trial plan: $($st.plans.trial | ConvertTo-Json -Compress)"
+        Assert ($st.plans.free.devices -eq 25 -and $st.plans.free.nonit_assets -eq 25 -and $st.plans.free.cloud_instances -eq 5 -and $st.plans.free.technicians -eq 0) "free plan: $($st.plans.free | ConvertTo-Json -Compress)"
+        Assert ($st.limits.nonit_assets -eq 50 -and $st.limits.cloud_instances -eq 10 -and $st.limits.technicians -eq 1) "trial limits: $($st.limits | ConvertTo-Json -Compress)"
+        $metrics = @($st.usage | Where-Object { $_.metric }) | ForEach-Object workload
+        foreach ($m in 'devices', 'nonit_assets', 'cloud_instances', 'technicians') { Assert ($metrics -contains $m) "usage metric $m missing: $($metrics -join ',')" }
+        Assert ($st.online.serverUrl -eq 'https://license.zentriq.com' -and -not $st.online.active) "online: $($st.online | ConvertTo-Json -Compress)"
+        function Raw81([string] $Method, [string] $Path, $Body) {
+            $r = Invoke-WebRequest "$base/api/v1$Path" -Method $Method -Body ($Body | ConvertTo-Json) -ContentType 'application/json' -Headers @{ 'X-Zentriq-Request' = '1' } -WebSession $s -SkipHttpErrorCheck
+            $text = if ($r.Content -is [byte[]]) { [Text.Encoding]::UTF8.GetString($r.Content) } else { [string]$r.Content }
+            [pscustomobject]@{ StatusCode = [int]$r.StatusCode; Content = $text }
+        }
+        $bad = Raw81 POST '/licensing/activate' @{ licenseKey = 'not-a-key' }
+        Assert ($bad.StatusCode -eq 400 -and $bad.Content -match 'ZQL-') "bad key: $($bad.StatusCode) $($bad.Content)"
+        $http = Raw81 PUT '/licensing/server' @{ url = 'http://license.example.test' }
+        Assert ($http.StatusCode -eq 400) "plain http server address accepted: $($http.StatusCode)"
+        Api PUT '/licensing/server' @{ url = 'https://127.0.0.1:9' } -Session $s | Out-Null
+        $down = Raw81 POST '/licensing/activate' @{ licenseKey = 'ZQL-00000-11111-22222-33333' }
+        Assert ($down.StatusCode -eq 502 -and $down.Content -match 'could not be reached') "unreachable license server: $($down.StatusCode) $($down.Content)"
+        Api PUT '/licensing/server' @{ url = '' } -Session $s | Out-Null
+        Assert ((Api GET '/licensing/status' -Session $s).online.serverUrl -eq 'https://license.zentriq.com') 'server address not reset'
+        $mode = (Api GET '/licensing/status' -Session $s).mode
+        Assert ($mode -eq 'Trial') "mode after failed activation: $mode"
+        "plans and metrics reported; bad key 400, http address 400, unreachable server 502 with a clear message; still Trial"
     } | Out-Null
     Check 'T25' 'Company profile can be edited and read back' {
         $s = Login
@@ -2223,7 +2250,7 @@ if (-not $installed) {
 foreach ($t in @(
     @('T17', 'Restart of Windows (trial persists across reboot)', 'CI runners cannot reboot mid-job; covered by T09/T10/T16 persistence checks. Run manually on a VM.'),
     @('T18', 'Trial expiry enforcement end-to-end (clock moved past 14 days)', 'Covered by unit tests (LicenseEvaluator); not run against an installed server.'),
-    @('T19', 'Valid commercial license activation end-to-end', 'Requires the vendor private key; signer + verifier covered by unit tests. Run manually with docs/licensing.md.'),
+    @('T19', 'Valid commercial license activation end-to-end', 'Needs the production license server and key. Online/offline activation, check-ins, suspension, revocation, renewal and support are covered end to end by the license server tests in ci-quick (verified with the product verifier).'),
     @('T20', 'AD/OU scan and directory sync (computers, users, groups, OUs) in a test domain', 'No Active Directory domain on CI runners. T37 covers validation and error handling only.'),
     @('T38', 'Password reset by e-mail (SMTP delivery and link)', 'No mail server on CI runners; T36 covers the no-SMTP path and zentriqctl reset-password.'),
     @('T39', 'Setup refuses Windows Server 2012 R2 and older', 'CI has only Windows Server 2022; the bundle/MSI conditions need a manual run on an old VM.'),

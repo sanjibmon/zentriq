@@ -369,7 +369,7 @@ fieldset.plain { border: 0; padding: 0; margin: 0; min-width: 0; }
 .progress.near > i { background: var(--warn); }
 .progress.over > i { background: var(--crit); }
 .lic-foot { padding: 10px 14px; }
-.lic-actions { justify-content: flex-start; margin: 12px 0 8px; }
+.lic-actions { justify-content: flex-start; flex-wrap: wrap; margin: 12px 0 8px; }
 .lic-steps { margin: 0 0 12px; padding-left: 18px; font-size: 13px; display: grid; gap: 4px; }
 .lic-span { grid-column: 1 / -1; }
 .btn.danger { color: var(--crit); border-color: var(--crit); }

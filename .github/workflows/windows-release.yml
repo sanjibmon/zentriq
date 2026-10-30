@@ -80,6 +80,18 @@ jobs:
           Move-Item artifacts/release artifacts/release-main
           Get-Content artifacts/prereqs/prereqs.lock.json
 
+      - name: Package the license server (vendor-hosted; not part of the customer installer)
+        shell: pwsh
+        run: |
+          $out = "$env:RUNNER_TEMP/license-server"
+          dotnet publish licensing/Zentriq.LicenseServer/Zentriq.LicenseServer.csproj -c Release -o $out "-p:Version=$($env:ZQ_VERSION)" --nologo *>&1 | Tee-Object -FilePath "$env:RUNNER_TEMP/ci-logs/3b-license-server.log"
+          if ($LASTEXITCODE -ne 0) { throw "license server publish failed" }
+          Copy-Item licensing/Dockerfile, licensing/docker-compose.yml, licensing/env.example, docs/license-server.md $out
+          $zip = "artifacts/release-main/Zentriq-LicenseServer-$($env:ZQ_VERSION).zip"
+          Compress-Archive -Path "$out/*" -DestinationPath $zip
+          $h = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          Add-Content artifacts/release-main/SHA256SUMS.txt "$h  $(Split-Path $zip -Leaf)" -Encoding ascii
+
       - name: Package upgrade target
         shell: pwsh
         run: |
