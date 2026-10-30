@@ -440,8 +440,8 @@ export function DashboardPage() {
         return lic.data ? (
           <div className="stack-v">
             <div><Pill tone={statusTone(lic.data.mode)}>{fmt.label(lic.data.mode)}</Pill> <span className="muted">{lic.data.summary}</span></div>
-            <HBars data={lic.data.usage.filter((u) => u.limit != null || u.billable > 0).map((u) => ({ key: u.workload, label: `${fmt.label(u.workload)}${u.limit != null ? ` (used of ${u.limit} entitled)` : ' (used)'}`, value: u.billable }))}
-              max={Math.max(1, ...lic.data.usage.map((u) => u.limit ?? u.billable))} onSelect={() => navigate('/licensing')} />
+            <HBars data={lic.data.usage.filter((u) => u.metric !== false && (u.limit != null || u.billable > 0)).map((u) => ({ key: u.workload, label: `${u.title || fmt.label(u.workload)}${u.limit != null ? ` (used of ${u.limit} entitled)` : ' (used)'}`, value: u.billable }))}
+              max={Math.max(1, ...lic.data.usage.filter((u) => u.metric !== false).map((u) => u.limit ?? u.billable))} onSelect={() => navigate('/licensing')} />
           </div>
         ) : <ErrorBox error={lic.error} />;
       case 'scans.recent':

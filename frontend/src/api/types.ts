@@ -170,6 +170,9 @@ export interface WorkloadUsage {
   workload: string;
   billable: number;
   limit: number | null;
+  title?: string;
+  /** Licensed metric (devices, nonit_assets, cloud_instances, technicians); false for the per-type breakdown of IT devices. */
+  metric?: boolean;
 }
 
 export interface LicensingStatus extends LicenseSummary {
@@ -187,6 +190,29 @@ export interface LicensingStatus extends LicenseSummary {
     modules: string[];
   } | null;
   licensee: Licensee | null;
+  warning?: string | null;
+  editionTitle?: string;
+  /** 'subscription' or 'perpetual' (licenses from the license server); null for trial, free tier and older licenses. */
+  licenseType?: string | null;
+  supportUntil?: string | null;
+  /** 'online' (license key, check-ins) or 'offline' (imported license file). */
+  activation?: string | null;
+  leaseUntil?: string | null;
+  revoked?: { licenseId: string; customerName: string } | null;
+  online?: {
+    serverUrl: string;
+    active: boolean;
+    keyHint: string | null;
+    licenseId: string | null;
+    activatedAt: string | null;
+    activatedBy: string | null;
+    lastAttemptAt: string | null;
+    lastCheckinAt: string | null;
+    lastStatus: string | null;
+    lastMessage: string | null;
+  };
+  plans?: { trial: Record<string, number>; free: Record<string, number>; nonItPacks: number[]; subscriptionYears: number[] };
+  releaseDate?: string;
 }
 
 export interface UserRow {

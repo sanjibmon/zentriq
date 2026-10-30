@@ -54,11 +54,11 @@ export function Pill({ children, tone = '' }: { children: ReactNode; tone?: Tone
 
 export function statusTone(s: string | null | undefined): Tone {
   switch ((s ?? '').toLowerCase()) {
-    case 'succeeded': case 'success': case 'completed': case 'active': case 'trial': case 'licensed': case 'healthy': case 'ok':
+    case 'succeeded': case 'success': case 'completed': case 'active': case 'trial': case 'licensed': case 'healthy': case 'ok': case 'free':
       return 'ok';
     case 'running': case 'queued': case 'cancelling': case 'partial': case 'licensedgrace':
       return 'info';
-    case 'failed': case 'dead': case 'denied': case 'failure': case 'trialexpired': case 'licenseexpired': case 'clockrollback': case 'disabled':
+    case 'failed': case 'dead': case 'denied': case 'failure': case 'trialexpired': case 'licenseexpired': case 'clockrollback': case 'disabled': case 'freeoverlimit': case 'leaseexpired': case 'supportexpired':
       return 'crit';
     case 'cancelled': case 'retired': case 'stale':
       return 'warn';
