@@ -16,8 +16,8 @@ public sealed record WorkloadUsage(string Workload, int Billable, int? Limit, st
 public sealed class WorkloadLimitExceededException(string workload, int limit)
     : Exception(workload switch
     {
-        Workloads.TotalDevices => $"The license allows {limit} IT devices and they are all in use. Retire unused devices, or extend the license.",
-        Workloads.NonItAssets => $"The license allows {limit} non-IT assets and they are all in use. Dispose of unused records, or add a larger non-IT pack.",
+        Workloads.TotalDevices => $"IT device limit reached: the license allows {limit} IT devices and they are all in use. Retire unused devices, or extend the license.",
+        Workloads.NonItAssets => $"Non-IT asset limit reached: the license allows {limit} non-IT assets and they are all in use. Dispose of unused records, or add a larger non-IT pack.",
         Workloads.CloudInstances => $"The license allows {limit} cloud and virtual instances, and the connections report more. Extend the license, or limit what the connections read (subscriptions, regions, projects).",
         Workloads.Technicians => limit == 0
             ? "Remote support is not part of this license."

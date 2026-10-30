@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Zentriq License Portal</title>
+  <link rel="stylesheet" href="/app.css">
+  <script src="/admin/admin.js" defer></script>
+</head>
+<body>
+  <header class="top">
+    <div class="brand"><span class="brand-mark">Z</span>Zentriq License Portal</div>
+    <div class="spacer"></div>
+    <span id="who" class="muted small"></span>
+    <button id="logout" class="hidden">Sign out</button>
+  </header>
+  <nav class="tabs hidden" id="tabs">
+    <a href="#/">Dashboard</a><a href="#/licenses">Licenses</a><a href="#/customers">Customers</a><a href="#/audit">Audit log</a><a href="#/settings">Settings</a>
+  </nav>
+  <main class="wrap" id="view"></main>
+  <dialog id="dlg"><form method="dialog" id="dlgform"><div class="dhead" id="dlgtitle"></div><div class="dbody" id="dlgbody"></div><div class="dfoot" id="dlgfoot"></div></form></dialog>
+</body>
+</html>

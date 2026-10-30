@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Zentriq Licensing</title>
+  <link rel="stylesheet" href="/app.css">
+  <script src="/offline.js" defer></script>
+</head>
+<body>
+  <header class="top"><div class="brand"><span class="brand-mark">Z</span>Zentriq Licensing</div></header>
+  <main class="wrap narrow">
+    <section class="card">
+      <h1>Offline activation</h1>
+      <p class="muted">For Zentriq servers without internet access. Servers that can reach this site activate directly from <b>Licensing › Activate online</b> with the license key.</p>
+      <ol class="muted small">
+        <li>On the Zentriq server, open <b>Licensing › Offline activation</b> and download the activation request file.</li>
+        <li>Bring the file to a computer with internet access and upload it here with your license key.</li>
+        <li>Download the license file and import it under <b>Licensing › Offline activation › Import license</b>.</li>
+      </ol>
+      <form id="f" autocomplete="off">
+        <div class="card">
+          <label for="key">License key</label>
+          <input id="key" class="mono" placeholder="ZQL-XXXXX-XXXXX-XXXXX-XXXXX" required>
+          <h3>Activation request</h3>
+          <div class="drop"><input id="file" type="file" accept=".json,application/json" required></div>
+          <p id="fileinfo" class="small muted"></p>
+        </div>
+        <div class="row end"><button class="primary" id="go" type="submit">Get license file</button></div>
+      </form>
+      <div id="out" class="msg hidden" role="status"></div>
+      <div id="done" class="hidden">
+        <p class="ok"><b>Your license file is ready.</b></p>
+        <p id="summary" class="muted"></p>
+        <a class="btn primary" id="dl" download>Download license file</a>
+      </div>
+    </section>
+    <p class="small muted">Perpetual licenses and subscriptions activated offline do not check in. To move a license to another server, contact Zentriq.</p>
+  </main>
+</body>
+</html>

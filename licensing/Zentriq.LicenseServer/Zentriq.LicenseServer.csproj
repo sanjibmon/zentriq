@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <!--
+    VENDOR-HOSTED service (license.zentriq.com): online activation, check-ins, offline (air-gapped) activation and the
+    license administration portal. Never packaged into the customer installer.
+  -->
+  <PropertyGroup>
+    <RootNamespace>Zentriq.LicenseServer</RootNamespace>
+    <AssemblyName>Zentriq.LicenseServer</AssemblyName>
+    <OutputType>Exe</OutputType>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\backend\Zentriq.Domain\Zentriq.Domain.csproj" />
+    <ProjectReference Include="..\..\backend\Zentriq.Application\Zentriq.Application.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Npgsql" />
+    <PackageReference Include="Microsoft.Extensions.Identity.Core" />
+    <PackageReference Include="QRCoder" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Migrations\*.sql" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Zentriq.LicenseServer.Tests" />
+  </ItemGroup>
+</Project>

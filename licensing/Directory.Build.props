@@ -1,0 +1,7 @@
+<Project>
+  <!-- The license server shares the product's build settings and its licensing contracts (Zentriq.Domain / Zentriq.Application). -->
+  <Import Project="..\backend\Directory.Build.props" />
+  <PropertyGroup>
+    <Product>Zentriq License Server</Product>
+  </PropertyGroup>
+</Project>
