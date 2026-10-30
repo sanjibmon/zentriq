@@ -196,15 +196,10 @@ public static class LicenseKeys
     public static string? Normalize(string? key)
     {
         if (string.IsNullOrWhiteSpace(key)) return null;
-        var s = new System.Text.StringBuilder();
-        foreach (var ch in key.Trim().ToUpperInvariant())
-        {
-            if (ch is '-' or ' ') continue;
-            var c = ch == 'O' ? '0' : ch is 'I' or 'L' ? '1' : ch;
-            s.Append(c);
-        }
-        var t = s.ToString();
-        if (t.StartsWith(Prefix, StringComparison.Ordinal)) t = t[Prefix.Length..];
+        var raw = new string(key.Trim().ToUpperInvariant().Where(ch => ch is not ('-' or ' ')).ToArray());
+        // The prefix comes off before the look-alike mapping (its 'L' would otherwise become '1').
+        if (raw.StartsWith(Prefix, StringComparison.Ordinal)) raw = raw[Prefix.Length..];
+        var t = new string(raw.Select(ch => ch == 'O' ? '0' : ch is 'I' or 'L' ? '1' : ch).ToArray());
         if (t.Length != 20 || t.Any(c => Alphabet.IndexOf(c) < 0)) return null;
         return $"{Prefix}-{t[..5]}-{t[5..10]}-{t[10..15]}-{t[15..]}";
     }

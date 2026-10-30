@@ -391,7 +391,7 @@
         <textarea class="mono" readonly rows="8">${esc(JSON.stringify(catalog.productKeyEntry, null, 2))}</textarea>
         <p class="small muted">Public address: ${esc(catalog.publicUrl)} · Online lease: ${catalog.leaseDays} days (then 30 days of grace).</p></div>
       <div class="card"><h2>Plans</h2><div class="grid2">
-        <div><h3>Trial (30 days, all features)</h3><p class="small">IT devices ${catalog.trial.devices}, non-IT ${catalog.trial.nonit_assets}, cloud/VM ${catalog.trial.cloud_instances}, technicians ${catalog.trial.technicians}, accessories unlimited.</p></div>
+        <div><h3>Trial (14 days, all features)</h3><p class="small">IT devices ${catalog.trial.devices}, non-IT ${catalog.trial.nonit_assets}, cloud/VM ${catalog.trial.cloud_instances}, technicians ${catalog.trial.technicians}, accessories unlimited.</p></div>
         <div><h3>Free tier (Standard edition)</h3><p class="small">IT devices ${catalog.free.devices}, non-IT ${catalog.free.nonit_assets}, cloud/VM ${catalog.free.cloud_instances}, no remote support, accessories unlimited.</p></div>
       </div></div>`;
     const on = (bid, fn) => $(bid) && $(bid).addEventListener('click', fn);

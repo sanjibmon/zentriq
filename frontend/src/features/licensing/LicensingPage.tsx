@@ -194,7 +194,7 @@ export function LicensingPage() {
             {d.plans && (
               <Panel title="Plans">
                 <dl className="dl2">
-                  <dt>Trial</dt><dd>30 days, all sections: {d.plans.trial.devices} IT devices, {d.plans.trial.nonit_assets} non-IT assets, {d.plans.trial.cloud_instances} cloud/VM instances, {d.plans.trial.technicians} remote support technician; accessories unlimited.</dd>
+                  <dt>Trial</dt><dd>14 days, all sections: {d.plans.trial.devices} IT devices, {d.plans.trial.nonit_assets} non-IT assets, {d.plans.trial.cloud_instances} cloud/VM instances, {d.plans.trial.technicians} remote support technician; accessories unlimited.</dd>
                   <dt>Free</dt><dd>Standard edition, no end: up to {d.plans.free.devices} IT devices and {d.plans.free.nonit_assets} non-IT assets, {d.plans.free.cloud_instances} cloud/VM instances, no remote support; accessories unlimited.</dd>
                   <dt>Licensed</dt><dd>Per IT device, non-IT packs ({d.plans.nonItPacks.map((p) => p.toLocaleString()).join(', ')} or unlimited), per cloud/VM instance and per remote support technician. Subscription for {d.plans.subscriptionYears.join(', ')} years, or perpetual with yearly support.</dd>
                 </dl>
