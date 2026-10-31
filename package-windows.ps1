@@ -180,6 +180,22 @@ New-Item -ItemType Directory -Force -Path $downloads | Out-Null
 Copy-Item $agentMsi $downloads -Force
 Set-Content (Join-Path $downloads 'ZentriqAgent-x64.version') $PackageVersion -Encoding ascii -NoNewline
 
+# ---- 4a2. Zentriq Agent for Linux (built on Linux: agent/linux/build-packages.sh) ------------------------
+# The console serves the packages (deb, rpm, tar.gz; x64 and ARM64) and the one-line installer from downloads/linux,
+# and devices fetch them from the agent port. CI puts them in artifacts/linux-agent/<package version>.
+$linuxSrc = if ($env:ZQ_LINUX_AGENT_DIR) { Join-Path $env:ZQ_LINUX_AGENT_DIR $PackageVersion } else { Join-Path $art "linux-agent/$PackageVersion" }
+$linuxDownloads = Join-Path $downloads 'linux'
+Remove-Item $linuxDownloads -Recurse -Force -ErrorAction SilentlyContinue
+if (Test-Path (Join-Path $linuxSrc 'version')) {
+    New-Item -ItemType Directory -Force -Path $linuxDownloads | Out-Null
+    Copy-Item (Join-Path $linuxSrc 'zentriq-agent-linux-*'), (Join-Path $linuxSrc 'install.sh'), (Join-Path $linuxSrc 'version') $linuxDownloads
+    $linuxVersion = (Get-Content (Join-Path $linuxSrc 'version') -Raw).Trim()
+    if ($linuxVersion -ne $PackageVersion) { throw "Linux agent packages are version $linuxVersion, expected $PackageVersion" }
+    Write-Host "Linux agent packages $linuxVersion added: $((Get-ChildItem $linuxDownloads).Name -join ', ')"
+} else {
+    Write-Warning "No Linux agent packages for $PackageVersion ($linuxSrc): the server will not offer the Linux agent."
+}
+
 # ---- 4b. server MSI ------------------------------------------------------------------------------
 Write-Section 'Zentriq.msi'
 Remove-Item (Join-Path $art 'msi') -Recurse -Force -ErrorAction SilentlyContinue
@@ -216,6 +232,7 @@ New-Item -ItemType Directory -Force -Path $release | Out-Null
 Copy-Item $bundle $release
 Copy-Item $msi $release
 Copy-Item $agentMsi $release
+if (Test-Path $linuxDownloads) { Copy-Item (Join-Path $linuxDownloads 'zentriq-agent-linux-*') $release }
 
 $kit = Join-Path $art 'msi-offline-kit'
 Remove-Item $kit -Recurse -Force -ErrorAction SilentlyContinue
@@ -257,7 +274,8 @@ $manifest = [ordered]@{
     notes          = @(
         'Zentriq-Setup-x64.exe: offline bootstrapper (VC++ runtime + PostgreSQL + Zentriq.msi).',
         'Zentriq.msi: Zentriq only; uses prereqs\ next to the MSI (see the offline kit) or an existing PostgreSQL server.',
-        'ZentriqAgent-x64.msi: Zentriq Agent for Windows devices (also served by the console at /downloads).'
+        'ZentriqAgent-x64.msi: Zentriq Agent for Windows devices (also served by the console at /downloads).',
+        'zentriq-agent-linux-{x64,arm64}.{deb,rpm,tar.gz}: Zentriq Agent for Linux (also served by the server, with the one-line installer).'
     )
 }
 $manifest | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $release 'release-manifest.json') -Encoding UTF8

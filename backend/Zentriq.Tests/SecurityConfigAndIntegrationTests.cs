@@ -161,7 +161,7 @@ public sealed class SecurityRuleTests
         Assert.False(eff.ContainsKey("SC-30"));      // default off
         Assert.False(eff.ContainsKey("SC-01"));
         Assert.Equal("low", eff["SC-02"].Severity);
-        Assert.Equal(28, BaselineDefinition.Default().Effective().Count());
+        Assert.Equal(40, BaselineDefinition.Default().Effective().Count());   // 28 Windows + 12 Linux checks on by default
         Assert.True(new BaselineDefinition { Categories = ["server"] }.InScope("server"));
         Assert.False(new BaselineDefinition { Categories = ["server"] }.InScope("endpoint"));
 
@@ -436,7 +436,7 @@ public sealed class SecurityAndIntegrationDatabaseTests : IAsyncLifetime
         Assert.Equal(100, await Score(good));
         Assert.True(await Score(weak) < 100);
         await using (var c = ds.CreateCommand("SELECT count(*) FROM zentriq.sec_rules"))
-            Assert.Equal(30L, await c.ExecuteScalarAsync());
+            Assert.Equal(43L, await c.ExecuteScalarAsync());
 
         // An exception exempts the check; fixing the other setting resolves it; failing_since is kept while failing.
         await using (var c = ds.CreateCommand("INSERT INTO zentriq.sec_exceptions (rule_id, asset_id, reason) VALUES ('SC-01', @a, 'Lab device without data')"))

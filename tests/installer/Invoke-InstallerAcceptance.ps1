@@ -2293,6 +2293,84 @@ if (-not $installed) {
         Record 'T79' 'Automatic agent update' 'NOT RUN' 'needs -UpgradeBundle (a newer agent package on the server)'
     }
 
+    # ---- Zentriq Agent for Linux (Ubuntu in WSL on this runner) ----------------------------------------
+    $wslDistro = $env:ZQ_WSL_DISTRO
+    $wslReady = $wslDistro -and (Get-Command wsl.exe -ErrorAction SilentlyContinue) -and ((& wsl.exe -d $wslDistro -u root -- uname -s 2>$null) -match 'Linux')
+    if ($wslReady) {
+        Check 'T80' 'Linux agent: one-line install from the console command (pinned key), enrollment, inventory with distribution / edition / server or desktop, live connection, Linux security checks, package uninstall through the agent, tamper-protected removal' {
+            $s = Login
+            function Wsl([string] $Script, [int] $TimeoutSec = 600) {
+                $f = Join-Path $OutDir ("wsl-" + [guid]::NewGuid().ToString('N').Substring(0, 8) + '.sh')
+                [IO.File]::WriteAllText($f, "set -e`n" + ($Script -replace "`r", ''))
+                $lin = (& wsl.exe -d $wslDistro -u root -- wslpath -a ($f -replace '\\', '/')).Trim()
+                $o = (& wsl.exe -d $wslDistro -u root -- bash $lin 2>&1 | Out-String)
+                $code = $LASTEXITCODE
+                Add-Content (Join-Path $OutDir 'linux-agent-wsl.log') "---- $Script`n$o"
+                if ($code -ne 0) { throw "WSL script failed ($code): $($o.Trim() -split "`n" | Select-Object -Last 8)" }
+                $o
+            }
+            $pkg = Api GET '/agents/package' -Session $s
+            Assert ($pkg.linuxPackages -and @($pkg.linuxPackages.files).Count -eq 6) "Linux packages on the server: $($pkg.linuxPackages | ConvertTo-Json -Compress -Depth 4)"
+            Api PUT '/agents/settings' @{ checkinMinutes = 30; inventoryMinutes = 180; uninstallProtection = $true; autoUpdate = $false; autoUpdateMax = 25 } -Session $s | Out-Null
+            try {
+                $tok = Api POST '/agents/enrollment-tokens' @{ name = 'ci-linux'; validDays = 1; maxUses = 1; serverUrl = 'https://localhost:8444'; checkinMinutes = 2; inventoryMinutes = 30 } -Session $s
+                Assert ($tok.linuxInstallCommand -match "^curl -fsSLk --pinnedpubkey 'sha256//[A-Za-z0-9+/=]{44}' https://localhost:8444/api/agent/v1/linux/install\.sh \| sudo sh -s -- ") "install command: $($tok.linuxInstallCommand)"
+                # A small package to remove later through the console.
+                Wsl @'
+mkdir -p /tmp/zqdummy/DEBIAN
+printf 'Package: zq-ci-dummy\nVersion: 1.0\nArchitecture: all\nMaintainer: Zentriq CI <ci@example.com>\nDescription: Zentriq CI test package\n' > /tmp/zqdummy/DEBIAN/control
+dpkg-deb --build /tmp/zqdummy /tmp/zq-ci-dummy.deb >/dev/null && dpkg -i /tmp/zq-ci-dummy.deb >/dev/null
+'@ | Out-Null
+                $out = Wsl ($tok.linuxInstallCommand + "`nzentriq-agent --identify`nzentriq-agent --status || true")
+                Assert ($out -match 'Distribution:\s+ubuntu \(debian family\)' -and $out -match 'Installation:\s+Server') "identify: $out"
+                # The service loop (no systemd in WSL 1): live connection, check-ins and actions.
+                Wsl "setsid nohup /opt/zentriq-agent/zentriq-agent --run >/var/log/zentriq-agent/run.out 2>&1 < /dev/null &`nsleep 3" | Out-Null
+                $deadline = (Get-Date).AddMinutes(3)
+                do { Start-Sleep 5; $a = @(Api GET '/agents' -Session $s | ForEach-Object { $_ }) | Where-Object { $_.enrollmentCode -eq 'ci-linux' -and $_.status -eq 'active' } | Select-Object -First 1 }
+                while (-not ($a -and $a.assetId -and $a.online) -and (Get-Date) -lt $deadline)
+                Assert ($a -and $a.assetId) "Linux agent not enrolled with inventory: $($a | ConvertTo-Json -Compress -Depth 3)"
+                Assert ($a.platform -eq 'linux-x64') "platform $($a.platform)"
+                Assert ($a.online -and $a.live) "not online over the live connection (online $($a.online), live $($a.live))"
+                $script:linuxAsset = $a.assetId
+                $inv = Api GET "/assets/$($a.assetId)/inventory" -Session $s
+                $os = $inv.document.os
+                Assert ($os.family -eq 'linux' -and $os.distribution -eq 'ubuntu' -and $os.distributionFamily -eq 'debian') "os: $($os | ConvertTo-Json -Compress)"
+                Assert ($os.isServer -eq $true -and $os.editionId -match 'Ubuntu' -and $os.kernel -and $os.packageManager -eq 'dpkg') "edition/role: $($os | ConvertTo-Json -Compress)"
+                $sw = @($inv.document.software)
+                Assert ($sw.Count -ge 50 -and ($sw | Where-Object name -eq 'zentriq-agent') -and ($sw | Where-Object name -eq 'zq-ci-dummy')) "software: $($sw.Count) packages"
+                Assert ($inv.document.security.linux) 'Linux security settings missing'
+                # Linux checks in Security Configuration.
+                Api POST '/security/evaluate' -Session $s | Out-Null
+                $deadline = (Get-Date).AddMinutes(2)
+                do { Start-Sleep 10; $sec = Api GET "/security/devices/$($a.assetId)" -Session $s; $lin = @($sec.results | Where-Object { $_.rule -like 'SL-*' }) } while ($lin.Count -eq 0 -and (Get-Date) -lt $deadline)
+                Assert ($lin.Count -ge 10) "Linux security results: $($lin.Count)"
+                Assert (-not ($sec.results | Where-Object { $_.rule -like 'SC-*' -and $_.status -in 'pass', 'fail', 'unknown' })) 'Windows checks evaluated on a Linux device'
+                # Remove a package through the console.
+                $r = Api POST '/software/uninstall' @{ name = 'zq-ci-dummy'; assetIds = @($a.assetId) } -Session $s
+                Assert ($r.sent -eq 1) "uninstall sent $($r.sent): $($r.message)"
+                $deadline = (Get-Date).AddMinutes(3)
+                do { Start-Sleep 5; $act = (Api GET "/activity?kind=uninstall&assetId=$($a.assetId)" -Session $s).items | Select-Object -First 1 } while ($act.status -notin 'succeeded', 'failed' -and (Get-Date) -lt $deadline)
+                Assert ($act.status -eq 'succeeded') "package uninstall $($act.status): $($act.detail)"
+                Assert ((Wsl "dpkg-query -W -f='`${Status}' zq-ci-dummy 2>/dev/null || echo gone") -notmatch 'install ok installed') 'package still installed'
+                # Tamper protection: removal needs a code.
+                $deadline = (Get-Date).AddMinutes(2)
+                do { Start-Sleep 5; $p = Wsl 'zentriq-agent --protection' } while ($p -notmatch 'Tamper protection: on' -and (Get-Date) -lt $deadline)
+                Assert ($p -match 'Tamper protection: on') "protection: $p"
+                $refused = Wsl 'apt-get remove -y zentriq-agent >/tmp/rm.log 2>&1 && echo REMOVED || echo REFUSED; tail -3 /tmp/rm.log'
+                Assert ($refused -match 'REFUSED' -and $refused -match 'protected') "removal without a code: $refused"
+                $code = Api POST '/agents/uninstall-code' @{} -Session $s
+                $deadline = (Get-Date).AddMinutes(2)
+                do { Start-Sleep 5; $rm = Wsl "pkill -f 'zentriq-agent --run' || true; zentriq-agent --uninstall $($code.code) 2>&1 || true; test -e /opt/zentriq-agent/zentriq-agent && echo STILL || echo GONE" } while ($rm -notmatch 'GONE' -and (Get-Date) -lt $deadline)
+                Assert ($rm -match 'GONE') "removal with the code: $rm"
+                "$($os.name) $($os.version) · $($os.editionId) · $($os.installationType) · $($sw.Count) packages · $($lin.Count) Linux checks · live connection · package removed via console · removal refused without a code, done with it"
+            } finally {
+                Get-Content (Join-Path $OutDir 'linux-agent-wsl.log') -ErrorAction SilentlyContinue | Out-Null
+                try { & wsl.exe -d $wslDistro -u root -- sh -c 'cp /var/log/zentriq-agent/*.log /var/log/zentriq-agent/run.out /tmp/ 2>/dev/null; cat /var/log/zentriq-agent/agent.log 2>/dev/null' 2>$null | Set-Content (Join-Path $OutDir 'linux-agent.log') } catch { }
+                Api PUT '/agents/settings' @{ checkinMinutes = 30; inventoryMinutes = 180; uninstallProtection = $false; autoUpdate = $false; autoUpdateMax = 25 } -Session $s | Out-Null
+            }
+        } | Out-Null
+    } else { Record 'T80' 'Linux agent end to end' 'BLOCKED' "WSL distribution '$wslDistro' not available on this runner" }
+
     Check 'T14' 'Logs contain no administrator password or connection-string passwords' {
         $paths = @((Join-Path $dataDir 'Logs'), $env:TEMP, $OutDir, (Join-Path $env:SystemRoot 'Temp'))
         $files = $paths | Where-Object { Test-Path $_ } | ForEach-Object { Get-ChildItem $_ -Recurse -File -Include '*.log', '*.txt', '*.json' -ErrorAction SilentlyContinue }

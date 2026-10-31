@@ -11,7 +11,9 @@ Summary:        Zentriq Agent: inventory and device management for Zentriq
 License:        Proprietary
 URL:            https://zentriq.com
 AutoReqProv:    no
-Requires:       glibc, libstdc++, zlib, ca-certificates
+Requires:       glibc, ca-certificates
+Requires:       (libstdc++ or libstdc++6)
+Requires:       (zlib or libz1)
 Requires:       (openssl-libs or libopenssl3 or libopenssl1_1)
 
 %description
