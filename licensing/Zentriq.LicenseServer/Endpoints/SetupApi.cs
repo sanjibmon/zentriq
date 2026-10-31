@@ -37,7 +37,7 @@ public static partial class SetupApi
             return await next(ctx);
         });
 
-        g.MapGet("/state", async (HttpContext http, ServerData data, SigningKeyHolder keys, AdminStore admins, CancellationToken ct) =>
+        g.MapGet("/state", async (HttpContext http, ServerData data, SigningKeyHolder keys, AdminStore admins, AccessStatus access, CancellationToken ct) =>
         {
             var s = data.State;
             var owners = await admins.CountAsync(ct);
@@ -52,6 +52,7 @@ public static partial class SetupApi
                 keyError = keys.LoadError,
                 suggestedKeyId = $"zentriq-prod-{DateTime.UtcNow:yyyy-MM}",
                 access = s.Access,
+                accessProblems = access.Problems,
                 localUrl = $"http://localhost:{s.HttpPort}",
                 publicUrl = s.PublicUrl,
                 dataFolder = data.Root,

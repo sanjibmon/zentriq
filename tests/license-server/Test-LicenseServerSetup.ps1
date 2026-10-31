@@ -49,6 +49,17 @@ function MsiRun([string[]] $Arguments, [string] $Log) {
     $p = Start-Process msiexec.exe -ArgumentList ($Arguments + @('/l*v', "`"$(Join-Path $LogDir $Log)`"")) -Wait -PassThru
     return $p.ExitCode
 }
+# Status and Location without following redirects (and any certificate).
+function Peek([string] $Url) {
+    $h = [Net.Http.HttpClientHandler]::new(); $h.AllowAutoRedirect = $false
+    $h.ServerCertificateCustomValidationCallback = [Net.Http.HttpClientHandler]::DangerousAcceptAnyServerCertificateValidator
+    $c = [Net.Http.HttpClient]::new($h)
+    try { $r = $c.GetAsync($Url).GetAwaiter().GetResult(); [pscustomobject]@{ Status = [int]$r.StatusCode; Location = "$($r.Headers.Location)" } }
+    finally { $c.Dispose() }
+}
+function Holders([int] $Port) {
+    @(Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue | ForEach-Object { "$($_.LocalAddress):$Port by $((Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue).ProcessName) ($($_.OwningProcess))" }) -join '; '
+}
 function SvcPid { (Get-CimInstance Win32_Service -Filter "Name='ZentriqLicenseServer'").ProcessId }
 function Req { @{ format = 'zentriq-activation-request'; schemaVersion = 3; requestId = [guid]::NewGuid(); installationId = [guid]::NewGuid(); productVersion = '1.1.1';
                   machineName = 'ZQ-CUSTOMER'; organization = 'CI Test'; createdAt = (Get-Date).ToUniversalTime().ToString('o'); currentUsage = @{} } }
@@ -62,16 +73,17 @@ Check 'S01' 'Silent install: PostgreSQL and the license server as Windows servic
     Assert ($w.StartName -eq 'NT SERVICE\ZentriqLicenseServer' -and $w.StartMode -eq 'Auto') "server service: $($w.StartName) $($w.StartMode)"
     Assert ((Get-CimInstance Win32_Service -Filter "Name='ZentriqLicenseDb'").StartName -match 'NetworkService') 'database service account'
     WaitFor { Healthy } 120 'health'
-    $r = Invoke-WebRequest "$base/admin/" -MaximumRedirection 0 -SkipHttpErrorCheck -UseBasicParsing
-    Assert ($r.StatusCode -eq 302 -and $r.Headers.Location -eq '/setup/') "portal before setup: $($r.StatusCode) $($r.Headers.Location)"
+    $r = Peek "$base/admin/"
+    Assert ($r.Status -eq 302 -and $r.Location -eq '/setup/') "portal before setup: $($r.Status) $($r.Location)"
     Assert ((Invoke-WebRequest "$base/setup/" -UseBasicParsing).Content -match 'setup.js') 'setup page'
     Assert (Get-NetFirewallRule -DisplayName 'Zentriq License Server (HTTP/HTTPS)' -ErrorAction SilentlyContinue) 'firewall rule missing'
     $acl = (Get-Acl $data).Access | ForEach-Object { $_.IdentityReference.Value }
     Assert (-not ($acl -match 'Users|Everyone|Authenticated')) "data folder readable by: $($acl -join ', ')"
-    $listen = @(Get-NetTCPConnection -State Listen -LocalPort 5439 | ForEach-Object LocalAddress) | Sort-Object -Unique
+    $listen = @(Get-NetTCPConnection -State Listen -LocalPort 5439 -ErrorAction SilentlyContinue | ForEach-Object LocalAddress) | Sort-Object -Unique
     Assert ($listen.Count -ge 1 -and -not ($listen | Where-Object { $_ -notin '127.0.0.1' })) "PostgreSQL listens on: $($listen -join ', ')"
-    $listenHttp = @(Get-NetTCPConnection -State Listen -LocalPort 5080 | ForEach-Object LocalAddress) | Sort-Object -Unique
+    $listenHttp = @(Get-NetTCPConnection -State Listen -LocalPort 5080 -ErrorAction SilentlyContinue | ForEach-Object LocalAddress) | Sort-Object -Unique
     Assert (-not ($listenHttp | Where-Object { $_ -notin '127.0.0.1', '::1' })) "server listens on: $($listenHttp -join ', ')"
+    Write-Host "Listening before public mode: 80 [$(Holders 80)] 443 [$(Holders 443)]"
     "services running (server as $($w.StartName), delayed auto start); health 200; /admin -> /setup/; PostgreSQL on 127.0.0.1:5439 only; http on localhost:5080 only; data folder admins/SYSTEM/service only"
 }
 
@@ -148,14 +160,21 @@ Check 'S05' 'Public mode with own certificate: wizard restarts the service, HTTP
     $r = Setup POST '/access' @{ mode = 'public'; hostname = 'license.ci.test'; certificate = 'pfx'; pfxBase64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes($pfxFile)); pfxPassword = 'ci pfx password' }
     Assert ($r.restart -and $r.canRestart) "access: $($r | ConvertTo-Json -Compress)"
     WaitFor { (SvcPid) -ne $pid1 -and (SvcPid) -ne 0 -and (Healthy) } 90 'service did not come back after the restart'
+    $problems = @((Setup GET '/state').accessProblems)
+    Write-Host "Access problems after the restart: $($problems -join ' | '); 80 [$(Holders 80)] 443 [$(Holders 443)]"
+    Assert (-not ($problems -match 'Port 443')) "443 not usable: $($problems -join ' ') [$(Holders 443)]"
+    $port80 = -not ($problems -match 'Port 80')
     WaitFor { Healthy 'https://localhost' } 30 'https health'
     $tcp = [Net.Sockets.TcpClient]::new('localhost', 443)
     $ssl = [Net.Security.SslStream]::new($tcp.GetStream(), $false, { $true })
     $ssl.AuthenticateAsClient('license.ci.test')
     $served = $ssl.RemoteCertificate.GetCertHashString(); $ssl.Dispose(); $tcp.Dispose()
     Assert ($served -eq $cert.Thumbprint) "served certificate $served, expected $($cert.Thumbprint)"
-    $h = Invoke-WebRequest 'http://localhost/admin/' -MaximumRedirection 0 -SkipHttpErrorCheck -UseBasicParsing
-    Assert ($h.StatusCode -in 301, 308 -and "$($h.Headers.Location)" -eq 'https://license.ci.test/admin/') "http redirect: $($h.StatusCode) $($h.Headers.Location)"
+    if ($port80) {
+        $h = Peek 'http://localhost/admin/'
+        Assert ($h.Status -in 301, 308 -and $h.Location -eq 'https://license.ci.test/admin/') "http redirect: $($h.Status) $($h.Location)"
+        $redirect = 'http -> https://license.ci.test'
+    } else { $redirect = "port 80 held by another program on this runner [$(Holders 80)]: reported on the setup page, server kept running on 443 and localhost" }
     $ip = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' } | Select-Object -First 1).IPAddress
     $net = Invoke-WebRequest "https://$ip/setup/api/state" -SkipCertificateCheck -SkipHttpErrorCheck -UseBasicParsing
     Assert ($net.StatusCode -eq 404) "wizard from the network ($ip): $($net.StatusCode)"
@@ -167,7 +186,7 @@ Check 'S05' 'Public mode with own certificate: wizard restarts the service, HTTP
     Setup POST '/access' @{ mode = 'local' } | Out-Null
     WaitFor { (SvcPid) -ne $pid2 -and (Healthy) } 90 'service did not come back after switching to local'
     Assert (-not (Get-NetTCPConnection -State Listen -LocalPort 443 -ErrorAction SilentlyContinue)) 'still listening on 443 in local mode'
-    "restarted by the wizard (pid $pid1 -> $pid2); https://localhost served the uploaded certificate; http -> https://license.ci.test; wizard 404 from $ip; portal reachable over https; back to local: 443 closed"
+    "restarted by the wizard (pid $pid1 -> $pid2); https://localhost served the uploaded certificate; $redirect; wizard 404 from $ip; portal reachable over https; back to local: 443 closed"
 }
 
 Check 'S06' 'Database backups: daily backup written by the service, and on demand' {
@@ -188,8 +207,8 @@ Check 'S07' 'Uninstall keeps the data; reinstall continues with the same key and
     Assert ($code -in 0, 3010) "reinstall exit $code"
     WaitFor { Healthy } 120 'health after reinstall'
     $script:s = New-Object Microsoft.PowerShell.Commands.WebRequestSession
-    $r = Invoke-WebRequest "$base/admin/" -MaximumRedirection 0 -SkipHttpErrorCheck -UseBasicParsing
-    Assert ($r.StatusCode -eq 200) "portal after reinstall: $($r.StatusCode) (setup should stay finished)"
+    $r = Peek "$base/admin/"
+    Assert ($r.Status -eq 200) "portal after reinstall: $($r.Status) (setup should stay finished)"
     Login
     Assert ((Api GET '/catalog').signing.fingerprint -eq $script:fp) 'different key after reinstall'
     Assert (@(Api GET '/licenses').Count -ge 3) 'licenses lost'
