@@ -1,10 +1,22 @@
 # Test report
 
-Latest: GitHub Actions run 41164422082, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
-10.0.20348** VM. Release: `v1.1.1-build.94` (pre-release, **unsigned**), package version **1.1.1.94**. Results: unit +
-PostgreSQL integration tests **352 PASS, 2 skipped** (ci-quick: 354/354); license server tests (ci-quick, PostgreSQL)
-**11/11 PASS**; local license server on Windows **7/7 PASS**; installer acceptance **71 passed, 0 failed**; in-place
-updates PASS (schema 30).
+Latest: GitHub Actions run 41173720673, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
+10.0.20348** VM. Release: `v1.1.1-build.95` (pre-release, **unsigned**), package version **1.1.1.95**. Results: unit +
+PostgreSQL integration tests **352 PASS, 2 skipped** (ci-quick: 354/354); installer acceptance **71 passed, 0 failed**;
+in-place updates PASS (schema 30). The license server is now a separate product: workflow `license-server`, release
+`license-server-v1.0.0-build.3` (Linux tests 12/12, Windows local edition 8/8).
+
+New in build 95: **license files validated by the license server**. Zentriq sends the customer a signed license file
+bound to no server; *Licensing › Import license file* checks the signature, has the Zentriq license server validate it
+(license active, newest file, activation free) and only then activates the license, bound to that server. Air-gapped
+servers use the same file on the license server's offline page. The license server, its signing code and tool and its
+documentation moved out of the customer product (`licensing/`); customer packages carry only customer documentation
+(no test report, no code-signing notes).
+
+| ID | Test (license server, Windows local edition) | Result |
+|---|---|---|
+| L08 | License file for the customer: validated and bound by the server; a reissued file replaces the old one | **PASS** |
+| L01-L07 | Setup and key ceremony, start, sign-in, subscription and perpetual licenses, online/offline activation, tamper detection, backup | **PASS** |
 
 New in build 94: **key ceremony** for the production license signing key (generated on the license server's own
 machine; ECDSA P-256; encrypted PKCS#8 with AES-256 and PBKDF2-SHA256 600,000 iterations; owner-only file; SHA-256
@@ -93,13 +105,18 @@ replaced) and the trial's 30-device total cap.
 ## Release artifacts (SHA-256)
 
 ```
-d1f19be1f6ee5e7ab5b5715566efd6cb9f8b63d028e3a34b2b4d750dbe9a998c  Zentriq-1.1.1-docs.zip
-0b47e520ea74f878c1a2ddae1c5c439b78118a2b12189e6400a77757506282d9  Zentriq-1.1.1-msi-offline-kit.zip
-62936d4a10503e0907b052fe54014d01a32e1df38fc6629d28abbb3ec04fbac8  Zentriq-Setup-x64.exe
-bcdea96fda597241be5c534b9f5063c950605edb65804704fae7579c204b29c2  Zentriq.msi
-1839fec6231b4d83260d5d9af274d894658aa00fb5c32743ea234644d4a3184f  ZentriqAgent-x64.msi
-360269ac6852b8b47b721ceb52e6635a7ce57bb4aca89a131955866236f295cc  Zentriq-LicenseServer-1.1.1.zip
-b0c88d653f84a71e20048284c438bc93195bb08ee3dd49fc19ac8013dfb0b376  Zentriq-LicenseServer-Local-win-x64-1.1.1.zip
+8c15c803ff8b3fc15ab82f5b9081dc5fb02db3d02ba519423552bd5f1a45a9ce  Zentriq-1.1.1-docs.zip
+5c31f1c8ed049f89524aebbbc2fa5b7715d18e65614dfc5070b1bd90b57680cd  Zentriq-1.1.1-msi-offline-kit.zip
+01f8c9708436a15671e38adb404232b2f679f2fffc5a5abaf198175da0589711  Zentriq-Setup-x64.exe
+58db92aa1b30856263f83b2c6ade65b128f6d7b84d8733da3e83b9fbbe40dd1a  Zentriq.msi
+daee1c325419159263c2cb78f9729eefe2cf3a85c05f5857f54101b1b61b3a76  ZentriqAgent-x64.msi
+```
+
+License server (separate release `license-server-v1.0.0-build.3`):
+
+```
+08049bd29fe1e8bc9fa12e9fb10c948febf6d477534b458f8ebe9991066fc237  Zentriq-LicenseServer-1.0.0.zip
+28b5caf2aecf9667d174793dd724c2b53836c64eee7a8ed0d41257e8c1c270f6  Zentriq-LicenseServer-Local-win-x64-1.0.0.zip
 ```
 
 ## Installer acceptance (tests/installer/Invoke-InstallerAcceptance.ps1)
