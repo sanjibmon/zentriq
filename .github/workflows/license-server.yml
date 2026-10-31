@@ -73,7 +73,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path out | Out-Null
       - name: Setup MSI
         shell: pwsh
-        run: ./licensing/installer/Build-Setup.ps1 -Version $env:ZLS_MSI_VERSION -OutDir out
+        run: ./licensing/installer/Build-Setup.ps1 -Version $env:ZLS_MSI_VERSION -OutDir out *>&1 | Tee-Object -FilePath "$env:RUNNER_TEMP/build.log"
       - name: Setup end-to-end test
         shell: pwsh
         run: ./tests/license-server/Test-LicenseServerSetup.ps1 -Msi "$PWD/out/Zentriq-LicenseServer-Setup-$($env:ZLS_MSI_VERSION).msi" -Report out/license-server-test-results.md -LogDir "$env:RUNNER_TEMP/zls-setup-logs" *>&1 | Tee-Object -FilePath "$env:RUNNER_TEMP/test.log"
@@ -96,7 +96,7 @@ jobs:
         shell: pwsh
         run: |
           $d = Join-Path $env:RUNNER_TEMP 'logs'; New-Item -ItemType Directory -Force -Path $d | Out-Null
-          Copy-Item "$env:RUNNER_TEMP/test.log", out/license-server-test-results.md, out/SHA256SUMS.txt $d -ErrorAction SilentlyContinue
+          Copy-Item "$env:RUNNER_TEMP/build.log", "$env:RUNNER_TEMP/test.log", out/license-server-test-results.md, out/SHA256SUMS.txt $d -ErrorAction SilentlyContinue
           $sl = Join-Path $env:RUNNER_TEMP 'zls-setup-logs'
           if (Test-Path $sl) { Get-ChildItem $sl -File | Where-Object Extension -in '.log', '.txt', '.md' | Copy-Item -Destination $d }
           "run $env:GITHUB_RUN_ID number $env:GITHUB_RUN_NUMBER commit $env:GITHUB_SHA branch $env:GITHUB_REF_NAME status ${{ job.status }}" | Set-Content "$d/RUN.txt"

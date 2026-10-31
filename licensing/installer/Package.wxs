@@ -29,7 +29,7 @@
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
 
     <Launch Condition="VersionNT64" Message="The Zentriq License Server needs 64-bit Windows." />
-    <Launch Condition="Installed OR VersionNT >= 1000" Message="The Zentriq License Server needs Windows Server 2016 / Windows 10 or later." />
+    <Launch Condition="Installed OR VersionNT >= 603" Message="The Zentriq License Server needs Windows Server 2016 / Windows 10 or later." />
     <Launch Condition="Privileged" Message="Run the setup as an administrator." />
 
     <Icon Id="ZlsIcon" SourceFile="$(var.AssetsDir)\zentriq.ico" />
@@ -78,8 +78,8 @@
         <RegistryValue Name="InstallFolder" Type="string" Value="[INSTALLFOLDER]" />
         <RegistryValue Name="Version" Type="string" Value="$(var.ProductVersion)" />
       </RegistryKey>
-      <util:InternetShortcut Id="PortalLink" Name="Zentriq License Portal" Target="http://localhost:5080/admin/" Type="url" />
-      <util:InternetShortcut Id="SetupLink" Name="Zentriq License Server setup" Target="http://localhost:5080/setup/" Type="url" />
+      <util:InternetShortcut Id="PortalLink" Directory="MENUDIR" Name="Zentriq License Portal" Target="http://localhost:5080/admin/" Type="url" />
+      <util:InternetShortcut Id="SetupLink" Directory="MENUDIR" Name="Zentriq License Server setup" Target="http://localhost:5080/setup/" Type="url" />
       <RemoveFolder Id="RemoveMenuDir" On="uninstall" />
       <!-- Stop the services before files are replaced or removed (they are deleted by the uninstall step). -->
       <ServiceControl Id="StopServer" Name="ZentriqLicenseServer" Stop="both" Wait="yes" />
