@@ -41,6 +41,10 @@ Get-ChildItem (Join-Path $pkg 'pgsql') -Recurse -Include '*.pdb' | Remove-Item -
 foreach ($x in 'pgAdmin 4', 'stackbuilder.exe') { Get-ChildItem (Join-Path $pkg 'pgsql\bin') -Filter $x -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force }
 foreach ($f in 'LICENSE', 'COPYRIGHT') { if (Test-Path (Join-Path $src $f)) { Copy-Item (Join-Path $src $f) (Join-Path $pkg "pgsql\$f") } }
 
+# Windows PowerShell 5.1 reads BOM-less scripts as ANSI: the scripts must stay plain ASCII.
+foreach ($f in 'zls.ps1', 'zls.cmd', 'README.txt') {
+    if ([IO.File]::ReadAllBytes((Join-Path $PSScriptRoot $f)) | Where-Object { $_ -gt 127 } | Select-Object -First 1) { throw "$f contains non-ASCII characters" }
+}
 Copy-Item (Join-Path $PSScriptRoot 'zls.ps1'), (Join-Path $PSScriptRoot 'zls.cmd'), (Join-Path $PSScriptRoot 'README.txt') $pkg
 Copy-Item (Join-Path $repo 'docs\license-server.md') $pkg
 Set-Content (Join-Path $pkg 'VERSION.txt') "Zentriq License Server (local edition) $Version`r`nPostgreSQL $PgVersion (EnterpriseDB binaries, SHA256 $hash)" -Encoding ascii

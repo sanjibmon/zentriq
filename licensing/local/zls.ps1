@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Zentriq License Server — local edition for Windows (testing before going public).
+  Zentriq License Server - local edition for Windows (testing before going public).
 
 .DESCRIPTION
   Runs the license server and its own PostgreSQL from this folder; nothing is installed and nothing listens beyond
@@ -124,13 +124,13 @@ function Get-SigningPhrase {
 }
 
 function Invoke-Setup {
-    if (-not (Test-Path $Server)) { Fail "Missing $Server — unpack the whole package." }
+    if (-not (Test-Path $Server)) { Fail "Missing $Server - unpack the whole package." }
     New-Item -ItemType Directory -Force -Path $Data, $Logs, $Keys | Out-Null
     $cfg = Get-Config
 
     # 1. Database (own PostgreSQL cluster in data\pg, loopback only, SCRAM password kept with DPAPI).
     if (-not (Test-Path (Join-Path $PgData 'PG_VERSION'))) {
-        Say '1/4  Creating the database cluster (data\pg)…' Cyan
+        Say '1/4  Creating the database cluster (data\pg)...' Cyan
         $dbPw = New-RandomSecret
         $pwFile = Join-Path $Data 'initdb.tmp'
         Set-Content $pwFile $dbPw -Encoding ascii -NoNewline
@@ -166,10 +166,10 @@ function Invoke-Setup {
     if (-not $OwnerEmail) { if ($NonInteractive) { Fail 'Pass -OwnerEmail.' } $OwnerEmail = Read-Host '     Your email (portal sign-in)' }
     $adminPhrase = if ($env:ZLS_ADMIN_PASSPHRASE) { $env:ZLS_ADMIN_PASSPHRASE } elseif ($NonInteractive) { Fail 'Set ZLS_ADMIN_PASSPHRASE.' } else { Read-Phrase '     Portal passphrase (12+ characters)' 12 -Confirm }
     $code = Invoke-Server @('create-admin', '--email', $OwnerEmail, '--name', $OwnerEmail) @{ 'ConnectionStrings__LicenseServer' = $cs; 'ZLS_ADMIN_PASSPHRASE' = $adminPhrase }
-    if ($code -ne 0) { Say '     (Account not created — it may exist already.)' Yellow }
+    if ($code -ne 0) { Say '     (Account not created - it may exist already.)' Yellow }
 
     # 4. Summary.
-    Say '4/4  Checking the key…' Cyan
+    Say '4/4  Checking the key...' Cyan
     Invoke-KeyInfo
     Say ''
     Say 'Done. Next:' Green
@@ -204,7 +204,7 @@ function Invoke-Start {
         Say "Running: $url/admin  (stop with .\zls.cmd stop)" Green
         if (-not $NoBrowser) { Start-Process "$url/admin" }
     } else {
-        Say "Starting on $url — portal $url/admin. Press Ctrl+C to stop the server (PostgreSQL keeps running; .\zls.cmd stop ends it)." Green
+        Say "Starting on $url - portal $url/admin. Press Ctrl+C to stop the server (PostgreSQL keeps running; .\zls.cmd stop ends it)." Green
         if (-not $NoBrowser) { Start-Job -ScriptBlock { param($u) Start-Sleep 4; Start-Process "$u/admin" } -ArgumentList $url | Out-Null }
         $null = Invoke-Server @('serve', '--urls', $url) $envs
     }

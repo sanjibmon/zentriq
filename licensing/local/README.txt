@@ -1,4 +1,4 @@
-Zentriq License Server — local edition (Windows)
+Zentriq License Server - local edition (Windows)
 ================================================
 
 Runs the license server and its own PostgreSQL from this folder, for testing before the public license server goes
@@ -15,7 +15,7 @@ http://localhost:5080). Everything it creates is in the "data" folder.
    Offline activation page:  http://localhost:5080/
 
 Try the license generation:
-   Customers > New customer;  Licenses > New license (subscription 1/3/5 years or perpetual with support) — the
+   Customers > New customer;  Licenses > New license (subscription 1/3/5 years or perpetual with support) - the
    license key is shown once;  open the license > Offline activation > "issue a test file" (or attach a real
    activation request from a Zentriq server);  then Verify file to inspect what was signed.
 
