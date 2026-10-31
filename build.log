@@ -1,0 +1,113 @@
+  Determining projects to restore...
+  Restored /home/runner/work/zentriq/zentriq/backend/Zentriq.Domain/Zentriq.Domain.csproj (in 114 ms).
+  Restored /home/runner/work/zentriq/zentriq/backend/Zentriq.Application/Zentriq.Application.csproj (in 37 ms).
+  Restored /home/runner/work/zentriq/zentriq/backend/Zentriq.Inventory/Zentriq.Inventory.csproj (in 3.75 sec).
+  Restored /home/runner/work/zentriq/zentriq/backend/Zentriq.Infrastructure/Zentriq.Infrastructure.csproj (in 3.76 sec).
+  Restored /home/runner/work/zentriq/zentriq/backend/Zentriq.Api/Zentriq.Api.csproj (in 3.76 sec).
+  Zentriq.Inventory -> /home/runner/work/zentriq/zentriq/backend/Zentriq.Inventory/bin/Release/netstandard2.0/Zentriq.Inventory.dll
+  Zentriq.Domain -> /home/runner/work/zentriq/zentriq/backend/Zentriq.Domain/bin/Release/net10.0/Zentriq.Domain.dll
+  Zentriq.Application -> /home/runner/work/zentriq/zentriq/backend/Zentriq.Application/bin/Release/net10.0/Zentriq.Application.dll
+/home/runner/work/zentriq/zentriq/backend/Zentriq.Infrastructure/Backup/RemoteTargets.cs(180,39): warning CS8604: Possible null reference argument for parameter 'host' in 'ConnectionInfo.ConnectionInfo(string host, int port, string username, params AuthenticationMethod[] authenticationMethods)'. [/home/runner/work/zentriq/zentriq/backend/Zentriq.Infrastructure/Zentriq.Infrastructure.csproj]
+  Zentriq.Infrastructure -> /home/runner/work/zentriq/zentriq/backend/Zentriq.Infrastructure/bin/Release/net10.0/Zentriq.Infrastructure.dll
+/home/runner/work/zentriq/zentriq/backend/Zentriq.Api/Infrastructure/ApiTokenAuthentication.cs(19,25): warning CS0108: 'ApiTokenAuthenticationHandler.Scheme' hides inherited member 'AuthenticationHandler<AuthenticationSchemeOptions>.Scheme'. Use the new keyword if hiding was intended. [/home/runner/work/zentriq/zentriq/backend/Zentriq.Api/Zentriq.Api.csproj]
+  Zentriq.Api -> /home/runner/work/zentriq/zentriq/backend/Zentriq.Api/bin/Release/net10.0/Zentriq.Api.dll
+
+Build succeeded.
+
+/home/runner/work/zentriq/zentriq/backend/Zentriq.Infrastructure/Backup/RemoteTargets.cs(180,39): warning CS8604: Possible null reference argument for parameter 'host' in 'ConnectionInfo.ConnectionInfo(string host, int port, string username, params AuthenticationMethod[] authenticationMethods)'. [/home/runner/work/zentriq/zentriq/backend/Zentriq.Infrastructure/Zentriq.Infrastructure.csproj]
+/home/runner/work/zentriq/zentriq/backend/Zentriq.Api/Infrastructure/ApiTokenAuthentication.cs(19,25): warning CS0108: 'ApiTokenAuthenticationHandler.Scheme' hides inherited member 'AuthenticationHandler<AuthenticationSchemeOptions>.Scheme'. Use the new keyword if hiding was intended. [/home/runner/work/zentriq/zentriq/backend/Zentriq.Api/Zentriq.Api.csproj]
+    2 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:32.80
+  Determining projects to restore...
+  Restored /home/runner/work/zentriq/zentriq/backend/Zentriq.Worker/Zentriq.Worker.csproj (in 1.21 sec).
+  4 of 5 projects are up-to-date for restore.
+  Zentriq.Inventory -> /home/runner/work/zentriq/zentriq/backend/Zentriq.Inventory/bin/Release/netstandard2.0/Zentriq.Inventory.dll
+  Zentriq.Domain -> /home/runner/work/zentriq/zentriq/backend/Zentriq.Domain/bin/Release/net10.0/Zentriq.Domain.dll
+  Zentriq.Application -> /home/runner/work/zentriq/zentriq/backend/Zentriq.Application/bin/Release/net10.0/Zentriq.Application.dll
+  Zentriq.Infrastructure -> /home/runner/work/zentriq/zentriq/backend/Zentriq.Infrastructure/bin/Release/net10.0/Zentriq.Infrastructure.dll
+/home/runner/work/zentriq/zentriq/backend/Zentriq.Worker/Agentless/SnmpCollector.cs(95,26): warning CS0618: 'MD5AuthenticationProvider' is obsolete: 'MD5 is no longer secure. Please use a more secure provider.' [/home/runner/work/zentriq/zentriq/backend/Zentriq.Worker/Zentriq.Worker.csproj]
+/home/runner/work/zentriq/zentriq/backend/Zentriq.Worker/Agentless/SnmpCollector.cs(97,22): warning CS0618: 'SHA1AuthenticationProvider' is obsolete: 'SHA-1 is no longer secure. Please use a more secure provider.' [/home/runner/work/zentriq/zentriq/backend/Zentriq.Worker/Zentriq.Worker.csproj]
+  Zentriq.Worker -> /home/runner/work/zentriq/zentriq/backend/Zentriq.Worker/bin/Release/net10.0/Zentriq.Worker.dll
+
+Build succeeded.
+
+/home/runner/work/zentriq/zentriq/backend/Zentriq.Worker/Agentless/SnmpCollector.cs(95,26): warning CS0618: 'MD5AuthenticationProvider' is obsolete: 'MD5 is no longer secure. Please use a more secure provider.' [/home/runner/work/zentriq/zentriq/backend/Zentriq.Worker/Zentriq.Worker.csproj]
+/home/runner/work/zentriq/zentriq/backend/Zentriq.Worker/Agentless/SnmpCollector.cs(97,22): warning CS0618: 'SHA1AuthenticationProvider' is obsolete: 'SHA-1 is no longer secure. Please use a more secure provider.' [/home/runner/work/zentriq/zentriq/backend/Zentriq.Worker/Zentriq.Worker.csproj]
+    2 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:04.89
+  Determining projects to restore...
+  Restored /home/runner/work/zentriq/zentriq/backend/Zentriq.Setup/Zentriq.Setup.csproj (in 889 ms).
+  4 of 5 projects are up-to-date for restore.
+  Zentriq.Inventory -> /home/runner/work/zentriq/zentriq/backend/Zentriq.Inventory/bin/Release/netstandard2.0/Zentriq.Inventory.dll
+  Zentriq.Domain -> /home/runner/work/zentriq/zentriq/backend/Zentriq.Domain/bin/Release/net10.0/Zentriq.Domain.dll
+  Zentriq.Application -> /home/runner/work/zentriq/zentriq/backend/Zentriq.Application/bin/Release/net10.0/Zentriq.Application.dll
+  Zentriq.Infrastructure -> /home/runner/work/zentriq/zentriq/backend/Zentriq.Infrastructure/bin/Release/net10.0/Zentriq.Infrastructure.dll
+  Zentriq.Setup -> /home/runner/work/zentriq/zentriq/backend/Zentriq.Setup/bin/Release/net10.0-windows/zentriqctl.dll
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:04.67
+  Determining projects to restore...
+  Restored /home/runner/work/zentriq/zentriq/backend/Zentriq.Tests/Zentriq.Tests.csproj (in 1.04 sec).
+  5 of 6 projects are up-to-date for restore.
+  Zentriq.Inventory -> /home/runner/work/zentriq/zentriq/backend/Zentriq.Inventory/bin/Release/netstandard2.0/Zentriq.Inventory.dll
+  Zentriq.Domain -> /home/runner/work/zentriq/zentriq/backend/Zentriq.Domain/bin/Release/net10.0/Zentriq.Domain.dll
+  Zentriq.Application -> /home/runner/work/zentriq/zentriq/backend/Zentriq.Application/bin/Release/net10.0/Zentriq.Application.dll
+  Zentriq.Infrastructure -> /home/runner/work/zentriq/zentriq/backend/Zentriq.Infrastructure/bin/Release/net10.0/Zentriq.Infrastructure.dll
+  Zentriq.Worker -> /home/runner/work/zentriq/zentriq/backend/Zentriq.Worker/bin/Release/net10.0/Zentriq.Worker.dll
+/home/runner/work/zentriq/zentriq/backend/Zentriq.Tests/DashboardWidgetTests.cs(31,9): warning xUnit2029: Do not use Assert.Empty to check if a value does not exist in a collection. Use Assert.DoesNotContain instead. (https://xunit.net/xunit.analyzers/rules/xUnit2029) [/home/runner/work/zentriq/zentriq/backend/Zentriq.Tests/Zentriq.Tests.csproj]
+/home/runner/work/zentriq/zentriq/backend/Zentriq.Tests/BackupTests.cs(403,117): warning CA1416: This call site is reachable on all platforms. 'DataProtectionBuilderExtensions.ProtectKeysWithDpapi(IDataProtectionBuilder, bool)' is only supported on: 'windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416) [/home/runner/work/zentriq/zentriq/backend/Zentriq.Tests/Zentriq.Tests.csproj]
+/home/runner/work/zentriq/zentriq/backend/Zentriq.Tests/BackupTests.cs(415,118): warning CA1416: This call site is reachable on all platforms. 'DataProtectionBuilderExtensions.ProtectKeysWithDpapi(IDataProtectionBuilder, bool)' is only supported on: 'windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416) [/home/runner/work/zentriq/zentriq/backend/Zentriq.Tests/Zentriq.Tests.csproj]
+/home/runner/work/zentriq/zentriq/backend/Zentriq.Tests/DepartmentsAndChangesTests.cs(106,9): warning xUnit2029: Do not use Assert.Empty to check if a value does not exist in a collection. Use Assert.DoesNotContain instead. (https://xunit.net/xunit.analyzers/rules/xUnit2029) [/home/runner/work/zentriq/zentriq/backend/Zentriq.Tests/Zentriq.Tests.csproj]
+/home/runner/work/zentriq/zentriq/backend/Zentriq.Tests/RemoteSupportTests.cs(75,9): warning xUnit2000: The literal or constant value MeshRights.QuickConsent should be passed as the 'expected' argument in the call to 'Assert.Equal(expected, actual)' in method 'Rights_consent_and_names' on type 'RemoteSupportTests'. Swap the parameter values. (https://xunit.net/xunit.analyzers/rules/xUnit2000) [/home/runner/work/zentriq/zentriq/backend/Zentriq.Tests/Zentriq.Tests.csproj]
+  Zentriq.Tests -> /home/runner/work/zentriq/zentriq/backend/Zentriq.Tests/bin/Release/net10.0/Zentriq.Tests.dll
+
+Build succeeded.
+
+/home/runner/work/zentriq/zentriq/backend/Zentriq.Tests/DashboardWidgetTests.cs(31,9): warning xUnit2029: Do not use Assert.Empty to check if a value does not exist in a collection. Use Assert.DoesNotContain instead. (https://xunit.net/xunit.analyzers/rules/xUnit2029) [/home/runner/work/zentriq/zentriq/backend/Zentriq.Tests/Zentriq.Tests.csproj]
+/home/runner/work/zentriq/zentriq/backend/Zentriq.Tests/BackupTests.cs(403,117): warning CA1416: This call site is reachable on all platforms. 'DataProtectionBuilderExtensions.ProtectKeysWithDpapi(IDataProtectionBuilder, bool)' is only supported on: 'windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416) [/home/runner/work/zentriq/zentriq/backend/Zentriq.Tests/Zentriq.Tests.csproj]
+/home/runner/work/zentriq/zentriq/backend/Zentriq.Tests/BackupTests.cs(415,118): warning CA1416: This call site is reachable on all platforms. 'DataProtectionBuilderExtensions.ProtectKeysWithDpapi(IDataProtectionBuilder, bool)' is only supported on: 'windows'. (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca1416) [/home/runner/work/zentriq/zentriq/backend/Zentriq.Tests/Zentriq.Tests.csproj]
+/home/runner/work/zentriq/zentriq/backend/Zentriq.Tests/DepartmentsAndChangesTests.cs(106,9): warning xUnit2029: Do not use Assert.Empty to check if a value does not exist in a collection. Use Assert.DoesNotContain instead. (https://xunit.net/xunit.analyzers/rules/xUnit2029) [/home/runner/work/zentriq/zentriq/backend/Zentriq.Tests/Zentriq.Tests.csproj]
+/home/runner/work/zentriq/zentriq/backend/Zentriq.Tests/RemoteSupportTests.cs(75,9): warning xUnit2000: The literal or constant value MeshRights.QuickConsent should be passed as the 'expected' argument in the call to 'Assert.Equal(expected, actual)' in method 'Rights_consent_and_names' on type 'RemoteSupportTests'. Swap the parameter values. (https://xunit.net/xunit.analyzers/rules/xUnit2000) [/home/runner/work/zentriq/zentriq/backend/Zentriq.Tests/Zentriq.Tests.csproj]
+    5 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:05.65
+  Determining projects to restore...
+  Restored /home/runner/work/zentriq/zentriq/agent/Zentriq.Agent/Zentriq.Agent.csproj (in 1.02 sec).
+  1 of 2 projects are up-to-date for restore.
+  Zentriq.Inventory -> /home/runner/work/zentriq/zentriq/backend/Zentriq.Inventory/bin/Release/netstandard2.0/Zentriq.Inventory.dll
+  Zentriq.Agent -> /home/runner/work/zentriq/zentriq/agent/Zentriq.Agent/bin/Release/net48/ZentriqAgent.exe
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:02.66
+  Determining projects to restore...
+/home/runner/work/zentriq/zentriq/licensing/Zentriq.LicenseServer/Zentriq.LicenseServer.csproj : warning NU1510: PackageReference Microsoft.Extensions.Identity.Core will not be pruned. This package is automatically available and does not need to be referenced explicitly. Remove the PackageReference item. [/home/runner/work/zentriq/zentriq/licensing/Zentriq.LicenseServer.Tests/Zentriq.LicenseServer.Tests.csproj]
+  Restored /home/runner/work/zentriq/zentriq/licensing/Zentriq.Licensing.Signing/Zentriq.Licensing.Signing.csproj (in 169 ms).
+  Restored /home/runner/work/zentriq/zentriq/licensing/Zentriq.LicenseServer/Zentriq.LicenseServer.csproj (in 1.09 sec).
+  Restored /home/runner/work/zentriq/zentriq/licensing/Zentriq.LicenseServer.Tests/Zentriq.LicenseServer.Tests.csproj (in 1.14 sec).
+  2 of 5 projects are up-to-date for restore.
+/home/runner/work/zentriq/zentriq/licensing/Zentriq.LicenseServer/Zentriq.LicenseServer.csproj : warning NU1510: PackageReference Microsoft.Extensions.Identity.Core will not be pruned. This package is automatically available and does not need to be referenced explicitly. Remove the PackageReference item.
+  Zentriq.Domain -> /home/runner/work/zentriq/zentriq/backend/Zentriq.Domain/bin/Release/net10.0/Zentriq.Domain.dll
+  Zentriq.Application -> /home/runner/work/zentriq/zentriq/backend/Zentriq.Application/bin/Release/net10.0/Zentriq.Application.dll
+  Zentriq.Licensing.Signing -> /home/runner/work/zentriq/zentriq/licensing/Zentriq.Licensing.Signing/bin/Release/net10.0/Zentriq.Licensing.Signing.dll
+  Zentriq.LicenseServer -> /home/runner/work/zentriq/zentriq/licensing/Zentriq.LicenseServer/bin/Release/net10.0/Zentriq.LicenseServer.dll
+  Zentriq.LicenseServer.Tests -> /home/runner/work/zentriq/zentriq/licensing/Zentriq.LicenseServer.Tests/bin/Release/net10.0/Zentriq.LicenseServer.Tests.dll
+
+Build succeeded.
+
+/home/runner/work/zentriq/zentriq/licensing/Zentriq.LicenseServer/Zentriq.LicenseServer.csproj : warning NU1510: PackageReference Microsoft.Extensions.Identity.Core will not be pruned. This package is automatically available and does not need to be referenced explicitly. Remove the PackageReference item. [/home/runner/work/zentriq/zentriq/licensing/Zentriq.LicenseServer.Tests/Zentriq.LicenseServer.Tests.csproj]
+/home/runner/work/zentriq/zentriq/licensing/Zentriq.LicenseServer/Zentriq.LicenseServer.csproj : warning NU1510: PackageReference Microsoft.Extensions.Identity.Core will not be pruned. This package is automatically available and does not need to be referenced explicitly. Remove the PackageReference item.
+    2 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:05.06

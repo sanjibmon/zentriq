@@ -1,0 +1,3 @@
+SNMP Simulator version 1.2.2, written by Ilya Etingof <etingof@gmail.com>
+Using foundation libraries: pysmi 2.0.0, pysnmp 7.1.30, pyasn1 0.6.5. Python
+interpreter: 3.14.4 (main, Aug 20 2026, 10:41:58) [GCC 15.2.0] Documentation

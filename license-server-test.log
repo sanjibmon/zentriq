@@ -1,0 +1,76 @@
+Test run for /home/runner/work/zentriq/zentriq/licensing/Zentriq.LicenseServer.Tests/bin/Release/net10.0/Zentriq.LicenseServer.Tests.dll (.NETCoreApp,Version=v10.0)
+A total of 1 test files matched the specified pattern.
+[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v3.1.4+50e68bbb8b (64-bit .NET 10.0.14)
+[xUnit.net 00:00:00.09]   Discovering: Zentriq.LicenseServer.Tests
+[xUnit.net 00:00:00.14]   Discovered:  Zentriq.LicenseServer.Tests
+[xUnit.net 00:00:00.16]   Starting:    Zentriq.LicenseServer.Tests
+warn: Microsoft.AspNetCore.StaticFiles.StaticFileMiddleware[16]
+      The WebRootPath was not found: /home/runner/work/zentriq/zentriq/licensing/Zentriq.LicenseServer.Tests/bin/Release/net10.0/wwwroot. Static files may be unavailable.
+warn: Microsoft.AspNetCore.DataProtection.KeyManagement.XmlKeyManager[35]
+      No XML encryptor configured. Key {7de6a427-ef5d-4e8c-98cf-1b4720cd478e} may be persisted to storage in unencrypted form.
+warn: Microsoft.AspNetCore.StaticFiles.StaticFileMiddleware[16]
+      The WebRootPath was not found: /home/runner/work/zentriq/zentriq/licensing/Zentriq.LicenseServer.Tests/bin/Release/net10.0/wwwroot. Static files may be unavailable.
+warn: Microsoft.AspNetCore.StaticFiles.StaticFileMiddleware[16]
+      The WebRootPath was not found: /home/runner/work/zentriq/zentriq/licensing/Zentriq.LicenseServer.Tests/bin/Release/net10.0/wwwroot. Static files may be unavailable.
+  Passed Zentriq.LicenseServer.Tests.IssuerTests.Unlimited_non_it_is_left_out_and_perpetual_never_expires [41 ms]
+  Passed Zentriq.LicenseServer.Tests.IssuerTests.Online_subscription_carries_metrics_lease_and_licensee_and_verifies [83 ms]
+  Passed Zentriq.LicenseServer.Tests.IssuerTests.Lease_never_runs_past_the_subscription_grace [1 ms]
+  Passed Zentriq.LicenseServer.Tests.KeyCeremonyTests.Weak_passphrases_and_plain_keys_are_refused [23 ms]
+warn: Microsoft.AspNetCore.DataProtection.KeyManagement.XmlKeyManager[35]
+      No XML encryptor configured. Key {d079ddd1-9b99-4371-b2b0-4764a66fcfea} may be persisted to storage in unencrypted form.
+warn: Microsoft.AspNetCore.StaticFiles.StaticFileMiddleware[16]
+      The WebRootPath was not found: /home/runner/work/zentriq/zentriq/licensing/Zentriq.LicenseServer.Tests/bin/Release/net10.0/wwwroot. Static files may be unavailable.
+  Passed Zentriq.LicenseServer.Tests.KeyCeremonyTests.Generated_key_is_encrypted_and_loads_only_with_its_passphrase [1 s]
+warn: Setup[0]
+      Restart the license server to apply the new address settings.
+warn: Setup[0]
+      Restart the license server to apply the new address settings.
+warn: Microsoft.AspNetCore.StaticFiles.StaticFileMiddleware[16]
+      The WebRootPath was not found: /home/runner/work/zentriq/zentriq/licensing/Zentriq.LicenseServer.Tests/bin/Release/net10.0/wwwroot. Static files may be unavailable.
+warn: Microsoft.AspNetCore.StaticFiles.StaticFileMiddleware[16]
+      The WebRootPath was not found: /home/runner/work/zentriq/zentriq/licensing/Zentriq.LicenseServer.Tests/bin/Release/net10.0/wwwroot. Static files may be unavailable.
+warn: Microsoft.AspNetCore.StaticFiles.StaticFileMiddleware[16]
+      The WebRootPath was not found: /home/runner/work/zentriq/zentriq/licensing/Zentriq.LicenseServer.Tests/bin/Release/net10.0/wwwroot. Static files may be unavailable.
+warn: Microsoft.AspNetCore.StaticFiles.StaticFileMiddleware[16]
+      The WebRootPath was not found: /home/runner/work/zentriq/zentriq/licensing/Zentriq.LicenseServer.Tests/bin/Release/net10.0/wwwroot. Static files may be unavailable.
+warn: Microsoft.AspNetCore.StaticFiles.StaticFileMiddleware[16]
+      The WebRootPath was not found: /home/runner/work/zentriq/zentriq/licensing/Zentriq.LicenseServer.Tests/bin/Release/net10.0/wwwroot. Static files may be unavailable.
+  Passed Zentriq.LicenseServer.Tests.LicenseServerFlowTests.Portal_verifies_generated_files_and_rejects_tampered_ones [1 s]
+  Passed Zentriq.LicenseServer.Tests.SetupWizardTests.Wizard_owner_key_backup_access_finish_and_automatic_unlock_after_restart [3 s]
+warn: Microsoft.AspNetCore.DataProtection.KeyManagement.XmlKeyManager[35]
+      No XML encryptor configured. Key {82f306c5-3f90-4673-bdfa-8ec1bb02a9c1} may be persisted to storage in unencrypted form.
+warn: Microsoft.AspNetCore.StaticFiles.StaticFileMiddleware[16]
+      The WebRootPath was not found: /home/runner/work/zentriq/zentriq/licensing/Zentriq.LicenseServer.Tests/bin/Release/net10.0/wwwroot. Static files may be unavailable.
+warn: Microsoft.AspNetCore.StaticFiles.StaticFileMiddleware[16]
+      The WebRootPath was not found: /home/runner/work/zentriq/zentriq/licensing/Zentriq.LicenseServer.Tests/bin/Release/net10.0/wwwroot. Static files may be unavailable.
+warn: Microsoft.AspNetCore.StaticFiles.StaticFileMiddleware[16]
+      The WebRootPath was not found: /home/runner/work/zentriq/zentriq/licensing/Zentriq.LicenseServer.Tests/bin/Release/net10.0/wwwroot. Static files may be unavailable.
+  Passed Zentriq.LicenseServer.Tests.LicenseServerFlowTests.Installation_deactivation_releases_the_key_and_revocation_is_final [760 ms]
+warn: Microsoft.AspNetCore.StaticFiles.StaticFileMiddleware[16]
+      The WebRootPath was not found: /home/runner/work/zentriq/zentriq/licensing/Zentriq.LicenseServer.Tests/bin/Release/net10.0/wwwroot. Static files may be unavailable.
+warn: Microsoft.AspNetCore.StaticFiles.StaticFileMiddleware[16]
+      The WebRootPath was not found: /home/runner/work/zentriq/zentriq/licensing/Zentriq.LicenseServer.Tests/bin/Release/net10.0/wwwroot. Static files may be unavailable.
+  Passed Zentriq.LicenseServer.Tests.LicenseServerFlowTests.License_file_is_validated_by_the_server_before_it_activates [720 ms]
+  Passed Zentriq.LicenseServer.Tests.SetupWizardTests.An_existing_key_is_imported_with_its_passphrase [2 s]
+warn: Microsoft.AspNetCore.StaticFiles.StaticFileMiddleware[16]
+      The WebRootPath was not found: /home/runner/work/zentriq/zentriq/licensing/Zentriq.LicenseServer.Tests/bin/Release/net10.0/wwwroot. Static files may be unavailable.
+warn: Microsoft.AspNetCore.StaticFiles.StaticFileMiddleware[16]
+      The WebRootPath was not found: /home/runner/work/zentriq/zentriq/licensing/Zentriq.LicenseServer.Tests/bin/Release/net10.0/wwwroot. Static files may be unavailable.
+  Passed Zentriq.LicenseServer.Tests.LicenseServerFlowTests.Offline_activation_with_key_and_from_the_portal_for_perpetual_licenses [645 ms]
+warn: Microsoft.AspNetCore.StaticFiles.StaticFileMiddleware[16]
+      The WebRootPath was not found: /home/runner/work/zentriq/zentriq/licensing/Zentriq.LicenseServer.Tests/bin/Release/net10.0/wwwroot. Static files may be unavailable.
+warn: Microsoft.AspNetCore.StaticFiles.StaticFileMiddleware[16]
+      The WebRootPath was not found: /home/runner/work/zentriq/zentriq/licensing/Zentriq.LicenseServer.Tests/bin/Release/net10.0/wwwroot. Static files may be unavailable.
+  Passed Zentriq.LicenseServer.Tests.LicenseServerFlowTests.Renewal_and_new_key [612 ms]
+warn: Microsoft.AspNetCore.StaticFiles.StaticFileMiddleware[16]
+      The WebRootPath was not found: /home/runner/work/zentriq/zentriq/licensing/Zentriq.LicenseServer.Tests/bin/Release/net10.0/wwwroot. Static files may be unavailable.
+warn: Microsoft.AspNetCore.StaticFiles.StaticFileMiddleware[16]
+      The WebRootPath was not found: /home/runner/work/zentriq/zentriq/licensing/Zentriq.LicenseServer.Tests/bin/Release/net10.0/wwwroot. Static files may be unavailable.
+  Passed Zentriq.LicenseServer.Tests.LicenseServerFlowTests.Online_activation_checkin_suspend_resume_and_portal_deactivation [664 ms]
+[xUnit.net 00:00:12.84]   Finished:    Zentriq.LicenseServer.Tests
+  Passed Zentriq.LicenseServer.Tests.LicenseServerFlowTests.Portal_requires_sign_in_and_the_request_header [659 ms]
+
+Test Run Successful.
+Total tests: 14
+     Passed: 14
+ Total time: 13.2972 Seconds
