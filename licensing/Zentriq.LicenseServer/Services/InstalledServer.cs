@@ -47,7 +47,8 @@ public static class InstalledServer
         X509Certificate2? pfx = null;
         if (access.IsPublic && access.Certificate == AccessSettings.PfxCertificate)
         {
-            try { pfx = X509CertificateLoader.LoadPkcs12FromFile(Path.Combine(data.Certs, "server.pfx"), data.GetSecret("pfx"), X509KeyStorageFlags.EphemeralKeySet); }
+            // Not an ephemeral key: Windows TLS (SChannel) needs the key in a key container.
+            try { pfx = X509CertificateLoader.LoadPkcs12FromFile(Path.Combine(data.Certs, "server.pfx"), data.GetSecret("pfx")); }
             catch (Exception ex) when (ex is IOException or System.Security.Cryptography.CryptographicException) { Console.Error.WriteLine("HTTPS certificate: " + ex.Message); }
         }
         var auto = access.IsPublic && access.Certificate == AccessSettings.AutoCertificate;
