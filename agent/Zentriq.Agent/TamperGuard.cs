@@ -85,6 +85,9 @@ internal static class TamperGuard
     /// Records something to report at the next check-in: "tamper" (a change that was undone, a wrong code) or "control"
     /// (stopped, disabled or paused with a code). Kept with the protection key (SYSTEM only), at most 20.
     /// </summary>
+    /// <summary>Runs <paramref name="act"/> shortly after the pipe answer has been written.</summary>
+    private static void Later(Action act) => System.Threading.Tasks.Task.Delay(500).ContinueWith(_ => act());
+
     public static void Record(string kind, string text)
     {
         if (kind == "tamper") Log.Warn("Tamper protection: " + text); else Log.Info("Tamper protection: " + text);
@@ -486,7 +489,8 @@ internal static class TamperGuard
                 : Reply(r.Ok, r.Message + (r.Ok ? "" : " Run 'ZentriqAgent.exe --diagnose' for details."));
         }
         // The code dialog for a stop or restart from the Services console (net stop, sc stop) that is waiting.
-        if (action == "cancel-stop") { StopGate.Cancel(); return Reply(true, "Cancelled; the agent keeps running."); }
+        // The answer goes back first: the service then stops (and starts again), which closes this pipe.
+        if (action == "cancel-stop") { Later(StopGate.Cancel); return Reply(true, "Cancelled; the agent starts again by itself."); }
         if (action == "authorize-stop")
         {
             if (!StopGate.Pending) return Reply(false, "No stop request is waiting; the dialog can be closed.");
@@ -509,7 +513,7 @@ internal static class TamperGuard
                 Set(false);
                 Record("control", "Agent service stopped with a code entered in the dialog (Services console, net stop or sc stop); it starts again when the device restarts, or with --enable.");
             }
-            StopGate.Authorize(restart);
+            Later(() => StopGate.Authorize(restart));
             return Reply(true, restart ? "Code accepted. The Zentriq Agent service restarts now." : "Code accepted. The Zentriq Agent service stops now.");
         }
         if (action == "restart")

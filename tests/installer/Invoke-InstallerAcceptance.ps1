@@ -609,6 +609,7 @@ if (-not $installed) {
                     $r = New-Object System.IO.StreamReader($p)
                     $w.WriteLine((@{ action = $Action; code = $Code } | ConvertTo-Json -Compress))
                     $line = $r.ReadLine(); $p.Dispose()
+                    Assert $line "no answer on the control pipe to '$Action'"
                     $line | ConvertFrom-Json
                 }
                 # Stop request (as Stop / Restart in the Services console): held ("Stopping") while the code dialog is open;
@@ -632,7 +633,7 @@ if (-not $installed) {
                         $w.WriteLine((@{ action = 'authorize-stop'; code = $Code; restart = [bool]$Restart } | ConvertTo-Json -Compress))
                         $ok = $r.ReadLine() | ConvertFrom-Json; $p.Dispose()
                         Assert ($ok.ok) "code refused in the stop dialog: $($ok.message)"
-                    } else { PipeSend 'cancel-stop' $null | Out-Null }
+                    } else { $c = PipeSend 'cancel-stop' $null; Assert ($c.ok) 'cancel not confirmed' }
                     return $st
                 }
                 function StartedAgain([string] $What) {
