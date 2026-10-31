@@ -1,10 +1,27 @@
 # Test report
 
-Latest: GitHub Actions run 41104678134, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
-10.0.20348** VM. Release: `v1.1.1-build.93` (pre-release, **unsigned**), package version **1.1.1.93**. Results: unit +
-PostgreSQL integration tests **352 PASS, 2 skipped** (live remote support and SNMP tests run in ci-quick: PASS, 354/354);
-license server tests (ci-quick, PostgreSQL) **8/8 PASS**; installer acceptance **71 passed, 0 failed**; in-place updates
-PASS (schema 30).
+Latest: GitHub Actions run 41164422082, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
+10.0.20348** VM. Release: `v1.1.1-build.94` (pre-release, **unsigned**), package version **1.1.1.94**. Results: unit +
+PostgreSQL integration tests **352 PASS, 2 skipped** (ci-quick: 354/354); license server tests (ci-quick, PostgreSQL)
+**11/11 PASS**; local license server on Windows **7/7 PASS**; installer acceptance **71 passed, 0 failed**; in-place
+updates PASS (schema 30).
+
+New in build 94: **key ceremony** for the production license signing key (generated on the license server's own
+machine; ECDSA P-256; encrypted PKCS#8 with AES-256 and PBKDF2-SHA256 600,000 iterations; owner-only file; SHA-256
+fingerprint; ceremony record; sign/verify self-test at every start); **Verify file** in the license portal and test
+files for license generation; **local edition for Windows** (`Zentriq-LicenseServer-Local-win-x64-1.1.1.zip`:
+self-contained server, portable PostgreSQL 17, `zls setup | start | stop | status | backup | key-info`); Zentriq
+accepts `http://localhost` as license server address for local testing.
+
+| ID | Test (local license server, Windows PowerShell 5.1) | Result |
+|---|---|---|
+| L01 | Setup: own PostgreSQL, key ceremony (encrypted key, owner-only ACL, public entry, record), owner account | **PASS** |
+| L02 | Start in the background; portal and offline activation page answer | **PASS** |
+| L03 | Owner signs in; portal shows the ceremony's key id and fingerprint | **PASS** |
+| L04 | Subscription license (3 years): offline file verified with its entitlements | **PASS** |
+| L05 | Perpetual license: online activation; support extension arrives with the next check-in | **PASS** |
+| L06 | A changed license file is rejected (bad signature) | **PASS** |
+| L07 | Database backup and stop | **PASS** |
 
 New in build 93: licensing by **IT devices** (per device, network devices included), **non-IT packs** (250 / 500 / 1,000 /
 2,000 / 4,000 / unlimited), **cloud and VM instances** and **remote support technicians**; IT accessories unlimited.
@@ -76,12 +93,13 @@ replaced) and the trial's 30-device total cap.
 ## Release artifacts (SHA-256)
 
 ```
-d2c4a3b129e5d9f370db8aee8f7b7f8e78a9f89a98f78dc33382feb965a19b4d  Zentriq-1.1.1-docs.zip
-bb05b5a1175abd0e0e1439f3cec0d44839181f7932ab29183d27a0eace7c386b  Zentriq-1.1.1-msi-offline-kit.zip
-a0e4289732fe90f567d137b25f3df2de335f46e4f552904191c8c4ccaa7a883c  Zentriq-Setup-x64.exe
-c9df62b40abb90366d535b1b5cba62333a1ad457ae1212b4c8c4a698d7cb3ef6  Zentriq.msi
-766d07786c9bffa6ec6ae3c30d0e920e41e751ae5b8a71d6389ce396d7e2eb7a  ZentriqAgent-x64.msi
-b70586777a2e7f34104a6bed07c492b5bf9de1755cffda2a8bcc87d725eb2147  Zentriq-LicenseServer-1.1.1.zip
+d1f19be1f6ee5e7ab5b5715566efd6cb9f8b63d028e3a34b2b4d750dbe9a998c  Zentriq-1.1.1-docs.zip
+0b47e520ea74f878c1a2ddae1c5c439b78118a2b12189e6400a77757506282d9  Zentriq-1.1.1-msi-offline-kit.zip
+62936d4a10503e0907b052fe54014d01a32e1df38fc6629d28abbb3ec04fbac8  Zentriq-Setup-x64.exe
+bcdea96fda597241be5c534b9f5063c950605edb65804704fae7579c204b29c2  Zentriq.msi
+1839fec6231b4d83260d5d9af274d894658aa00fb5c32743ea234644d4a3184f  ZentriqAgent-x64.msi
+360269ac6852b8b47b721ceb52e6635a7ce57bb4aca89a131955866236f295cc  Zentriq-LicenseServer-1.1.1.zip
+b0c88d653f84a71e20048284c438bc93195bb08ee3dd49fc19ac8013dfb0b376  Zentriq-LicenseServer-Local-win-x64-1.1.1.zip
 ```
 
 ## Installer acceptance (tests/installer/Invoke-InstallerAcceptance.ps1)
