@@ -103,6 +103,7 @@
             <div><label>Its password</label><input id="ap" type="password" autocomplete="off"></div></div>
             ${a.pfxExpires ? `<p class="small muted">Current certificate valid until ${esc(String(a.pfxExpires).slice(0, 10))}.</p>` : ''}</div>
         </div>
+        ${(st.accessProblems || []).map((m) => `<div class="msg bad">${esc(m)}</div>`).join('')}
         <p class="small muted mt">Now: ${pub ? `public at <code>${esc(st.publicUrl)}</code>` : 'this computer only'}. The portal on this computer stays at <code>${esc(st.localUrl)}/admin</code> either way.</p>
         <div id="amsg" class="msg hidden"></div>
         <div class="row end"><button id="ago">Save</button></div></div>`);

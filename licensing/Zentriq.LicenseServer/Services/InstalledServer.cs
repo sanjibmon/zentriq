@@ -63,11 +63,23 @@ public static class InstalledServer
             }).PersistDataToDirectory(new DirectoryInfo(Path.Combine(data.Certs, "letsencrypt")), acmePassword);
         }
 
+        // A public port another program holds (IIS, another web server) must not stop the server: it then still runs
+        // on localhost:5080, and the setup page shows the problem.
+        var status = new AccessStatus();
+        builder.Services.AddSingleton(status);
+        var httpFree = false; var httpsFree = false;
+        if (access.IsPublic)
+        {
+            httpFree = PortFree(80, status);
+            httpsFree = PortFree(443, status);
+            if (access.Certificate == AccessSettings.PfxCertificate && pfx is null) status.Problems.Add("The HTTPS certificate (certs\\server.pfx) could not be loaded; choose it again.");
+        }
         builder.WebHost.ConfigureKestrel(k =>
         {
             k.ListenLocalhost(state.HttpPort);
             if (!access.IsPublic) return;
-            k.Listen(IPAddress.IPv6Any, 80);
+            if (httpFree) k.Listen(IPAddress.IPv6Any, 80);
+            if (!httpsFree) return;
             if (auto)
             {
                 var services = k.ApplicationServices;
@@ -76,6 +88,24 @@ public static class InstalledServer
             else if (pfx is not null)
                 k.Listen(IPAddress.IPv6Any, 443, l => l.UseHttps(pfx));
         });
+    }
+
+    private static bool PortFree(int port, AccessStatus status)
+    {
+        try
+        {
+            var probe = new System.Net.Sockets.TcpListener(IPAddress.IPv6Any, port);
+            probe.Server.DualMode = true;
+            probe.Start();
+            probe.Stop();
+            return true;
+        }
+        catch (System.Net.Sockets.SocketException ex)
+        {
+            status.Problems.Add($"Port {port} cannot be used ({ex.SocketErrorCode}): another program, for example IIS or another web server, is using it. Stop that program (or move it to another port) and save the settings again.");
+            Console.Error.WriteLine($"Port {port}: {ex.Message}");
+            return false;
+        }
     }
 
     public static bool IsLoopback(HttpContext ctx) => ctx.Connection.RemoteIpAddress is { } ip && IPAddress.IsLoopback(ip.IsIPv4MappedToIPv6 ? ip.MapToIPv4() : ip);
@@ -120,4 +150,10 @@ public static class InstalledServer
             await next();
         });
     }
+}
+
+/// <summary>Problems with the public addresses found at start-up (shown by the setup page).</summary>
+public sealed class AccessStatus
+{
+    public List<string> Problems { get; } = [];
 }
