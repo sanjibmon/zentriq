@@ -1,10 +1,30 @@
 # Test report
 
-Latest: GitHub Actions run 41173720673, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
-10.0.20348** VM. Release: `v1.1.1-build.95` (pre-release, **unsigned**), package version **1.1.1.95**. Results: unit +
+Latest: GitHub Actions run 41205117265, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
+10.0.20348** VM. Release: `v1.1.1-build.99` (pre-release, **unsigned**), package version **1.1.1.99**. Results: unit +
 PostgreSQL integration tests **352 PASS, 2 skipped** (ci-quick: 354/354); installer acceptance **71 passed, 0 failed**;
-in-place updates PASS (schema 30). The license server is now a separate product: workflow `license-server`, release
-`license-server-v1.0.0-build.3` (Linux tests 12/12, Windows local edition 8/8).
+in-place updates PASS (schema 31).
+
+New in build 99 (builds 96-98 did not pass acceptance and were not released):
+
+* **IT accessories: add categories.** The category field offers *+ Add category…*; the *Categories* button adds,
+  renames and deletes categories (in use: refused). Categories are kept in their own table (migration V0031, 15
+  built-in categories plus the ones already used).
+* **Agents: no "Tampering blocked" message** on each device; only *Protection paused* is shown.
+* **Agent service Stop / Restart with a code.** Stop and Restart in the Services console (and `net stop`, `sc stop`,
+  `Stop-Service`) are no longer greyed out. While tamper protection is on, the request is held (*Stopping*) and a code
+  dialog opens for each signed-in administrator: with the device's code or the code for all agents, **Restart service**
+  restarts it and **Stop service** stops it. Windows does not let a service refuse a stop it has received (an SCM test
+  in build 97 showed that a refused stop leaves the service unable to take any request, error 1061), so without a code
+  (cancel, wrong code, two minutes) the agent completes the stop and starts again by itself at once, and the attempt is
+  reported as tampering.
+
+| ID | Test | Result |
+|---|---|---|
+| T78 | Stop without a code: held (StopPending), wrong code refused, cancelled → started again at once (new process); code + Restart → restarted (new process); code + Stop → stopped; disabling refused; console pause / resume; device code and code for all | **PASS** |
+| T67 | Uninstall protection; stop without a code held and started again | **PASS** |
+| T69 | IT accessories incl. built-in and added categories | **PASS** |
+| T29, T47, T60, T79 | Revocation, updates and remote support with the new service host | **PASS** |
 
 New in build 95: **license files validated by the license server**. Zentriq sends the customer a signed license file
 bound to no server; *Licensing › Import license file* checks the signature, has the Zentriq license server validate it
