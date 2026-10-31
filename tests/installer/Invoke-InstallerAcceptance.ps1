@@ -1099,7 +1099,7 @@ if (-not $installed) {
             Assert ($r -and $r.status -in 'pass', 'fail') "$must is $($r.status) ($($r.actual))"
         }
         $rules = (Api GET '/security/rules' -Session $s).rules
-        Assert (@($rules).Count -eq 30 -and @($rules | Where-Object enabled).Count -eq 28) "rules: $(@($rules).Count), on $(@($rules | Where-Object enabled).Count)"
+        Assert (@($rules).Count -eq 43 -and @($rules | Where-Object enabled).Count -eq 40) "rules: $(@($rules).Count), on $(@($rules | Where-Object enabled).Count)"
         $failing = @($d.results | Where-Object status -eq 'fail')
         $target = if ($failing.Count) { $failing[0] } else { $known[0] }
         $rd = Api GET "/security/rules/$($target.rule)?status=" -Session $s
@@ -2336,8 +2336,9 @@ dpkg-deb --build /tmp/zqdummy /tmp/zq-ci-dummy.deb >/dev/null && dpkg -i /tmp/zq
                 $os = $inv.document.os
                 Assert ($os.family -eq 'linux' -and $os.distribution -eq 'ubuntu' -and $os.distributionFamily -eq 'debian') "os: $($os | ConvertTo-Json -Compress)"
                 Assert ($os.isServer -eq $true -and $os.editionId -match 'Ubuntu' -and $os.kernel -and $os.packageManager -eq 'dpkg') "edition/role: $($os | ConvertTo-Json -Compress)"
-                $sw = @($inv.document.software)
-                Assert ($sw.Count -ge 50 -and ($sw | Where-Object name -eq 'zentriq-agent') -and ($sw | Where-Object name -eq 'zq-ci-dummy')) "software: $($sw.Count) packages"
+                # Installed packages are kept in the software inventory (not in the stored document).
+                $sw = foreach ($n in 'zentriq-agent', 'zq-ci-dummy') { @(Api GET "/inventory/software/installs?name=$n" -Session $s | ForEach-Object { $_ }) | Where-Object { $_.assetId -eq $a.assetId } }
+                Assert (@($sw).Count -eq 2) "packages in the software inventory: $(@($sw).Count) of zentriq-agent, zq-ci-dummy"
                 Assert ($inv.document.security.linux) 'Linux security settings missing'
                 # Linux checks in Security Configuration.
                 Api POST '/security/evaluate' -Session $s | Out-Null
@@ -2362,7 +2363,7 @@ dpkg-deb --build /tmp/zqdummy /tmp/zq-ci-dummy.deb >/dev/null && dpkg -i /tmp/zq
                 $deadline = (Get-Date).AddMinutes(2)
                 do { Start-Sleep 5; $rm = Wsl "pkill -f 'zentriq-agent --run' || true; zentriq-agent --uninstall $($code.code) 2>&1 || true; test -e /opt/zentriq-agent/zentriq-agent && echo STILL || echo GONE" } while ($rm -notmatch 'GONE' -and (Get-Date) -lt $deadline)
                 Assert ($rm -match 'GONE') "removal with the code: $rm"
-                "$($os.name) $($os.version) · $($os.editionId) · $($os.installationType) · $($sw.Count) packages · $($lin.Count) Linux checks · live connection · package removed via console · removal refused without a code, done with it"
+                "$($os.name) $($os.version) · $($os.editionId) · $($os.installationType) · packages listed · $($lin.Count) Linux checks · live connection · package removed via console · removal refused without a code, done with it"
             } finally {
                 Get-Content (Join-Path $OutDir 'linux-agent-wsl.log') -ErrorAction SilentlyContinue | Out-Null
                 try { & wsl.exe -d $wslDistro -u root -- sh -c 'cp /var/log/zentriq-agent/*.log /var/log/zentriq-agent/run.out /tmp/ 2>/dev/null; cat /var/log/zentriq-agent/agent.log 2>/dev/null' 2>$null | Set-Content (Join-Path $OutDir 'linux-agent.log') } catch { }
