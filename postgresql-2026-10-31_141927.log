@@ -1,0 +1,8 @@
+2026-10-31 14:19:27.237 UTC [5668] LOG:  database system was shut down at 2026-10-31 14:19:22 UTC
+2026-10-31 14:19:53.214 UTC [4648] LOG:  could not receive data from client: An existing connection was forcibly closed by the remote host.
+	
+2026-10-31 14:19:53.215 UTC [968] LOG:  could not receive data from client: An existing connection was forcibly closed by the remote host.
+	
+2026-10-31 14:19:53.470 UTC [1500] LOG:  shutting down
+2026-10-31 14:19:53.476 UTC [1500] LOG:  checkpoint starting: shutdown immediate
+2026-10-31 14:19:54.900 UTC [1500] LOG:  checkpoint complete: wrote 1023 buffers (6.2%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.019 s, sync=1.385 s, total=1.430 s; sync files=339, longest=0.097 s, average=0.005 s; distance=4743 kB, estimate=4743 kB; lsn=0/1A0CB60, redo lsn=0/1A0CB60

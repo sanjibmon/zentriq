@@ -1,0 +1,34 @@
+Publishing the license server (self-contained, win-x64)...
+  Determining projects to restore...
+D:\a\zentriq\zentriq\licensing\Zentriq.LicenseServer\Zentriq.LicenseServer.csproj : warning NU1510: PackageReference Microsoft.Extensions.Identity.Core will not be pruned. This package is automatically available and does not need to be referenced explicitly. Remove the PackageReference item.
+  Restored D:\a\zentriq\zentriq\backend\Zentriq.Domain\Zentriq.Domain.csproj (in 8.68 sec).
+  Restored D:\a\zentriq\zentriq\backend\Zentriq.Application\Zentriq.Application.csproj (in 8.68 sec).
+  Restored D:\a\zentriq\zentriq\licensing\Zentriq.Licensing.Signing\Zentriq.Licensing.Signing.csproj (in 8.68 sec).
+  Restored D:\a\zentriq\zentriq\licensing\Zentriq.LicenseServer\Zentriq.LicenseServer.csproj (in 8.7 sec).
+D:\a\zentriq\zentriq\licensing\Zentriq.LicenseServer\Zentriq.LicenseServer.csproj : warning NU1510: PackageReference Microsoft.Extensions.Identity.Core will not be pruned. This package is automatically available and does not need to be referenced explicitly. Remove the PackageReference item.
+  Zentriq.Domain -> D:\a\zentriq\zentriq\backend\Zentriq.Domain\bin\Release\net10.0\Zentriq.Domain.dll
+  Zentriq.Licensing.Signing -> D:\a\zentriq\zentriq\licensing\Zentriq.Licensing.Signing\bin\Release\net10.0\Zentriq.Licensing.Signing.dll
+  Zentriq.Application -> D:\a\zentriq\zentriq\backend\Zentriq.Application\bin\Release\net10.0\Zentriq.Application.dll
+  Zentriq.LicenseServer -> D:\a\zentriq\zentriq\licensing\Zentriq.LicenseServer\bin\Release\net10.0\win-x64\Zentriq.LicenseServer.dll
+  Zentriq.LicenseServer -> C:\Users\runneradmin\AppData\Local\Temp\zls-setup-ee0f0629\server\
+Downloading postgresql-17.11-1-windows-x64-binaries.zip...
+PostgreSQL binaries SHA256: 6eabdf00d2893713b75db4336a23c3fdf505f056e217ec6e2e95d901750cfea3
+Extracting PostgreSQL (bin, lib, share only)...
+Added vcruntime140.dll (app-local)
+Added vcruntime140_1.dll (app-local)
+Added msvcp140.dll (app-local)
+Building the MSI...
+  Determining projects to restore...
+  Restored D:\a\zentriq\zentriq\licensing\installer\Zentriq.LicenseServer.Setup.wixproj (in 752 ms).
+D:\a\zentriq\zentriq\licensing\installer\Package.wxs(27): warning WIX1076: ICE61: This product should remove only older versions of itself. The Maximum version is not less than the current product. (1.1.13 1.1.13) [D:\a\zentriq\zentriq\licensing\installer\Zentriq.LicenseServer.Setup.wixproj]
+  Zentriq.LicenseServer.Setup -> C:\Users\runneradmin\AppData\Local\Temp\zls-setup-ee0f0629\msi\Zentriq-LicenseServer-Setup.msi
+
+Build succeeded.
+
+D:\a\zentriq\zentriq\licensing\installer\Package.wxs(27): warning WIX1076: ICE61: This product should remove only older versions of itself. The Maximum version is not less than the current product. (1.1.13 1.1.13) [D:\a\zentriq\zentriq\licensing\installer\Zentriq.LicenseServer.Setup.wixproj]
+    1 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:01:18.17
+Setup: out\Zentriq-LicenseServer-Setup-1.1.13.msi (74.8 MB); PostgreSQL 17.11-1 (SHA256 6eabdf00d2893713b75db4336a23c3fdf505f056e217ec6e2e95d901750cfea3)
+out\Zentriq-LicenseServer-Setup-1.1.13.msi
