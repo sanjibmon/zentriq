@@ -8,9 +8,9 @@ This guide covers two modules: **Security Configuration**, which checks Windows 
 
 ### What it does
 
-Zentriq reads the security settings of every Windows device from its latest inventory and compares them with one or more **baselines**. Each device gets a result for every check (pass, fail, unknown or exception) and a **score from 0 to 100**. Zentriq also tracks how many devices are compliant over time.
+Zentriq reads the security settings of every Windows and Linux device from its latest inventory and compares them with one or more **baselines**. Each device gets a result for every check (pass, fail, unknown or exception) and a **score from 0 to 100**. Zentriq also tracks how many devices are compliant over time.
 
-The module is **read-only**. Zentriq does not change any setting on a device. For each check it gives the reason the check matters and the Group Policy or Intune setting that fixes it. You apply the fix with your own tools, and Zentriq re-checks the device after its next inventory.
+The module is **read-only**. Zentriq does not change any setting on a device. For each check it gives the reason the check matters and the setting that fixes it (Group Policy or Intune on Windows; the configuration file or command on Linux). You apply the fix with your own tools, and Zentriq re-checks the device after its next inventory.
 
 ### Where the data comes from
 
@@ -32,7 +32,7 @@ Agents and agentless WinRM scans collect the following in the `security.hardenin
 
 ### The checks
 
-There are 30 built-in checks. Each one references a CIS Controls v8 safeguard and matches common CIS Benchmark and Microsoft security baseline settings.
+There are 43 built-in checks: 30 for Windows (below) and 13 for Linux. Each one references a CIS Controls v8 safeguard and matches common CIS Benchmark and Microsoft security baseline settings.
 
 | ID | Check | Area | Severity | Applies to |
 |---|---|---|---|---|
@@ -67,7 +67,29 @@ There are 30 built-in checks. Each one references a CIS Controls v8 safeguard an
 | SC-29 | Remote Registry service disabled | Hardening | Low | All |
 | SC-30 | Credential Guard running (off by default) | Credential protection | Low | Workstations |
 
-A check that does not apply to a device is not stored. For example, SC-16 does not apply to a workstation, SC-10 does not apply to a VM, and no check applies to a Linux device. When the device did not report the needed data, the result is **unknown**.
+**Linux devices** (the Zentriq Agent for Linux, or SSH scans) have their own 13 checks; the SC checks apply to Windows only:
+
+| ID | Check | Area | Severity | Applies to |
+|---|---|---|---|---|
+| SL-01 | SSH: root cannot sign in | Linux: remote access | High | All |
+| SL-02 | SSH: password sign-in turned off | Linux: remote access | Medium | All |
+| SL-03 | Host firewall active (ufw, firewalld, nftables, iptables) | Linux: hardening | High | All |
+| SL-04 | SELinux enforcing or AppArmor on | Linux: hardening | Medium | All |
+| SL-05 | Automatic security updates | Linux: patching | Medium | All |
+| SL-06 | No pending security updates (0, adjustable) | Linux: patching | High | All |
+| SL-07 | No reboot pending after updates | Linux: patching | Low | All |
+| SL-08 | Only root has UID 0 | Linux: accounts | High | All |
+| SL-09 | Password maximum age set (≤ 365 days, adjustable; off by default) | Linux: accounts | Low | All |
+| SL-10 | No Telnet server | Linux: remote access | High | All |
+| SL-11 | Time synchronised | Linux: logging | Low | All |
+| SL-12 | Audit daemon running | Linux: logging | Low | Servers |
+| SL-13 | Disk encrypted (LUKS) | Linux: hardening | Medium | Desktops |
+
+Linux devices report these settings in the `security.linux` section of their inventory (SSH server settings, SELinux /
+AppArmor, automatic updates, firewall, password ageing, UID 0 accounts, auditd, time synchronisation, Telnet, pending
+and security updates, reboot required).
+
+A check that does not apply to a device is not stored. For example, SC-16 does not apply to a workstation, SC-10 does not apply to a VM, and SL-12 does not apply to a desktop. When the device did not report the needed data, the result is **unknown**.
 
 ### Score
 

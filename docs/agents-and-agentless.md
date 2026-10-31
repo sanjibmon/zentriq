@@ -115,6 +115,10 @@ can read these attributes; no administrator account is needed for AD itself.
 
 ## Zentriq Agent
 
+The agent runs on **Windows** (this section) and on **Linux** servers and desktops: see [linux-agent.md](linux-agent.md) for
+the Linux packages, the one-line install command, how it identifies the distribution, edition and server or desktop,
+and its tamper protection. Both use the same agent port, enrollment codes, settings and console actions.
+
 ### Server side
 
 * The API listens on **8444/TCP** for agents (mutual TLS). Only `/api/agent/*` and `/downloads/*` are served on that
@@ -288,7 +292,7 @@ log is `C:\ProgramData\Zentriq\Agent\Logs\agent.log`.
 
 ### Agent limitations (this release)
 
-* The inventory agent runs on Windows (macOS and Linux agents are planned; remote support already works on all three). Needs .NET Framework 4.8 (not present by default on Server 2016/2019; Windows 10 1903+/11 have it).
+* The Windows agent needs .NET Framework 4.8 (not present by default on Server 2016/2019; Windows 10 1903+/11 have it). Linux servers and desktops use the [Zentriq Agent for Linux](linux-agent.md); a macOS agent is planned (remote support already works on macOS).
 * Inventory only – the agent does not deploy software, patch or provide remote control.
 * If the server's self-signed certificate is replaced by a new self-signed one **after** the old one stopped working,
   agents must be re-enrolled; use a CA-issued certificate for internet-facing deployments.
