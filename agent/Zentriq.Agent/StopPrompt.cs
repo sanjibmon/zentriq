@@ -98,8 +98,8 @@ internal static class StopPrompt
     /// <summary>The user's full administrator token (the elevated half under UAC), or zero when the user is not an administrator.</summary>
     private static IntPtr AdministratorToken(IntPtr user)
     {
-        if (GetTokenInformation(user, TokenElevationType, out var type, 4, out _) && type == ElevationLimited
-            && GetTokenInformation(user, TokenLinkedToken, out var linked, IntPtr.Size, out _) && linked != IntPtr.Zero)
+        if (GetTokenInt(user, TokenElevationType, out var type, 4, out _) && type == ElevationLimited
+            && GetTokenPtr(user, TokenLinkedToken, out var linked, IntPtr.Size, out _) && linked != IntPtr.Zero)
             return linked;   // SYSTEM (SeTcbPrivilege) receives a primary token
         using var id = new WindowsIdentity(user);
         return new WindowsPrincipal(id).IsInRole(WindowsBuiltInRole.Administrator) ? user : IntPtr.Zero;
@@ -225,10 +225,10 @@ internal static class StopPrompt
     private static extern void WTSFreeMemory(IntPtr memory);
     [DllImport("wtsapi32.dll", SetLastError = true)]
     private static extern bool WTSQueryUserToken(int sessionId, out IntPtr token);
-    [DllImport("advapi32.dll", SetLastError = true)]
-    private static extern bool GetTokenInformation(IntPtr token, int cls, out int value, int length, out int returned);
-    [DllImport("advapi32.dll", SetLastError = true)]
-    private static extern bool GetTokenInformation(IntPtr token, int cls, out IntPtr value, int length, out int returned);
+    [DllImport("advapi32.dll", SetLastError = true, EntryPoint = "GetTokenInformation")]
+    private static extern bool GetTokenInt(IntPtr token, int cls, out int value, int length, out int returned);
+    [DllImport("advapi32.dll", SetLastError = true, EntryPoint = "GetTokenInformation")]
+    private static extern bool GetTokenPtr(IntPtr token, int cls, out IntPtr value, int length, out int returned);
     [DllImport("userenv.dll", SetLastError = true)]
     private static extern bool CreateEnvironmentBlock(out IntPtr env, IntPtr token, bool inherit);
     [DllImport("userenv.dll", SetLastError = true)]
