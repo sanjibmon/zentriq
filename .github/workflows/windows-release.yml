@@ -9,6 +9,8 @@ name: windows-release
 on:
   push:
     branches: [main]
+    # The license server is a separate product with its own workflow and releases.
+    paths-ignore: ['licensing/**', 'tests/license-server/**', '.github/workflows/license-server.yml']
   workflow_dispatch:
 
 permissions:
