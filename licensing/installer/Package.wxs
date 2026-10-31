@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Zentriq-LicenseServer-Setup-<version>.msi
+    Install:   double-click (the setup wizard opens in the browser at the end), or
+               msiexec /i Zentriq-LicenseServer-Setup-<version>.msi /qn   (then open http://localhost:5080/setup)
+    Upgrade:   run the newer MSI; data, key and settings are kept.
+    Remove:    Settings > Apps, or msiexec /x; the data folder C:\ProgramData\Zentriq\LicenseServer is kept.
+  Program files: C:\Program Files\Zentriq License Server (server\, pgsql\)
+  Services:      ZentriqLicenseDb (PostgreSQL, 127.0.0.1:5439, NETWORK SERVICE)
+                 ZentriqLicenseServer (NT SERVICE\ZentriqLicenseServer; http://localhost:5080, and 80/443 in public mode)
+  The services are created by "Zentriq.LicenseServer.exe install" (deferred, as SYSTEM) and removed by "uninstall".
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+
+  <Package Name="Zentriq License Server"
+           Manufacturer="Zentriq"
+           Version="$(var.ProductVersion)"
+           UpgradeCode="04F53F41-6647-4F10-B611-19EBC683BA35"
+           Scope="perMachine"
+           InstallerVersion="500"
+           Language="1033"
+           Compressed="yes">
+
+    <SummaryInformation Description="Zentriq License Server $(var.ProductVersion)" />
+    <MajorUpgrade Schedule="afterInstallInitialize" AllowSameVersionUpgrades="yes"
+                  DowngradeErrorMessage="A newer version of the Zentriq License Server is already installed." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <Launch Condition="VersionNT64" Message="The Zentriq License Server needs 64-bit Windows." />
+    <Launch Condition="Installed OR VersionNT >= 1000" Message="The Zentriq License Server needs Windows Server 2016 / Windows 10 or later." />
+    <Launch Condition="Privileged" Message="Run the setup as an administrator." />
+
+    <Icon Id="ZlsIcon" SourceFile="$(var.AssetsDir)\zentriq.ico" />
+    <Property Id="ARPPRODUCTICON" Value="ZlsIcon" />
+    <Property Id="ARPNOMODIFY" Value="1" />
+    <!-- Service processes are stopped by the services' own steps; no Restart Manager prompt. -->
+    <Property Id="MSIRESTARTMANAGERCONTROL" Value="Disable" />
+
+    <!-- Data folder (database, signing key, certificates, logs, backups). Kept on uninstall. -->
+    <Property Id="ZLSDATA" Secure="yes">
+      <RegistrySearch Id="RegData" Root="HKLM" Key="SOFTWARE\Zentriq\LicenseServer" Name="DataFolder" Type="raw" Bitness="always64" />
+    </Property>
+    <SetProperty Id="ZLSDATA" Value="[CommonAppDataFolder]Zentriq\LicenseServer" Before="CostFinalize" Sequence="both" Condition="NOT ZLSDATA" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="Zentriq License Server">
+        <Directory Id="SERVERDIR" Name="server" />
+        <Directory Id="PGDIR" Name="pgsql" />
+      </Directory>
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="MENUDIR" Name="Zentriq License Server" />
+    </StandardDirectory>
+
+    <Feature Id="Main" Title="Zentriq License Server" Level="1" AllowAbsent="no">
+      <ComponentGroupRef Id="ServerFiles" />
+      <ComponentGroupRef Id="PgFiles" />
+      <ComponentRef Id="ZlsRegistration" />
+    </Feature>
+
+    <ComponentGroup Id="ServerFiles" Directory="SERVERDIR">
+      <Component Id="ServerExeComponent">
+        <File Id="ServerExe" Source="$(var.StageDir)\server\Zentriq.LicenseServer.exe" KeyPath="yes" />
+      </Component>
+      <Files Include="$(var.StageDir)\server\**">
+        <Exclude Files="$(var.StageDir)\server\Zentriq.LicenseServer.exe" />
+      </Files>
+    </ComponentGroup>
+    <ComponentGroup Id="PgFiles" Directory="PGDIR">
+      <Files Include="$(var.StageDir)\pgsql\**" />
+    </ComponentGroup>
+
+    <Component Id="ZlsRegistration" Directory="MENUDIR">
+      <RegistryKey Root="HKLM" Key="SOFTWARE\Zentriq\LicenseServer">
+        <RegistryValue Name="DataFolder" Type="string" Value="[ZLSDATA]" KeyPath="yes" />
+        <RegistryValue Name="InstallFolder" Type="string" Value="[INSTALLFOLDER]" />
+        <RegistryValue Name="Version" Type="string" Value="$(var.ProductVersion)" />
+      </RegistryKey>
+      <util:InternetShortcut Id="PortalLink" Name="Zentriq License Portal" Target="http://localhost:5080/admin/" Type="url" />
+      <util:InternetShortcut Id="SetupLink" Name="Zentriq License Server setup" Target="http://localhost:5080/setup/" Type="url" />
+      <RemoveFolder Id="RemoveMenuDir" On="uninstall" />
+      <!-- Stop the services before files are replaced or removed (they are deleted by the uninstall step). -->
+      <ServiceControl Id="StopServer" Name="ZentriqLicenseServer" Stop="both" Wait="yes" />
+      <ServiceControl Id="StopDatabase" Name="ZentriqLicenseDb" Stop="both" Wait="yes" />
+    </Component>
+
+    <CustomAction Id="ZlsInstall" FileRef="ServerExe" ExeCommand="install --data &quot;[ZLSDATA]&quot; --version $(var.ProductVersion)" Execute="deferred" Impersonate="no" Return="check" />
+    <CustomAction Id="ZlsInstallRollback" FileRef="ServerExe" ExeCommand="uninstall" Execute="rollback" Impersonate="no" Return="ignore" />
+    <CustomAction Id="ZlsUninstall" FileRef="ServerExe" ExeCommand="uninstall" Execute="deferred" Impersonate="no" Return="ignore" />
+    <!-- Finish page: open the setup wizard in the browser (as the signed-in user). -->
+    <CustomAction Id="ZlsOpenSetup" Directory="INSTALLFOLDER" ExeCommand="&quot;[WindowsFolder]explorer.exe&quot; &quot;http://localhost:5080/setup/&quot;" Execute="immediate" Impersonate="yes" Return="asyncNoWait" />
+
+    <InstallExecuteSequence>
+      <Custom Action="ZlsUninstall" Before="RemoveFiles" Condition='REMOVE = "ALL"' />
+      <Custom Action="ZlsInstallRollback" After="InstallFiles" Condition='NOT (REMOVE = "ALL")' />
+      <Custom Action="ZlsInstall" After="ZlsInstallRollback" Condition='NOT (REMOVE = "ALL")' />
+    </InstallExecuteSequence>
+
+    <WixVariable Id="WixUILicenseRtf" Value="$(var.HereDir)License.rtf" />
+    <WixVariable Id="WixUIBannerBmp" Value="$(var.AssetsDir)\WixUIBanner.bmp" />
+    <WixVariable Id="WixUIDialogBmp" Value="$(var.AssetsDir)\WixUIDialog.bmp" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Open the setup wizard now" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALTEXT" Value="Finish the setup in the browser: owner account, signing key, its backup, and who can reach the server. Later: http://localhost:5080/setup on this server." />
+    <ui:WixUI Id="WixUI_Minimal" />
+    <UI>
+      <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="ZlsOpenSetup" Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed" />
+    </UI>
+  </Package>
+</Wix>

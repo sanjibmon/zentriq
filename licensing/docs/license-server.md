@@ -64,10 +64,10 @@ keys:
 
 | Practice | How |
 |---|---|
-| Generated where it is kept | `keygen` (or `zls setup`) creates it on the license server's own machine. It is never created on a build machine, emailed or uploaded. |
+| Generated where it is kept | The setup wizard (or `keygen`) creates it on the license server itself. It is never created on a build machine, emailed or uploaded. |
 | Strong algorithm | ECDSA P-256 with SHA-256 (ES256). |
 | Encrypted at rest | PKCS#8, AES-256-CBC, key derived with PBKDF2-HMAC-SHA256 and 600,000 iterations from a passphrase of 16+ characters. The file is readable only by its owner (Windows ACL / Unix mode 0600). |
-| Passphrase kept apart | Docker: a separate secret file. Local edition: protected for the Windows user with DPAPI (or asked at every start with `-NoStorePassphrase`). |
+| Passphrase kept apart | Kept in the data folder's `protected` folder, encrypted with Windows DPAPI for the server and readable only by administrators, SYSTEM and the license server service, so the service unlocks the key by itself after a restart. The key file itself is readable only by the service and SYSTEM. |
 | Identified and verifiable | Key id (`zentriq-prod-YYYY-MM`) and SHA-256 fingerprint of the public key, written to `<id>.ceremony.txt` and shown in the portal (*Settings › Signing key*). Confirm the fingerprint by a second channel when the public key is handed over. |
 | Only the public key travels | `<id>.product-entry.json` goes into `backend/Zentriq.Infrastructure/Resources/license-public-keys.json`; Zentriq trusts only keys compiled into the build. |
 | Self-tested | At every start the service signs a probe and verifies it with Zentriq's own verifier; a wrong key or passphrase stops the start with a clear message. |
@@ -84,51 +84,60 @@ that adds your production key.
 * **Portal accounts**: passphrase (12+ characters, ASP.NET Core Identity hashing), optional authenticator app
   (TOTP), lockout for 15 minutes after 5 failures, 8-hour sliding sessions in an HttpOnly, SameSite=Strict cookie,
   a custom request header on every change (CSRF), strict Content-Security-Policy. Owners manage accounts.
-* Public hosting: HTTPS only (the compose file uses Caddy with automatic certificates). The local edition listens on
-  `localhost` only.
+* Network: before the setup is finished, and in *this computer only* mode, the server listens on
+  `http://localhost:5080` only. In public mode it adds HTTPS on 443 (Let's Encrypt or your certificate, HSTS) and
+  HTTP on 80 only to validate the certificate and redirect to HTTPS. The setup wizard (`/setup`) answers on the
+  server itself only, and needs the owner signed in once the owner exists.
+* Services: the license server runs as its own virtual account (`NT SERVICE\ZentriqLicenseServer`), PostgreSQL as
+  NETWORK SERVICE on 127.0.0.1:5439 with a random password. The data folder is closed to everyone except
+  administrators, SYSTEM and these services.
 
-## Local edition for Windows (test before going public)
+## Install (Windows Server)
 
-Release asset `Zentriq-LicenseServer-Local-win-x64-<version>.zip`: the license server (self-contained, no .NET
-install needed), a portable PostgreSQL 17 (EnterpriseDB binaries) and `zls.cmd`. Nothing is installed; everything it
-creates is in the folder's `data` subfolder. PostgreSQL listens on 127.0.0.1:5439, the server on
-`http://localhost:5080`.
+The release asset **`Zentriq-LicenseServer-Setup-<version>.msi`** is everything: the license server, its own
+PostgreSQL 17 and the setup wizard. Use it the same way for testing on your PC and for the public server.
 
-1. Unpack to a folder you control, e.g. `C:\ZentriqLicense`.
-2. `zls setup`: database (its password kept with DPAPI), **key ceremony** (asks for the signing key passphrase),
-   owner account of the portal (asks for your email and a portal passphrase). Prints the key id and fingerprint.
-3. `zls start` opens `http://localhost:5080/admin` (`zls start -Background` returns to the prompt; `zls stop`).
-4. Generate licenses: *Customers › New customer*; *Licenses › New license*; on the license, *Offline activation*
-   (attach a real activation request from a Zentriq server, or tick *test file*); *Verify file* shows exactly what
-   was signed and checks the signature as Zentriq does.
-5. Back up `data\keys\<id>.private.pem` offline; send only `data\keys\<id>.product-entry.json` to have Zentriq
-   built with your key.
+1. **Run the Setup** as an administrator (Windows Server 2016 or later, or Windows 10/11 for testing). It installs to
+   `C:\Program Files\Zentriq License Server`, creates the database and two Windows services that start with
+   Windows (*Zentriq License Server* and *Zentriq License Server database*), and opens the setup wizard.
+2. **Setup wizard** (`http://localhost:5080/setup`, on the server itself):
+   1. *Owner account* of the license portal: your email and a passphrase (12+ characters).
+   2. *Signing key*: **Create a new key** (key ceremony: choose a passphrase of 16+ characters, e.g. five random
+      words) or **Use a key I created before** (the `.private.pem` from the earlier local edition, with its passphrase).
+   3. *Back up the key and send the public key*: download the encrypted key backup and keep it in two offline
+      places (passphrase stored separately); download `<key id>.product-entry.json` and send only that to have
+      Zentriq built with your key; confirm the fingerprint by phone. Tick *I have stored the key backup*.
+   4. *Who can reach the server*: **This computer only** (testing, `http://localhost:5080`), or **Customers over the
+      internet**: the server's name (`license.zentriq.com`; its DNS record must point to the server, ports 80 and
+      443 open to it) and either a **free certificate obtained and renewed automatically** (Let's Encrypt; accept
+      their subscriber agreement, give an email) or **your certificate** (.pfx with its private key). Saving
+      restarts the service by itself to apply it (a few seconds).
+   5. *Finish* opens the license portal (`/admin`).
+3. In the portal: turn on the authenticator app (*Settings*), add the other portal accounts, then customers and
+   licenses.
 
-Other commands: `zls status`, `zls backup` (database dump into `data\backups`), `zls key-info`.
+Nothing else is needed: after a reboot both services start and the key is unlocked automatically. The wizard stays
+available at `http://localhost:5080/setup` on the server (owner sign-in) to change who can reach the server or to
+back up the database at once. Start-menu shortcuts: *Zentriq License Portal* and *Zentriq License Server setup*.
 
-Once Zentriq trusts your key, a Zentriq server on the **same computer** can activate online against the local
-server: *Licensing › License server* `http://localhost:5080` (plain http is accepted only for localhost), then
-*Activate online*. Any Zentriq server can use the files from *Offline activation*.
+| | |
+|---|---|
+| Program | `C:\Program Files\Zentriq License Server` (`server`, `pgsql`) |
+| Data (kept on uninstall) | `C:\ProgramData\Zentriq\LicenseServer`: `pg` database, `keys` signing key, `protected` passphrases (DPAPI), `certs`, `logs` (server and install logs, 30 days), `backups`, `config.json` (wizard settings) |
+| Database backups | Daily, automatically, into `backups` (newest 14 kept); *Back up the database now* in the wizard. Copy them off the server regularly; the signing key is backed up separately (step 3). |
+| Upgrade | Run the newer Setup: services stopped, files replaced, database migrated, services started; settings and key kept. |
+| Uninstall | *Settings › Apps*: removes the program, services and firewall rule; the data folder stays, so installing again continues with the same key, licenses and settings. |
+| Silent install | `msiexec /i Zentriq-LicenseServer-Setup-<version>.msi /qn`, then the wizard at `http://localhost:5080/setup`. |
 
-## Deploy (Docker, public)
+Testing with a Zentriq server on the **same computer** (once Zentriq trusts your key): *Licensing › License server*
+`http://localhost:5080` (plain http is accepted only for localhost), then *Activate online*. Any Zentriq server can use
+the files from *Offline activation*.
 
-From `licensing/`:
-
-1. Create the signing key once, on the host:
-   `docker compose run --rm --no-deps -it license keygen --out /keys` (asks for the passphrase). Copy
-   `keys/<id>.private.pem` to `secrets/signing.pem` and the passphrase (one line) to `secrets/signing.passphrase`;
-   store an offline backup; send `keys/<id>.product-entry.json` for the Zentriq build. To move the key created with
-   the local edition instead, copy its `.private.pem` and passphrase the same way and keep the same key id.
-2. Copy `env.example` to `.env`; set `ZLS_HOSTNAME` (`license.zentriq.com`; DNS must point to the host),
-   `ZLS_DB_PASSWORD`, `ZLS_KEY_ID`, and for the first start `ZLS_BOOTSTRAP_EMAIL` and `ZLS_ADMIN_PASSPHRASE` (the owner
-   account; remove them afterwards).
-3. `docker compose up -d`. The database schema is created and migrated automatically at start-up.
-4. Sign in at `https://<host>/admin`, turn on the authenticator app, add the other portal accounts.
-
-Without Docker: publish `Zentriq.LicenseServer`, set `ConnectionStrings__LicenseServer`, the `LicenseServer__*`
-settings and `ZLS_SIGNING_PASSPHRASE`, and run it. Commands: `serve` (default), `migrate`, `keygen --out <dir>
-[--key-id <id>]`, `key-info`, `create-admin --email <e> --name <n>` (portal passphrase from `ZLS_ADMIN_PASSPHRASE` or
-standard input).
+Command line (`server\Zentriq.LicenseServer.exe`, as administrator): `create-admin --data
+"C:\ProgramData\Zentriq\LicenseServer" --email <e>` adds an owner if every owner account is lost (passphrase from
+`ZLS_ADMIN_PASSPHRASE` or typed); `install` / `uninstall` are what the Setup runs. The key id and fingerprint are shown in
+the wizard and in the portal (*Settings › Signing key*). Settings for a server run without the Setup (development and
+tests):
 
 ### Settings
 
@@ -141,12 +150,12 @@ standard input).
 | `LicenseServer:PublicUrl` | `https://license.zentriq.com` | Public address |
 | `LicenseServer:LeaseDays` | 30 | Online lease length |
 | `LicenseServer:RequestsPerMinute` | 30 | Public API rate limit per address |
-| `LicenseServer:TrustAllProxies` | false | Trust X-Forwarded-For/Proto from any proxy (set in the compose file) |
+| `LicenseServer:TrustAllProxies` | false | Trust X-Forwarded-For/Proto from any proxy (only behind your own reverse proxy) |
 
 ### Backup
 
-Back up the PostgreSQL database (`pg_dump zentriq_license`) daily and the signing key once (offline). Losing the
-database loses the key fingerprints: customers' installed licenses keep working, but online check-ins and new
+The installed server backs up its database daily (see *Install*); copy `backups` off the server regularly, and keep
+the signing key backup offline (wizard step 3). Losing the database loses the key fingerprints: customers' installed licenses keep working, but online check-ins and new
 activations need the licenses to be re-created.
 
 ## Tests
@@ -158,6 +167,12 @@ perpetual support extension, subscription renewal and new keys, the portal's fil
 and the key ceremony (encryption, wrong passphrase, no overwrite, weak passphrases). Every issued file is verified with
 the product's own `LicenseVerifier`.
 
-`tests/license-server/Test-LocalLicenseServer.ps1` (windows-release) unpacks the local edition and runs it under
-Windows PowerShell 5.1: setup and key ceremony, start, sign-in, subscription and perpetual licenses, offline and online
-activation, a support extension arriving by check-in, tamper detection, backup and stop.
+`SetupWizardTests` (same project): the installed mode before and after the wizard — portal sent to the wizard until it
+is finished, owner first, key created or imported and never replaced, backup confirmation, address settings and
+certificate checks, automatic key unlock at the next start.
+
+`tests/license-server/Test-LicenseServerSetup.ps1` (license-server workflow, Windows): silent install, services and
+their accounts, loopback-only listeners, data folder permissions, the wizard, subscription / perpetual / license-file
+activation, restart of both services with automatic unlock, public mode with a certificate (the service restarts itself,
+HTTPS with that certificate, HTTP redirect, wizard not reachable from the network), daily backup, uninstall keeping the
+data and reinstall.

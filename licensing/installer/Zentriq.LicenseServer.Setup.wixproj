@@ -1,0 +1,20 @@
+<Project Sdk="WixToolset.Sdk/5.0.2">
+  <!-- Zentriq License Server Setup (per-machine, x64): the server, its own PostgreSQL, two Windows services and the
+       browser setup wizard. Built by Build-Setup.ps1, which stages the files first. Vendor-hosted; never given to customers. -->
+  <PropertyGroup>
+    <OutputName>Zentriq-LicenseServer-Setup</OutputName>
+    <OutputType>Package</OutputType>
+    <Platform Condition="'$(Platform)' == ''">x64</Platform>
+    <InstallerPlatform>x64</InstallerPlatform>
+    <Cultures>en-US</Cultures>
+    <ProductVersion Condition="'$(ProductVersion)' == ''">1.1.0</ProductVersion>
+    <StageDir Condition="'$(StageDir)' == ''">$(MSBuildThisFileDirectory)stage</StageDir>
+    <AssetsDir>$(MSBuildThisFileDirectory)..\..\installer\assets</AssetsDir>
+    <DefineConstants>ProductVersion=$(ProductVersion);StageDir=$(StageDir);AssetsDir=$(AssetsDir);HereDir=$(MSBuildThisFileDirectory)</DefineConstants>
+    <IntermediateOutputPath>$(MSBuildThisFileDirectory)obj\</IntermediateOutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="WixToolset.UI.wixext" Version="5.0.2" />
+    <PackageReference Include="WixToolset.Util.wixext" Version="5.0.2" />
+  </ItemGroup>
+</Project>
