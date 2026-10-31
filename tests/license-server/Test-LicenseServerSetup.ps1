@@ -11,6 +11,7 @@ param(
     [string] $LogDir = (Join-Path $env:RUNNER_TEMP 'zls-setup-logs')
 )
 $ErrorActionPreference = 'Stop'
+$Msi = [IO.Path]::GetFullPath($Msi)   # msiexec needs backslashes
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 $results = [System.Collections.Generic.List[object]]::new()
 function Check([string] $Id, [string] $Name, [scriptblock] $Body) {
