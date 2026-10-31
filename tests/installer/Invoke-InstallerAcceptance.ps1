@@ -2357,7 +2357,7 @@ dpkg-deb --build /tmp/zqdummy /tmp/zq-ci-dummy.deb >/dev/null && dpkg -i /tmp/zq
                 $deadline = (Get-Date).AddMinutes(2)
                 do { Start-Sleep 5; $p = Wsl 'zentriq-agent --protection' } while ($p -notmatch 'Tamper protection: on' -and (Get-Date) -lt $deadline)
                 Assert ($p -match 'Tamper protection: on') "protection: $p"
-                $refused = Wsl 'apt-get remove -y zentriq-agent >/tmp/rm.log 2>&1 && echo REMOVED || echo REFUSED; tail -3 /tmp/rm.log'
+                $refused = Wsl 'apt-get remove -y zentriq-agent >/tmp/rm.log 2>&1 && echo REMOVED || echo REFUSED; grep -m1 "is protected" /tmp/rm.log || tail -5 /tmp/rm.log'
                 Assert ($refused -match 'REFUSED' -and $refused -match 'protected') "removal without a code: $refused"
                 $code = Api POST '/agents/uninstall-code' @{} -Session $s
                 $deadline = (Get-Date).AddMinutes(2)
