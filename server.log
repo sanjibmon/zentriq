@@ -1,0 +1,10 @@
+info: Zentriq.LicenseServer[0]
+      Signing key zentriq-test-local loaded and self-tested. Fingerprint SHA256:FA:28:D9:0B:6F:9F:17:26:47:3A:B4:4C:ED:3E:96:E7:D2:5F:EF:53:61:85:92:38:4D:82:F9:43:51:01:EE:42
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:5080
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Production
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: D:\a\_temp\zls-local-test\ZentriqLicenseServer\server
