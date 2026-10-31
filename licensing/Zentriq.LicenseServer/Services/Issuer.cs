@@ -49,8 +49,12 @@ public sealed class SigningKey : IDisposable
 }
 
 /// <summary>Builds and signs license files for activations, and records every issued file.</summary>
-public sealed class LicenseIssuer(SigningKey key, LicenseServerOptions options, TimeProvider time)
+public sealed class LicenseIssuer(SigningKeyHolder keys, LicenseServerOptions options, TimeProvider time)
 {
+    public LicenseIssuer(SigningKey key, LicenseServerOptions options, TimeProvider time) : this(new SigningKeyHolder(key), options, time) { }
+
+    private SigningKey key => keys.Require();
+
     public DateTimeOffset Now => time.GetUtcNow();
 
     public LicensePayload Payload(License l, Customer c, Guid installationId, Guid? requestId, string activation, DateTimeOffset now)

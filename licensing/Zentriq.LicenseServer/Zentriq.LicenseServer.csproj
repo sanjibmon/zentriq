@@ -18,6 +18,10 @@
     <PackageReference Include="Npgsql" />
     <PackageReference Include="Microsoft.Extensions.Identity.Core" />
     <PackageReference Include="QRCoder" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" />
+    <PackageReference Include="System.ServiceProcess.ServiceController" />
+    <PackageReference Include="LettuceEncrypt" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Migrations\*.sql" />

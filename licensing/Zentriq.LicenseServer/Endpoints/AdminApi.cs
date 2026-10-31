@@ -113,7 +113,10 @@ public static class AdminApi
 
         // ---- catalog / dashboard --------------------------------------------------------------------------------
 
-        g.MapGet("/catalog", (SigningKey key, LicenseServerOptions o) => Results.Ok(new
+        g.MapGet("/catalog", (SigningKeyHolder keys, LicenseServerOptions o) =>
+        {
+            var key = keys.Require();
+            return Results.Ok(new
         {
             editions = Catalog.Editions.Select(e => new { id = e, title = Editions.Title(e), modules = Editions.ModulesOf(e) }),
             modules = Modules.All.OrderBy(m => m),
@@ -122,7 +125,8 @@ public static class AdminApi
             signing = new { key.KeyId, key.PublicPem, key.Fingerprint },
             productKeyEntry = new { keyId = key.KeyId, publicKeyPem = key.PublicPem, notAfter = (string?)null, revoked = false },
             publicUrl = o.PublicUrl, leaseDays = o.LeaseDays,
-        }));
+        });
+        });
 
         g.MapGet("/dashboard", async (NpgsqlDataSource ds, TimeProvider time, CancellationToken ct) =>
         {
@@ -359,8 +363,9 @@ public static class AdminApi
         });
 
         // Checks a license file exactly as Zentriq does (signature first, then content), against this server's signing key.
-        g.MapPost("/verify", (VerifyBody body, SigningKey key, TimeProvider time) =>
+        g.MapPost("/verify", (VerifyBody body, SigningKeyHolder keys, TimeProvider time) =>
         {
+            var key = keys.Require();
             var doc = body.Document?.Trim() ?? "";
             if (doc.Length == 0) return Bad("document", "Choose a license file (.zlic).");
             Guid installation = Guid.Empty; string? keyId = null; JsonElement? payload = null;

@@ -128,6 +128,42 @@ public static class KeyCeremony
         return new(keyId, fp, priv, pub, entryFile, record);
     }
 
+    /// <summary>
+    /// Takes over a key created earlier (for example with an earlier edition, or on another machine during a
+    /// move): it must be encrypted and open with <paramref name="passphrase"/>; it is self-tested and written like a
+    /// new key, with its public key, product entry and a ceremony record.
+    /// </summary>
+    public static Ceremony Import(string dir, string keyId, string encryptedPem, string passphrase)
+    {
+        if (!System.Text.RegularExpressions.Regex.IsMatch(keyId, "^[a-z0-9][a-z0-9-]{2,62}$")) throw new InvalidOperationException("Key ids use lower-case letters, digits and hyphens, e.g. zentriq-prod-2026-10.");
+        if (!encryptedPem.Contains("-----BEGIN ENCRYPTED PRIVATE KEY-----", StringComparison.Ordinal)) throw new InvalidOperationException("Choose the encrypted private key file (<key id>.private.pem).");
+        using var key = Load(encryptedPem, passphrase, false);
+        SelfTest(key, keyId);
+        Directory.CreateDirectory(dir);
+        var priv = Path.Combine(dir, keyId + ".private.pem");
+        if (File.Exists(priv)) throw new InvalidOperationException($"{priv} exists; a signing key is never overwritten.");
+        WriteOwnerOnly(priv, encryptedPem.Trim() + "\n");
+        var publicPem = key.ExportSubjectPublicKeyInfoPem();
+        var fp = Fingerprint(key);
+        var pub = Path.Combine(dir, keyId + ".public.pem");
+        File.WriteAllText(pub, publicPem);
+        var entryFile = Path.Combine(dir, keyId + ".product-entry.json");
+        File.WriteAllText(entryFile, ProductEntry(keyId, publicPem));
+        var record = Path.Combine(dir, keyId + ".ceremony.txt");
+        File.WriteAllText(record, $"""
+            Zentriq license signing key — imported
+            ======================================
+            Key id:        {keyId}
+            Fingerprint:   {fp}
+            Imported (UTC): {DateTimeOffset.UtcNow:yyyy-MM-dd HH:mm:ss} on {Environment.MachineName}
+            The key was created earlier; keep its existing offline backups. Zentriq trusts it under this key id.
+            """);
+        return new(keyId, fp, priv, pub, entryFile, record);
+    }
+
+    public static string ProductEntry(string keyId, string publicPem) =>
+        JsonSerializer.Serialize(new { keyId, publicKeyPem = publicPem, notAfter = (string?)null, revoked = false }, new JsonSerializerOptions { WriteIndented = true });
+
     private static void WriteOwnerOnly(string path, string content)
     {
         if (OperatingSystem.IsWindows())
