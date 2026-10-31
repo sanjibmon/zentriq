@@ -1,0 +1,49 @@
+==== mode 5
+sc stop #1 exit 0 : SERVICE_NAME: ZqScmExp TYPE : 10 WIN32_OWN_PROCESS STATE : 4 RUNNING (STOPPABLE, NOT_PAUSABLE, ACCEPTS_SHUTDOWN) WIN32_EXIT_CODE : 0 (0x0) SERVICE_EXIT_CODE : 0 (0x0) CHECKPOINT : 0x0 WAIT_HINT : 0x0
+  query: STATE 4 RUNNING (STOPPABLE, NOT_PAUSABLE, ACCEPTS_SHUTDOWN) WIN32_EXIT_CODE : 0 (0x0) SERVICE_EXIT_CODE : 0 (0x0) CHECKP
+sc stop #2 exit 1061 : [SC] ControlService FAILED 1061: The service cannot accept control messages at this time.
+  query: STATE 4 RUNNING (STOPPABLE, NOT_PAUSABLE, ACCEPTS_SHUTDOWN) WIN32_EXIT_CODE : 0 (0x0) SERVICE_EXIT_CODE : 0 (0x0) CHECKP
+sc stop #3 exit 1061 : [SC] ControlService FAILED 1061: The service cannot accept control messages at this time.
+  query: STATE 4 RUNNING (STOPPABLE, NOT_PAUSABLE, ACCEPTS_SHUTDOWN) WIN32_EXIT_CODE : 0 (0x0) SERVICE_EXIT_CODE : 0 (0x0) CHECKP
+sc stop #4 exit 1061 : [SC] ControlService FAILED 1061: The service cannot accept control messages at this time.
+  query: STATE 4 RUNNING (STOPPABLE, NOT_PAUSABLE, ACCEPTS_SHUTDOWN) WIN32_EXIT_CODE : 0 (0x0) SERVICE_EXIT_CODE : 0 (0x0) CHECKP
+  log: 12:19:11.752 SetServiceStatus state=4 ok=True
+  log: 12:19:11.752 running, mode 5
+  log: 12:19:13.771 stop #1 declined with 5
+==== mode 1061
+sc stop #1 exit 0 : SERVICE_NAME: ZqScmExp TYPE : 10 WIN32_OWN_PROCESS STATE : 4 RUNNING (STOPPABLE, NOT_PAUSABLE, ACCEPTS_SHUTDOWN) WIN32_EXIT_CODE : 0 (0x0) SERVICE_EXIT_CODE : 0 (0x0) CHECKPOINT : 0x0 WAIT_HINT : 0x0
+  query: STATE 4 RUNNING (STOPPABLE, NOT_PAUSABLE, ACCEPTS_SHUTDOWN) WIN32_EXIT_CODE : 0 (0x0) SERVICE_EXIT_CODE : 0 (0x0) CHECKP
+sc stop #2 exit 1061 : [SC] ControlService FAILED 1061: The service cannot accept control messages at this time.
+  query: STATE 4 RUNNING (STOPPABLE, NOT_PAUSABLE, ACCEPTS_SHUTDOWN) WIN32_EXIT_CODE : 0 (0x0) SERVICE_EXIT_CODE : 0 (0x0) CHECKP
+sc stop #3 exit 1061 : [SC] ControlService FAILED 1061: The service cannot accept control messages at this time.
+  query: STATE 4 RUNNING (STOPPABLE, NOT_PAUSABLE, ACCEPTS_SHUTDOWN) WIN32_EXIT_CODE : 0 (0x0) SERVICE_EXIT_CODE : 0 (0x0) CHECKP
+sc stop #4 exit 1061 : [SC] ControlService FAILED 1061: The service cannot accept control messages at this time.
+  query: STATE 4 RUNNING (STOPPABLE, NOT_PAUSABLE, ACCEPTS_SHUTDOWN) WIN32_EXIT_CODE : 0 (0x0) SERVICE_EXIT_CODE : 0 (0x0) CHECKP
+  log: 12:19:25.911 SetServiceStatus state=4 ok=True
+  log: 12:19:25.911 running, mode 1061
+  log: 12:19:27.914 stop #1 declined with 1061
+==== mode 0
+sc stop #1 exit 0 : SERVICE_NAME: ZqScmExp TYPE : 10 WIN32_OWN_PROCESS STATE : 4 RUNNING (STOPPABLE, NOT_PAUSABLE, ACCEPTS_SHUTDOWN) WIN32_EXIT_CODE : 0 (0x0) SERVICE_EXIT_CODE : 0 (0x0) CHECKPOINT : 0x0 WAIT_HINT : 0x0
+  query: STATE 4 RUNNING (STOPPABLE, NOT_PAUSABLE, ACCEPTS_SHUTDOWN) WIN32_EXIT_CODE : 0 (0x0) SERVICE_EXIT_CODE : 0 (0x0) CHECKP
+sc stop #2 exit 1061 : [SC] ControlService FAILED 1061: The service cannot accept control messages at this time.
+  query: STATE 4 RUNNING (STOPPABLE, NOT_PAUSABLE, ACCEPTS_SHUTDOWN) WIN32_EXIT_CODE : 0 (0x0) SERVICE_EXIT_CODE : 0 (0x0) CHECKP
+sc stop #3 exit 1061 : [SC] ControlService FAILED 1061: The service cannot accept control messages at this time.
+  query: STATE 4 RUNNING (STOPPABLE, NOT_PAUSABLE, ACCEPTS_SHUTDOWN) WIN32_EXIT_CODE : 0 (0x0) SERVICE_EXIT_CODE : 0 (0x0) CHECKP
+sc stop #4 exit 1061 : [SC] ControlService FAILED 1061: The service cannot accept control messages at this time.
+  query: STATE 4 RUNNING (STOPPABLE, NOT_PAUSABLE, ACCEPTS_SHUTDOWN) WIN32_EXIT_CODE : 0 (0x0) SERVICE_EXIT_CODE : 0 (0x0) CHECKP
+  log: 12:19:40.041 SetServiceStatus state=4 ok=True
+  log: 12:19:40.041 running, mode 0
+  log: 12:19:42.043 stop #1 declined with 0
+  log: 12:19:42.043 SetServiceStatus state=4 ok=True
+==== mode 120
+sc stop #1 exit 0 : SERVICE_NAME: ZqScmExp TYPE : 10 WIN32_OWN_PROCESS STATE : 4 RUNNING (STOPPABLE, NOT_PAUSABLE, ACCEPTS_SHUTDOWN) WIN32_EXIT_CODE : 0 (0x0) SERVICE_EXIT_CODE : 0 (0x0) CHECKPOINT : 0x0 WAIT_HINT : 0x0
+  query: STATE 4 RUNNING (STOPPABLE, NOT_PAUSABLE, ACCEPTS_SHUTDOWN) WIN32_EXIT_CODE : 0 (0x0) SERVICE_EXIT_CODE : 0 (0x0) CHECKP
+sc stop #2 exit 1061 : [SC] ControlService FAILED 1061: The service cannot accept control messages at this time.
+  query: STATE 4 RUNNING (STOPPABLE, NOT_PAUSABLE, ACCEPTS_SHUTDOWN) WIN32_EXIT_CODE : 0 (0x0) SERVICE_EXIT_CODE : 0 (0x0) CHECKP
+sc stop #3 exit 1061 : [SC] ControlService FAILED 1061: The service cannot accept control messages at this time.
+  query: STATE 4 RUNNING (STOPPABLE, NOT_PAUSABLE, ACCEPTS_SHUTDOWN) WIN32_EXIT_CODE : 0 (0x0) SERVICE_EXIT_CODE : 0 (0x0) CHECKP
+sc stop #4 exit 1061 : [SC] ControlService FAILED 1061: The service cannot accept control messages at this time.
+  query: STATE 4 RUNNING (STOPPABLE, NOT_PAUSABLE, ACCEPTS_SHUTDOWN) WIN32_EXIT_CODE : 0 (0x0) SERVICE_EXIT_CODE : 0 (0x0) CHECKP
+  log: 12:19:54.157 SetServiceStatus state=4 ok=True
+  log: 12:19:54.157 running, mode 120
+  log: 12:19:56.162 stop #1 declined with 120
