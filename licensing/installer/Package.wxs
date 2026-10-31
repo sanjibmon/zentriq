@@ -34,7 +34,6 @@
 
     <Icon Id="ZlsIcon" SourceFile="$(var.AssetsDir)\zentriq.ico" />
     <Property Id="ARPPRODUCTICON" Value="ZlsIcon" />
-    <Property Id="ARPNOMODIFY" Value="1" />
     <!-- Service processes are stopped by the services' own steps; no Restart Manager prompt. -->
     <Property Id="MSIRESTARTMANAGERCONTROL" Value="Disable" />
 
