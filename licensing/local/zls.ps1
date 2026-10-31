@@ -53,14 +53,19 @@ function Plain([Security.SecureString] $s) {
     try { [Runtime.InteropServices.Marshal]::PtrToStringBSTR($b) } finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($b) }
 }
 # DPAPI (current Windows user): the value can be read back only by this user on this computer.
+# Windows DPAPI through .NET directly (no dependency on the PowerShell security module).
+try { Add-Type -AssemblyName System.Security -ErrorAction Stop } catch { }
+$Entropy = [Text.Encoding]::UTF8.GetBytes('Zentriq License Server local edition')
 function Protect-Value([string] $Name, [string] $Value) {
     New-Item -ItemType Directory -Force -Path $Vault | Out-Null
-    ConvertTo-SecureString $Value -AsPlainText -Force | ConvertFrom-SecureString | Set-Content (Join-Path $Vault "$Name.dpapi") -Encoding ascii
+    $enc = [Security.Cryptography.ProtectedData]::Protect([Text.Encoding]::UTF8.GetBytes($Value), $Entropy, [Security.Cryptography.DataProtectionScope]::CurrentUser)
+    Set-Content (Join-Path $Vault "$Name.dpapi") ([Convert]::ToBase64String($enc)) -Encoding ascii
 }
 function Unprotect-Value([string] $Name) {
     $f = Join-Path $Vault "$Name.dpapi"
     if (-not (Test-Path $f)) { return $null }
-    return Plain (ConvertTo-SecureString ((Get-Content $f -Raw).Trim()))
+    $dec = [Security.Cryptography.ProtectedData]::Unprotect([Convert]::FromBase64String((Get-Content $f -Raw).Trim()), $Entropy, [Security.Cryptography.DataProtectionScope]::CurrentUser)
+    return [Text.Encoding]::UTF8.GetString($dec)
 }
 function New-RandomSecret {
     $bytes = New-Object byte[] 24
@@ -146,7 +151,7 @@ function Invoke-Setup {
         Protect-Value 'database' $dbPw
         Start-Pg
         $env:PGPASSWORD = $dbPw
-        try { & (Join-Path $PgBin 'createdb.exe') -h 127.0.0.1 -p $PgPort -U $DbUser $DbName; if ($LASTEXITCODE -ne 0) { Fail 'createdb failed' } }
+        try { & (Join-Path $PgBin 'createdb.exe') -w -h 127.0.0.1 -p $PgPort -U $DbUser $DbName; if ($LASTEXITCODE -ne 0) { Fail 'createdb failed' } }
         finally { Remove-Item Env:\PGPASSWORD -ErrorAction SilentlyContinue }
     } else { Say '1/4  Database cluster exists.' Cyan; Start-Pg }
     $cs = Get-ConnectionString
@@ -241,7 +246,8 @@ function Invoke-Backup {
     $dir = Join-Path $Data 'backups'; New-Item -ItemType Directory -Force -Path $dir | Out-Null
     $file = Join-Path $dir ("$DbName-" + (Get-Date).ToString('yyyyMMdd-HHmmss') + '.dump')
     $env:PGPASSWORD = Unprotect-Value 'database'
-    try { & (Join-Path $PgBin 'pg_dump.exe') -h 127.0.0.1 -p $PgPort -U $DbUser -Fc -f $file $DbName; if ($LASTEXITCODE -ne 0) { Fail 'pg_dump failed' } }
+    if (-not $env:PGPASSWORD) { Fail 'The database is not set up. Run: .\zls.cmd setup' }
+    try { & (Join-Path $PgBin 'pg_dump.exe') -w -h 127.0.0.1 -p $PgPort -U $DbUser -Fc -f $file $DbName; if ($LASTEXITCODE -ne 0) { Fail 'pg_dump failed' } }
     finally { Remove-Item Env:\PGPASSWORD -ErrorAction SilentlyContinue }
     Say "Database backup: $file" Green
     Say 'The signing key is not in this backup: keep data\keys\*.private.pem backed up offline, its passphrase separately.'

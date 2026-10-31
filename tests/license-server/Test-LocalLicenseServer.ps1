@@ -25,8 +25,10 @@ $zls = Join-Path $root 'zls.ps1'
 function Zls([string[]] $Arguments, [int] $TimeoutSeconds = 300) {
     # Output into files and a time limit: a process left holding a pipe can never stall the run.
     $o = New-TemporaryFile; $e = New-TemporaryFile
+    $savedPath = $env:PSModulePath; $env:PSModulePath = $null   # as zls.cmd does: 5.1 with its own module path
     $p = Start-Process powershell.exe -PassThru -WindowStyle Hidden -RedirectStandardOutput $o.FullName -RedirectStandardError $e.FullName `
         -ArgumentList (@('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$zls`"") + $Arguments)
+    $env:PSModulePath = $savedPath
     $null = $p.Handle   # keeps the exit code available after exit
     $done = $p.WaitForExit($TimeoutSeconds * 1000)
     $out = (Get-Content $o.FullName -Raw) + (Get-Content $e.FullName -Raw)
