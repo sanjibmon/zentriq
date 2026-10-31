@@ -5,6 +5,23 @@ Latest: GitHub Actions run 41205117265, workflow `windows-release`, on a GitHub-
 PostgreSQL integration tests **352 PASS, 2 skipped** (ci-quick: 354/354); installer acceptance **71 passed, 0 failed**;
 in-place updates PASS (schema 31).
 
+**License server** (separate product, workflow `license-server`): release `license-server-v1.1.0-build.13`,
+`Zentriq-LicenseServer-Setup-1.1.13.msi` (SHA256 `ebabe8222cc0570a87373f44274bd7c06320e54932079fbd4483b98179215f68`).
+One Setup for Windows Server instead of the zip and command prompt: it installs the server and its own PostgreSQL as two
+Windows services and opens a browser setup wizard (owner, signing key created or imported, key backup and product
+entry, who can reach the server: this computer only, or HTTPS with Let's Encrypt or your certificate). The key unlocks
+by itself after a restart; daily database backups. Tests: 14/14 (Linux, incl. the wizard), Windows Setup test 7/7.
+
+| ID | Test (license server Setup, Windows Server 2022) | Result |
+|---|---|---|
+| S01 | Silent install: services (server as its own virtual account), loopback-only listeners, portal leads to the wizard, data folder closed | **PASS** |
+| S02 | Wizard: owner, key ceremony, product entry, encrypted backup, finish only after the backup is confirmed | **PASS** |
+| S03 | Subscription offline file, perpetual online + check-in, customer license file bound online, tampering rejected | **PASS** |
+| S04 | Both services stopped and the server started: database starts as dependency, key unlocked without a prompt | **PASS** |
+| S05 | Public mode with own certificate: service restarts itself, HTTPS with that certificate, wizard 404 from the network, port taken by another program reported (server keeps running), back to local | **PASS** |
+| S06 | Daily and on-demand database backups | **PASS** |
+| S07 | Uninstall keeps the data; reinstall continues with the same key and licenses | **PASS** |
+
 New in build 99 (builds 96-98 did not pass acceptance and were not released):
 
 * **IT accessories: add categories.** The category field offers *+ Add category…*; the *Categories* button adds,
