@@ -602,19 +602,24 @@ if (-not $installed) {
                     $line = $r.ReadLine(); $p.Dispose()
                     $line | ConvertFrom-Json
                 }
-                # Stop request without a code (as Stop in the Services console): held, then refused; with the code: stops.
-                function StopRequest([string] $Code) {
-                    & sc.exe stop ZentriqAgent | Out-Null
+                # Stop request (as Stop / Restart in the Services console): declined at once, the code dialog opens; with the
+                # code (what the dialog sends over the local pipe) the agent stops or restarts itself.
+                function StopRequest([string] $Code, [switch] $Restart) {
+                    $out = (& sc.exe stop ZentriqAgent 2>&1) -join ' '
+                    Assert ($LASTEXITCODE -ne 0) "sc stop was not declined: $out"
                     Start-Sleep 3
-                    $st = (Get-Service ZentriqAgent).Status
-                    if ($st -eq 'StopPending') {
-                        $script:dialogs = @(Get-CimInstance Win32_Process -Filter "Name='ZentriqAgent.exe'" | Where-Object CommandLine -match '--stop-prompt').Count
-                        $bad = PipeSend 'authorize-stop' 'ABCD-EFGH-JKMN-PQRS'
-                        Assert (-not $bad.ok) 'a wrong code was accepted in the stop dialog'
-                        if ($Code) { $ok = PipeSend 'authorize-stop' $Code; Assert ($ok.ok) "code refused in the stop dialog: $($ok.message)" }
-                        else { PipeSend 'cancel-stop' $null | Out-Null }
-                    }
-                    return $st
+                    Assert ((Get-Service ZentriqAgent).Status -eq 'Running') "service not running after a declined stop: $((Get-Service ZentriqAgent).Status)"
+                    $script:dialogs = @(Get-CimInstance Win32_Process -Filter "Name='ZentriqAgent.exe'" | Where-Object CommandLine -match '--stop-prompt').Count
+                    $bad = PipeSend 'authorize-stop' 'ABCD-EFGH-JKMN-PQRS'
+                    Assert (-not $bad.ok) 'a wrong code was accepted in the stop dialog'
+                    if ($Code) {
+                        $p = New-Object System.IO.Pipes.NamedPipeClientStream('.', 'ZentriqAgentControl', [System.IO.Pipes.PipeDirection]::InOut); $p.Connect(5000)
+                        $w = New-Object System.IO.StreamWriter($p); $w.AutoFlush = $true; $r = New-Object System.IO.StreamReader($p)
+                        $w.WriteLine((@{ action = 'authorize-stop'; code = $Code; restart = [bool]$Restart } | ConvertTo-Json -Compress))
+                        $ok = $r.ReadLine() | ConvertFrom-Json; $p.Dispose()
+                        Assert ($ok.ok) "code refused in the stop dialog: $($ok.message)"
+                    } else { PipeSend 'cancel-stop' $null | Out-Null }
+                    return ($out -replace '\s+', ' ').Trim()
                 }
                 # Wait for the agent to have applied tamper protection (registry key read-only for administrators).
                 WaitFor { Refused { Set-ItemProperty $svcKey -Name Description -Value 'x' -ErrorAction Stop } } 180 'service registry key still writable for administrators'
@@ -622,7 +627,7 @@ if (-not $installed) {
                 # Stop without a code: the request is held (dialog on an administrator's desktop) or refused; it keeps running.
                 $first = StopRequest $null
                 WaitFor { (Get-Service ZentriqAgent).Status -eq 'Running' } 60 'the agent did not keep running after a stop request without a code'
-                $script:stopNoCode = "stop request without a code: $first, then Running"
+                $script:stopNoCode = "stop without a code declined ($first), still running"
                 & sc.exe config ZentriqAgent start= disabled | Out-Null
                 Assert ((Svc).StartMode -eq 'Auto') "startup type changed with sc.exe: $((Svc).StartMode)"
                 Assert (Refused { Set-ItemProperty $svcKey -Name Start -Value 4 -ErrorAction Stop }) 'the Start value could be set to Disabled in the registry'
@@ -637,14 +642,18 @@ if (-not $installed) {
                 Assert ($aud.total -ge 1) 'agent.tamper not in the audit log'
                 # Stop request with the code entered in the dialog (when an administrator's desktop is available): stops.
                 $dev = Api POST "/agents/$($script:agentId)/code" -Session $s
-                $held = StopRequest $dev.code
-                if ($held -eq 'StopPending') {
-                    WaitFor { (Get-Service ZentriqAgent).Status -eq 'Stopped' } 60 'the agent did not stop after the code was entered in the dialog'
-                    Start-Service ZentriqAgent
-                    WaitFor { (Get-Service ZentriqAgent).Status -eq 'Running' } 60 'agent did not start again'
-                    WaitFor { Hardened } 120 'protection not back after the dialog stop'
-                    $script:stopDialog = "dialog shown in $($script:dialogs) session(s); wrong code refused; valid code stopped it"
-                } else { $script:stopDialog = 'no administrator desktop on this runner: the request was refused at once (dialog path covered by the pipe test above when a desktop exists)' }
+                # Restart with the code: the service restarts by itself (new process).
+                $pid1 = (Svc).ProcessId
+                StopRequest $dev.code -Restart | Out-Null
+                WaitFor { (Svc).State -eq 'Running' -and (Svc).ProcessId -ne $pid1 } 90 'the agent did not restart after the code was entered in the dialog'
+                WaitFor { Hardened } 120 'protection not back after the dialog restart'
+                # Stop with the code: stops until started again.
+                StopRequest $dev.code | Out-Null
+                WaitFor { (Get-Service ZentriqAgent).Status -eq 'Stopped' } 60 'the agent did not stop after the code was entered in the dialog'
+                Start-Service ZentriqAgent
+                WaitFor { (Get-Service ZentriqAgent).Status -eq 'Running' } 60 'agent did not start again'
+                WaitFor { Hardened } 120 'protection not back after the dialog stop'
+                $script:stopDialog = "dialog shown in $($script:dialogs) session(s); wrong code refused; code + Restart restarted it (new process), code + Stop stopped it"
                 # Stop with this device's own code; enable again.
                 & $exe --stop $dev.code | Out-Host
                 Assert ($LASTEXITCODE -eq 0) "--stop with the device code exit $LASTEXITCODE"

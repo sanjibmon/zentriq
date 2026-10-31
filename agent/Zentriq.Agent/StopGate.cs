@@ -16,6 +16,10 @@ internal static class StopGate
     private static string _authorizedFor = "";
     private static bool _pending;
     private static Outcome _outcome = Outcome.Pending;
+    private static bool _restart;
+
+    /// <summary>The code dialog asked for a restart rather than a stop.</summary>
+    public static bool RestartRequested { get { lock (Gate) return _restart; } }
 
     /// <summary>The agent itself is about to stop or restart its service (console control, --restart, update).</summary>
     public static void AuthorizeInternal(string why, TimeSpan? window = null)
@@ -52,7 +56,7 @@ internal static class StopGate
 
     public static void Begin()
     {
-        lock (Gate) { _pending = true; _outcome = Outcome.Pending; }
+        lock (Gate) { _pending = true; _outcome = Outcome.Pending; _restart = false; }
     }
 
     public static void End()
@@ -61,12 +65,12 @@ internal static class StopGate
     }
 
     /// <summary>The code dialog: a valid code was entered.</summary>
-    public static bool Authorize()
+    public static bool Authorize(bool restart)
     {
         lock (Gate)
         {
             if (!_pending) return false;
-            _outcome = Outcome.Authorized; _pending = false;
+            _outcome = Outcome.Authorized; _pending = false; _restart = restart;
             Monitor.PulseAll(Gate);
             return true;
         }

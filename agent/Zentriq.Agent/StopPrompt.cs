@@ -8,7 +8,6 @@ using System.IO.Pipes;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
-using System.ServiceProcess;
 using System.Text;
 using System.Text.Json;
 using System.Windows.Forms;
@@ -116,23 +115,26 @@ internal static class StopPrompt
         return 0;
     }
 
-    private static (bool Ok, string Message) Send(string action, string? code)
+    private static (bool Ok, string Message, bool StopRequest) Send(string action, string? code, bool restart = false)
     {
         using var pipe = new NamedPipeClientStream(".", TamperGuard.PipeName, PipeDirection.InOut);
         pipe.Connect(5000);
         var writer = new StreamWriter(pipe, new UTF8Encoding(false), 4096, leaveOpen: true) { AutoFlush = true };
         var reader = new StreamReader(pipe, new UTF8Encoding(false), false, 4096, leaveOpen: true);
-        writer.WriteLine(JsonSerializer.Serialize(new Dictionary<string, object?> { ["action"] = action, ["code"] = code }));
+        writer.WriteLine(JsonSerializer.Serialize(new Dictionary<string, object?> { ["action"] = action, ["code"] = code, ["restart"] = restart }));
         using var doc = JsonDocument.Parse(reader.ReadLine() ?? "{}");
-        return (doc.RootElement.TryGetProperty("ok", out var o) && o.GetBoolean(), doc.RootElement.TryGetProperty("message", out var m) ? m.GetString() ?? "" : "");
+        var r = doc.RootElement;
+        var waiting = r.TryGetProperty("status", out var st) && st.ValueKind == JsonValueKind.Object && st.TryGetProperty("stopRequest", out var sr) && sr.ValueKind == JsonValueKind.True;
+        return (r.TryGetProperty("ok", out var o) && o.GetBoolean(), r.TryGetProperty("message", out var m) ? m.GetString() ?? "" : "", waiting);
     }
 
     private sealed class CodeForm : Form
     {
         private readonly TextBox _code = new TextBox();
         private readonly Label _message = new Label();
-        private readonly Button _allow = new Button();
-        private readonly Timer _watch = new Timer { Interval = 2000 };
+        private readonly Button _stop = new Button();
+        private readonly Button _restart = new Button();
+        private readonly Timer _watch = new Timer { Interval = 3000 };
         private bool _done;
 
         public CodeForm()
@@ -151,27 +153,28 @@ internal static class StopPrompt
             var title = new Label { Text = "A code is needed to stop or restart the Zentriq Agent", Font = new Font("Segoe UI", 11f, FontStyle.Bold), AutoSize = false, Location = new Point(20, 16), Size = new Size(400, 24) };
             var text = new Label
             {
-                Text = "Tamper protection is on for this device. Enter the one-hour code from the Zentriq console " +
-                       "(Agents › the device's agent menu, or Agents › Uninstall code). Without a code the service keeps running.",
+                Text = "Tamper protection is on for this device, so the request was declined. Enter the one-hour code from the " +
+                       "Zentriq console (Agents › the device's agent menu, or Agents › Uninstall code) to stop or restart the service.",
                 AutoSize = false, Location = new Point(20, 46), Size = new Size(400, 56),
             };
             var label = new Label { Text = "Code (16 letters and digits, e.g. ABCD-EFGH-JKMN-PQRS):", AutoSize = true, Location = new Point(20, 108) };
             _code.Location = new Point(20, 130); _code.Size = new Size(400, 26); _code.CharacterCasing = CharacterCasing.Upper; _code.MaxLength = 24;
             _message.AutoSize = false; _message.Location = new Point(20, 162); _message.Size = new Size(400, 38); _message.ForeColor = Color.Firebrick;
-            _allow.Text = "Stop / restart"; _allow.Size = new Size(120, 30); _allow.Location = new Point(196, 206);
+            _restart.Text = "Restart service"; _restart.Size = new Size(124, 30); _restart.Location = new Point(20, 206);
+            _stop.Text = "Stop service"; _stop.Size = new Size(110, 30); _stop.Location = new Point(206, 206);
             var cancel = new Button { Text = "Cancel", Size = new Size(96, 30), Location = new Point(324, 206), DialogResult = DialogResult.Cancel };
-            _allow.Click += (_, _) => Submit();
+            _stop.Click += (_, _) => Submit(restart: false);
+            _restart.Click += (_, _) => Submit(restart: true);
             cancel.Click += (_, _) => Close();
-            AcceptButton = _allow; CancelButton = cancel;
-            Controls.AddRange(new Control[] { title, text, label, _code, _message, _allow, cancel });
+            AcceptButton = _stop; CancelButton = cancel;
+            Controls.AddRange(new Control[] { title, text, label, _code, _message, _restart, _stop, cancel });
 
             // Closes by itself when the request ends elsewhere (another administrator's dialog, or the two minutes passed).
             _watch.Tick += (_, _) =>
             {
                 try
                 {
-                    using var sc = new ServiceController(Program.ServiceName);
-                    if (sc.Status != ServiceControllerStatus.StopPending) { _done = true; Close(); }
+                    if (!Send("status", null).StopRequest) { _done = true; Close(); }
                 }
                 catch (Exception) { }
             };
@@ -183,19 +186,19 @@ internal static class StopPrompt
             };
         }
 
-        private void Submit()
+        private void Submit(bool restart)
         {
             _message.Text = "";
-            _allow.Enabled = false;
+            _stop.Enabled = _restart.Enabled = false;
             try
             {
-                var (ok, message) = Send("authorize-stop", _code.Text.Trim());
+                var (ok, message, _) = Send("authorize-stop", _code.Text.Trim(), restart);
                 if (ok) { _done = true; Close(); return; }
                 _message.Text = message;
                 _code.SelectAll(); _code.Focus();
             }
             catch (Exception ex) { _message.Text = "The Zentriq Agent service did not answer: " + ex.Message; }
-            finally { _allow.Enabled = true; }
+            finally { _stop.Enabled = _restart.Enabled = true; }
         }
     }
 

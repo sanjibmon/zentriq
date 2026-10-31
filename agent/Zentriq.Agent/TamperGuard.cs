@@ -469,6 +469,7 @@ internal static class TamperGuard
     private static object Status() => new Dictionary<string, object?>
     {
         ["protected"] = UninstallProtection.Enabled, ["active"] = Wanted, ["pausedUntil"] = PausedUntil?.ToString("o"),
+        ["stopRequest"] = StopGate.Pending,
     };
 
     private static string Handle(string line)
@@ -500,11 +501,16 @@ internal static class TamperGuard
                 Record("tamper", "Wrong code entered to stop the agent service: " + refused);
                 return Reply(false, refused);
             }
-            SetMarker("StoppedByCode", DateTime.UtcNow);
-            Set(false);
-            Record("control", "Agent service stopped with a code (Services console, net stop or sc stop); a restart starts it again at once, otherwise it starts again when the device restarts.");
-            StopGate.Authorize();
-            return Reply(true, "Code accepted. The Zentriq Agent service stops now.");
+            var restart = doc.RootElement.TryGetProperty("restart", out var rs) && rs.ValueKind == JsonValueKind.True;
+            if (restart) Record("control", "Agent service restarted with a code entered in the dialog (Services console, net stop or sc stop).");
+            else
+            {
+                SetMarker("StoppedByCode", DateTime.UtcNow);
+                Set(false);
+                Record("control", "Agent service stopped with a code entered in the dialog (Services console, net stop or sc stop); it starts again when the device restarts, or with --enable.");
+            }
+            StopGate.Authorize(restart);
+            return Reply(true, restart ? "Code accepted. The Zentriq Agent service restarts now." : "Code accepted. The Zentriq Agent service stops now.");
         }
         if (action == "restart")
         {

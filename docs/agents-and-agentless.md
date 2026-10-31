@@ -196,12 +196,11 @@ Intune command-line arguments, the Configuration Manager install command. Zentri
   its protection data readable by **SYSTEM only** (`HKLM\SOFTWARE\Zentriq\Agent\Protection`), and nobody on the device —
   users, local administrators and domain administrators alike — can remove, stop or disable the agent without a code:
   * **Stop and Restart need a code.** *Stop* and *Restart* in the Services console (and `net stop`, `sc stop`,
-    `Stop-Service`) are available, but the agent holds the request: the service shows *Stopping* and a dialog opens on
-    the desktop of each signed-in administrator, **"A code is needed to stop or restart the Zentriq Agent"**. With a
-    valid code (the device's code or the code for all) the service stops — and *Restart* starts it again at once;
-    after a plain *Stop* it starts again when the device restarts, or with `--enable`. Cancel, a wrong code, or no code
-    within two minutes (20 seconds when nobody is signed in to show the dialog to): the service reports *Running* again,
-    keeps working, and the attempt is reported like tampering;
+    `Stop-Service`) are available, but while protection is on the request is declined at once (*Access is denied*) and
+    a dialog opens on the desktop of each signed-in administrator: **"A code is needed to stop or restart the Zentriq
+    Agent"**. Enter the device's code or the code for all and choose **Restart service** (it stops and starts again at
+    once) or **Stop service** (it stays stopped until the device restarts, or `--enable`). Cancel, a wrong code, or no
+    code within two minutes: nothing happens, the agent keeps running and the attempt is reported like tampering;
   * *Startup type* (Disabled / Manual) in Services, `sc config` and `Set-Service` are refused;
   * its **registry key** (`HKLM\SYSTEM\CurrentControlSet\Services\ZentriqAgent`) and its **program folder** are
     read-only for administrators, so the startup type cannot be changed in the registry and the program cannot be
