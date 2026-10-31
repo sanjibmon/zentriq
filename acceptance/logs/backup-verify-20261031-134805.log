@@ -1,0 +1,9 @@
+﻿2026-10-31T13:48:05.7031351Z INFO Backup zentriq-runnervmnjgfq-20261031-134804-ci.zbak decrypted and readable: version 1.1.1, created 2026-10-31 13:48:05Z, 31 item(s) (database, configuration, certificates, MFA keys, remote support), 750 TOC lines.
+2026-10-31T13:48:08.5183793Z INFO   restored zentriq.schema_migrations: 31 row(s)
+2026-10-31T13:48:08.5200858Z INFO   restored zentriq.install_state: 1 row(s)
+2026-10-31T13:48:08.5209396Z INFO   restored zentriq.users: 1 row(s)
+2026-10-31T13:48:08.5229189Z INFO   restored zentriq.assets: 0 row(s)
+2026-10-31T13:48:08.5236691Z INFO   restored zentriq.audit_events: 3 row(s)
+2026-10-31T13:48:08.5260631Z INFO   restored zentriq.trial: 1 row(s)
+2026-10-31T13:48:08.5261133Z INFO Deep restore validation PASSED.
+2026-10-31T13:48:10.3137900Z INFO Backup verification PASSED.

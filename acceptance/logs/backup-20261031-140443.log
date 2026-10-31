@@ -1,0 +1,5 @@
+﻿2026-10-31T14:04:43.0799075Z INFO Data protection keys: 1 file(s), 1 secret(s) made portable.
+2026-10-31T14:04:43.2582954Z INFO Backup written: C:\ProgramData\Zentriq\Backups\zentriq-runnervmnjgfq-20261031-140442-manual.zbak (9573 KiB, database, configuration, certificates, MFA keys, remote support; key AF517928B5C6CE7E, password protected).
+2026-10-31T14:04:43.3286951Z INFO CI folder: Copied to C:\ZqBackupDest; 1 older backup(s) removed.
+2026-10-31T14:04:43.3521615Z INFO CI share: Copied to \\localhost\ZqBackups\zentriq.
+2026-10-31T14:04:43.4227005Z INFO Backup created: C:\ProgramData\Zentriq\Backups\zentriq-runnervmnjgfq-20261031-140442-manual.zbak

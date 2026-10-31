@@ -1,0 +1,5 @@
+[PASS   ] S01 Install previous release 1.1.1.95 schema 30
+[PASS   ] S03 Enroll previous agent 1.1.1.95 agent c0bae248-3c64-409a-8700-5866aa515926
+[PASS   ] S02 Upgrade 1.1.1.95 -> 1.1.1.99 in place keeps data, sign-in and trial (30 devices) schema 31; Programs and Features: one entry 'Zentriq 1.1.1.99'
+[PASS   ] S05 New features work after the update activity log 200, software uninstall 400, agent update 400, dashboard overview 200; dashboard layout saved and read back
+[PASS   ] S04 Agent 1.1.1.95 -> 1.1.1.99 updated in place (no enrollment code) old agent checked in to the upgraded server; same registration c0bae248-3c64-409a-8700-5866aa515926 and certificate; console updates now available; one 'Zentriq Agent' entry (1.1.1.99); service running

@@ -1,0 +1,2 @@
+<134>1 2026-10-31T14:00:16.260Z runnervmnjgfq Zentriq - test - CEF:0|Zentriq|Zentriq|1.1.1|test|Test message from Zentriq|1|rt=1793455216260 externalId=10 msg=This is a test of the "CI syslog" channel, sent by admin@ci.zentriq.test. If you can read it, the channel works.
+<134>1 2026-10-31T14:01:08.783Z runnervmnjgfq Zentriq - asset.discovered - CEF:0|Zentriq|Zentriq|1.1.1|asset.discovered|New device: CI-INTEGRATION-DEVICE|1|rt=1793455268783 externalId=12 msg=Category: other\nFound by: manual dhost=CI-INTEGRATION-DEVICE cs2Label=assetCriticality cs2=Low

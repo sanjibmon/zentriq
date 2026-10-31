@@ -1,0 +1,33 @@
+{
+  "succeeded": true,
+  "mode": "repair",
+  "productVersion": "1.1.2",
+  "url": "https://runnervmnjgfq/",
+  "failedStep": null,
+  "error": null,
+  "remedy": null,
+  "logPath": "C:\\ProgramData\\Zentriq\\Logs\\provision-20261031-141133.log",
+  "trialExpiresAt": "2026-11-14T13:46:54.246+00:00",
+  "checks": {
+    "System compatibility and prerequisite checks": "PASS",
+    "Prepare data directories and permissions": "PASS",
+    "Install or connect to PostgreSQL": "PASS",
+    "Create database, roles and protected credentials": "PASS",
+    "Pre-upgrade backup": "PASS",
+    "Apply database migrations": "PASS",
+    "Record the installed sections": "PASS",
+    "Configure HTTPS certificate": "PASS",
+    "Write configuration": "PASS",
+    "Configure and start Zentriq services": "PASS",
+    "remote support": "PASS",
+    "Configure remote support": "PASS",
+    "https": "PASS",
+    "Verify API readiness over HTTPS": "PASS",
+    "Verify the worker processes a test job": "PASS",
+    "Create the first administrator and start the trial": "PASS",
+    "trial": "Trial",
+    "Verify the web console and trial state": "PASS",
+    "Register maintenance and backup tasks": "PASS"
+  },
+  "completedAt": "2026-10-31T14:11:33.8222272+00:00"
+}

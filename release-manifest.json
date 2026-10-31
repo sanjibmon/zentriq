@@ -1,0 +1,82 @@
+{
+  "product": "Zentriq",
+  "version": "1.1.1",
+  "build": 99,
+  "packageVersion": "1.1.1.99",
+  "builtAtUtc": "2026-10-31T13:28:36.0558917Z",
+  "gitCommit": "656ea024ddf17444721fbc1e6c9980aac910084b",
+  "builder": {
+    "os": "Microsoft Windows NT 10.0.20348.0",
+    "wix": "5.0.2",
+    "dotnetSdk": "10.0.403"
+  },
+  "signed": false,
+  "signingMode": null,
+  "files": [
+    {
+      "name": "Zentriq-1.1.1-docs.zip",
+      "bytes": 86298,
+      "sha256": "1e029e859b85fdfc95bfd9c7fe2f022523cf01805f33c3e4da3765ea32feba05",
+      "signature": null
+    },
+    {
+      "name": "Zentriq-1.1.1-msi-offline-kit.zip",
+      "bytes": 501133913,
+      "sha256": "e06c8cb4cf38b61fbaa7c2905a082d086c7e7bed32c7fdc014090c484e423eea",
+      "signature": null
+    },
+    {
+      "name": "Zentriq-Setup-x64.exe",
+      "bytes": 501739040,
+      "sha256": "c87ef03d692f916356ba919235bd849dde7193c5899cde03cc9641f2d59ebf33",
+      "signature": "NotSigned"
+    },
+    {
+      "name": "Zentriq.msi",
+      "bytes": 109461475,
+      "sha256": "3986413d81e53c68f9140edf7bf081f877148b9bacfc26790046d498eb80060d",
+      "signature": "NotSigned"
+    },
+    {
+      "name": "ZentriqAgent-x64.msi",
+      "bytes": 3854336,
+      "sha256": "42cad94389ec7b238a14c425ee6f2b0133a64532876462f612df5bf0bd4d2c56",
+      "signature": "NotSigned"
+    }
+  ],
+  "prerequisites": {
+    "postgresql": {
+      "file": "postgresql-17.11-1-windows-x64.exe",
+      "product": "PostgreSQL",
+      "version": "17.11-1",
+      "fileVersion": "1.0.0.0",
+      "productVersion": "17",
+      "sha256": "f104c552d8495a6f20738c2a03f643164bc64b9985363329e314dec24559f0b7",
+      "pinned": true,
+      "signer": "CN=EnterpriseDB Corporation, O=EnterpriseDB Corporation, L=Wilmington, S=Delaware, C=US",
+      "signerThumbprint": "7BEDD1269FCCF7A5D95F18274750B79893C06C70",
+      "timestamped": true,
+      "bytes": 373033224,
+      "license": "PostgreSQL License (https://www.postgresql.org/about/licence/); installer by EnterpriseDB"
+    },
+    "vcredist": {
+      "file": "vc_redist.x64.exe",
+      "product": "Microsoft Visual C++ 2015-2022 Redistributable (x64)",
+      "version": "14.44.35211.0",
+      "fileVersion": "14.44.35211.0",
+      "productVersion": "14.44.35211.0",
+      "sha256": "cc0ff0eb1dc3f5188ae6300faef32bf5beeba4bdd6e8e445a9184072096b713b",
+      "pinned": true,
+      "signer": "CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US",
+      "signerThumbprint": "8F985BE8FD256085C90A95D3C74580511A1DB975",
+      "timestamped": true,
+      "bytes": 25635768,
+      "license": "Microsoft Software License Terms - Visual C++ Redistributable (redistribution permitted)"
+    }
+  },
+  "notes": [
+    "Zentriq-Setup-x64.exe: offline bootstrapper (VC++ runtime + PostgreSQL + Zentriq.msi).",
+    "Zentriq.msi: Zentriq only; uses prereqs\\ next to the MSI (see the offline kit) or an existing PostgreSQL server.",
+    "ZentriqAgent-x64.msi: Zentriq Agent for Windows devices (also served by the console at /downloads)."
+  ]
+}

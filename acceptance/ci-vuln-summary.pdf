@@ -1,0 +1,104 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [5 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 841.89 595.28] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 6 0 R >>
+endobj
+6 0 obj
+<< /Length 2190 >>
+stream
+BT /F2 16 Tf 36 543.28 Td (Vulnerability summary by severity) Tj ET
+0.35 0.35 0.35 rg
+BT /F1 9 Tf 36 525.28 Td (4 row\(s\) ∑ generated 2026-10-31 13:59) Tj ET
+0 0 0 rg
+BT /F2 9 Tf 36 507.28 Td (Overview) Tj ET
+BT /F1 8 Tf 36 490.28 Td (high) Tj ET
+0.149 0.443 0.835 rg
+256 489.28 400 9 re f
+0.2 0.2 0.2 rg
+BT /F1 8 Tf 660 490.28 Td (57) Tj ET
+0 0 0 rg
+BT /F1 8 Tf 36 477.28 Td (critical) Tj ET
+0.906 0.396 0.161 rg
+256 476.28 133.33 9 re f
+0.2 0.2 0.2 rg
+BT /F1 8 Tf 393.33 477.28 Td (19) Tj ET
+0 0 0 rg
+BT /F1 8 Tf 36 464.28 Td (medium) Tj ET
+0.11 0.651 0.471 rg
+256 463.28 119.3 9 re f
+0.2 0.2 0.2 rg
+BT /F1 8 Tf 379.3 464.28 Td (17) Tj ET
+0 0 0 rg
+BT /F1 8 Tf 36 451.28 Td (low) Tj ET
+0.894 0.643 0.09 rg
+256 450.28 28.07 9 re f
+0.2 0.2 0.2 rg
+BT /F1 8 Tf 288.07 451.28 Td (4) Tj ET
+0 0 0 rg
+0.92 0.94 0.96 rg
+36 417.28 769.89 18 re f
+0.1 0.12 0.16 rg
+BT /F2 8 Tf 40 422.78 Td (Severity) Tj ET
+BT /F2 8 Tf 194.35 422.78 Td (Count) Tj ET
+BT /F2 8 Tf 336.94 422.78 Td (Hostname ∑ distinct) Tj ET
+BT /F2 8 Tf 517.15 422.78 Td (CVSS ∑ average) Tj ET
+BT /F2 8 Tf 715.33 422.78 Td (Risk score ∑ maximum) Tj ET
+0 0 0 rg
+BT /F1 8 Tf 40 406.78 Td (high) Tj ET
+BT /F1 8 Tf 208.3 406.78 Td (57) Tj ET
+BT /F1 8 Tf 407.66 406.78 Td (1) Tj ET
+BT /F1 8 Tf 565.33 406.78 Td (8.83) Tj ET
+BT /F1 8 Tf 792.99 406.78 Td (71) Tj ET
+0.975 0.98 0.985 rg
+36 387.28 769.89 15 re f
+0 0 0 rg
+BT /F1 8 Tf 40 391.78 Td (critical) Tj ET
+BT /F1 8 Tf 208.3 391.78 Td (19) Tj ET
+BT /F1 8 Tf 407.66 391.78 Td (1) Tj ET
+BT /F1 8 Tf 565.33 391.78 Td (9.60) Tj ET
+BT /F1 8 Tf 792.99 391.78 Td (69) Tj ET
+BT /F1 8 Tf 40 376.78 Td (medium) Tj ET
+BT /F1 8 Tf 208.3 376.78 Td (17) Tj ET
+BT /F1 8 Tf 407.66 376.78 Td (1) Tj ET
+BT /F1 8 Tf 565.33 376.78 Td (5.04) Tj ET
+BT /F1 8 Tf 792.99 376.78 Td (48) Tj ET
+0.975 0.98 0.985 rg
+36 357.28 769.89 15 re f
+0 0 0 rg
+BT /F1 8 Tf 40 361.78 Td (low) Tj ET
+BT /F1 8 Tf 212.75 361.78 Td (4) Tj ET
+BT /F1 8 Tf 407.66 361.78 Td (1) Tj ET
+BT /F1 8 Tf 565.33 361.78 Td (2.60) Tj ET
+BT /F1 8 Tf 792.99 361.78 Td (19) Tj ET
+0.45 0.45 0.45 rg
+BT /F1 7.5 Tf 36 20 Td (Zentriq ∑ Vulnerability summary by severity ∑ generated 2026-10-31 13:59) Tj ET
+BT /F1 7.5 Tf 767.53 20 Td (Page 1 of 1) Tj ET
+
+endstream
+endobj
+xref
+0 7
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000121 00000 n 
+0000000218 00000 n 
+0000000320 00000 n 
+0000000462 00000 n 
+trailer
+<< /Size 7 /Root 1 0 R >>
+startxref
+2704
+%%EOF
