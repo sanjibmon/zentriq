@@ -90,14 +90,14 @@ public sealed class LicenseService(NpgsqlDataSource ds, LicenseIssuer issuer, Au
         if (byFile)
         {
             // The license file proves the purchase: genuine (our signature), for a known license, and the newest file issued.
-            var payload = licenseFile!.Length <= LicenseFormats.MaxDocumentBytes ? issuer.ReadLicenseFile(licenseFile) : null;
-            if (payload is null)
+            var filePayload = licenseFile!.Length <= LicenseFormats.MaxDocumentBytes ? issuer.ReadLicenseFile(licenseFile) : null;
+            if (filePayload is null)
             {
                 await audit.WriteAsync("public", "activate.bad_file", null, ip, new { mode }, ct, conn, tx);
                 await tx.CommitAsync(ct);
                 return new(false, 422, "This is not a valid Zentriq license file. Use the file Zentriq sent you, unchanged.");
             }
-            found = await FindByIdAsync(conn, tx, payload.LicenseId, ct);
+            found = await FindByIdAsync(conn, tx, filePayload.LicenseId, ct);
             if (found is { } ff && ff.L.FileHash != LicenseIssuer.FileHash(licenseFile))
             {
                 await audit.WriteAsync("public", "activate.replaced_file", ff.L.Id, ip, new { mode }, ct, conn, tx);
