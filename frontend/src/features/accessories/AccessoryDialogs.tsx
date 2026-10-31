@@ -68,7 +68,7 @@ export function ItemDialog({ item, categories, onClose, onSaved }: { item: Acces
                 <input className="in" value={newCat} maxLength={60} autoFocus placeholder="New category name" onChange={(e) => setNewCat(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void saveCategory(); } if (e.key === 'Escape') { e.stopPropagation(); setNewCat(null); } }} />
                 <button type="button" className="btn sm primary" disabled={!newCat.trim()} onClick={() => void saveCategory()}>Add</button>
-                <button type="button" className="btn sm" onClick={() => setNewCat(null)}>Cancel</button>
+                <button type="button" className="btn sm" aria-label="Cancel" title="Cancel" onClick={() => setNewCat(null)}>✕</button>
               </span>
             )}
           </label>

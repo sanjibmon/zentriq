@@ -377,8 +377,9 @@ fieldset.plain { border: 0; padding: 0; margin: 0; min-width: 0; }
 .lic-key summary { cursor: pointer; margin-bottom: 8px; }
 
 /* IT accessory categories */
-.cat-add { display: flex; gap: 6px; align-items: center; }
-.cat-add .in { flex: 1; min-width: 0; }
+.cat-add { display: flex; gap: 6px; align-items: center; min-width: 0; }
+.cat-add .in, .form-v .cat-add .in { flex: 1 1 0; width: auto; min-width: 0; }
+.cat-add .btn { flex: none; }
 .cat-list { display: grid; gap: 2px; max-height: 50vh; overflow: auto; border: 1px solid var(--line); border-radius: 8px; }
 .cat-row { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--line); font-size: 13px; }
 .cat-row:last-child { border-bottom: 0; }
