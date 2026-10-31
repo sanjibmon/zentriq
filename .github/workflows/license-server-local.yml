@@ -1,0 +1,34 @@
+name: license-server-local
+
+# Windows check of the local license server edition on work branches: build the package (self-contained server +
+# portable PostgreSQL) and run its end-to-end test under Windows PowerShell 5.1. main runs the same in windows-release.
+
+on:
+  push:
+    branches: ['dev/**']
+    paths: ['licensing/**', 'tests/license-server/**', 'backend/Zentriq.Domain/**', 'backend/Zentriq.Application/**', '.github/workflows/license-server-local.yml']
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  local:
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Build the local package
+        shell: pwsh
+        run: ./licensing/local/Build-LocalPackage.ps1 -Version '1.1.1' -OutDir "$env:RUNNER_TEMP/out"
+      - name: End-to-end test
+        shell: pwsh
+        run: ./tests/license-server/Test-LocalLicenseServer.ps1 -Zip "$env:RUNNER_TEMP/out/Zentriq-LicenseServer-Local-win-x64-1.1.1.zip" -Report "$env:RUNNER_TEMP/local-license-server.md"
+      - name: Summary
+        if: always()
+        shell: pwsh
+        run: if (Test-Path "$env:RUNNER_TEMP/local-license-server.md") { Get-Content "$env:RUNNER_TEMP/local-license-server.md" | Out-File $env:GITHUB_STEP_SUMMARY -Append }
