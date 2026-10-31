@@ -3,8 +3,8 @@ name: license-server
 # The Zentriq License Server is a separate product (vendor-hosted; never shipped to customers). It has its own
 # version (licensing/version.txt), its own tests and its own releases (tags license-server-v<version>-build.<n>);
 # nothing of it goes into the customer release made by windows-release.
-#   dev/** : Linux tests (PostgreSQL) + Windows local edition end-to-end test
-#   main   : the same, then a pre-release with the Docker/server package and the Windows local edition
+#   dev/** : Linux tests (PostgreSQL) + Windows Setup MSI end-to-end test (install, setup wizard, licenses, HTTPS, reinstall)
+#   main   : the same, then a pre-release with Zentriq-LicenseServer-Setup-<version>.msi
 
 on:
   push:
@@ -57,7 +57,7 @@ jobs:
 
   windows:
     runs-on: windows-2022
-    timeout-minutes: 40
+    timeout-minutes: 60
     needs: test
     steps:
       - uses: actions/checkout@v4
@@ -67,23 +67,16 @@ jobs:
       - name: Version
         shell: pwsh
         run: |
-          $v = (Get-Content licensing/version.txt -Raw).Trim()
-          "ZLS_VERSION=$v" | Out-File $env:GITHUB_ENV -Append
+          $v = [version](Get-Content licensing/version.txt -Raw).Trim()
+          "ZLS_VERSION=$($v.Major).$($v.Minor).0" | Out-File $env:GITHUB_ENV -Append
+          "ZLS_MSI_VERSION=$($v.Major).$($v.Minor).$($env:GITHUB_RUN_NUMBER)" | Out-File $env:GITHUB_ENV -Append
           New-Item -ItemType Directory -Force -Path out | Out-Null
-      - name: Server package (Docker / any OS with .NET)
+      - name: Setup MSI
         shell: pwsh
-        run: |
-          $o = "$env:RUNNER_TEMP/server"
-          dotnet publish licensing/Zentriq.LicenseServer/Zentriq.LicenseServer.csproj -c Release -o $o "-p:Version=$env:ZLS_VERSION" --nologo
-          if ($LASTEXITCODE -ne 0) { throw 'publish failed' }
-          Copy-Item licensing/Dockerfile, licensing/docker-compose.yml, licensing/env.example, licensing/docs/*.md $o
-          Compress-Archive -Path "$o/*" -DestinationPath "out/Zentriq-LicenseServer-$env:ZLS_VERSION.zip"
-      - name: Windows local edition
+        run: ./licensing/installer/Build-Setup.ps1 -Version $env:ZLS_MSI_VERSION -OutDir out
+      - name: Setup end-to-end test
         shell: pwsh
-        run: ./licensing/local/Build-LocalPackage.ps1 -Version $env:ZLS_VERSION -OutDir out
-      - name: Windows local edition end-to-end test
-        shell: pwsh
-        run: ./tests/license-server/Test-LocalLicenseServer.ps1 -Zip "out/Zentriq-LicenseServer-Local-win-x64-$($env:ZLS_VERSION).zip" -Report out/license-server-test-results.md *>&1 | Tee-Object -FilePath "$env:RUNNER_TEMP/test.log"
+        run: ./tests/license-server/Test-LicenseServerSetup.ps1 -Msi "$PWD/out/Zentriq-LicenseServer-Setup-$($env:ZLS_MSI_VERSION).msi" -Report out/license-server-test-results.md -LogDir "$env:RUNNER_TEMP/zls-setup-logs" *>&1 | Tee-Object -FilePath "$env:RUNNER_TEMP/test.log"
       - name: Summary
         if: always()
         shell: pwsh
@@ -94,18 +87,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          Get-ChildItem out -Filter *.zip | ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant())  $($_.Name)" } | Set-Content out/SHA256SUMS.txt -Encoding ascii
+          Get-ChildItem out -Filter *.msi | ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant())  $($_.Name)" } | Set-Content out/SHA256SUMS.txt -Encoding ascii
           $tag = "license-server-v$($env:ZLS_VERSION)-build.$($env:GITHUB_RUN_NUMBER)"
-          $notes = "Zentriq License Server $($env:ZLS_VERSION) (vendor-hosted; not for customers). Commit $($env:GITHUB_SHA). Windows local edition test results attached."
-          gh release create $tag --prerelease --title "Zentriq License Server $($env:ZLS_VERSION) (build $($env:GITHUB_RUN_NUMBER))" --notes $notes --target $env:GITHUB_SHA (Get-ChildItem out -File).FullName
+          $notes = "Zentriq License Server $($env:ZLS_MSI_VERSION) Setup for Windows Server (vendor-hosted; not for customers). Commit $($env:GITHUB_SHA). Setup test results attached."
+          gh release create $tag --prerelease --title "Zentriq License Server $($env:ZLS_MSI_VERSION) (build $($env:GITHUB_RUN_NUMBER))" --notes $notes --target $env:GITHUB_SHA (Get-ChildItem out -File).FullName
       - name: Push logs to the license-server-logs branch
         if: always()
         shell: pwsh
         run: |
           $d = Join-Path $env:RUNNER_TEMP 'logs'; New-Item -ItemType Directory -Force -Path $d | Out-Null
           Copy-Item "$env:RUNNER_TEMP/test.log", out/license-server-test-results.md, out/SHA256SUMS.txt $d -ErrorAction SilentlyContinue
-          $data = Join-Path $env:RUNNER_TEMP 'zls-local-test/ZentriqLicenseServer/data/logs'
-          if (Test-Path $data) { Copy-Item "$data/*" $d }
+          $sl = Join-Path $env:RUNNER_TEMP 'zls-setup-logs'
+          if (Test-Path $sl) { Get-ChildItem $sl -File | Where-Object Extension -in '.log', '.txt', '.md' | Copy-Item -Destination $d }
           "run $env:GITHUB_RUN_ID number $env:GITHUB_RUN_NUMBER commit $env:GITHUB_SHA branch $env:GITHUB_REF_NAME status ${{ job.status }}" | Set-Content "$d/RUN.txt"
           Set-Location $d
           git init -q; git checkout -q -b license-server-logs; git add -A

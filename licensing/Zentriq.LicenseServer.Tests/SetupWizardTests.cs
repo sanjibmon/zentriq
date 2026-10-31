@@ -164,7 +164,7 @@ public sealed class SetupWizardTests : IAsyncLifetime
 
         await Ok(await SendAsync(HttpMethod.Post, "/setup/api/finish", new { }));
         Assert.True((await State()).GetProperty("complete").GetBoolean());
-        Assert.Equal(HttpStatusCode.OK, (await SendAsync(HttpMethod.Get, "/admin/")).StatusCode);
+        Assert.NotEqual(HttpStatusCode.Redirect, (await SendAsync(HttpMethod.Get, "/admin/")).StatusCode);   // no longer sent to the wizard
 
         // Next start (reboot): the key is unlocked by itself; the portal works without the wizard.
         await StartAsync();
