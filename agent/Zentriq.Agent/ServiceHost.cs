@@ -6,12 +6,14 @@ using System.Threading;
 namespace Zentriq.Agent;
 
 /// <summary>
-/// The agent's own Windows service host (instead of System.ServiceProcess.ServiceBase, which cannot decline a stop).
-/// While tamper protection is on, a stop request — Stop or Restart in the Services console, net stop, sc stop — is
-/// declined at once ("Access is denied"; the service never enters "Stopping", which Windows could not take back), and a
-/// code dialog opens on the desktop of the administrators who are signed in (<see cref="StopPrompt"/>). With a valid
-/// code from the Zentriq console the agent then stops — or restarts — itself. Without a code (cancelled, wrong, nobody
-/// to enter it, or after two minutes) nothing happens: it keeps running and the attempt is reported.
+/// The agent's own Windows service host (instead of System.ServiceProcess.ServiceBase), so a stop request can be held.
+/// Windows does not let a service refuse a stop: once a stop control was delivered, the service control manager accepts
+/// no other control until the service has stopped (error 1061), whatever the service answers. So while tamper
+/// protection is on, a stop request — Stop or Restart in the Services console, net stop, sc stop — is held: the service
+/// shows "Stopping" and a code dialog opens on the desktop of the administrators who are signed in
+/// (<see cref="StopPrompt"/>). With a valid code from the Zentriq console it stops (or restarts). Without one
+/// (cancelled, wrong, nobody to enter it, or after two minutes) it completes the stop and starts again at once, and
+/// the attempt is reported.
 /// Stops that are already authorized go straight through: protection off or paused, a stop or disable with a code,
 /// console control, the agent's own restart and update, and Windows Installer (updates, uninstall with a code).
 /// </summary>
@@ -22,7 +24,7 @@ internal sealed partial class AgentService
     private const int AcceptStop = 0x1, AcceptShutdown = 0x4, AcceptPowerEvent = 0x40;
     private const int ControlStop = 1, ControlInterrogate = 4, ControlShutdown = 5, ControlPowerEvent = 13;
     private const int PbtResumeSuspend = 7, PbtResumeAutomatic = 18;
-    private const int NoError = 0, ErrorAccessDenied = 5, ErrorCallNotImplemented = 120, ErrorServiceSpecific = 1066;
+    private const int NoError = 0, ErrorCallNotImplemented = 120, ErrorServiceSpecific = 1066;
 
     /// <summary>How long a stop request waits for the code before the service carries on.</summary>
     public static readonly TimeSpan CodeWait = TimeSpan.FromMinutes(2);
@@ -129,7 +131,9 @@ internal sealed partial class AgentService
             var sameState = _status.State == state;
             _status.Type = ServiceWin32OwnProcess;
             _status.State = state;
-            _status.Accepted = state == StateRunning ? AcceptStop | AcceptShutdown | AcceptPowerEvent : 0;
+            // While waiting for a code only shutdown is accepted (a second Stop would change nothing).
+            _status.Accepted = state == StateRunning ? AcceptStop | AcceptShutdown | AcceptPowerEvent
+                : state == StateStopPending && Volatile.Read(ref _waitingForCode) == 1 && Volatile.Read(ref _stopping) == 0 ? AcceptShutdown : 0;
             _status.Win32ExitCode = exitCode;
             _status.SpecificExitCode = specific;
             _status.CheckPoint = state == StateStartPending || state == StateStopPending ? (sameState ? _status.CheckPoint + 1 : 1) : 0;
@@ -152,17 +156,27 @@ internal sealed partial class AgentService
         }) { IsBackground = true, Name = "stop" }.Start();
     }
 
-    /// <summary>
-    /// A stop request from outside the agent: through at once when authorized; otherwise declined, and the code dialog
-    /// opens (the service then stops or restarts itself when the code is entered).
-    /// </summary>
+    /// <summary>A stop request from outside the agent: through at once when authorized, otherwise held for the code.</summary>
     private int OnStopRequested()
     {
         if (Volatile.Read(ref _stopping) == 1) return NoError;
         if (StopGate.Allowed(out var why)) { BeginStop(why); return NoError; }
         if (Interlocked.Exchange(ref _waitingForCode, 1) == 0)
+        {
+            Report(StateStopPending, waitHint: 15000);
             new Thread(WaitForCode) { IsBackground = true, Name = "stop-code" }.Start();
-        return ErrorAccessDenied;
+        }
+        return NoError;
+    }
+
+    /// <summary>A separate process (SYSTEM) that starts the service again once this process has stopped.</summary>
+    private static void StartAgainAfterStop(string why)
+    {
+        Log.Info("The agent service starts again after this stop: " + why + ".");
+        var cmd = System.IO.Path.Combine(Environment.SystemDirectory, "cmd.exe");
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(cmd,
+            $"/c for /l %i in (1,1,30) do (ping -n 3 127.0.0.1 >nul & sc query {Program.ServiceName} | find \"STOPPED\" >nul && (net start {Program.ServiceName} & exit /b 0))")
+        { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = System.IO.Path.GetTempPath() });
     }
 
     private void WaitForCode()
@@ -179,27 +193,28 @@ internal sealed partial class AgentService
             outcome = StopGate.Wait(TimeSpan.FromSeconds(3));
             if (outcome != StopGate.Outcome.Pending) break;
             if (shown > 0 && StopPrompt.OpenDialogs() == 0 && DateTime.UtcNow > deadline - CodeWait + TimeSpan.FromSeconds(5)) { outcome = StopGate.Outcome.Cancelled; break; }
+            Report(StateStopPending, waitHint: 15000);   // still working on it (keeps the Services console waiting)
         }
         StopPrompt.CloseAll();
+        Volatile.Write(ref _waitingForCode, 0);
+        if (Volatile.Read(ref _stopping) == 1) { StopGate.End(); return; }   // Windows is shutting down meanwhile
         if (outcome == StopGate.Outcome.Authorized)
         {
-            Volatile.Write(ref _waitingForCode, 0);
             if (StopGate.RestartRequested)
             {
-                // A separate process stops and starts the service again (this process ends with the stop).
-                StopGate.AuthorizeInternal("restarted with a code entered on the device");
-                var cmd = System.IO.Path.Combine(Environment.SystemDirectory, "cmd.exe");
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(cmd, $"/c ping -n 2 127.0.0.1 >nul & net stop {Program.ServiceName} & net start {Program.ServiceName}")
-                { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = System.IO.Path.GetTempPath() });
+                StartAgainAfterStop("restart with a code entered on the device");
+                BeginStop("restart with a code entered on the device");
             }
             else BeginStop("stopped with a code entered on the device");
             return;
         }
         StopGate.End();
-        Volatile.Write(ref _waitingForCode, 0);
-        if (Volatile.Read(ref _stopping) == 1) return;   // Windows is shutting down meanwhile
+        // The stop cannot be taken back (Windows accepts no other request until the service has stopped): stop and
+        // start again at once.
         var reason = outcome == StopGate.Outcome.Cancelled ? "the code dialog was cancelled"
             : shown == 0 ? "no administrator was signed in to enter the code" : "no valid code was entered within two minutes";
-        TamperGuard.Record("tamper", $"Someone tried to stop the agent service (Services console, net stop or sc stop) without a code: {reason}. It keeps running.");
+        TamperGuard.Record("tamper", $"Someone tried to stop the agent service (Services console, net stop or sc stop) without a code: {reason}. It was started again at once.");
+        StartAgainAfterStop("stop without a code");
+        BeginStop("stop without a code (starting again)");
     }
 }

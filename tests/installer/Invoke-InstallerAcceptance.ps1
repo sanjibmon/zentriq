@@ -555,7 +555,7 @@ if (-not $installed) {
     } | Out-Null
 
     if ($agentInstalled) {
-        Check 'T67' 'Agent uninstall protection: removal needs a one-hour code from the console; service cannot be stopped; reinstall' {
+        Check 'T67' 'Agent uninstall protection: removal needs a one-hour code from the console; service stop held for a code (starts again without one); reinstall' {
             $s = Login
             $exe = Join-Path $env:ProgramFiles 'Zentriq Agent\ZentriqAgent.exe'
             Api PUT '/agents/settings' @{ checkinMinutes = 30; inventoryMinutes = 180; uninstallProtection = $true } -Session $s | Out-Null
@@ -565,8 +565,17 @@ if (-not $installed) {
             Assert ($reg.PSObject.Properties['UninstallProtected'] -and $reg.UninstallProtected -eq 1) 'agent did not turn uninstall protection on'
             $readable = $true; try { Get-ItemProperty 'HKLM:\SOFTWARE\Zentriq\Agent\Protection' -ErrorAction Stop | Out-Null } catch { $readable = $false }
             Assert (-not $readable) 'the uninstall key is readable by administrators'
-            $stopped = $true; try { Stop-Service ZentriqAgent -ErrorAction Stop } catch { $stopped = $false }
-            Assert (-not $stopped -and (Get-Service ZentriqAgent).Status -eq 'Running') 'an administrator could stop the protected agent service'
+            # A stop request is held for a code (Windows cannot refuse it); without one the agent starts again at once.
+            $pid0 = (Get-CimInstance Win32_Service -Filter "Name='ZentriqAgent'").ProcessId
+            & sc.exe stop ZentriqAgent | Out-Null
+            Start-Sleep 3
+            $held = (Get-Service ZentriqAgent).Status
+            Assert ($held -eq 'StopPending') "a stop request was not held for a code: $held"
+            $cp = New-Object System.IO.Pipes.NamedPipeClientStream('.', 'ZentriqAgentControl', [System.IO.Pipes.PipeDirection]::InOut); $cp.Connect(5000)
+            $cw = New-Object System.IO.StreamWriter($cp); $cw.AutoFlush = $true; $cw.WriteLine('{"action":"cancel-stop"}'); (New-Object System.IO.StreamReader($cp)).ReadLine() | Out-Null; $cp.Dispose()
+            $deadline = (Get-Date).AddSeconds(90)
+            do { Start-Sleep 3; $sv = Get-CimInstance Win32_Service -Filter "Name='ZentriqAgent'" } while (-not ($sv.State -eq 'Running' -and $sv.ProcessId -ne $pid0) -and (Get-Date) -lt $deadline)
+            Assert ($sv.State -eq 'Running' -and $sv.ProcessId -ne $pid0) "the agent did not start again after a stop without a code: $($sv.State)"
             $product = (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*' -ErrorAction SilentlyContinue | Where-Object { $_.PSObject.Properties['DisplayName'] -and $_.DisplayName -eq 'Zentriq Agent' } | Select-Object -First 1).PSChildName
             $p1 = Start-Process msiexec.exe -ArgumentList '/x', $product, '/qn', '/l*v', "`"$(Join-Path $OutDir 'agent-uninstall-nocode.log')`"" -Wait -PassThru
             Assert ($p1.ExitCode -ne 0 -and (Get-Service ZentriqAgent -ErrorAction SilentlyContinue)) "uninstall without a code was not refused (exit $($p1.ExitCode))"
@@ -582,7 +591,7 @@ if (-not $installed) {
             $p2b = Start-Process msiexec.exe -ArgumentList '/x', $product, '/qn', "UNINSTALLCODE=$($first.code)", '/l*v', "`"$(Join-Path $OutDir 'agent-uninstall-oldcode.log')`"" -Wait -PassThru
             Assert ($p2b.ExitCode -ne 0 -and (Get-Service ZentriqAgent -ErrorAction SilentlyContinue)) "the replaced code still removed the agent (exit $($p2b.ExitCode))"
             # ---- T78: stopping and disabling need a code too (checked here while protection is on) ----
-            Check 'T78' 'Agent stop and disable protection: a stop request waits for a code (dialog) and is refused without one; disabling refused; wrong code refused and reported; stop / disable / enable with a code; console pause, resume and per-device code' {
+            Check 'T78' 'Agent stop and disable protection: a stop request waits for a code (dialog); without one the agent starts again at once; disabling refused; wrong code refused and reported; stop / disable / enable with a code; console pause, resume and per-device code' {
                 $svcKey = 'HKLM:\SYSTEM\CurrentControlSet\Services\ZentriqAgent'
                 function Svc { Get-CimInstance Win32_Service -Filter "Name='ZentriqAgent'" }
                 function WaitFor([scriptblock] $Cond, [int] $Seconds, [string] $What) {
@@ -602,16 +611,21 @@ if (-not $installed) {
                     $line = $r.ReadLine(); $p.Dispose()
                     $line | ConvertFrom-Json
                 }
-                # Stop request (as Stop / Restart in the Services console): declined at once, the code dialog opens; with the
-                # code (what the dialog sends over the local pipe) the agent stops or restarts itself.
-                function StopRequest([string] $Code, [switch] $Restart) {
+                # Stop request (as Stop / Restart in the Services console): held ("Stopping") while the code dialog is open;
+                # with the code (what the dialog sends over the local pipe) it stops or restarts; without one it stops and
+                # starts again at once (Windows does not let a service refuse a stop).
+                function StopRequest([string] $Code, [switch] $Restart, [switch] $WrongFirst) {
+                    $script:pidBefore = (Svc).ProcessId
                     $out = (& sc.exe stop ZentriqAgent 2>&1) -join ' '
-                    Assert ($LASTEXITCODE -ne 0) "sc stop was not declined: $out"
+                    Assert ($LASTEXITCODE -eq 0) "sc stop failed: $out"
                     Start-Sleep 3
-                    Assert ((Get-Service ZentriqAgent).Status -eq 'Running') "service not running after a declined stop: $((Get-Service ZentriqAgent).Status)"
+                    $st = (Get-Service ZentriqAgent).Status
+                    Assert ($st -eq 'StopPending') "stop request not held for a code: $st"
                     $script:dialogs = @(Get-CimInstance Win32_Process -Filter "Name='ZentriqAgent.exe'" | Where-Object CommandLine -match '--stop-prompt').Count
-                    $bad = PipeSend 'authorize-stop' 'ABCD-EFGH-JKMN-PQRS'
-                    Assert (-not $bad.ok) 'a wrong code was accepted in the stop dialog'
+                    if ($WrongFirst) {
+                        $bad = PipeSend 'authorize-stop' 'ABCD-EFGH-JKMN-PQRS'
+                        Assert (-not $bad.ok) 'a wrong code was accepted in the stop dialog'
+                    }
                     if ($Code) {
                         $p = New-Object System.IO.Pipes.NamedPipeClientStream('.', 'ZentriqAgentControl', [System.IO.Pipes.PipeDirection]::InOut); $p.Connect(5000)
                         $w = New-Object System.IO.StreamWriter($p); $w.AutoFlush = $true; $r = New-Object System.IO.StreamReader($p)
@@ -619,15 +633,19 @@ if (-not $installed) {
                         $ok = $r.ReadLine() | ConvertFrom-Json; $p.Dispose()
                         Assert ($ok.ok) "code refused in the stop dialog: $($ok.message)"
                     } else { PipeSend 'cancel-stop' $null | Out-Null }
-                    return ($out -replace '\s+', ' ').Trim()
+                    return $st
+                }
+                function StartedAgain([string] $What) {
+                    WaitFor { $v = Svc; $v.State -eq 'Running' -and $v.ProcessId -ne $script:pidBefore } 90 $What
                 }
                 # Wait for the agent to have applied tamper protection (registry key read-only for administrators).
                 WaitFor { Refused { Set-ItemProperty $svcKey -Name Description -Value 'x' -ErrorAction Stop } } 180 'service registry key still writable for administrators'
                 Assert (Refused { Set-Service ZentriqAgent -StartupType Disabled -ErrorAction Stop }) 'an administrator could disable the protected service'
-                # Stop without a code: the request is held (dialog on an administrator's desktop) or refused; it keeps running.
-                $first = StopRequest $null
-                WaitFor { (Get-Service ZentriqAgent).Status -eq 'Running' } 60 'the agent did not keep running after a stop request without a code'
-                $script:stopNoCode = "stop without a code declined ($first), still running"
+                # Stop without a code (cancelled in the dialog): it stops and starts again at once.
+                $first = StopRequest $null -WrongFirst
+                StartedAgain 'the agent did not start again after a stop request without a code'
+                WaitFor { Hardened } 120 'protection not back after a stop without a code'
+                $script:stopNoCode = "stop without a code held ($first), wrong code refused, cancelled: started again at once (new process)"
                 & sc.exe config ZentriqAgent start= disabled | Out-Null
                 Assert ((Svc).StartMode -eq 'Auto') "startup type changed with sc.exe: $((Svc).StartMode)"
                 Assert (Refused { Set-ItemProperty $svcKey -Name Start -Value 4 -ErrorAction Stop }) 'the Start value could be set to Disabled in the registry'
@@ -643,9 +661,8 @@ if (-not $installed) {
                 # Stop request with the code entered in the dialog (when an administrator's desktop is available): stops.
                 $dev = Api POST "/agents/$($script:agentId)/code" -Session $s
                 # Restart with the code: the service restarts by itself (new process).
-                $pid1 = (Svc).ProcessId
                 StopRequest $dev.code -Restart | Out-Null
-                WaitFor { (Svc).State -eq 'Running' -and (Svc).ProcessId -ne $pid1 } 90 'the agent did not restart after the code was entered in the dialog'
+                StartedAgain 'the agent did not restart after the code was entered in the dialog'
                 WaitFor { Hardened } 120 'protection not back after the dialog restart'
                 # Stop with the code: stops until started again.
                 StopRequest $dev.code | Out-Null
@@ -677,7 +694,8 @@ if (-not $installed) {
                 Api POST "/agents/$($script:agentId)/control" @{ operation = 'resume' } -Session $s | Out-Null
                 WaitFor { Hardened } 180 'console resume did not restore protection'
                 StopRequest $null | Out-Null
-                WaitFor { (Get-Service ZentriqAgent).Status -eq 'Running' } 60 'the service could be stopped after resume'
+                StartedAgain 'the agent did not start again after a stop without a code (after resume)'
+                WaitFor { Hardened } 120 'protection not back after the stop following resume'
                 $acts = Api GET '/activity?kind=agent-control' -Session $s
                 Assert (@($acts.items | Where-Object status -eq 'succeeded').Count -ge 2) 'console pause / resume not completed in the Activity log'
                 "$($script:stopNoCode); $($script:stopDialog); disabling (Set-Service, sc.exe, registry) refused; program folder read-only; watchdog task present; wrong code refused and reported; stop with the device code and --enable; disable with the code for all and --enable; protection back each time; console pause allowed Stop-Service, resume held stop requests again"
@@ -705,7 +723,7 @@ if (-not $installed) {
             do { Start-Sleep 10 } while ((Get-ItemProperty 'HKLM:\SOFTWARE\Zentriq\Agent').PSObject.Properties['UninstallProtected'] -and (Get-Date) -lt $deadline)
             Assert (-not (Get-ItemProperty 'HKLM:\SOFTWARE\Zentriq\Agent').PSObject.Properties['UninstallProtected']) 'protection still on after switching it off'
             Stop-Service ZentriqAgent; Start-Service ZentriqAgent   # stoppable again
-            "no code: exit $($p1.ExitCode); wrong code: exit $($p2.ExitCode); service stop refused; code for all agents $($code.code) (valid until $($code.expiresAt)) removed the agent, the replaced code did not; reinstalled and protection switched off"
+            "no code: exit $($p1.ExitCode); wrong code: exit $($p2.ExitCode); stop without a code: held, started again; code for all agents $($code.code) (valid until $($code.expiresAt)) removed the agent, the replaced code did not; reinstalled and protection switched off"
         } | Out-Null
     } else { Record 'T67' 'Agent uninstall protection' 'BLOCKED' 'agent install failed' }
 

@@ -153,8 +153,8 @@ internal static class StopPrompt
             var title = new Label { Text = "A code is needed to stop or restart the Zentriq Agent", Font = new Font("Segoe UI", 11f, FontStyle.Bold), AutoSize = false, Location = new Point(20, 16), Size = new Size(400, 24) };
             var text = new Label
             {
-                Text = "Tamper protection is on for this device, so the request was declined. Enter the one-hour code from the " +
-                       "Zentriq console (Agents › the device's agent menu, or Agents › Uninstall code) to stop or restart the service.",
+                Text = "Tamper protection is on for this device. Enter the one-hour code from the Zentriq console (Agents › the " +
+                       "device's agent menu, or Agents › Uninstall code). Without a code the Zentriq Agent starts again by itself.",
                 AutoSize = false, Location = new Point(20, 46), Size = new Size(400, 56),
             };
             var label = new Label { Text = "Code (16 letters and digits, e.g. ABCD-EFGH-JKMN-PQRS):", AutoSize = true, Location = new Point(20, 108) };
