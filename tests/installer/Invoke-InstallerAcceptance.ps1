@@ -2297,7 +2297,7 @@ if (-not $installed) {
     $wslDistro = $env:ZQ_WSL_DISTRO
     $wslReady = $wslDistro -and (Get-Command wsl.exe -ErrorAction SilentlyContinue) -and ((& wsl.exe -d $wslDistro -u root -- uname -s 2>$null) -match 'Linux')
     if ($wslReady) {
-        Check 'T80' 'Linux agent: one-line install from the console command (pinned key), enrollment, inventory with distribution / edition / server or desktop, live connection, Linux security checks, package uninstall through the agent, tamper-protected removal' {
+        Check 'T81' 'Linux agent: one-line install from the console command (pinned key), enrollment, inventory with distribution / edition / server or desktop, live connection, Linux security checks, package uninstall through the agent, tamper-protected removal' {
             $s = Login
             function Wsl([string] $Script, [int] $TimeoutSec = 600) {
                 $f = Join-Path $OutDir ("wsl-" + [guid]::NewGuid().ToString('N').Substring(0, 8) + '.sh')
@@ -2370,7 +2370,7 @@ dpkg-deb --build /tmp/zqdummy /tmp/zq-ci-dummy.deb >/dev/null && dpkg -i /tmp/zq
                 Api PUT '/agents/settings' @{ checkinMinutes = 30; inventoryMinutes = 180; uninstallProtection = $false; autoUpdate = $false; autoUpdateMax = 25 } -Session $s | Out-Null
             }
         } | Out-Null
-    } else { Record 'T80' 'Linux agent end to end' 'BLOCKED' "WSL distribution '$wslDistro' not available on this runner" }
+    } else { Record 'T81' 'Linux agent end to end' 'BLOCKED' "WSL distribution '$wslDistro' not available on this runner" }
 
     Check 'T14' 'Logs contain no administrator password or connection-string passwords' {
         $paths = @((Join-Path $dataDir 'Logs'), $env:TEMP, $OutDir, (Join-Path $env:SystemRoot 'Temp'))

@@ -1,9 +1,28 @@
 # Test report
 
-Latest: GitHub Actions run 41205117265, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
-10.0.20348** VM. Release: `v1.1.1-build.99` (pre-release, **unsigned**), package version **1.1.1.99**. Results: unit +
-PostgreSQL integration tests **352 PASS, 2 skipped** (ci-quick: 354/354); installer acceptance **71 passed, 0 failed**;
-in-place updates PASS (schema 31).
+Latest: GitHub Actions run 41243876015, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
+10.0.20348** VM plus an Ubuntu job for the Linux agent. Release: `v1.1.1-build.102` (pre-release, **unsigned**), package
+version **1.1.1.102**. Results: unit + PostgreSQL integration tests **369 PASS, 2 skipped** (ci-quick: 371/371);
+installer acceptance **72 passed, 0 failed**; Linux agent on 11 distributions **11/11**; in-place updates PASS (schema 32).
+
+New in build 102: **Zentriq Agent for Linux** (builds 100-101 failed only on test assertions and were not released).
+
+* Packages for x64 and ARM64: `.deb`, `.rpm` and `.tar.gz` (self-contained, systemd service `zentriq-agent`), served by
+  the server and attached to the release. One-line install command in *Agents › New enrollment code* (downloads from
+  the agent port trusting only the pinned server key, checks the SHA-256, installs and enrolls).
+* Identifies the distribution and its family, version / LTS, **edition** (e.g. Ubuntu Server, RHEL Server, Fedora
+  Workstation, SLES / SLED) and **server or desktop** (stated edition, meta-packages, display manager / graphical target
+  / sessions, chassis), desktop environment, kernel and package manager; plus the full inventory (hardware, packages,
+  services, users, security settings).
+* Same features as Windows: live connection, schedules, service start / stop / restart, package uninstall, self-update
+  per platform and format, remote support agent for Linux, tamper protection (package removal and `systemctl stop`
+  refused without a code, watchdog timer), Linux checks SL-01 to SL-13 in Security Configuration.
+
+| ID | Test | Result |
+|---|---|---|
+| T81 | Ubuntu 24.04 in WSL against the installed server: console install command, enrollment, inventory (Ubuntu Server, Server), live connection, 11 Linux checks evaluated, package uninstalled through the console, removal refused without a code and done with one | **PASS** |
+| D01-D11 | Ubuntu 24.04 / 22.04 (desktop), Debian 12 (deb, tar.gz), Rocky 9, AlmaLinux 9, Oracle Linux 9, RHEL UBI 9, Fedora 41, openSUSE Leap 15.6, Amazon Linux 2023: install, identify, collect, remove | **PASS** |
+| T53 | Security configuration with 43 checks (30 Windows + 13 Linux) | **PASS** |
 
 **License server** (separate product, workflow `license-server`): release `license-server-v1.1.0-build.13`,
 `Zentriq-LicenseServer-Setup-1.1.13.msi` (SHA256 `ebabe8222cc0570a87373f44274bd7c06320e54932079fbd4483b98179215f68`).
