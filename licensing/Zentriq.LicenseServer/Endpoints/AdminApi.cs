@@ -24,6 +24,7 @@ public static class AdminApi
     public sealed record YearsBody(int? Years);
     public sealed record StatusBody(string? Status, string? Reason);
     public sealed record OfflineIssueBody(JsonElement Request);
+    public sealed record VerifyBody(string? Document);
     public sealed record AdminBody(string? Email, string? Name, string? Password, bool? Owner);
     public sealed record PasswordBody(string? Current, string? Password);
     public sealed record CodeBody(string? Code, string? Secret);
@@ -118,7 +119,7 @@ public static class AdminApi
             modules = Modules.All.OrderBy(m => m),
             nonItPacks = Catalog.NonItPacks, subscriptionYears = Catalog.SubscriptionYears, supportYears = Catalog.SupportYears,
             trial = Plans.TrialLimits, free = Plans.FreeLimits,
-            signing = new { key.KeyId, key.PublicPem },
+            signing = new { key.KeyId, key.PublicPem, key.Fingerprint },
             productKeyEntry = new { keyId = key.KeyId, publicKeyPem = key.PublicPem, notAfter = (string?)null, revoked = false },
             publicUrl = o.PublicUrl, leaseDays = o.LeaseDays,
         }));
@@ -340,6 +341,36 @@ public static class AdminApi
             await audit.WriteAsync(Actor(u), "activate.offline_portal", id, PublicApi.Ip(http), new { req.InstallationId, req.MachineName, req.Organization }, ct, conn, tx);
             await tx.CommitAsync(ct);
             return Results.Ok(new { license = doc, fileName = $"zentriq-license-{payload.LicenseId}.zlic" });
+        });
+
+        // Checks a license file exactly as Zentriq does (signature first, then content), against this server's signing key.
+        g.MapPost("/verify", (VerifyBody body, SigningKey key, TimeProvider time) =>
+        {
+            var doc = body.Document?.Trim() ?? "";
+            if (doc.Length == 0) return Bad("document", "Choose a license file (.zlic).");
+            Guid installation = Guid.Empty; string? keyId = null; JsonElement? payload = null;
+            try
+            {
+                using var env = JsonDocument.Parse(doc);
+                keyId = env.RootElement.TryGetProperty("keyId", out var k) ? k.GetString() : null;
+                if (env.RootElement.TryGetProperty("payload", out var p) && p.GetString() is { } b64)
+                {
+                    using var pd = JsonDocument.Parse(Convert.FromBase64String(b64));
+                    payload = pd.RootElement.Clone();
+                    if (pd.RootElement.TryGetProperty("installationId", out var i) && i.TryGetGuid(out var g2)) installation = g2;
+                }
+            }
+            catch (Exception ex) when (ex is JsonException or FormatException) { }
+            var verifier = new Zentriq.Application.Licensing.LicenseVerifier(new Zentriq.Application.Licensing.InMemoryPublicKeyStore(
+                [new Zentriq.Application.Licensing.LicensePublicKey(key.KeyId, key.PublicPem, null, false)]));
+            var r = verifier.Verify(doc, installation, time.GetUtcNow(), enforceValidityWindow: false);
+            var current = r.IsValid ? verifier.Verify(doc, installation, time.GetUtcNow()) : r;
+            return Results.Ok(new
+            {
+                valid = r.IsValid, rejection = r.Rejection.ToString(), message = r.Message, currentlyValid = current.IsValid, currentMessage = current.Message,
+                keyId, signingKeyId = key.KeyId, fingerprint = key.Fingerprint,
+                payload = r.IsValid ? payload : null,   // content is shown only for files whose signature verified
+            });
         });
 
         g.MapGet("/documents/{id:guid}", async (Guid id, NpgsqlDataSource ds, CancellationToken ct) =>

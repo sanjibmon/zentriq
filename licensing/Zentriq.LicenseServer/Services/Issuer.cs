@@ -15,23 +15,33 @@ public sealed class LicenseServerOptions
     /// <summary>Public base address shown on the offline activation page.</summary>
     public string PublicUrl { get; set; } = LicenseServerProtocol.DefaultServerUrl;
     public int LeaseDays { get; set; } = LicenseFormats.LeaseDays;
+    /// <summary>File holding the signing key passphrase (Docker secret). Otherwise the ZLS_SIGNING_PASSPHRASE environment variable.</summary>
+    public string? SigningKeyPassphraseFile { get; set; }
+    /// <summary>Accept an unencrypted PEM key (tests only).</summary>
+    public bool AllowUnencryptedKey { get; set; }
 }
 
-/// <summary>The private signing key, loaded once. Missing or unreadable keys stop the service at start-up.</summary>
+/// <summary>The private signing key, loaded once and self-tested. Missing, unreadable or wrong keys stop the service at start-up.</summary>
 public sealed class SigningKey : IDisposable
 {
     public ECDsa Key { get; }
     public string KeyId { get; }
     public string PublicPem { get; }
+    public string Fingerprint { get; }
 
-    public SigningKey(ECDsa key, string keyId) { Key = key; KeyId = keyId; PublicPem = key.ExportSubjectPublicKeyInfoPem(); }
+    public SigningKey(ECDsa key, string keyId)
+    {
+        Key = key; KeyId = keyId; PublicPem = key.ExportSubjectPublicKeyInfoPem(); Fingerprint = KeyCeremony.Fingerprint(key);
+    }
 
     public static SigningKey Load(LicenseServerOptions o)
     {
         if (string.IsNullOrWhiteSpace(o.SigningKeyFile))
             throw new InvalidOperationException("LicenseServer:SigningKeyFile is not set. Create a key with 'Zentriq.LicenseServer keygen --out <dir>'.");
         if (!File.Exists(o.SigningKeyFile)) throw new InvalidOperationException($"The signing key file {o.SigningKeyFile} does not exist.");
-        return new SigningKey(LicenseSigning.LoadPrivateKey(File.ReadAllText(o.SigningKeyFile)), o.SigningKeyId);
+        var key = KeyCeremony.Load(File.ReadAllText(o.SigningKeyFile), KeyCeremony.ReadPassphrase(o), o.AllowUnencryptedKey);
+        KeyCeremony.SelfTest(key, o.SigningKeyId);
+        return new SigningKey(key, o.SigningKeyId);
     }
 
     public void Dispose() => Key.Dispose();

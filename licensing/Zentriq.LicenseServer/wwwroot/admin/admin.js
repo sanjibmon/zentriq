@@ -53,6 +53,14 @@
     a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
     a.download = name; a.click();
   }
+  function testRequest() {
+    return { format: 'zentriq-activation-request', schemaVersion: 3, requestId: crypto.randomUUID(), installationId: crypto.randomUUID(), productVersion: 'test',
+      machineName: 'TEST-REQUEST', organization: 'License generation test', createdAt: new Date().toISOString(), currentUsage: {} };
+  }
+  function readText(input) {
+    const f = input.files[0];
+    return f ? f.text() : Promise.reject(new Error('Choose a file.'));
+  }
   function readFile(input) {
     return new Promise((res, rej) => {
       const f = input.files[0];
@@ -105,6 +113,7 @@
     const go = m ? () => licenseDetail(decodeURIComponent(m[1]))
       : h.startsWith('/licenses') ? licenses
       : h.startsWith('/customers') ? customers
+      : h.startsWith('/verify') ? verify
       : h.startsWith('/audit') ? audit
       : h.startsWith('/settings') ? settings : dashboard;
     go().catch((e) => { view.innerHTML = `<div class="msg bad">${esc(e.message)}</div>`; });
@@ -338,8 +347,9 @@
     });
     on('a_offline', async () => {
       const ok = await dialog('Offline activation', `<p>For an air-gapped server: attach the activation request the customer sent (Licensing › Offline activation › Download request).</p>
-        <div class="drop"><input id="o_file" type="file" accept=".json,application/json"></div>`,
-      [{ label: 'Cancel' }, { label: 'Issue license file', kind: 'primary', run: async () => post('/offline', { request: await readFile($('o_file')) }) }]);
+        <div class="drop"><input id="o_file" type="file" accept=".json,application/json"></div>
+        <label class="check mt"><input id="o_test" type="checkbox">No request at hand: issue a <b>test</b> file for a made-up installation (uses one activation; deactivate it afterwards)</label>`,
+      [{ label: 'Cancel' }, { label: 'Issue license file', kind: 'primary', run: async () => post('/offline', { request: $('o_test').checked ? testRequest() : await readFile($('o_file')) }) }]);
       if (ok) { download(ok.fileName, ok.license); reload(); }
     });
     const status = (s, title, text) => async () => {
@@ -355,6 +365,36 @@
         [{ label: 'Cancel' }, { label: 'Deactivate', kind: 'danger', run: () => api(`/activations/${b.dataset.deact}/deactivate`, { method: 'POST' }).then(() => true) }]);
       if (ok) reload();
     }));
+  }
+
+
+  // ---- verify a license file ------------------------------------------------------------------------------
+  async function verify() {
+    view.innerHTML = `<h1>Verify a license file</h1>
+      <div class="card"><p class="muted">Checks a <code>.zlic</code> file the way Zentriq does: the signature over the exact bytes first, then the content.
+        Use it to inspect what the server generated, or a file a customer sends back.</p>
+        <div class="drop"><input id="v_file" type="file" accept=".zlic,.json,application/json"></div>
+        <div class="row end mt"><button class="primary" id="v_go">Verify</button></div></div>
+      <div id="v_out"></div>`;
+    $('v_go').addEventListener('click', async () => {
+      const out = $('v_out');
+      try {
+        const r = await api('/verify', { method: 'POST', body: { document: await readText($('v_file')) } });
+        const p = r.payload || {};
+        const ent = p.entitlements ? Object.entries(p.entitlements).map(([k, v]) => `${esc(k)}: ${Number(v).toLocaleString()}`).join('<br>') : '—';
+        out.innerHTML = `<div class="card"><h2>${r.valid ? '<span class="ok">Signature valid</span>' : '<span class="bad">Not valid</span>'}</h2>
+          <p>${esc(r.message)}${r.valid && !r.currentlyValid ? ` <span class="warn">Today: ${esc(r.currentMessage)}</span>` : ''}</p>
+          <div class="kv"><div>Signed with key</div><div class="mono">${esc(r.keyId || '—')}</div><div>This server's key</div><div class="mono">${esc(r.signingKeyId)} · ${esc(r.fingerprint)}</div>
+          ${r.valid ? `<div>License</div><div class="mono">${esc(p.licenseId)}</div><div>Customer</div><div>${esc(p.customer)}</div>
+            <div>Edition / type</div><div>${esc(p.edition)} · ${esc(p.licenseType || 'subscription')}${p.termYears ? ` · ${p.termYears} yr` : ''}</div>
+            <div>Activation</div><div>${esc(p.activation || 'offline')}${p.leaseUntil ? ` · lease until ${day(p.leaseUntil)}` : ''}</div>
+            <div>Installation</div><div class="mono">${esc(p.installationId)}</div>
+            <div>Issued</div><div>${when(p.issuedAt)}</div><div>Valid until</div><div>${p.licenseType === 'perpetual' ? 'Perpetual' : day(p.expiresAt)} (+${p.graceDays} days grace)</div>
+            <div>Support until</div><div>${day(p.supportUntil)}</div><div>Entitlements</div><div>${ent}<br><span class="muted small">IT accessories unlimited${p.entitlements && p.entitlements.nonit_assets == null ? '; non-IT unlimited' : ''}</span></div>
+            <div>Extra modules</div><div>${(p.modules || []).length ? esc(p.modules.join(', ')) : '—'}</div>` : ''}</div>
+          ${r.valid ? `<details class="mt"><summary class="small">Signed content (JSON)</summary><textarea class="mono" readonly rows="16">${esc(JSON.stringify(p, null, 2))}</textarea></details>` : ''}</div>`;
+      } catch (e) { out.innerHTML = `<div class="msg bad">${esc(e.message)}</div>`; }
+    });
   }
 
   // ---- audit -----------------------------------------------------------------------------------------------
@@ -386,7 +426,7 @@
             ${a.mfa ? `<button data-a="${a.id}" data-act="reset-mfa">Reset authenticator</button>` : ''}<button data-a="${a.id}" data-act="unlock">Unlock</button>` : ''}</td></tr>`).join('')}
         </tbody></table></div></div>
       <div class="card"><h2>Signing key</h2>
-        <p>License files are signed with key <code>${esc(catalog.signing.keyId)}</code>. Zentriq trusts it only when its public key is listed in
+        <p>License files are signed with key <code>${esc(catalog.signing.keyId)}</code>, fingerprint <code>${esc(catalog.signing.fingerprint)}</code>. Zentriq trusts it only when its public key is listed in
         <code>backend/Zentriq.Infrastructure/Resources/license-public-keys.json</code> (compiled into the product). Entry for that file:</p>
         <textarea class="mono" readonly rows="8">${esc(JSON.stringify(catalog.productKeyEntry, null, 2))}</textarea>
         <p class="small muted">Public address: ${esc(catalog.publicUrl)} · Online lease: ${catalog.leaseDays} days (then 30 days of grace).</p></div>

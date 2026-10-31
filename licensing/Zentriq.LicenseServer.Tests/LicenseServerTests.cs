@@ -101,13 +101,16 @@ public sealed class LicenseServerFlowTests : IAsyncLifetime
             await cmd.ExecuteNonQueryAsync();
         }
         _keyDir = Directory.CreateTempSubdirectory("zls").FullName;
-        var (priv, pub) = LicenseSigning.NewKeyPair();
-        _publicPem = pub;
-        await File.WriteAllTextAsync(Path.Combine(_keyDir, "k.pem"), priv);
+        // The production path: an encrypted key from the key ceremony, the passphrase from a secret file.
+        const string phrase = "flow test signing passphrase 42";
+        var ceremony = KeyCeremony.Generate(_keyDir, "test-2026", phrase);
+        _publicPem = await File.ReadAllTextAsync(ceremony.PublicFile);
+        await File.WriteAllTextAsync(Path.Combine(_keyDir, "phrase.txt"), phrase);
         var cs = new NpgsqlConnectionStringBuilder(pg) { Database = _dbName }.ConnectionString;
         _app = Program.Build([
             $"--ConnectionStrings:LicenseServer={cs}",
-            $"--LicenseServer:SigningKeyFile={Path.Combine(_keyDir, "k.pem")}",
+            $"--LicenseServer:SigningKeyFile={ceremony.PrivateFile}",
+            $"--LicenseServer:SigningKeyPassphraseFile={Path.Combine(_keyDir, "phrase.txt")}",
             "--LicenseServer:SigningKeyId=test-2026",
             "--LicenseServer:RequestsPerMinute=10000",
         ], b => b.WebHost.UseTestServer());
@@ -276,6 +279,26 @@ public sealed class LicenseServerFlowTests : IAsyncLifetime
     }
 
     [DbFact]
+    public async Task Portal_verifies_generated_files_and_rejects_tampered_ones()
+    {
+        await LoginAsync();
+        var (id, _) = await NewLicenseAsync();
+        var issued = await OkJson(await AdminAsync(HttpMethod.Post, $"/licenses/{id}/offline", new { request = Request(Guid.NewGuid()) }));
+        var doc = issued.GetProperty("license").GetString()!;
+        var ok = await OkJson(await AdminAsync(HttpMethod.Post, "/verify", new { document = doc }));
+        Assert.True(ok.GetProperty("valid").GetBoolean());
+        Assert.Equal(id, ok.GetProperty("payload").GetProperty("licenseId").GetString());
+        Assert.StartsWith("SHA256:", ok.GetProperty("fingerprint").GetString());
+
+        var env = JsonSerializer.Deserialize<SignedDocument>(doc)!;
+        var json = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(env.Payload)).Replace("\"devices\":300", "\"devices\":30000");
+        var tampered = JsonSerializer.Serialize(env with { Payload = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(json)) });
+        var bad = await OkJson(await AdminAsync(HttpMethod.Post, "/verify", new { document = tampered }));
+        Assert.False(bad.GetProperty("valid").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, bad.GetProperty("payload").ValueKind);
+    }
+
+    [DbFact]
     public async Task Renewal_and_new_key()
     {
         await LoginAsync();
@@ -289,5 +312,43 @@ public sealed class LicenseServerFlowTests : IAsyncLifetime
         var nk = await OkJson(await AdminAsync(HttpMethod.Post, $"/licenses/{id}/rekey"));
         Assert.Equal(HttpStatusCode.NotFound, (await _client.PostAsJsonAsync("/" + LicenseServerProtocol.ActivatePath, new OnlineActivateRequest(key, Request(Guid.NewGuid())))).StatusCode);
         await OkJson(await _client.PostAsJsonAsync("/" + LicenseServerProtocol.ActivatePath, new OnlineActivateRequest(nk.GetProperty("licenseKey").GetString()!, Request(Guid.NewGuid()))));
+    }
+}
+
+/// <summary>The key ceremony: encrypted at rest, passphrase required, never overwritten, unencrypted keys refused.</summary>
+public sealed class KeyCeremonyTests
+{
+    private const string Phrase = "a long signing passphrase 2026";
+
+    [Fact]
+    public void Generated_key_is_encrypted_and_loads_only_with_its_passphrase()
+    {
+        var dir = Directory.CreateTempSubdirectory("zlskey").FullName;
+        var c = KeyCeremony.Generate(dir, "zentriq-prod-2026-10", Phrase);
+        var pem = File.ReadAllText(c.PrivateFile);
+        Assert.Contains("BEGIN ENCRYPTED PRIVATE KEY", pem);
+        using (var k = KeyCeremony.Load(pem, Phrase, allowUnencrypted: false)) Assert.Equal(c.Fingerprint, KeyCeremony.Fingerprint(k));
+        Assert.Equal(c.Fingerprint, KeyCeremony.FingerprintOfPem(File.ReadAllText(c.PublicFile)));
+        Assert.Throws<InvalidOperationException>(() => KeyCeremony.Load(pem, "the wrong passphrase!!", false));
+        Assert.Throws<InvalidOperationException>(() => KeyCeremony.Load(pem, null, false));
+        Assert.Throws<InvalidOperationException>(() => KeyCeremony.Generate(dir, "zentriq-prod-2026-10", Phrase));   // never overwritten
+        Assert.Contains("zentriq-prod-2026-10", File.ReadAllText(c.EntryFile));
+        Assert.DoesNotContain("PRIVATE", File.ReadAllText(c.EntryFile));
+        Assert.Contains(c.Fingerprint, File.ReadAllText(c.RecordFile));
+        if (!OperatingSystem.IsWindows()) Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(c.PrivateFile));
+        Directory.Delete(dir, true);
+    }
+
+    [Fact]
+    public void Weak_passphrases_and_plain_keys_are_refused()
+    {
+        var dir = Directory.CreateTempSubdirectory("zlskey").FullName;
+        Assert.Throws<InvalidOperationException>(() => KeyCeremony.Generate(dir, "zentriq-prod-x", "short"));
+        Assert.Throws<InvalidOperationException>(() => KeyCeremony.Generate(dir, "Bad Key Id", Phrase));
+        var plain = LicenseSigning.NewKeyPair().PrivatePem;
+        Assert.Throws<InvalidOperationException>(() => KeyCeremony.Load(plain, null, allowUnencrypted: false));
+        using var k = KeyCeremony.Load(plain, null, allowUnencrypted: true);
+        KeyCeremony.SelfTest(k, "t");
+        Directory.Delete(dir, true);
     }
 }

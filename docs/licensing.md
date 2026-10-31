@@ -91,6 +91,8 @@ Data is **never** deleted, and sign-in, viewing data, backup, restore and licens
   new server. A key activates on as many servers as the license allows (normally one).
 * **License server address**: `https://license.zentriq.com` by default (*Licensing › License server*,
   system setting `licensing.server_url`). The server's outbound proxy settings apply; port 443 must be allowed.
+  Plain `http://` is accepted only for a license server on the same computer (`http://localhost:5080`, the local
+  edition used for testing).
 
 API: `POST /api/v1/licensing/activate {licenseKey}`, `POST /licensing/checkin`, `POST /licensing/deactivate`,
 `PUT /licensing/server {url}`, `GET /licensing/status`. All require *licensing.manage* (status: signed in).

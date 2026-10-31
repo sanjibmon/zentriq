@@ -91,8 +91,10 @@ public static class LicensingEndpoints
         {
             var url = body.Url?.Trim();
             if (string.IsNullOrEmpty(url)) url = LicenseServerProtocol.DefaultServerUrl;
-            if (!Uri.TryCreate(url, UriKind.Absolute, out var u) || u.Scheme != Uri.UriSchemeHttps || !string.IsNullOrEmpty(u.Query))
-                return Validation.Problem("url", "Enter the https address of the license server, e.g. https://license.zentriq.com.");
+            // https only; plain http is accepted for a license server on this same machine (local testing), never across the network.
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var u) || !string.IsNullOrEmpty(u.Query) ||
+                !(u.Scheme == Uri.UriSchemeHttps || (u.Scheme == Uri.UriSchemeHttp && u.IsLoopback)))
+                return Validation.Problem("url", "Enter the https address of the license server, e.g. https://license.zentriq.com (http only for http://localhost).");
             await online.SetServerUrlAsync(url, ct);
             await rc.AuditAsync("license.server", url);
             return Results.Ok(new { url });

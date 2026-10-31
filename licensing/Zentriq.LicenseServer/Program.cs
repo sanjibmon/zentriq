@@ -12,12 +12,24 @@ public partial class Program
 {
     public static async Task<int> Main(string[] args)
     {
-        // Commands: (none) | serve  — run the service;  keygen --out <dir> [--key-id <id>];  migrate;
+        // Commands: (none) | serve  — run the service;  keygen --out <dir> [--key-id <id>];  key-info;  migrate;
         //           create-admin --email <e> --name <n>  (the passphrase is read from ZLS_ADMIN_PASSPHRASE or standard input).
-        var command = args.FirstOrDefault(a => !a.StartsWith('-')) ?? "serve";
-        if (command == "keygen") return Keygen(args);
+        var command = args.Length > 0 && !args[0].StartsWith('-') ? args[0] : "serve";
+        var rest = args.Length > 0 && !args[0].StartsWith('-') ? args[1..] : args;
+        if (command == "keygen") return Keygen(rest);
 
-        var app = Build(args.Where(a => a != command).ToArray());
+        var app = Build(rest);
+        if (command is "serve" or "key-info")
+        {
+            // Load and self-test the signing key before anything else (wrong passphrase or file: stop here, clearly).
+            try
+            {
+                var key = app.Services.GetRequiredService<SigningKey>();
+                app.Logger.LogInformation("Signing key {KeyId} loaded and self-tested. Fingerprint {Fingerprint}", key.KeyId, key.Fingerprint);
+                if (command == "key-info") { Console.WriteLine($"Key id:      {key.KeyId}\nFingerprint: {key.Fingerprint}\n{key.PublicPem}"); return 0; }
+            }
+            catch (InvalidOperationException ex) { Console.Error.WriteLine(ex.Message); return 3; }
+        }
         var ds = app.Services.GetRequiredService<NpgsqlDataSource>();
         var applied = await MigrationRunner.MigrateAsync(ds);
         if (applied > 0) app.Logger.LogInformation("Applied {Count} database migration(s).", applied);
@@ -121,23 +133,41 @@ public partial class Program
     private static int Keygen(string[] args)
     {
         var dir = Arg(args, "--out");
-        if (dir is null) { Console.Error.WriteLine("Usage: keygen --out <directory> [--key-id <id>]"); return 2; }
+        if (dir is null) { Console.Error.WriteLine("Usage: keygen --out <directory> [--key-id <id>]   (passphrase: ZLS_SIGNING_PASSPHRASE or prompted)"); return 2; }
         var keyId = Arg(args, "--key-id") ?? $"zentriq-prod-{DateTime.UtcNow:yyyy-MM}";
-        Directory.CreateDirectory(dir);
-        var priv = Path.Combine(dir, keyId + ".private.pem");
-        if (File.Exists(priv)) { Console.Error.WriteLine($"{priv} exists; refusing to overwrite a signing key."); return 1; }
-        var (privatePem, publicPem) = LicenseSigning.NewKeyPair();
-        File.WriteAllText(priv, privatePem);
-        if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(priv, UnixFileMode.UserRead | UnixFileMode.UserWrite);
-        File.WriteAllText(Path.Combine(dir, keyId + ".public.pem"), publicPem);
-        var entry = System.Text.Json.JsonSerializer.Serialize(new { keyId, publicKeyPem = publicPem, notAfter = (string?)null, revoked = false },
-            new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
-        File.WriteAllText(Path.Combine(dir, keyId + ".product-entry.json"), entry);
-        Console.WriteLine($"Signing key: {priv}  (back it up offline; anyone holding it can issue licenses)");
-        Console.WriteLine($"Key id:      {keyId}");
-        Console.WriteLine("Add this entry to backend/Zentriq.Infrastructure/Resources/license-public-keys.json and rebuild Zentriq:");
-        Console.WriteLine(entry);
-        return 0;
+        var pass = Environment.GetEnvironmentVariable(KeyCeremony.PassphraseEnv);
+        if (string.IsNullOrEmpty(pass))
+        {
+            if (Console.IsInputRedirected) { Console.Error.WriteLine($"Set {KeyCeremony.PassphraseEnv} or run keygen interactively."); return 2; }
+            pass = ReadHidden($"Passphrase for the signing key ({KeyCeremony.MinPassphraseLength}+ characters): ");
+            if (ReadHidden("Repeat the passphrase: ") != pass) { Console.Error.WriteLine("The passphrases do not match."); return 1; }
+        }
+        try
+        {
+            var c = KeyCeremony.Generate(dir, keyId, pass);
+            Console.WriteLine($"Key id:       {c.KeyId}");
+            Console.WriteLine($"Fingerprint:  {c.Fingerprint}");
+            Console.WriteLine($"Private key:  {c.PrivateFile}  (encrypted; back it up offline, keep the passphrase separately)");
+            Console.WriteLine($"Public key:   {c.EntryFile}  (send ONLY this file to Zentriq, confirm the fingerprint by phone)");
+            Console.WriteLine($"Record:       {c.RecordFile}");
+            return 0;
+        }
+        catch (InvalidOperationException ex) { Console.Error.WriteLine(ex.Message); return 1; }
+    }
+
+    private static string ReadHidden(string prompt)
+    {
+        Console.Write(prompt);
+        var sb = new System.Text.StringBuilder();
+        while (true)
+        {
+            var k = Console.ReadKey(intercept: true);
+            if (k.Key == ConsoleKey.Enter) break;
+            if (k.Key == ConsoleKey.Backspace) { if (sb.Length > 0) sb.Length--; continue; }
+            if (!char.IsControl(k.KeyChar)) sb.Append(k.KeyChar);
+        }
+        Console.WriteLine();
+        return sb.ToString();
     }
 
     private static async Task<int> CreateAdminAsync(WebApplication app, string[] args)
