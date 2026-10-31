@@ -22,9 +22,17 @@ if (Test-Path $dir) { Remove-Item $dir -Recurse -Force }
 Expand-Archive $Zip -DestinationPath $dir
 $root = Join-Path $dir 'ZentriqLicenseServer'
 $zls = Join-Path $root 'zls.ps1'
-function Zls([string[]] $Arguments) {
-    $out = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $zls @Arguments 2>&1 | Out-String
-    if ($LASTEXITCODE -ne 0) { throw "zls $($Arguments -join ' ') exited $LASTEXITCODE`n$out" }
+function Zls([string[]] $Arguments, [int] $TimeoutSeconds = 300) {
+    # Output into files and a time limit: a process left holding a pipe can never stall the run.
+    $o = New-TemporaryFile; $e = New-TemporaryFile
+    $p = Start-Process powershell.exe -PassThru -WindowStyle Hidden -RedirectStandardOutput $o.FullName -RedirectStandardError $e.FullName `
+        -ArgumentList (@('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$zls`"") + $Arguments)
+    $null = $p.Handle   # keeps the exit code available after exit
+    $done = $p.WaitForExit($TimeoutSeconds * 1000)
+    $out = (Get-Content $o.FullName -Raw) + (Get-Content $e.FullName -Raw)
+    Remove-Item $o.FullName, $e.FullName -ErrorAction SilentlyContinue
+    if (-not $done) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue; throw "zls $($Arguments -join ' ') did not finish in $TimeoutSeconds s`n$out" }
+    if ($p.ExitCode -ne 0) { throw "zls $($Arguments -join ' ') exited $($p.ExitCode)`n$out" }
     $out
 }
 $base = 'http://localhost:5080'

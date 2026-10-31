@@ -90,7 +90,7 @@ function Invoke-Server([string[]] $Arguments, [hashtable] $Env) {
     $saved = @{}
     foreach ($k in $Env.Keys) { $saved[$k] = [Environment]::GetEnvironmentVariable($k); [Environment]::SetEnvironmentVariable($k, $Env[$k]) }
     Push-Location (Split-Path $Server)
-    try { & $Server @Arguments; return $LASTEXITCODE }
+    try { & $Server @Arguments | Out-Host; return $LASTEXITCODE }
     finally { Pop-Location; foreach ($k in $Env.Keys) { [Environment]::SetEnvironmentVariable($k, $saved[$k]) } }
 }
 
@@ -98,8 +98,13 @@ function Test-PgRunning { & (Join-Path $PgBin 'pg_ctl.exe') status -D $PgData *>
 function Start-Pg {
     if (Test-PgRunning) { return }
     New-Item -ItemType Directory -Force -Path $Logs | Out-Null
-    & (Join-Path $PgBin 'pg_ctl.exe') start -D $PgData -l (Join-Path $Logs 'postgresql.log') -w -t 60 -o "-p $PgPort -c listen_addresses=127.0.0.1" | Out-Null
-    if ($LASTEXITCODE -ne 0) { Fail "PostgreSQL did not start; see $(Join-Path $Logs 'postgresql.log')" }
+    # Started detached with its output in files: the database server it launches must not inherit this console's
+    # handles (a caller reading this script's output would otherwise wait for as long as PostgreSQL runs).
+    $p = Start-Process -FilePath (Join-Path $PgBin 'pg_ctl.exe') -WindowStyle Hidden -PassThru `
+        -ArgumentList @('start', '-D', "`"$PgData`"", '-l', "`"$(Join-Path $Logs 'postgresql.log')`"", '-w', '-t', '60', '-o', "`"-p $PgPort -c listen_addresses=127.0.0.1`"") `
+        -RedirectStandardOutput (Join-Path $Logs 'pg_ctl.log') -RedirectStandardError (Join-Path $Logs 'pg_ctl-error.log')
+    if (-not $p.WaitForExit(90000)) { Fail 'PostgreSQL did not start within 90 seconds.' }
+    if (-not (Test-PgRunning)) { Fail "PostgreSQL did not start; see $(Join-Path $Logs 'postgresql.log') and pg_ctl-error.log" }
 }
 function Stop-Pg { if (Test-PgRunning) { & (Join-Path $PgBin 'pg_ctl.exe') stop -D $PgData -m fast -w | Out-Null } }
 
