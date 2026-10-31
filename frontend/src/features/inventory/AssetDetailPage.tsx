@@ -118,7 +118,16 @@ export function AssetDetailPage({ id, section = ASSETS_SECTION }: { id: string; 
           </Panel>
           <Panel title="Operating system & collection">
             <KV items={[
-              ['Operating system', (d?.os.name as string | null) ?? a.osName], ['Version', [d?.os.version, d?.os.build && `build ${d.os.build}`].filter(Boolean).join(' ') || null],
+              ['Operating system', (d?.os.name as string | null) ?? a.osName],
+              ['Version', [d?.os.displayVersion ?? d?.os.version, d?.os.build && `build ${d.os.build}`, d?.os.lts === true && 'LTS'].filter(Boolean).join(' ') || null],
+              ...(d?.os.family === 'linux' ? [
+                ['Distribution', [d.os.distribution, d.os.distributionFamily && d.os.distributionFamily !== d.os.distribution && `(${d.os.distributionFamily} family)`].filter(Boolean).join(' ') || null],
+                ['Edition', d.os.editionId as string | null],
+                ['Server or desktop', d.os.isServer == null ? null : d.os.isServer ? `Server${d.os.installationType ? ` (${d.os.installationType})` : ''}` : `Desktop${d.os.installationType ? ` (${d.os.installationType})` : ''}`],
+                ['Desktop environment', (d.os.desktopEnvironment as string | null) ?? 'None (headless)'],
+                ['Kernel', <span className="mono">{(d.os.kernel as string | null) ?? '—'}</span>],
+                ['Packages', d.os.packageManager ? `${d.os.packageManager}` : null],
+              ] as [string, ReactNode][] : d?.os.editionId ? [['Edition', [d.os.editionId, d.os.installationType && `(${d.os.installationType})`].filter(Boolean).join(' ')]] as [string, ReactNode][] : []),
               ['Architecture', d?.os.architecture as string | null], ['Installed', fmt.day(d?.os.installDate as string | null)], ['Last boot', fmt.date(d?.os.lastBoot as string | null)],
               ['Inventory source', inv.data?.source ? fmt.label(inv.data.source) : null], ['Collected', fmt.date(inv.data?.collectedAt)],
               ['Agent', inv.data?.agent ? <><Pill tone={inv.data.agent.status === 'active' ? 'ok' : 'crit'}>{fmt.label(inv.data.agent.status)}</Pill> {inv.data.agent.version} · checked in {fmt.ago(inv.data.agent.lastCheckinAt)}</> : 'Not installed'],

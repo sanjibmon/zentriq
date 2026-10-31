@@ -1,0 +1,6 @@
+[Unit]
+Description=Zentriq Agent watchdog (tamper protection)
+
+[Service]
+Type=oneshot
+ExecStart=/opt/zentriq-agent/zentriq-agent --watchdog

@@ -13,6 +13,7 @@ public sealed record DeviceFacts(InventoryDocument Doc, string Category, DateTim
     public bool IsEndpoint => !IsServer && Category is "endpoint" or "";
     public bool IsVirtual => Doc.Hardware.IsVirtual == true;
     public HardeningInfo? H => Doc.Security.Hardening;
+    public LinuxHardeningInfo? L => Doc.Security.Linux;
 }
 
 public sealed record CheckResult(CheckStatus Status, string? Actual)
@@ -33,7 +34,7 @@ public sealed record RuleParam(string Key, string Label, int Default, int Min, i
 /// </summary>
 public sealed record SecurityRule(
     string Id, string Title, string Category, string Severity, string Applies, string Reference, string Rationale, string Remediation,
-    Func<DeviceFacts, IReadOnlyDictionary<string, int>, CheckResult> Check, RuleParam[]? Params = null, bool DefaultOn = true)
+    Func<DeviceFacts, IReadOnlyDictionary<string, int>, CheckResult> Check, RuleParam[]? Params = null, bool DefaultOn = true, string Platform = "windows")
 {
     public IReadOnlyDictionary<string, int> Resolve(IReadOnlyDictionary<string, int>? overrides)
     {
@@ -44,7 +45,7 @@ public sealed record SecurityRule(
 
     public CheckResult Evaluate(DeviceFacts f, IReadOnlyDictionary<string, int>? overrides = null)
     {
-        if (f.Doc.Os.Family != "windows") return CheckResult.NotApplicable;
+        if (f.Doc.Os.Family != Platform) return CheckResult.NotApplicable;
         if (Applies == "server" && !f.IsServer) return CheckResult.NotApplicable;
         if (Applies == "endpoint" && f.IsServer) return CheckResult.NotApplicable;
         try { return Check(f, Resolve(overrides)); }
@@ -280,6 +281,92 @@ public static class SecurityRules
             "Script block logging records the PowerShell code that runs, which is essential for investigating attacks.",
             "Group Policy › Windows Components › Windows PowerShell › Turn on PowerShell Script Block Logging = Enabled.",
             (f, _) => CheckResult.Bool(f.H?.ScriptBlockLogging, "on", "off")),
+
+        // ---- Linux ---------------------------------------------------------------------------------
+        new("SL-01", "SSH: root cannot sign in", "Linux: remote access", "high", "all", "CIS Controls v8 5.4",
+            "Signing in as root over SSH skips individual accountability and is the first target of password guessing.",
+            "In /etc/ssh/sshd_config (or a file in sshd_config.d) set PermitRootLogin no, then reload sshd; administrators sign in with their own account and use sudo.",
+            (f, _) => f.L?.SshServer == false ? CheckResult.Pass("no SSH server")
+                : f.L?.SshRootLogin is { } r ? (r == "no" ? CheckResult.Pass("PermitRootLogin no") : CheckResult.Fail($"PermitRootLogin {r}")) : CheckResult.Unknown(),
+            Platform: "linux"),
+
+        new("SL-02", "SSH: password sign-in turned off", "Linux: remote access", "medium", "all", "CIS Controls v8 6.3",
+            "SSH keys (or certificates) cannot be guessed; passwords exposed to the network can.",
+            "Set PasswordAuthentication no (and KbdInteractiveAuthentication no) in sshd_config after the users have SSH keys, then reload sshd.",
+            (f, _) => f.L?.SshServer == false ? CheckResult.Pass("no SSH server") : CheckResult.Bool(f.L?.SshPasswordAuth is { } pa ? !pa : null, "keys only", "passwords allowed"),
+            Platform: "linux"),
+
+        new("SL-03", "Host firewall active", "Linux: hardening", "high", "all", "CIS Controls v8 4.4",
+            "A host firewall limits what an attacker on the network can reach, even when a service is exposed by mistake.",
+            "Turn on ufw (Ubuntu / Debian: ufw allow OpenSSH; ufw enable) or firewalld (RHEL family / SUSE: systemctl enable --now firewalld) and allow only the services the server provides.",
+            (f, _) => f.Doc.Security.FirewallEnabled is { } on ? (on ? CheckResult.Pass(f.L?.Firewall ?? "on") : CheckResult.Fail("no active firewall")) : CheckResult.Unknown("needs the agent or an SSH account with sudo"),
+            Platform: "linux"),
+
+        new("SL-04", "SELinux or AppArmor enforcing", "Linux: hardening", "medium", "all", "CIS Controls v8 4.1",
+            "Mandatory access control confines services, so a compromised one cannot read or change the rest of the system.",
+            "RHEL family: SELINUX=enforcing in /etc/selinux/config (relabel and reboot). Ubuntu / Debian / SUSE: keep AppArmor enabled (aa-status) with the profiles in enforce mode.",
+            (f, _) => f.L is null ? CheckResult.Unknown()
+                : f.L.Selinux == "enforcing" ? CheckResult.Pass("SELinux enforcing")
+                : f.L.AppArmor == true ? CheckResult.Pass("AppArmor")
+                : f.L.Selinux is null && f.L.AppArmor is null ? CheckResult.Unknown()
+                : CheckResult.Fail(f.L.Selinux is { } se ? $"SELinux {se}" : "AppArmor off"),
+            Platform: "linux"),
+
+        new("SL-05", "Automatic security updates", "Linux: patching", "medium", "all", "CIS Controls v8 7.3",
+            "Security fixes that install themselves close vulnerabilities without waiting for someone to log in.",
+            "Ubuntu / Debian: install unattended-upgrades (dpkg-reconfigure -plow unattended-upgrades). RHEL family: dnf install dnf-automatic; systemctl enable --now dnf-automatic-install.timer. SUSE: enable automatic online update (yast2 online_update_configuration).",
+            (f, _) => CheckResult.Bool(f.L?.AutoUpdates, "on", "off"),
+            Platform: "linux"),
+
+        new("SL-06", "No pending security updates", "Linux: patching", "high", "all", "CIS Controls v8 7.3",
+            "Published security updates that are not installed leave known vulnerabilities open.",
+            "Install the updates: apt-get update && apt-get upgrade (Ubuntu / Debian), dnf upgrade --security (RHEL family), zypper patch --category security (SUSE); reboot if a new kernel was installed.",
+            (f, p) => f.L?.PendingSecurityUpdates is { } n
+                ? (n <= p["maxPending"] ? CheckResult.Pass(n == 0 ? "none" : $"{n} pending") : CheckResult.Fail($"{n} security update(s) pending{(f.L.PendingUpdates is { } all ? $" ({all} updates in total)" : "")}"))
+                : CheckResult.Unknown("the package manager did not tell which updates are security updates"),
+            [new RuleParam("maxPending", "Pending security updates allowed", 0, 0, 50)], Platform: "linux"),
+
+        new("SL-07", "No reboot pending after updates", "Linux: patching", "low", "all", "CIS Controls v8 7.3",
+            "A new kernel or library is used only after a restart; until then the old, vulnerable one keeps running.",
+            "Restart the device in its next maintenance window (or use live patching where the distribution offers it).",
+            (f, _) => CheckResult.Bool(f.L?.RebootRequired is { } rb ? !rb : null, "not needed", "reboot required"),
+            Platform: "linux"),
+
+        new("SL-08", "Only root has UID 0", "Linux: accounts", "high", "all", "CIS Controls v8 5.4",
+            "Another account with UID 0 is a second, often hidden, root account.",
+            "Remove the extra account, or give it its own UID (usermod -u); review how it was created.",
+            (f, _) => f.L?.ExtraUid0 is { } x ? (x.Count == 0 ? CheckResult.Pass("root only") : CheckResult.Fail(string.Join(", ", x))) : CheckResult.Unknown(),
+            Platform: "linux"),
+
+        new("SL-09", "Password maximum age set", "Linux: accounts", "low", "all", "CIS Controls v8 5.2",
+            "Without a maximum age a leaked local password stays valid indefinitely.",
+            "Set PASS_MAX_DAYS in /etc/login.defs (and chage -M for existing users), or manage local accounts centrally.",
+            (f, p) => f.L?.PassMaxDays is { } d ? (d > 0 && d <= p["maxDays"] ? CheckResult.Pass($"{d} days") : CheckResult.Fail(d >= 99999 ? "never expires" : $"{d} days")) : CheckResult.Unknown(),
+            [new RuleParam("maxDays", "Maximum password age (days)", 365, 30, 3650)], Platform: "linux", DefaultOn: false),
+
+        new("SL-10", "No Telnet server", "Linux: remote access", "high", "all", "CIS Controls v8 4.8",
+            "Telnet sends passwords and sessions in clear text.",
+            "Remove the telnet server package (telnetd / telnet-server / inetutils-telnetd); use SSH.",
+            (f, _) => CheckResult.Bool(f.L?.TelnetServer is { } t ? !t : null, "not installed", "installed"),
+            Platform: "linux"),
+
+        new("SL-11", "Time synchronised", "Linux: logging", "low", "all", "CIS Controls v8 8.4",
+            "Logs from different systems can only be correlated when their clocks agree; Kerberos and TLS need correct time too.",
+            "Enable chrony or systemd-timesyncd (timedatectl set-ntp true) with the company's time servers.",
+            (f, _) => CheckResult.Bool(f.L?.TimeSync, "synchronised", "not synchronised"),
+            Platform: "linux"),
+
+        new("SL-12", "Audit daemon running on servers", "Linux: logging", "low", "server", "CIS Controls v8 8.2",
+            "auditd records security-relevant events (logins, privilege use, changes to key files) for investigations.",
+            "Install and enable auditd (apt install auditd / dnf install audit; systemctl enable --now auditd) with the distribution's or CIS audit rules.",
+            (f, _) => CheckResult.Bool(f.L?.Auditd, "running", "not running"),
+            Platform: "linux"),
+
+        new("SL-13", "Disk encrypted (laptops and desktops)", "Linux: hardening", "medium", "endpoint", "CIS Controls v8 3.6",
+            "A lost or stolen laptop with an unencrypted disk gives away all its data.",
+            "Install with LUKS full-disk encryption (re-installation is usually needed for the system disk); encrypt data disks with cryptsetup.",
+            (f, _) => CheckResult.Bool(f.Doc.Security.DiskEncryption, "encrypted", "not encrypted"),
+            Platform: "linux"),
     ];
 
     public static SecurityRule? Find(string id) => All.FirstOrDefault(r => r.Id == id);

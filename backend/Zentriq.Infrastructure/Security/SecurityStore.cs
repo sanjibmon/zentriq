@@ -108,7 +108,7 @@ public sealed class SecurityStore(NpgsqlDataSource ds)
         await using (var cmd = ds.CreateCommand("""
             SELECT a.id, a.category, d.document::text
               FROM zentriq.assets a JOIN zentriq.asset_inventory_documents d ON d.asset_id = a.id
-             WHERE a.status = 'active' AND d.document #>> '{os,family}' = 'windows'
+             WHERE a.status = 'active' AND d.document #>> '{os,family}' IN ('windows', 'linux')
             """))
         await using (var r = await cmd.ExecuteReaderAsync(ct))
         {
@@ -121,7 +121,7 @@ public sealed class SecurityStore(NpgsqlDataSource ds)
                 var id = r.GetGuid(0);
                 var facts = new DeviceFacts(doc, r.GetString(1), now);
                 devices++;
-                if (doc.Security.Hardening is null) noData++;
+                if (doc.Os.Family == "windows" ? doc.Security.Hardening is null : doc.Security.Linux is null) noData++;
                 foreach (var b in baselines.Where(b => b.Definition.InScope(facts.IsServer ? "server" : "endpoint")))
                     rows.AddRange(EvaluateDevice(b, id, facts, exceptions));
             }

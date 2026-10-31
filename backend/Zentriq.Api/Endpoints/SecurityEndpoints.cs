@@ -50,10 +50,12 @@ public static class SecurityEndpoints
                 failedHigh = r.GetInt64(4), notAssessed = r.GetInt64(5), exempt = r.GetInt64(6), unknown = r.GetInt64(7), good = r.GetInt64(8), poor = r.GetInt64(9),
             }))[0];
             var coverage = (await Rows("""
-                SELECT count(*), count(*) FILTER (WHERE d.document #> '{security,hardening}' IS NULL OR jsonb_typeof(d.document #> '{security,hardening}') = 'null')
+                SELECT count(*),
+                       count(*) FILTER (WHERE jsonb_typeof(d.document #> CASE WHEN d.document #>> '{os,family}' = 'linux' THEN '{security,linux}'::text[] ELSE '{security,hardening}'::text[] END) IS DISTINCT FROM 'object'),
+                       count(*) FILTER (WHERE d.document #>> '{os,family}' = 'linux')
                   FROM zentriq.assets a JOIN zentriq.asset_inventory_documents d ON d.asset_id = a.id
-                 WHERE a.status = 'active' AND d.document #>> '{os,family}' = 'windows'
-                """, r => new { windowsDevices = r.GetInt64(0), noSettingsData = r.GetInt64(1) }))[0];
+                 WHERE a.status = 'active' AND d.document #>> '{os,family}' IN ('windows', 'linux')
+                """, r => new { windowsDevices = r.GetInt64(0), noSettingsData = r.GetInt64(1), linuxDevices = r.GetInt64(2) }))[0];
             var byCategory = await Rows($"""
                 SELECT COALESCE(r.category, 'Other'), count(*) FILTER (WHERE x.status = 'pass'), count(*) FILTER (WHERE x.status = 'fail'),
                        count(*) FILTER (WHERE x.status = 'unknown'), count(*) FILTER (WHERE x.status = 'exempt')
@@ -115,7 +117,7 @@ public static class SecurityEndpoints
                     return new
                     {
                         id = rule.Id, title = rule.Title, category = rule.Category, defaultSeverity = rule.Severity, severity = on ? e.Severity : rule.Severity,
-                        applies = rule.Applies, reference = rule.Reference, rationale = rule.Rationale, remediation = rule.Remediation, enabled = on,
+                        applies = rule.Applies, platform = rule.Platform, reference = rule.Reference, rationale = rule.Rationale, remediation = rule.Remediation, enabled = on,
                         @params = (rule.Params ?? []).Select(p => new { p.Key, p.Label, p.Default, p.Min, p.Max, value = on ? e.Params[p.Key] : p.Default }),
                         pass = c.Pass, fail = c.Fail, unknown = c.Unknown, exempt = c.Exempt,
                     };
@@ -150,7 +152,7 @@ public static class SecurityEndpoints
             var exceptions = await ExceptionsAsync(ds, rule.Id, ct);
             return Results.Ok(new
             {
-                rule = new { id = rule.Id, title = rule.Title, category = rule.Category, severity = rule.Severity, applies = rule.Applies, reference = rule.Reference, rationale = rule.Rationale, remediation = rule.Remediation },
+                rule = new { id = rule.Id, title = rule.Title, category = rule.Category, severity = rule.Severity, applies = rule.Applies, platform = rule.Platform, reference = rule.Reference, rationale = rule.Rationale, remediation = rule.Remediation },
                 devices, exceptions,
             });
         });
@@ -225,11 +227,15 @@ public static class SecurityEndpoints
                 }
             }
             bool? hasData = null;
-            await using (var cmd = ds.CreateCommand("SELECT document #> '{security,hardening}' IS NOT NULL AND jsonb_typeof(document #> '{security,hardening}') <> 'null', document #>> '{os,family}' FROM zentriq.asset_inventory_documents WHERE asset_id = @a"))
+            await using (var cmd = ds.CreateCommand("""
+                SELECT jsonb_typeof(document #> CASE WHEN document #>> '{os,family}' = 'linux' THEN '{security,linux}'::text[] ELSE '{security,hardening}'::text[] END) = 'object',
+                       document #>> '{os,family}'
+                  FROM zentriq.asset_inventory_documents WHERE asset_id = @a
+                """))
             {
                 cmd.Parameters.AddWithValue("a", assetId);
                 await using var r = await cmd.ExecuteReaderAsync(ct);
-                if (await r.ReadAsync(ct) && !r.IsDBNull(1) && r.GetString(1) == "windows") hasData = !r.IsDBNull(0) && r.GetBoolean(0);
+                if (await r.ReadAsync(ct) && !r.IsDBNull(1) && r.GetString(1) is "windows" or "linux") hasData = !r.IsDBNull(0) && r.GetBoolean(0);
             }
             return Results.Ok(new { baselines, results, settingsReported = hasData });
         });
@@ -271,7 +277,7 @@ public static class SecurityEndpoints
                 id, name = r.GetString(0), description = r.IsDBNull(1) ? null : r.GetString(1), builtIn = r.GetBoolean(2), enabled = r.GetBoolean(3), categories = def.Categories,
                 rules = SecurityRules.All.Select(rule => new
                 {
-                    id = rule.Id, title = rule.Title, category = rule.Category, defaultSeverity = rule.Severity, applies = rule.Applies,
+                    id = rule.Id, title = rule.Title, category = rule.Category, defaultSeverity = rule.Severity, applies = rule.Applies, platform = rule.Platform,
                     enabled = eff.ContainsKey(rule.Id), severity = eff.TryGetValue(rule.Id, out var e) ? e.Severity : rule.Severity,
                     @params = (rule.Params ?? []).Select(p => new { p.Key, p.Label, p.Default, p.Min, p.Max, value = eff.TryGetValue(rule.Id, out var e2) ? e2.Params[p.Key] : p.Default }),
                 }),

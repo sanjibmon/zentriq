@@ -34,13 +34,14 @@ public static class AgentEndpoints
     private const long MaxInventoryJson = 48L * 1024 * 1024;
 
     public sealed record EnrollRequest(string Token, string Csr, string? Hostname, string? OsName, string? AgentVersion, string? SmbiosUuid,
-        int? CheckinMinutes = null, int? InventoryMinutes = null);
+        int? CheckinMinutes = null, int? InventoryMinutes = null, string? Platform = null);
     public sealed record HelloRequest(string? CodeId, string? Nonce);
     /// <summary>Presence: the hash of the uninstall code the agent holds ("" none; null = agent does not report it).</summary>
     public sealed record PresenceRequest(string? UninstallCodeHash = null);
     public sealed record RenewRequest(string Csr);
     public sealed record CheckinRequest(string? AgentVersion, string? Hostname, string? OsName, string? LastError, string[]? Capabilities = null,
-        DateTimeOffset? OfflineSince = null, bool? UninstallProtected = null, List<AgentEvent>? Events = null, TamperReport? TamperProtection = null);
+        DateTimeOffset? OfflineSince = null, bool? UninstallProtected = null, List<AgentEvent>? Events = null, TamperReport? TamperProtection = null,
+        string? Platform = null);
     /// <summary>Reported by the agent: "tamper" (a change it undid, a wrong code) or "control" (stopped, disabled, paused with a code).</summary>
     public sealed record AgentEvent(string? Kind, DateTimeOffset? At, string? Text);
     /// <summary>Tamper protection on the device: on, pending, paused (until) or off.</summary>
@@ -141,8 +142,8 @@ public static class AgentEndpoints
             {
                 await using (var ins = new NpgsqlCommand("""
                     INSERT INTO zentriq.agent_registrations (id, agent_version, cert_thumbprint, cert_serial, cert_not_after, status, hostname, os_name, last_ip, token_id,
-                                                            enrolled_at, last_checkin_at, checkin_minutes, inventory_minutes, online_until, uninstall_key_protected)
-                    VALUES (@id, @v, @tp, @sn, @na, 'active', @h, @os, @ip, @tok, now(), now(), @ci, @inv, now() + interval '45 seconds', @uk)   -- then the live connection (or, older agents, the check-in) keeps it online
+                                                            enrolled_at, last_checkin_at, checkin_minutes, inventory_minutes, online_until, uninstall_key_protected, platform)
+                    VALUES (@id, @v, @tp, @sn, @na, 'active', @h, @os, @ip, @tok, now(), now(), @ci, @inv, now() + interval '45 seconds', @uk, @pf)   -- then the live connection (or, older agents, the check-in) keeps it online
                     """, conn, tx))
                 {
                     ins.Parameters.AddWithValue("ci", checkin);
@@ -157,6 +158,7 @@ public static class AgentEndpoints
                     ins.Parameters.Add(Text("os", Trunc(req.OsName, 200)));
                     ins.Parameters.Add(new NpgsqlParameter("ip", NpgsqlDbType.Inet) { Value = (object?)ClientIp(http) ?? DBNull.Value });
                     ins.Parameters.AddWithValue("tok", tokenId);
+                    ins.Parameters.AddWithValue("pf", AgentPackages.Normalize(req.Platform));
                     await ins.ExecuteNonQueryAsync(ct);
                 }
                 await using (var upd = new NpgsqlCommand("UPDATE zentriq.agent_enrollment_tokens SET uses = uses + 1 WHERE id = @id", conn, tx))
@@ -166,7 +168,7 @@ public static class AgentEndpoints
                 }
                 await tx.CommitAsync(ct);
                 await audit.WriteAsync(new AuditActor(null, "agent", http.Connection.RemoteIpAddress?.ToString()), "agent.enroll", agentId.ToString(), detail: new { hostname = req.Hostname, tokenId }, ct: ct);
-                log.LogInformation("Agent {AgentId} enrolled ({Host}) from {Ip}", agentId, req.Hostname, http.Connection.RemoteIpAddress);
+                log.LogInformation("Agent {AgentId} enrolled ({Host}, {Platform}) from {Ip}", agentId, req.Hostname, AgentPackages.Normalize(req.Platform), http.Connection.RemoteIpAddress);
                 return Results.Ok(new
                 {
                     agentId,
@@ -270,14 +272,16 @@ public static class AgentEndpoints
                                            ELSE now() + make_interval(mins => checkin_minutes * 2 + 5) END,
                        last_outage_from = COALESCE(@off, last_outage_from), last_outage_to = CASE WHEN @off::timestamptz IS NULL THEN last_outage_to ELSE now() END,
                        uninstall_protected = COALESCE(@up, uninstall_protected),
-                       tamper_state = COALESCE(@ts, tamper_state), tamper_until = CASE WHEN @ts::text IS NULL THEN tamper_until ELSE @tu END
+                       tamper_state = COALESCE(@ts, tamper_state), tamper_until = CASE WHEN @ts::text IS NULL THEN tamper_until ELSE @tu END,
+                       platform = COALESCE(@pf, platform)
                  WHERE id = @id
-                RETURNING last_inventory_at, cert_not_after, checkin_minutes, inventory_minutes, uninstall_key_protected
+                RETURNING last_inventory_at, cert_not_after, checkin_minutes, inventory_minutes, uninstall_key_protected, platform
                 """);
             cmd.Parameters.Add(new NpgsqlParameter("off", NpgsqlDbType.TimestampTz) { Value = (object?)outageFrom ?? DBNull.Value });
             cmd.Parameters.Add(new NpgsqlParameter("up", NpgsqlDbType.Boolean) { Value = (object?)req.UninstallProtected ?? DBNull.Value });
             var ts = req.TamperProtection?.State is "on" or "pending" or "paused" or "off" ? req.TamperProtection.State : null;
             cmd.Parameters.Add(Text("ts", ts));
+            cmd.Parameters.Add(Text("pf", req.Platform is null ? null : AgentPackages.Normalize(req.Platform)));
             cmd.Parameters.Add(new NpgsqlParameter("tu", NpgsqlDbType.TimestampTz) { Value = ts == "paused" && req.TamperProtection!.Until is { } tu ? tu : DBNull.Value });
             cmd.Parameters.AddWithValue("id", agent.Id);
             cmd.Parameters.Add(new NpgsqlParameter("ip", NpgsqlDbType.Inet) { Value = (object?)ClientIp(http) ?? DBNull.Value });
@@ -288,6 +292,7 @@ public static class AgentEndpoints
             DateTimeOffset? lastInv = null, notAfter = null;
             int checkin = settings.CheckinMinutes, inventory = settings.InventoryMinutes;
             string? keyProtected = null;
+            var platform = AgentPackages.Windows;
             await using (var r = await cmd.ExecuteReaderAsync(ct))
                 if (await r.ReadAsync(ct))
                 {
@@ -296,6 +301,7 @@ public static class AgentEndpoints
                     checkin = r.GetInt32(2);
                     inventory = r.GetInt32(3);
                     keyProtected = r.IsDBNull(4) ? null : r.GetString(4);
+                    platform = r.GetString(5);
                 }
             if (outageFrom is not null) lf.CreateLogger("Zentriq.Agents").LogInformation("Agent {AgentId} reconnected after being offline since {Since:u}", agent.Id, outageFrom);
             // The device's uninstall key (created here for agents enrolled before uninstall protection existed).
@@ -325,7 +331,7 @@ public static class AgentEndpoints
             if (caps.Contains("tamper-protection")) kinds.Add("agent-control");
             await CompleteUpdatesAsync(ds, agent.Id, req.AgentVersion, ct);
             if (settings.AutoUpdate && caps.Contains("self-update") && agent.AssetId is not null)
-                await QueueAutoUpdateAsync(ds, env, agent.Id, agent.AssetId.Value, req.AgentVersion, settings.AutoUpdateMax, ct);
+                await QueueAutoUpdateAsync(ds, env, agent.Id, agent.AssetId.Value, req.AgentVersion, settings.AutoUpdateMax, platform, ct);
             if (kinds.Count > 0)
             {
                 // Hand out new actions, and re-send ones whose result never arrived (e.g. the device restarted mid-action).
@@ -370,30 +376,57 @@ public static class AgentEndpoints
         }).AllowAnonymous();
 
         // The agent package for console-requested updates (client certificate required, like every agent call).
-        g.MapGet("/package", async (HttpContext http, NpgsqlDataSource ds, AgentServer server, IWebHostEnvironment env, CancellationToken ct) =>
+        g.MapGet("/package", async (HttpContext http, NpgsqlDataSource ds, AgentServer server, IWebHostEnvironment env, string? platform, string? format, CancellationToken ct) =>
         {
             var (agent, error) = await AuthenticateAsync(http, ds, server, ct);
             if (agent is null) return error!;
+            if (AgentPackages.IsLinux(platform))
+            {
+                if (format is not ("deb" or "rpm" or "tar")) return Results.Problem(statusCode: 400, title: "Choose the package format: deb, rpm or tar.");
+                var path = AgentPackages.Physical(env, AgentPackages.LinuxFile(platform!, format));
+                return path is null ? Results.Problem(statusCode: 404, title: $"No {format} agent package for {platform} is available on this server.")
+                    : Results.File(path, AgentPackages.ContentType(format), Path.GetFileName(path));
+            }
             var file = env.WebRootFileProvider.GetFileInfo(PackagePath);
             if (!file.Exists || file.PhysicalPath is null) return Results.Problem(statusCode: 404, title: "No agent package is available on this server.");
             return Results.File(file.PhysicalPath, "application/x-msi", "ZentriqAgent-x64.msi");
         }).AllowAnonymous();
 
         // The branded remote support agent installer for this server (requested by "install remote support" actions).
-        g.MapGet("/remote-agent", async (HttpContext http, NpgsqlDataSource ds, AgentServer server, Zentriq.Infrastructure.Remote.RemoteSupportService remote, CancellationToken ct) =>
+        g.MapGet("/remote-agent", async (HttpContext http, NpgsqlDataSource ds, AgentServer server, Zentriq.Infrastructure.Remote.RemoteSupportService remote, string? platform, CancellationToken ct) =>
         {
             var (agent, error) = await AuthenticateAsync(http, ds, server, ct);
             if (agent is null) return error!;
+            var pf = AgentPackages.Normalize(platform);
             try
             {
-                var (bytes, _) = await remote.AgentInstallerAsync(ct);
-                return Results.File(bytes, "application/octet-stream", "ZentriqRemoteSupport.exe");
+                var (bytes, _) = await remote.AgentInstallerAsync(pf, ct);
+                return Results.File(bytes, "application/octet-stream", AgentPackages.IsLinux(pf) ? "meshagent" : "ZentriqRemoteSupport.exe");
             }
             catch (Exception ex) when (ex is Zentriq.Infrastructure.Remote.MeshException or HttpRequestException or System.Net.WebSockets.WebSocketException or TaskCanceledException)
             {
                 return Results.Problem(statusCode: 503, title: "Remote support is not available on the server: " + ex.Message);
             }
         }).AllowAnonymous();
+
+        // Linux installation (no client certificate yet): the installer script and the packages, from the agent port the
+        // devices already reach. The one-line install command fetches them trusting only the server's pinned key.
+        g.MapGet("/linux/install.sh", (IWebHostEnvironment env) =>
+            AgentPackages.Physical(env, AgentPackages.LinuxInstallScript) is { } script
+                ? Results.File(script, "text/x-shellscript; charset=utf-8", "install.sh")
+                : Results.Problem(statusCode: 404, title: "The Linux agent is not available on this server.")).AllowAnonymous();
+        g.MapGet("/linux/package", (IWebHostEnvironment env, string? platform, string? format) =>
+        {
+            if (!AgentPackages.IsLinux(platform) || format is not ("deb" or "rpm" or "tar"))
+                return Results.Problem(statusCode: 400, title: "Give platform (linux-x64 or linux-arm64) and format (deb, rpm or tar).");
+            var path = AgentPackages.Physical(env, AgentPackages.LinuxFile(platform!, format));
+            return path is null ? Results.Problem(statusCode: 404, title: $"No {format} agent package for {platform} is available on this server.")
+                : Results.File(path, AgentPackages.ContentType(format), Path.GetFileName(path));
+        }).AllowAnonymous();
+        g.MapGet("/linux/package.sha256", (IWebHostEnvironment env, string? platform, string? format) =>
+            AgentPackages.IsLinux(platform) && format is "deb" or "rpm" or "tar" && AgentPackages.Physical(env, AgentPackages.LinuxFile(platform!, format)) is { } path
+                ? Results.Text(AgentPackages.Sha256(path) + "\n", "text/plain")
+                : Results.NotFound()).AllowAnonymous();
 
         g.MapPost("/inventory", async (HttpContext http, NpgsqlDataSource ds, AgentServer server, InventoryStore store, LicensingService licensing, ILoggerFactory lf, CancellationToken ct) =>
         {
@@ -480,13 +513,13 @@ public static class AgentEndpoints
 
         g.MapGet("", async (NpgsqlDataSource ds, IWebHostEnvironment env, AgentPresence presence, CancellationToken ct) =>
         {
-            var latest = PackageVersion(env);
+            var latestBy = AgentPackages.Platforms.ToDictionary(p => p, p => AgentPackages.Version(env, p));
             await using var cmd = ds.CreateCommand("""
                 SELECT r.id, r.status, r.agent_version, r.hostname, r.os_name, host(r.last_ip), r.enrolled_at, r.last_checkin_at, r.last_inventory_at,
                        r.cert_not_after, r.asset_id, a.hostname, r.revoked_at, t.name, r.capabilities,
                        u.status, u.target, u.detail, u.requested_at, u.completed_at,
                        r.checkin_minutes, r.inventory_minutes, COALESCE(r.online_until > now(), false), r.last_outage_from, r.last_outage_to, r.uninstall_protected,
-                       zentriq.asset_ipv4(r.asset_id), r.tamper_state, r.tamper_until, r.last_tamper_at, r.last_tamper, COALESCE(u.automatic, false)
+                       zentriq.asset_ipv4(r.asset_id), r.tamper_state, r.tamper_until, r.last_tamper_at, r.last_tamper, COALESCE(u.automatic, false), r.platform
                   FROM zentriq.agent_registrations r
                   LEFT JOIN LATERAL (SELECT x.status, x.target, x.detail, x.requested_at, x.completed_at, x.automatic FROM zentriq.asset_actions x
                                       WHERE x.agent_id = r.id AND x.kind = 'agent-update' ORDER BY x.requested_at DESC LIMIT 1) u ON true
@@ -502,13 +535,15 @@ public static class AgentEndpoints
                 string? S(int i) => r.IsDBNull(i) ? null : r.GetString(i);
                 var lastCheckin = D(7);
                 var status = r.GetString(1);
+                var platform = r.GetString(32);
+                var latest = latestBy.GetValueOrDefault(platform);
                 var health = status == "revoked" ? "revoked" : status == "replaced" ? "replaced"
                     : lastCheckin is null ? "never"
                     : r.GetBoolean(22) ? "online"
                     : lastCheckin > DateTimeOffset.UtcNow.AddDays(-7) ? "stale" : "offline";
                 list.Add(new
                 {
-                    id = r.GetGuid(0), status, health, version = r.GetString(2), hostname = S(3) ?? S(11), osName = S(4), lastIp = Ipv4(S(26), S(5)),
+                    id = r.GetGuid(0), status, health, platform, version = r.GetString(2), hostname = S(3) ?? S(11), osName = S(4), lastIp = Ipv4(S(26), S(5)),
                     enrolledAt = r.GetFieldValue<DateTimeOffset>(6), lastCheckinAt = lastCheckin, lastInventoryAt = D(8), certificateExpires = D(9),
                     assetId = r.IsDBNull(10) ? (Guid?)null : r.GetGuid(10), revokedAt = D(12), enrollmentCode = S(13),
                     canSelfUpdate = !r.IsDBNull(14) && r.GetFieldValue<string[]>(14).Contains("self-update"),
@@ -628,31 +663,35 @@ public static class AgentEndpoints
         // capability are reported back: they need the new MSI installed once (after that they update from here).
         g.MapPost("/update", async (UpdateRequest body, NpgsqlDataSource ds, IWebHostEnvironment env, RequestContext rc, CancellationToken ct) =>
         {
-            var file = env.WebRootFileProvider.GetFileInfo(PackagePath);
-            var latest = PackageVersion(env);
-            if (!file.Exists || file.PhysicalPath is null || latest is null) return Results.Problem(statusCode: 409, title: "No agent package is available on this server.");
+            var latestBy = AgentPackages.Platforms.ToDictionary(p => p, p => AgentPackages.Version(env, p));
+            if (latestBy.Values.All(v => v is null)) return Results.Problem(statusCode: 409, title: "No agent package is available on this server.");
             var ids = body.AgentIds?.Distinct().Take(20000).ToArray() ?? [];
             if (ids.Length == 0 && body.All != true) return Validation.Problem("agentIds", "Select agents, or update all agents.");
-            var sha = PackageSha256(file.PhysicalPath);
+            var argBy = new Dictionary<string, string?>();
 
             await using var q = ds.CreateCommand("""
                 SELECT r.id, r.asset_id, r.agent_version, COALESCE(r.hostname, a.hostname), COALESCE('self-update' = ANY(r.capabilities), false),
                        EXISTS (SELECT 1 FROM zentriq.asset_actions x WHERE x.agent_id = r.id AND x.kind = 'agent-update' AND x.status IN ('queued','sent','running')
-                                  AND x.requested_at > now() - interval '24 hours')
+                                  AND x.requested_at > now() - interval '24 hours'),
+                       r.platform
                   FROM zentriq.agent_registrations r LEFT JOIN zentriq.assets a ON a.id = r.asset_id
                  WHERE r.status = 'active' AND (@all OR r.id = ANY(@ids))
                 """);
             q.Parameters.AddWithValue("all", body.All == true);
             q.Parameters.AddWithValue("ids", ids);
-            var rows = new List<(Guid Id, Guid? Asset, string Version, string? Host, bool Capable, bool Pending)>();
+            var rows = new List<(Guid Id, Guid? Asset, string Version, string? Host, bool Capable, bool Pending, string Platform)>();
             await using (var r = await q.ExecuteReaderAsync(ct))
                 while (await r.ReadAsync(ct))
-                    rows.Add((r.GetGuid(0), r.IsDBNull(1) ? null : r.GetGuid(1), r.GetString(2), r.IsDBNull(3) ? null : r.GetString(3), r.GetBoolean(4), r.GetBoolean(5)));
+                    rows.Add((r.GetGuid(0), r.IsDBNull(1) ? null : r.GetGuid(1), r.GetString(2), r.IsDBNull(3) ? null : r.GetString(3), r.GetBoolean(4), r.GetBoolean(5), r.GetString(6)));
 
-            int queued = 0, current = 0, pending = 0, manual = 0, noAsset = 0;
+            int queued = 0, current = 0, pending = 0, manual = 0, noAsset = 0, noPackage = 0;
             var manualHosts = new List<string>();
+            var targets = new SortedSet<string>(StringComparer.Ordinal);
             foreach (var a in rows)
             {
+                var latest = latestBy.GetValueOrDefault(a.Platform);
+                if (!argBy.TryGetValue(a.Platform, out var arg)) argBy[a.Platform] = arg = latest is null ? null : AgentPackages.UpdateArgument(env, a.Platform);
+                if (latest is null || arg is null) { noPackage++; continue; }
                 if (!IsOlder(a.Version, latest)) { current++; continue; }
                 if (a.Pending) { pending++; continue; }
                 if (!a.Capable) { manual++; manualHosts.Add(a.Host ?? a.Id.ToString()); continue; }
@@ -664,21 +703,24 @@ public static class AgentEndpoints
                 ins.Parameters.AddWithValue("as", a.Asset.Value);
                 ins.Parameters.AddWithValue("ag", a.Id);
                 ins.Parameters.AddWithValue("t", latest);
-                ins.Parameters.AddWithValue("sha", sha);
+                ins.Parameters.AddWithValue("sha", arg);
                 ins.Parameters.Add(new NpgsqlParameter("by", NpgsqlDbType.Uuid) { Value = (object?)rc.UserId ?? DBNull.Value });
                 ins.Parameters.AddWithValue("d", $"Update {a.Version} -> {latest} requested.");
                 await ins.ExecuteNonQueryAsync(ct);
+                targets.Add(latest);
                 queued++;
             }
             AgentPresence.Instance.Nudge();
-            await rc.AuditAsync("agent.update_requested", latest, detail: new { queued, current, pending, manual, noAsset, all = body.All == true });
+            var version = string.Join(", ", targets.DefaultIfEmpty(latestBy[AgentPackages.Windows] ?? latestBy.Values.First(v => v is not null)!));
+            await rc.AuditAsync("agent.update_requested", version, detail: new { queued, current, pending, manual, noAsset, noPackage, all = body.All == true });
             var parts = new List<string>();
-            if (queued > 0) parts.Add($"{queued} agent(s) will update to {latest} at their next check-in (set by their check-in interval).");
+            if (queued > 0) parts.Add($"{queued} agent(s) will update to {version} at their next check-in (set by their check-in interval).");
             if (pending > 0) parts.Add($"{pending} already have an update in progress.");
             if (current > 0) parts.Add($"{current} are already up to date.");
             if (manual > 0) parts.Add($"{manual} run an earlier agent that cannot update itself ({string.Join(", ", manualHosts.Take(5))}{(manual > 5 ? ", …" : "")}): install the new ZentriqAgent-x64.msi on them once; later updates then work from here.");
             if (noAsset > 0) parts.Add($"{noAsset} have not sent inventory yet and were skipped.");
-            return Results.Ok(new { queued, current, pending, manual, noAsset, version = latest, message = parts.Count > 0 ? string.Join(" ", parts) : "No agents selected." });
+            if (noPackage > 0) parts.Add($"{noPackage} run on a platform this server has no agent package for.");
+            return Results.Ok(new { queued, current, pending, manual, noAsset, noPackage, version, message = parts.Count > 0 ? string.Join(" ", parts) : "No agents selected." });
         }).RequireAuthorization(Permissions.AgentsManage);
 
         // Check-in and inventory intervals of selected agents (applied at their next check-in).
@@ -826,11 +868,13 @@ public static class AgentEndpoints
                 id, name = req.Name.Trim(), serverUrl = url, expiresAt = expires, maxUses = req.MaxUses, code = AgentCodes.Group(code),
                 checkinMinutes = checkin, inventoryMinutes = inventory,
                 installCommand = InstallCommand(url, AgentCodes.Group(code), checkin, inventory),
+                linuxInstallCommand = AgentPackages.LinuxInfo(env) is null ? null : AgentPackages.LinuxInstallCommand(url, server.ServerPin, AgentCodes.Group(code), checkin, inventory),
                 package = PackageInfo(env),
+                linuxPackages = AgentPackages.LinuxInfo(env),
             });
         }).RequireAuthorization(Permissions.AgentsManage);
 
-        g.MapGet("/enrollment-tokens/{id:guid}/code", async (Guid id, NpgsqlDataSource ds, RequestContext rc, IWebHostEnvironment env, Zentriq.Infrastructure.Secrets.CredentialProtector protector, CancellationToken ct) =>
+        g.MapGet("/enrollment-tokens/{id:guid}/code", async (Guid id, NpgsqlDataSource ds, RequestContext rc, IWebHostEnvironment env, AgentServer server, Zentriq.Infrastructure.Secrets.CredentialProtector protector, CancellationToken ct) =>
         {
             await using var cmd = ds.CreateCommand("SELECT name, code_protected, revoked_at IS NULL AND expires_at > now() AND (max_uses IS NULL OR uses < max_uses), server_url, expires_at, max_uses, uses, checkin_minutes, inventory_minutes FROM zentriq.agent_enrollment_tokens WHERE id = @id");
             cmd.Parameters.AddWithValue("id", id);
@@ -849,7 +893,10 @@ public static class AgentEndpoints
                 id, name, code = shown, serverUrl = r.GetString(3), expiresAt = r.GetFieldValue<DateTimeOffset>(4), maxUses = r.IsDBNull(5) ? (int?)null : r.GetInt32(5), uses = r.GetInt32(6),
                 checkinMinutes = ci, inventoryMinutes = inv,
                 installCommand = AgentCodes.IsShortEnrollmentCode(code) ? InstallCommand(r.GetString(3), shown, ci, inv) : $"msiexec /i ZentriqAgent-x64.msi /qn ENROLLMENTCODE=\"{code}\"",
+                linuxInstallCommand = AgentCodes.IsShortEnrollmentCode(code) && AgentPackages.LinuxInfo(env) is not null
+                    ? AgentPackages.LinuxInstallCommand(r.GetString(3), server.ServerPin, shown, ci, inv) : null,
                 package = PackageInfo(env),
+                linuxPackages = AgentPackages.LinuxInfo(env),
             };
             await r.DisposeAsync();
             await rc.AuditAsync("agent.token_viewed", name);
@@ -890,7 +937,7 @@ public static class AgentEndpoints
         }).RequireAuthorization(Permissions.AgentsManage);
 
         g.MapGet("/package", (IWebHostEnvironment env, AgentServer server) =>
-            Results.Ok(new { package = PackageInfo(env), agentPort = server.Port, defaultServerUrl = server.DefaultUrl, enrollmentAvailable = server.Ca is not null }))
+            Results.Ok(new { package = PackageInfo(env), linuxPackages = AgentPackages.LinuxInfo(env), agentPort = server.Port, defaultServerUrl = server.DefaultUrl, enrollmentAvailable = server.Ca is not null }))
             .RequireAuthorization(Permissions.AssetsView);
     }
 
@@ -915,21 +962,7 @@ public static class AgentEndpoints
     /// <summary>True when <paramref name="version"/> is older than <paramref name="latest"/> (1.1.1 = 1.1.1.0).</summary>
     internal static bool IsOlder(string? version, string? latest) => AgentProtocol.IsOlderVersion(version, latest);
 
-    private static readonly object HashLock = new();
-    private static (string Path, DateTime Written, long Length, string Sha)? _hash;
-
-    internal static string PackageSha256(string path)
-    {
-        var info = new FileInfo(path);
-        lock (HashLock)
-        {
-            if (_hash is { } h && h.Path == path && h.Written == info.LastWriteTimeUtc && h.Length == info.Length) return h.Sha;
-            using var s = File.OpenRead(path);
-            var sha = Convert.ToHexString(SHA256.HashData(s)).ToLowerInvariant();
-            _hash = (path, info.LastWriteTimeUtc, info.Length, sha);
-            return sha;
-        }
-    }
+    internal static string PackageSha256(string path) => AgentPackages.Sha256(path);
 
     /// <summary>
     /// Events the agent reports at check-in: written to the audit log; tampering is also kept on the agent and raised as a
@@ -969,12 +1002,11 @@ public static class AgentEndpoints
     /// Automatic update (Agents › Settings): an agent older than the package on this server gets an update action at its
     /// check-in, unless one is in progress, one failed in the last 24 hours, or the limit of simultaneous updates is reached.
     /// </summary>
-    private static async Task QueueAutoUpdateAsync(NpgsqlDataSource ds, IWebHostEnvironment env, Guid agentId, Guid assetId, string? version, int max, CancellationToken ct)
+    private static async Task QueueAutoUpdateAsync(NpgsqlDataSource ds, IWebHostEnvironment env, Guid agentId, Guid assetId, string? version, int max, string platform, CancellationToken ct)
     {
-        var latest = PackageVersion(env);
+        var latest = AgentPackages.Version(env, platform);
         if (latest is null || !IsOlder(version, latest)) return;
-        var file = env.WebRootFileProvider.GetFileInfo(PackagePath);
-        if (!file.Exists || file.PhysicalPath is null) return;
+        if (AgentPackages.UpdateArgument(env, platform) is not { } argument) return;
         await using var ins = ds.CreateCommand("""
             INSERT INTO zentriq.asset_actions (asset_id, agent_id, channel, kind, target, operation, argument, detail, automatic)
             SELECT @as, @ag, 'agent', 'agent-update', @t, 'update', @sha, @d, true
@@ -987,7 +1019,7 @@ public static class AgentEndpoints
         ins.Parameters.AddWithValue("as", assetId);
         ins.Parameters.AddWithValue("ag", agentId);
         ins.Parameters.AddWithValue("t", latest);
-        ins.Parameters.AddWithValue("sha", PackageSha256(file.PhysicalPath));
+        ins.Parameters.AddWithValue("sha", argument);
         ins.Parameters.AddWithValue("d", $"Automatic update {version} -> {latest}.");
         ins.Parameters.AddWithValue("max", (long)Math.Max(1, max));
         await ins.ExecuteNonQueryAsync(ct);
@@ -1005,7 +1037,7 @@ public static class AgentEndpoints
                SET status = CASE WHEN target = @v THEN 'succeeded' ELSE 'failed' END,
                    result_state = CASE WHEN target = @v THEN 'updated' ELSE NULL END,
                    detail = CASE WHEN target = @v THEN 'Updated to ' || @v || '.'
-                                 ELSE 'The agent still reports ' || @v || ' after the update was started. See C:\ProgramData\Zentriq\Agent\Logs\update-' || target || '.log on the device.' END,
+                                 ELSE 'The agent still reports ' || @v || ' after the update was started. See the update log on the device: C:\ProgramData\Zentriq\Agent\Logs\update-' || target || '.log (Windows) or /var/log/zentriq-agent/update-' || target || '.log (Linux).' END,
                    completed_at = now()
              WHERE agent_id = @a AND kind = 'agent-update'
                AND (target = @v AND status IN ('queued','sent','running')

@@ -288,8 +288,14 @@ public static class RemoteEndpoints
             if (body.Operation is not ("install" or "uninstall")) return Validation.Problem("operation", "Choose install or uninstall.");
             var ids = body.AssetIds?.Distinct().Take(5000).ToArray() ?? [];
             if (ids.Length == 0) return Validation.Problem("assetIds", "Select devices.");
-            string sha;
-            try { (_, sha) = await remote.AgentInstallerAsync(ct); }
+            // The checksum of the remote support agent for each device's platform (Windows, Linux x64 / ARM64).
+            var shaBy = new Dictionary<string, string>(StringComparer.Ordinal);
+            async Task<string> ShaAsync(string platform)
+            {
+                if (!shaBy.TryGetValue(platform, out var sha)) shaBy[platform] = sha = (await remote.AgentInstallerAsync(platform, ct)).Sha256;
+                return sha;
+            }
+            try { await ShaAsync("windows-x64"); }
             catch (Exception ex) when (ex is MeshException or WebSocketException or HttpRequestException or TaskCanceledException)
             {
                 return Results.Problem(statusCode: 503, title: "Remote support is not available: " + ex.Message);
@@ -297,22 +303,26 @@ public static class RemoteEndpoints
             await using var q = ds.CreateCommand("""
                 SELECT a.id, COALESCE(a.hostname, zentriq.asset_ipv4(a.id), host(a.primary_ip)), ag.id, COALESCE('remote-support' = ANY(ag.capabilities), false),
                        EXISTS (SELECT 1 FROM zentriq.asset_actions x WHERE x.asset_id = a.id AND x.kind = 'remote-support' AND x.status IN ('queued','sent','running')
-                                  AND x.requested_at > now() - interval '1 hour')
+                                  AND x.requested_at > now() - interval '1 hour'),
+                       COALESCE(ag.platform, 'windows-x64')
                   FROM zentriq.assets a
-                  LEFT JOIN LATERAL (SELECT r.id, r.capabilities FROM zentriq.agent_registrations r WHERE r.asset_id = a.id AND r.status = 'active'
+                  LEFT JOIN LATERAL (SELECT r.id, r.capabilities, r.platform FROM zentriq.agent_registrations r WHERE r.asset_id = a.id AND r.status = 'active'
                                       ORDER BY r.last_checkin_at DESC NULLS LAST LIMIT 1) ag ON true
                  WHERE a.id = ANY(@ids)
                 """);
             q.Parameters.AddWithValue("ids", ids);
-            var rows = new List<(Guid Asset, string Host, Guid? Agent, bool Capable, bool Pending)>();
+            var rows = new List<(Guid Asset, string Host, Guid? Agent, bool Capable, bool Pending, string Platform)>();
             await using (var r = await q.ExecuteReaderAsync(ct))
-                while (await r.ReadAsync(ct)) rows.Add((r.GetGuid(0), r.GetString(1), r.IsDBNull(2) ? null : r.GetGuid(2), r.GetBoolean(3), r.GetBoolean(4)));
-            int queued = 0, noAgent = 0, oldAgent = 0, pending = 0;
+                while (await r.ReadAsync(ct)) rows.Add((r.GetGuid(0), r.GetString(1), r.IsDBNull(2) ? null : r.GetGuid(2), r.GetBoolean(3), r.GetBoolean(4), r.GetString(5)));
+            int queued = 0, noAgent = 0, oldAgent = 0, pending = 0, unavailable = 0;
             foreach (var a in rows)
             {
                 if (a.Agent is null) { noAgent++; continue; }
                 if (!a.Capable) { oldAgent++; continue; }
                 if (a.Pending) { pending++; continue; }
+                string sha;
+                try { sha = await ShaAsync(a.Platform); }
+                catch (Exception ex) when (ex is MeshException or WebSocketException or HttpRequestException or TaskCanceledException) { unavailable++; continue; }
                 await using var ins = ds.CreateCommand("""
                     INSERT INTO zentriq.asset_actions (asset_id, agent_id, channel, kind, target, operation, argument, requested_by, detail)
                     VALUES (@as, @ag, 'agent', 'remote-support', 'Zentriq Remote Support', @op, @sha, @by, @d)
@@ -327,12 +337,13 @@ public static class RemoteEndpoints
                 queued++;
             }
             AgentPresence.Instance.Nudge();
-            await rc.AuditAsync($"remote.{body.Operation}", $"{queued} device(s)", detail: new { queued, noAgent, oldAgent, pending });
+            await rc.AuditAsync($"remote.{body.Operation}", $"{queued} device(s)", detail: new { queued, noAgent, oldAgent, pending, unavailable });
             var parts = new List<string>();
             if (queued > 0) parts.Add($"{queued} device(s) will {(body.Operation == "install" ? "install" : "remove")} Zentriq Remote Support at their next agent check-in (set by the check-in interval).");
             if (pending > 0) parts.Add($"{pending} already have a request in progress.");
             if (oldAgent > 0) parts.Add($"{oldAgent} run an earlier Zentriq Agent: update the agent first (Agents › Update).");
             if (noAgent > 0) parts.Add($"{noAgent} have no Zentriq Agent: use the installer download or command on those devices.");
+            if (unavailable > 0) parts.Add($"{unavailable} run on a platform the remote support server has no agent for.");
             return Results.Ok(new { queued, pending, oldAgent, noAgent, message = parts.Count > 0 ? string.Join(" ", parts) : "Nothing to do." });
         }).RequireAuthorization(Permissions.RemoteManage);
 

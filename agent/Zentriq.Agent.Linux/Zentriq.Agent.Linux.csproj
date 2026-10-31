@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Zentriq Agent for Linux: a systemd service for Linux servers and desktops (x64, ARM64; glibc distributions:
+    Ubuntu, Debian, RHEL and its rebuilds, Fedora, SUSE, Amazon Linux, …). Same agent protocol as the Windows agent
+    (outbound HTTPS to the agent port, mutual TLS after enrollment). Published self-contained (no .NET runtime needed
+    on the device) and packaged as .deb, .rpm and .tar.gz by agent/linux/build-packages.sh.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>Zentriq.AgentLinux</RootNamespace>
+    <AssemblyName>zentriq-agent</AssemblyName>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+    <Company>Zentriq</Company>
+    <Product>Zentriq Agent</Product>
+    <Copyright>Copyright (c) Zentriq</Copyright>
+    <Version Condition="'$(Version)' == ''">1.0.0</Version>
+    <RuntimeIdentifiers>linux-x64;linux-arm64</RuntimeIdentifiers>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <!-- Native runtime libraries stay next to the program (no extraction to a temporary folder at start). -->
+    <IncludeNativeLibrariesForSelfExtract>false</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <DebugType>none</DebugType>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+    <TieredPGO>true</TieredPGO>
+    <NoWarn>$(NoWarn);CS8604;CS8602;CA1416</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\backend\Zentriq.Inventory\Zentriq.Inventory.csproj" />
+  </ItemGroup>
+</Project>

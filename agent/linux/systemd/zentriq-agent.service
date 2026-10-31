@@ -1,0 +1,19 @@
+[Unit]
+Description=Zentriq Agent (inventory and device management)
+Documentation=https://zentriq.com
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/opt/zentriq-agent/zentriq-agent run
+Restart=always
+RestartSec=10
+TimeoutStopSec=30
+Nice=5
+Environment=DOTNET_gcServer=0 DOTNET_GCHeapHardLimit=0x10000000 DOTNET_CLI_TELEMETRY_OPTOUT=1
+# Not sandboxed on purpose: the agent reads hardware and security settings as root and, when an administrator asks in
+# the Zentriq console, controls services and removes packages. It only connects out (HTTPS to the agent port).
+
+[Install]
+WantedBy=multi-user.target

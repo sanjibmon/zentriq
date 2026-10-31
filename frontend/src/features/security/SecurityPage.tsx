@@ -9,7 +9,7 @@ import { useConfirm } from '../../components/Confirm';
 import { Icon } from '../../components/Icon';
 import { Callout, DataTable, ErrorBox, fmt, Kpis, PageHead, Pager, Panel, Pill } from '../../components/ui';
 import {
-  APPLIES_LABEL, RESULT_LABEL, resultTone, SCORE_COLOR, secSevTone,
+  appliesLabel, RESULT_LABEL, resultTone, SCORE_COLOR, secSevTone,
   type BaselineDetail, type BaselineSummary, type DeviceScore, type RuleDetail, type SecException, type SecOverview, type SecRule,
 } from './types';
 
@@ -68,8 +68,8 @@ function Overview({ baselineId, onRule }: { baselineId: string | null; onRule: (
   const band: Record<string, string> = { '0–49': 'var(--crit)', '50–69': '#e8590c', '70–89': 'var(--warn)', '90–100': 'var(--ok)' };
   return (
     <>
-      {c.windowsDevices === 0 && <Callout tone="info" icon="info">No Windows device inventory yet. Install the agent or run an agentless scan; devices are checked every 30 minutes.</Callout>}
-      {c.noSettingsData > 0 && <Callout tone="warn" icon="info">{c.noSettingsData} of {c.windowsDevices} Windows device(s) have not reported their security settings yet, so many checks show as <i>unknown</i>. Update their agent (Agents › Update) or collect inventory again.</Callout>}
+      {c.windowsDevices === 0 && <Callout tone="info" icon="info">No Windows or Linux device inventory yet. Install the agent or run an agentless scan (Windows or SSH credential); devices are checked every 30 minutes.</Callout>}
+      {c.noSettingsData > 0 && <Callout tone="warn" icon="info">{c.noSettingsData} of {c.windowsDevices} device(s) have not reported their security settings yet, so many checks show as <i>unknown</i>. Update their agent (Agents › Update) or collect inventory again.</Callout>}
       {c.windowsDevices > 0 && !o.data.lastEvaluation && <Callout tone="info" icon="info">Devices have not been evaluated yet. The first evaluation runs within 30 minutes, or click <b>Evaluate now</b>.</Callout>}
       <Kpis items={[
         { label: 'Average score', value: <span style={{ color: SCORE_COLOR(k.avgScore) }}>{k.avgScore ?? '—'}</span>, sub: `${k.devices.toLocaleString()} device(s) assessed`, to: '/security?tab=devices' },
@@ -152,7 +152,7 @@ function Checks({ baselineId, onRule }: { baselineId: string | null; onRule: (id
       <label className="check-inline"><input type="checkbox" checked={onlyFailing} onChange={(e) => setOnlyFailing(e.target.checked)} /> Failing only</label>
     </div>}>
       <DataTable rows={rows} empty="No checks match." columns={[
-        { key: 'id', label: 'Check', className: 'wrap', render: (x) => <button className="linkish" onClick={() => onRule(x.id)} style={{ textAlign: 'left' }}><span className="mono">{x.id}</span> {x.title}<div className="faint" style={{ fontSize: 11.5 }}>{x.category} · {APPLIES_LABEL[x.applies]} · {x.reference}</div></button> },
+        { key: 'id', label: 'Check', className: 'wrap', render: (x) => <button className="linkish" onClick={() => onRule(x.id)} style={{ textAlign: 'left' }}><span className="mono">{x.id}</span> {x.title}<div className="faint" style={{ fontSize: 11.5 }}>{x.category} · {appliesLabel(x)} · {x.reference}</div></button> },
         { key: 's', label: 'Severity', render: (x) => <Pill tone={secSevTone(x.severity)}>{cap(x.severity)}</Pill> },
         { key: 'on', label: 'In baseline', render: (x) => x.enabled ? 'On' : <span className="faint">Off</span> },
         { key: 'p', label: 'Pass', render: (x) => x.pass || '' },
@@ -194,7 +194,7 @@ function RuleDrawer({ id, baselineId, onClose }: { id: string; baselineId: strin
           {r && <>
             <dl className="kv-grid" style={{ margin: '0 0 12px' }}>
               <div><dt>Area</dt><dd>{r.category}</dd></div>
-              <div><dt>Applies to</dt><dd>{APPLIES_LABEL[r.applies]}</dd></div>
+              <div><dt>Applies to</dt><dd>{appliesLabel(r)}</dd></div>
               <div><dt>Reference</dt><dd>{r.reference}</dd></div>
             </dl>
             <h4 style={{ margin: '0 0 4px' }}>Why it matters</h4>
@@ -289,7 +289,7 @@ function Devices({ baselineId }: { baselineId: string | null }) {
       <select className="in" value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort"><option value="worst">Lowest score first</option><option value="best">Highest score first</option><option value="failed">Most failed</option><option value="host">Hostname</option></select>
     </div>}>
       <ErrorBox error={d.error} />
-      <DataTable rows={(d.data?.items ?? []).map((x) => ({ ...x, id: x.assetId }))} empty={d.loading ? 'Loading…' : 'No Windows devices assessed yet.'} columns={[
+      <DataTable rows={(d.data?.items ?? []).map((x) => ({ ...x, id: x.assetId }))} empty={d.loading ? 'Loading…' : 'No Windows or Linux devices assessed yet.'} columns={[
         { key: 'h', label: 'Device', render: (x) => <Link to={`/assets/${x.assetId}?tab=security`}>{x.hostname ?? x.assetId}</Link> },
         { key: 'o', label: 'Operating system', render: (x) => x.os ?? '—' },
         { key: 'c', label: 'Category', render: (x) => fmt.label(x.category) },
@@ -320,12 +320,12 @@ function Baselines({ onChanged }: { onChanged: () => void }) {
   }
   return (
     <>
-      <Callout tone="info" icon="info">A baseline is a set of checks with your severities and thresholds, for all Windows devices or only servers or workstations. Every enabled baseline is evaluated; each device gets a score per baseline.</Callout>
+      <Callout tone="info" icon="info">A baseline is a set of checks with your severities and thresholds, for all Windows and Linux devices or only servers or workstations / desktops. Every enabled baseline is evaluated; each device gets a score per baseline.</Callout>
       <Panel flush title="Baselines" right={manage && <button className="btn sm primary" onClick={() => setEdit({ id: null, copyFrom: list.data?.find((b) => b.builtIn)?.id })}><Icon name="plus" size={12} /> New baseline</button>}>
         <ErrorBox error={list.error} />
         <DataTable rows={list.data ?? []} empty="No baselines." columns={[
           { key: 'n', label: 'Name', className: 'wrap', render: (b) => <><b>{b.name}</b>{b.builtIn && <Pill tone="info">Built-in</Pill>}<div className="faint" style={{ fontSize: 11.5 }}>{b.description}</div></> },
-          { key: 's', label: 'Scope', render: (b) => b.categories.length === 0 ? 'All Windows devices' : b.categories.map((c) => (c === 'server' ? 'Servers' : 'Workstations')).join(', ') },
+          { key: 's', label: 'Scope', render: (b) => b.categories.length === 0 ? 'All devices' : b.categories.map((c) => (c === 'server' ? 'Servers' : 'Workstations / desktops')).join(', ') },
           { key: 'r', label: 'Checks', render: (b) => b.rules },
           { key: 'd', label: 'Devices', render: (b) => b.devices },
           { key: 'a', label: 'Average score', render: (b) => <ScoreBar v={b.avgScore} /> },
@@ -400,7 +400,7 @@ function BaselineEditor({ id, copyFrom, readOnly, onClose, onSaved }: { id: stri
                     <tr key={r.id} className={r.enabled ? '' : 'faint'}>
                       <td><input type="checkbox" aria-label={`Check ${r.id} on`} checked={r.enabled} onChange={(e) => setRule(r.id, { enabled: e.target.checked })} /></td>
                       <td className="wrap"><span className="mono">{r.id}</span> {r.title}</td>
-                      <td>{APPLIES_LABEL[r.applies]}</td>
+                      <td>{appliesLabel(r)}</td>
                       <td><select className="in sm" value={r.severity} onChange={(e) => setRule(r.id, { severity: e.target.value })} aria-label={`Severity of ${r.id}`}>
                         {['high', 'medium', 'low'].map((s) => <option key={s} value={s}>{cap(s)}{s === r.defaultSeverity ? ' (default)' : ''}</option>)}
                       </select></td>

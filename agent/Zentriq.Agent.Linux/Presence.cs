@@ -1,0 +1,131 @@
+using System;
+using System.Net;
+using System.Threading;
+
+namespace Zentriq.AgentLinux;
+
+/// <summary>
+/// The agent's live connection to the server: one presence request held open by the server and renewed as soon as it
+/// returns. The server shows the device online from the moment the connection is made and offline the moment it closes
+/// (or, when it dies silently, within a minute). When an administrator queues work (collect now, an action, an update) the
+/// server answers early and the agent checks in at once. Runs beside the regular check-in / inventory schedule.
+/// </summary>
+internal static class Presence
+{
+    /// <summary>Set when the network changes: retry a lost connection now.</summary>
+    internal static readonly AutoResetEvent Retry = new AutoResetEvent(false);
+
+    public static bool Connected { get; private set; }
+
+    public static void Loop(CancellationToken ct)
+    {
+        ServerClient? client = null;
+        string? clientKey = null;
+        var failures = 0;
+        DateTime? lostAt = null;
+        try
+        {
+            while (!ct.IsCancellationRequested)
+            {
+                var state = AgentState.Load();
+                var cert = state.Enrolled && !string.IsNullOrEmpty(state.ServerUrl) ? CertificateStore.Find(state.CertThumbprint) : null;
+                if (cert is null)
+                {
+                    // Not enrolled yet: enrollment sets Retry, so the live connection starts right after it.
+                    Connected = false;
+                    if (WaitAny(ct, TimeSpan.FromSeconds(10))) return;
+                    continue;
+                }
+                var key = state.ServerUrl + "|" + state.CertThumbprint + "|" + string.Join(",", state.ServerPins) + "|" + state.ProxyUrl;
+                if (client is null || key != clientKey)
+                {
+                    client?.Dispose();
+                    // The server holds the request for about 25 seconds; give up on a dead connection after 60.
+                    client = new ServerClient(state.ServerUrl!, state.ServerPins, cert, state.ProxyUrl, timeout: TimeSpan.FromSeconds(60));
+                    clientKey = key;
+                }
+                try
+                {
+                    // Tell the server which uninstall code this device holds, so a new or replaced one arrives at once.
+                    string? held = null;
+                    if (Shell.IsRoot) try { held = Protection.Load().CodeForAllHash(); } catch (Exception) { }
+                    var started = DateTime.UtcNow;
+                    var r = client.PresenceAsync(held, ct).GetAwaiter().GetResult();
+                    if (!Connected)
+                    {
+                        Log.Info(lostAt is { } since
+                            ? $"Live connection to the server restored at {state.ServerUrl} (lost for {(int)(DateTime.UtcNow - since).TotalSeconds} s)."
+                            : $"Live connection to the server at {state.ServerUrl}.");
+                        // After a gap, check in now (reports the outage, picks up settings and queued work).
+                        if (lostAt is not null) AgentService.RequestServerWake();
+                    }
+                    Connected = true;
+                    failures = 0;
+                    // A new or cancelled uninstall code reaches the device within seconds.
+                    if (r.UninstallProtection == true && Shell.IsRoot)
+                        try { var p = Protection.Load(); if (p.Enabled) Protection.Apply(true, null, r.UninstallCode); } catch (Exception ex) { Log.Warn("Could not store the uninstall code: " + ex.Message); }
+                    lostAt = null;
+                    // An early answer only to deliver a code: never ask again more often than every 2 seconds.
+                    if (!r.Wake && DateTime.UtcNow - started < TimeSpan.FromSeconds(1) && WaitAny(ct, TimeSpan.FromSeconds(2))) return;
+                    if (r.Wake)
+                    {
+                        AgentService.RequestServerWake();
+                        // The work stays pending until the check-in has taken it: give it time instead of asking again at once
+                        // (still well inside the online grace period).
+                        if (WaitAny(ct, TimeSpan.FromSeconds(15))) return;
+                    }
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested) { return; }
+                catch (ServerException ex) when (ex.Status == HttpStatusCode.NotFound)
+                {
+                    // A server older than this agent: no live connection, the check-in schedule still applies.
+                    Connected = false;
+                    if (failures++ == 0) Log.Info("The server does not support live connections yet (older version); using the check-in schedule only.");
+                    if (WaitAny(ct, TimeSpan.FromMinutes(30))) return;
+                }
+                catch (Exception ex)
+                {
+                    if (Connected || failures == 0)
+                    {
+                        lostAt = DateTime.UtcNow;
+                        Log.Warn("Live connection to the server lost: " + AgentWorker.Describe(ex));
+                    }
+                    Connected = false;
+                    failures++;
+                    client?.Dispose();
+                    client = null;
+                    // Server refused (revoked, certificate): the check-in cycle deals with that; retry slowly.
+                    var wait = ex is ServerException se && (se.Status == HttpStatusCode.Forbidden || se.Status == HttpStatusCode.Unauthorized)
+                        ? TimeSpan.FromMinutes(10)
+                        : TimeSpan.FromSeconds(Math.Min(60, 5 * Math.Pow(2, Math.Min(failures - 1, 4))));   // 5, 10, 20, 40, 60 s
+                    if (WaitAny(ct, wait)) return;
+                }
+            }
+        }
+        finally
+        {
+            // Stopping (service stop, shutdown): say goodbye so the server shows the device offline at once, then close.
+            if (Connected) Leave();
+            Connected = false;
+            client?.Dispose();
+        }
+    }
+
+    private static void Leave()
+    {
+        try
+        {
+            var state = AgentState.Load();
+            var cert = CertificateStore.Find(state.CertThumbprint);
+            if (cert is null || string.IsNullOrEmpty(state.ServerUrl)) return;
+            using var c = new ServerClient(state.ServerUrl!, state.ServerPins, cert, state.ProxyUrl, timeout: TimeSpan.FromSeconds(3));
+            c.LeaveAsync().GetAwaiter().GetResult();
+            Log.Info("Live connection closed (agent stopping).");
+        }
+        catch (Exception ex) { Log.Info("Could not say goodbye to the server: " + AgentWorker.Describe(ex)); }
+    }
+
+    /// <summary>Waits; returns true when the agent is stopping. The network changing ends the wait early.</summary>
+    private static bool WaitAny(CancellationToken ct, TimeSpan timeout) =>
+        WaitHandle.WaitAny(new[] { ct.WaitHandle, Retry }, timeout) == 0;
+}

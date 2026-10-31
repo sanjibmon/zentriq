@@ -46,7 +46,8 @@ public sealed class SecurityRuleTests
     [Fact]
     public void Catalogue_has_unique_ids_guidance_and_references()
     {
-        Assert.Equal(30, SecurityRules.All.Count);
+        Assert.Equal(43, SecurityRules.All.Count);
+        Assert.Equal(13, SecurityRules.All.Count(r => r.Platform == "linux"));
         Assert.Equal(SecurityRules.All.Count, SecurityRules.All.Select(r => r.Id).Distinct().Count());
         Assert.All(SecurityRules.All, r =>
         {
@@ -212,6 +213,65 @@ public sealed class SecurityRuleTests
         Assert.True(h.UacEnabled);
         Assert.False(h.Smb1Enabled);
         Assert.False(h.WDigestCleartext);
+    }
+}
+
+/// <summary>Security Configuration checks for Linux devices (agent or SSH inventory).</summary>
+public sealed class LinuxSecurityRuleTests
+{
+    private static readonly DateTimeOffset Now = new(2026, 10, 31, 12, 0, 0, TimeSpan.Zero);
+
+    private static InventoryDocument Linux(Action<LinuxHardeningInfo>? change = null, bool server = true)
+    {
+        var doc = new InventoryDocument();
+        doc.Os.Family = "linux"; doc.Os.Name = "Ubuntu"; doc.Os.Version = "24.04"; doc.Os.Distribution = "ubuntu"; doc.Os.IsServer = server;
+        doc.Security.FirewallEnabled = true;
+        doc.Security.DiskEncryption = false;
+        var h = new LinuxHardeningInfo
+        {
+            SshServer = true, SshRootLogin = "no", SshPasswordAuth = false, SshPort = 22, AppArmor = true, AutoUpdates = true, Firewall = "ufw",
+            PassMaxDays = 99999, ExtraUid0 = [], Auditd = false, TimeSync = true, TelnetServer = false, PendingUpdates = 4, PendingSecurityUpdates = 0, RebootRequired = false,
+        };
+        change?.Invoke(h);
+        doc.Security.Linux = h;
+        return doc;
+    }
+
+    private static CheckResult Run(string id, InventoryDocument doc, string category = "server") =>
+        SecurityRules.Find(id)!.Evaluate(new DeviceFacts(doc, category, Now));
+
+    [Fact]
+    public void A_well_configured_server_passes_and_windows_checks_do_not_apply()
+    {
+        var doc = Linux();
+        foreach (var id in new[] { "SL-01", "SL-02", "SL-03", "SL-04", "SL-05", "SL-06", "SL-07", "SL-08", "SL-10", "SL-11" })
+            Assert.True(Run(id, doc).Status == CheckStatus.Pass, id + ": " + Run(id, doc).Actual);
+        Assert.Equal(CheckStatus.Fail, Run("SL-12", doc).Status);                 // auditd not running on a server
+        Assert.Equal(CheckStatus.NotApplicable, Run("SL-13", doc).Status);        // disk encryption: desktops only
+        Assert.Equal(CheckStatus.Fail, Run("SL-13", Linux(server: false), "endpoint").Status);
+        Assert.Equal(CheckStatus.NotApplicable, Run("SC-03", doc).Status);        // Windows checks
+        var win = new InventoryDocument(); win.Os.Family = "windows";
+        Assert.Equal(CheckStatus.NotApplicable, Run("SL-01", win).Status);
+    }
+
+    [Fact]
+    public void Weak_settings_fail_with_what_was_found()
+    {
+        Assert.Equal("PermitRootLogin yes", Run("SL-01", Linux(h => h.SshRootLogin = "yes")).Actual);
+        Assert.Equal(CheckStatus.Fail, Run("SL-01", Linux(h => h.SshRootLogin = "prohibit-password")).Status);
+        Assert.Equal(CheckStatus.Pass, Run("SL-01", Linux(h => { h.SshServer = false; h.SshRootLogin = null; })).Status);
+        Assert.Equal(CheckStatus.Fail, Run("SL-02", Linux(h => h.SshPasswordAuth = true)).Status);
+        Assert.Equal("SELinux permissive", Run("SL-04", Linux(h => { h.AppArmor = null; h.Selinux = "permissive"; })).Actual);
+        Assert.Equal(CheckStatus.Pass, Run("SL-04", Linux(h => { h.AppArmor = null; h.Selinux = "enforcing"; })).Status);
+        Assert.StartsWith("3 security update(s) pending", Run("SL-06", Linux(h => h.PendingSecurityUpdates = 3)).Actual);
+        Assert.Equal(CheckStatus.Unknown, Run("SL-06", Linux(h => h.PendingSecurityUpdates = null)).Status);
+        Assert.Equal("toor", Run("SL-08", Linux(h => h.ExtraUid0 = ["toor"])).Actual);
+        Assert.Equal(CheckStatus.Fail, Run("SL-10", Linux(h => h.TelnetServer = true)).Status);
+        Assert.Equal("never expires", Run("SL-09", Linux()).Actual);
+        var noFw = Linux(); noFw.Security.FirewallEnabled = false;
+        Assert.Equal(CheckStatus.Fail, Run("SL-03", noFw).Status);
+        var noData = new InventoryDocument(); noData.Os.Family = "linux";
+        Assert.Equal(CheckStatus.Unknown, Run("SL-05", noData).Status);
     }
 }
 

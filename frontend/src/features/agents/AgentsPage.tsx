@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../../api/client';
-import type { AgentPackage, AgentRow, AgentSettingsResponse, EnrollmentToken, NewEnrollmentToken } from '../../api/types';
+import type { AgentPackage, AgentRow, AgentSettingsResponse, EnrollmentToken, LinuxPackages, NewEnrollmentToken } from '../../api/types';
 import { Modal } from '../../components/Modal';
 import { Icon } from '../../components/Icon';
 import { useAuth } from '../../app/auth';
@@ -165,7 +165,11 @@ export function AgentsPage() {
               <label>Enrollment code<CopyBox value={created.code} label="Enrollment code" /></label>
             </div>
             <small className="muted">In the installer wizard enter both, and choose how often the agent checks its connection and sends inventory (this code suggests every {every(created.checkinMinutes)} and {every(created.inventoryMinutes)}).</small>
-            <label>Silent install (Intune, SCCM, GPO or an elevated prompt)<CopyBox value={created.installCommand} label="Install command" rows={2} /></label>
+            <label>Windows: silent install (Intune, SCCM, GPO or an elevated prompt)<CopyBox value={created.installCommand} label="Install command" rows={2} /></label>
+            {created.linuxInstallCommand ? <>
+              <label>Linux: install and enroll in one line (as root or with sudo; Ubuntu, Debian, RHEL, Rocky, AlmaLinux, Oracle, Fedora, SUSE, Amazon Linux and others, x64 or ARM64)<CopyBox value={created.linuxInstallCommand} label="Linux install command" rows={3} /></label>
+              <small className="muted">It downloads the installer and the right package (.deb, .rpm or .tar.gz) from this server&apos;s agent port, trusting only this server&apos;s key, installs the <span className="mono">zentriq-agent</span> service and enrolls. With your own tooling: install the package from <LinuxDownloads p={created.linuxPackages} />, then run <span className="mono">sudo zentriq-agent --enroll {created.code} --server {created.serverUrl}</span>.</small>
+            </> : <small className="muted">Linux agent packages are not on this server.</small>}
             <small className="muted">Devices outside your network need <span className="mono">{created.serverUrl}</span> to be reachable (published through your firewall). If the server&apos;s address changes, agents on the network find it again by themselves.</small>
           </div>
         </Panel>
@@ -196,7 +200,7 @@ export function AgentsPage() {
             ...(manage ? [{ key: 'sel', label: <input type="checkbox" aria-label="Select all" checked={rows.length > 0 && picked.length === rows.filter((x) => x.status === 'active').length} onChange={(e) => setPicked(e.target.checked ? rows.filter((x) => x.status === 'active').map((x) => x.id) : [])} />,
               render: (r: AgentRow) => r.status === 'active' ? <input type="checkbox" aria-label={`Select ${r.hostname ?? r.id}`} checked={picked.includes(r.id)} onChange={() => setPicked(picked.includes(r.id) ? picked.filter((x) => x !== r.id) : [...picked, r.id])} /> : null }] : []),
             { key: 'h', label: 'Device', render: (r) => <>{r.assetId ? <Link to={`/assets/${r.assetId}`}><b>{r.hostname ?? r.id}</b></Link> : <b>{r.hostname ?? r.id}</b>}<TamperState r={r} /></> },
-            { key: 'os', label: 'Operating system', className: 'wrap', render: (r) => r.osName ?? <span className="faint">—</span> },
+            { key: 'os', label: 'Operating system', className: 'wrap', render: (r) => <>{r.osName ?? <span className="faint">—</span>}{r.platform?.startsWith('linux') && <div className="faint" style={{ fontSize: 11.5 }}>Linux agent · {r.platform === 'linux-arm64' ? 'ARM64' : 'x64'}</div>}</> },
             { key: 'ip', label: 'IP address', render: (r) => r.lastIp ? <span className="mono">{r.lastIp}</span> : <span className="faint">—</span> },
             { key: 's', label: 'Connection', render: (r) => r.health === 'online'
               ? <Pill tone="ok">Online</Pill>
@@ -246,6 +250,10 @@ export function AgentsPage() {
           <label>Find out why it cannot reach the server (service, enrollment, certificate, DNS, port, server key)<CopyBox value={`${UNINSTALL_EXE} --diagnose`} label="Diagnose" /></label>
           <label>Restart the agent service (no code needed, also with tamper protection)<CopyBox value={`${UNINSTALL_EXE} --restart`} label="Restart" /></label>
           <small className="muted">If the service was stopped or disabled with a code, start it again with <span className="mono">--enable</span>. The log is in <span className="mono">C:\ProgramData\Zentriq\Agent\Logs\agent.log</span>.</small>
+          <p className="muted" style={{ margin: '12px 0 8px' }}>On a Linux device (as root or with sudo) the same options work with <span className="mono">{LINUX_AGENT}</span>, for example:</p>
+          <label>Diagnose<CopyBox value={`${LINUX_AGENT} --diagnose`} label="Diagnose (Linux)" /></label>
+          <label>Show what the agent detects (distribution, edition, server or desktop)<CopyBox value={`${LINUX_AGENT} --identify`} label="Identify (Linux)" /></label>
+          <small className="muted">The log is in <span className="mono">/var/log/zentriq-agent/agent.log</span> and in the journal (<span className="mono">journalctl -u zentriq-agent</span>).</small>
         </details>
       )}
       {schedule && <ScheduleDialog ids={schedule.ids} onClose={() => setSchedule(null)} onDone={(m) => { setSchedule(null); setMsg(m); setPicked([]); agents.reload(); }} />}
@@ -368,6 +376,13 @@ function ScheduleDialog({ ids, onClose, onDone }: { ids: string[] | 'all'; onClo
 
 interface UninstallCodeState { protection?: boolean; active: boolean; code: string | null; expiresAt: string | null; createdBy: string | null; createdAt: string | null }
 const UNINSTALL_EXE = '"C:\\Program Files\\Zentriq Agent\\ZentriqAgent.exe"';
+const LINUX_AGENT = 'sudo zentriq-agent';
+
+/** Links to the Linux agent packages on this server. */
+function LinuxDownloads({ p }: { p?: LinuxPackages | null }) {
+  if (!p || p.files.length === 0) return <>this server</>;
+  return <>{p.files.map((f, i) => <span key={f.url}>{i > 0 && ', '}<a href={f.url} download>{f.format === 'tar' ? 'tar.gz' : f.format} {f.platform === 'linux-arm64' ? 'ARM64' : 'x64'}</a></span>)}</>;
+}
 
 /** One random code that removes the agent on any device, valid for one hour. */
 function UninstallCodeDialog({ onClose }: { onClose: () => void }) {
@@ -402,6 +417,8 @@ function UninstallCodeDialog({ onClose }: { onClose: () => void }) {
           <label>Remove the agent (on the device, as administrator)<CopyBox value={`${UNINSTALL_EXE} --uninstall ${c.code}`} label="Uninstall command" rows={2} /></label>
           <label>Stop the agent until the device restarts<CopyBox value={`${UNINSTALL_EXE} --stop ${c.code}`} label="Stop command" /></label>
           <label>Disable the agent (until enabled again with --enable)<CopyBox value={`${UNINSTALL_EXE} --disable ${c.code}`} label="Disable command" /></label>
+          <label>Linux: remove the agent<CopyBox value={`${LINUX_AGENT} --uninstall ${c.code}`} label="Uninstall command (Linux)" /></label>
+          <small className="muted">Linux: <span className="mono">--stop</span> and <span className="mono">--disable</span> work the same way.</small>
           <small className="muted">Or Apps &gt; Zentriq Agent &gt; Modify &gt; Remove, and enter the code. <span className="mono">--pause {'<code>'}</span> turns tamper protection off for one hour so the Services console can stop or disable the agent. Online devices receive the code within seconds, others when they next connect. For one device only, use <b>Agent… › Code for this device</b> in the agents list.</small>
         </> : <p className="muted" style={{ margin: 0 }}>No code is active. Create one to remove, stop or disable the agent on devices: a random 16-character code that works on every device for one hour, then expires.</p>)}
       </div>

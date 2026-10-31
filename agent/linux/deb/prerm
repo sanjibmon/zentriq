@@ -1,0 +1,22 @@
+#!/bin/sh
+# Zentriq Agent: before removing or upgrading. Removal needs a code while tamper protection is on.
+set -e
+case "$1" in
+  remove|purge|deconfigure)
+    if [ -x /opt/zentriq-agent/zentriq-agent ]; then
+      /opt/zentriq-agent/zentriq-agent --check-uninstall || exit 1
+    fi
+    if [ -d /run/systemd/system ]; then
+      rm -f /etc/systemd/system/zentriq-agent.service.d/10-protection.conf
+      systemctl daemon-reload >/dev/null 2>&1 || true
+      systemctl disable --now zentriq-agent-watchdog.timer zentriq-agent.service >/dev/null 2>&1 || true
+    fi
+    ;;
+  upgrade)
+    if [ -d /run/systemd/system ]; then
+      rm -f /etc/systemd/system/zentriq-agent.service.d/10-protection.conf
+      systemctl daemon-reload >/dev/null 2>&1 || true
+    fi
+    ;;
+esac
+exit 0

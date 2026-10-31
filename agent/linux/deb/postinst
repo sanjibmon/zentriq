@@ -1,0 +1,21 @@
+#!/bin/sh
+# Zentriq Agent: after installing or upgrading.
+set -e
+echo deb > /opt/zentriq-agent/installed-by
+mkdir -p /var/lib/zentriq-agent /var/log/zentriq-agent
+chmod 700 /var/lib/zentriq-agent
+chmod 750 /var/log/zentriq-agent
+if [ -d /run/systemd/system ]; then
+  # The stop protection is set again by the agent when it starts.
+  rm -f /etc/systemd/system/zentriq-agent.service.d/10-protection.conf
+  systemctl daemon-reload >/dev/null 2>&1 || true
+  systemctl enable zentriq-agent.service zentriq-agent-watchdog.timer >/dev/null 2>&1 || true
+  systemctl restart zentriq-agent.service >/dev/null 2>&1 || true
+  systemctl start zentriq-agent-watchdog.timer >/dev/null 2>&1 || true
+fi
+if [ "$1" = "configure" ] && [ -n "$ZENTRIQ_ENROLLMENT_CODE" ] && [ -n "$ZENTRIQ_SERVER" ]; then
+  /opt/zentriq-agent/zentriq-agent --enroll "$ZENTRIQ_ENROLLMENT_CODE" --server "$ZENTRIQ_SERVER" \
+    ${ZENTRIQ_CHECKIN:+--checkin "$ZENTRIQ_CHECKIN"} ${ZENTRIQ_INVENTORY:+--inventory "$ZENTRIQ_INVENTORY"} ${ZENTRIQ_PROXY:+--proxy "$ZENTRIQ_PROXY"} \
+    || echo "Zentriq Agent: enrollment did not succeed; run: sudo zentriq-agent --enroll <code> --server https://<server>:8444"
+fi
+exit 0

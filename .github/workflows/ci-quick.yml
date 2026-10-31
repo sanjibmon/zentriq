@@ -22,7 +22,7 @@ env:
 jobs:
   quick:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     services:
       postgres:
         image: postgres:17
@@ -46,6 +46,7 @@ jobs:
             dotnet build backend/$p/$p.csproj -c Release 2>&1 | tee -a build.log
           done
           dotnet build agent/Zentriq.Agent/Zentriq.Agent.csproj -c Release 2>&1 | tee -a build.log
+          dotnet build agent/Zentriq.Agent.Linux/Zentriq.Agent.Linux.csproj -c Release 2>&1 | tee -a build.log
           dotnet build licensing/Zentriq.LicenseServer.Tests/Zentriq.LicenseServer.Tests.csproj -c Release 2>&1 | tee -a build.log
       - name: Remote support engine (MeshCentral) for the live test
         run: |
@@ -83,6 +84,17 @@ jobs:
         run: |
           set -o pipefail
           dotnet test licensing/Zentriq.LicenseServer.Tests/Zentriq.LicenseServer.Tests.csproj -c Release --no-build --logger "console;verbosity=normal" 2>&1 | tee license-server-test.log
+      - name: Linux agent packages (deb, rpm, tar.gz; x64 and ARM64)
+        if: always()
+        run: |
+          set -o pipefail
+          sudo apt-get install -y -qq rpm >/dev/null
+          agent/linux/build-packages.sh "1.1.2.${GITHUB_RUN_NUMBER}" "$RUNNER_TEMP/linux-agent" x64 arm64 2>&1 | tee linux-agent-build.log
+      - name: Linux agent on distributions (containers)
+        if: always()
+        run: |
+          set -o pipefail
+          tests/linux-agent/test-distros.sh "$RUNNER_TEMP/linux-agent" linux-agent-distros.md 2>&1 | tee linux-agent-distros.log
       - name: Web console
         if: always()
         working-directory: frontend
@@ -94,7 +106,8 @@ jobs:
         if: always()
         run: |
           d="$RUNNER_TEMP/logs"; mkdir -p "$d"
-          cp build.log test.log license-server-test.log mesh.log snmp.log "$d/" 2>/dev/null || true
+          cp build.log test.log license-server-test.log mesh.log snmp.log linux-agent-build.log linux-agent-distros.log linux-agent-distros.md "$d/" 2>/dev/null || true
+          if [ -d "$RUNNER_TEMP/linux-agent/results" ]; then cp -r "$RUNNER_TEMP/linux-agent/results" "$d/linux-agent-results"; fi
           cp frontend/build.log "$d/console.log" 2>/dev/null || true
           if [ -d frontend/dist ]; then cp -r frontend/dist "$d/dist"; fi
           echo "run $GITHUB_RUN_ID commit $GITHUB_SHA branch $GITHUB_REF_NAME status ${{ job.status }}" > "$d/RUN.txt"

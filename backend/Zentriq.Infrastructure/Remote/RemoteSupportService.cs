@@ -257,25 +257,36 @@ public sealed partial class RemoteSupportService(NpgsqlDataSource ds, ZentriqOpt
 
     // ---- agent installer ----------------------------------------------------------------------------
 
-    private (byte[] Bytes, string Sha256, DateTimeOffset At)? _installer;
+    private readonly Dictionary<string, (byte[] Bytes, string Sha256, DateTimeOffset At)> _installers = new(StringComparer.Ordinal);
     private readonly SemaphoreSlim _installerLock = new(1, 1);
 
-    /// <summary>The branded Windows (x64) remote agent installer for the Zentriq group (cached 30 minutes).</summary>
-    public async Task<(byte[] Bytes, string Sha256)> AgentInstallerAsync(CancellationToken ct)
+    /// <summary>The remote support engine's agent ids: Windows x64 (installer), Linux x86-64 and Linux ARM64 (binaries).</summary>
+    private static readonly Dictionary<string, int> AgentIds = new(StringComparer.Ordinal) { ["windows-x64"] = 4, ["linux-x64"] = 6, ["linux-arm64"] = 26 };
+
+    public Task<(byte[] Bytes, string Sha256)> AgentInstallerAsync(CancellationToken ct) => AgentInstallerAsync("windows-x64", ct);
+
+    /// <summary>
+    /// The remote support agent for one platform, bound to this server's device group (cached for 30 minutes): the
+    /// Windows installer, or the Linux agent binary with its settings attached (it installs itself with -install).
+    /// </summary>
+    public async Task<(byte[] Bytes, string Sha256)> AgentInstallerAsync(string platform, CancellationToken ct)
     {
+        if (!AgentIds.TryGetValue(platform, out var id)) throw new MeshException($"Remote support has no agent for {platform}.");
         await _installerLock.WaitAsync(ct);
         try
         {
-            if (_installer is { } i && i.At > DateTimeOffset.UtcNow.AddMinutes(-30)) return (i.Bytes, i.Sha256);
+            if (_installers.TryGetValue(platform, out var i) && i.At > DateTimeOffset.UtcNow.AddMinutes(-30)) return (i.Bytes, i.Sha256);
             string mesh;
             await using (var c = await ConnectAsync(ct)) mesh = await EnsureGroupAsync(c, null, ct);
             var meshTail = mesh.StartsWith("mesh//", StringComparison.Ordinal) ? mesh["mesh//".Length..] : mesh;
-            using var r = await Loopback.GetAsync(new Uri(LocalUrl, $"meshagents?id=4&meshid={Uri.EscapeDataString(meshTail)}&installflags=0"), ct);
-            if (!r.IsSuccessStatusCode) throw new MeshException($"The remote support server did not provide the agent installer (HTTP {(int)r.StatusCode}).");
+            using var r = await Loopback.GetAsync(new Uri(LocalUrl, $"meshagents?id={id}&meshid={Uri.EscapeDataString(meshTail)}&installflags=0"), ct);
+            if (!r.IsSuccessStatusCode) throw new MeshException($"The remote support server did not provide the agent for {platform} (HTTP {(int)r.StatusCode}).");
             var bytes = await r.Content.ReadAsByteArrayAsync(ct);
-            if (bytes.Length < 100_000 || bytes[0] != 'M' || bytes[1] != 'Z') throw new MeshException("The remote support server returned something that is not a Windows program.");
+            var windows = platform == "windows-x64";
+            if (bytes.Length < 100_000 || (windows ? bytes[0] != 'M' || bytes[1] != 'Z' : bytes[0] != 0x7F || bytes[1] != 'E' || bytes[2] != 'L' || bytes[3] != 'F'))
+                throw new MeshException($"The remote support server returned something that is not a {(windows ? "Windows" : "Linux")} program.");
             var sha = Convert.ToHexStringLower(SHA256.HashData(bytes));
-            _installer = (bytes, sha, DateTimeOffset.UtcNow);
+            _installers[platform] = (bytes, sha, DateTimeOffset.UtcNow);
             return (bytes, sha);
         }
         finally { _installerLock.Release(); }

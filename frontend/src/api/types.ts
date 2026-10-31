@@ -324,6 +324,8 @@ export interface SshHostKey {
 
 export interface AgentRow {
   id: string;
+  /** windows-x64 | linux-x64 | linux-arm64 */
+  platform?: string;
   checkinMinutes: number;
   inventoryMinutes: number;
   online: boolean;
@@ -369,8 +371,15 @@ export interface EnrollmentToken {
   state: string;
 }
 
+export interface LinuxPackages {
+  version: string | null;
+  files: { platform: string; format: string; url: string; size: number; sha256: string }[];
+  installScript: boolean;
+}
+
 export interface AgentPackage {
   package: { url: string; size: number; version: string | null } | null;
+  linuxPackages?: LinuxPackages | null;
   agentPort: number;
   defaultServerUrl: string;
   enrollmentAvailable: boolean;
@@ -386,6 +395,9 @@ export interface NewEnrollmentToken {
   maxUses: number | null;
   code: string;
   installCommand: string;
+  /** One line for Linux devices (null when this server has no Linux agent packages). */
+  linuxInstallCommand?: string | null;
+  linuxPackages?: LinuxPackages | null;
 }
 
 export interface SoftwareRow {

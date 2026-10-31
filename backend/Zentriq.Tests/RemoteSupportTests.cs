@@ -248,6 +248,13 @@ public sealed class RemoteSupportLiveTests : IAsyncLifetime
         var (bytes, sha) = installer;
         Assert.Equal((byte)'M', bytes[0]);
         Assert.Equal(64, sha.Length);
+        // Linux agents (x64 and ARM64) for devices with the Zentriq Agent for Linux: ELF programs bound to the device group.
+        foreach (var platform in new[] { "linux-x64", "linux-arm64" })
+        {
+            var (elf, elfSha) = await remote.AgentInstallerAsync(platform, default);
+            Assert.True(elf[0] == 0x7F && elf[1] == (byte)'E' && elf[2] == (byte)'L' && elf[3] == (byte)'F', platform + " is not an ELF program");
+            Assert.NotEqual(sha, elfSha);
+        }
         // Devices must be told where the server is (WAN mode), not to look for it by multicast (LAN mode), even for a
         // host name without a dot such as "localhost".
         string meshId;
