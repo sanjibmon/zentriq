@@ -58,7 +58,7 @@ public static class SshCollector
 
         var uname = Run(UnixCollector.ProbeCommand);
         var isMac = uname.StartsWith("Darwin", StringComparison.Ordinal);
-        var commands = isMac ? UnixCollector.MacCommands : UnixCollector.LinuxCommands;
+        var commands = isMac ? UnixCollector.MacCommands : UnixCollector.LinuxCommands.Concat(UnixCollector.LinuxExtraCommands);
         var outputs = new Dictionary<string, string>();
         foreach (var (k, cmd) in commands)
         {

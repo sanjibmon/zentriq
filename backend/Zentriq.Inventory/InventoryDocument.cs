@@ -72,8 +72,20 @@ public sealed class OsInfo
     [JsonPropertyName("displayVersion")] public string? DisplayVersion { get; set; }
     /// <summary>Client, Server or Server Core.</summary>
     [JsonPropertyName("installationType")] public string? InstallationType { get; set; }
-    /// <summary>Edition, e.g. Professional, Enterprise, EnterpriseS (LTSC), ServerStandard.</summary>
+    /// <summary>Edition, e.g. Professional, Enterprise, EnterpriseS (LTSC), ServerStandard; on Linux e.g. "Ubuntu Server", "Fedora Workstation".</summary>
     [JsonPropertyName("editionId")] public string? EditionId { get; set; }
+    /// <summary>Linux: distribution id from os-release (ubuntu, debian, rhel, rocky, almalinux, sles, opensuse-leap, fedora, …).</summary>
+    [JsonPropertyName("distribution")] public string? Distribution { get; set; }
+    /// <summary>Linux: debian | rhel | fedora | suse | arch | alpine | gentoo | other.</summary>
+    [JsonPropertyName("distributionFamily")] public string? DistributionFamily { get; set; }
+    /// <summary>Linux: installed desktop environment(s) (GNOME, KDE Plasma, Xfce, …), or null on a headless system.</summary>
+    [JsonPropertyName("desktopEnvironment")] public string? DesktopEnvironment { get; set; }
+    /// <summary>Linux: kernel release (uname -r).</summary>
+    [JsonPropertyName("kernel")] public string? Kernel { get; set; }
+    /// <summary>Linux: dpkg | rpm | pacman | apk.</summary>
+    [JsonPropertyName("packageManager")] public string? PackageManager { get; set; }
+    /// <summary>Long-term support release (Ubuntu LTS and similar), when the distribution says so.</summary>
+    [JsonPropertyName("lts")] public bool? Lts { get; set; }
 }
 
 public sealed class HardwareInfo
@@ -183,6 +195,36 @@ public sealed class SecurityInfo
     [JsonPropertyName("secureBoot")] public bool? SecureBoot { get; set; }
     /// <summary>Security settings read from the registry and WMI (read-only), assessed by Security Configuration.</summary>
     [JsonPropertyName("hardening")] public HardeningInfo? Hardening { get; set; }
+    /// <summary>Linux security settings (read-only), assessed by Security Configuration.</summary>
+    [JsonPropertyName("linux")] public LinuxHardeningInfo? Linux { get; set; }
+}
+
+/// <summary>Linux security settings. Null = could not be read (not root over SSH, tool missing): reported as "unknown".</summary>
+public sealed class LinuxHardeningInfo
+{
+    /// <summary>Effective PermitRootLogin of the SSH server (yes | no | prohibit-password | forced-commands-only), null without an SSH server.</summary>
+    [JsonPropertyName("sshRootLogin")] public string? SshRootLogin { get; set; }
+    [JsonPropertyName("sshPasswordAuth")] public bool? SshPasswordAuth { get; set; }
+    [JsonPropertyName("sshPort")] public int? SshPort { get; set; }
+    /// <summary>The SSH server is installed and running.</summary>
+    [JsonPropertyName("sshServer")] public bool? SshServer { get; set; }
+    /// <summary>SELinux mode: enforcing | permissive | disabled; null when SELinux is not available.</summary>
+    [JsonPropertyName("selinux")] public string? Selinux { get; set; }
+    [JsonPropertyName("apparmor")] public bool? AppArmor { get; set; }
+    /// <summary>Automatic (security) updates: unattended-upgrades, dnf-automatic / yum-cron, or zypper automatic patches.</summary>
+    [JsonPropertyName("autoUpdates")] public bool? AutoUpdates { get; set; }
+    [JsonPropertyName("firewall")] public string? Firewall { get; set; }
+    [JsonPropertyName("passMaxDays")] public int? PassMaxDays { get; set; }
+    /// <summary>Accounts with UID 0 other than root.</summary>
+    [JsonPropertyName("extraUid0")] public List<string>? ExtraUid0 { get; set; }
+    [JsonPropertyName("auditd")] public bool? Auditd { get; set; }
+    [JsonPropertyName("timeSync")] public bool? TimeSync { get; set; }
+    [JsonPropertyName("telnetServer")] public bool? TelnetServer { get; set; }
+    /// <summary>Package updates waiting to be installed (security ones where the package manager tells).</summary>
+    [JsonPropertyName("pendingUpdates")] public int? PendingUpdates { get; set; }
+    [JsonPropertyName("pendingSecurityUpdates")] public int? PendingSecurityUpdates { get; set; }
+    /// <summary>A reboot is needed to finish installing updates (new kernel, libraries).</summary>
+    [JsonPropertyName("rebootRequired")] public bool? RebootRequired { get; set; }
 }
 
 /// <summary>

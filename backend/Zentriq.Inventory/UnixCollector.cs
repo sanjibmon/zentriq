@@ -11,7 +11,7 @@ namespace Zentriq.Inventory;
 /// no writes); this class holds the commands and turns their output into an <see cref="InventoryDocument"/>.
 /// Parsing is pure so it is unit-tested without a remote host.
 /// </summary>
-public static class UnixCollector
+public static partial class UnixCollector
 {
     /// <summary>First command: identifies the platform.</summary>
     public const string ProbeCommand = "uname -s; uname -m; uname -r";
@@ -27,7 +27,9 @@ public static class UnixCollector
         ["ipaddr"] = "ip -o addr show 2>/dev/null",
         ["iplink"] = "ip -o link show 2>/dev/null",
         ["route"] = "ip route show default 2>/dev/null",
-        ["packages"] = "if command -v dpkg-query >/dev/null 2>&1; then dpkg-query -W -f='dpkg\\t${Package}\\t${Version}\\t${Architecture}\\n' 2>/dev/null; fi; if command -v rpm >/dev/null 2>&1; then rpm -qa --qf 'rpm\\t%{NAME}\\t%{VERSION}-%{RELEASE}\\t%{ARCH}\\t%{VENDOR}\\n' 2>/dev/null; fi",
+        ["packages"] = "if command -v dpkg-query >/dev/null 2>&1; then dpkg-query -W -f='dpkg\\t${Package}\\t${Version}\\t${Architecture}\\n' 2>/dev/null; fi; if command -v rpm >/dev/null 2>&1; then rpm -qa --qf 'rpm\\t%{NAME}\\t%{VERSION}-%{RELEASE}\\t%{ARCH}\\t%{VENDOR}\\n' 2>/dev/null; fi; " +
+                       "if command -v pacman >/dev/null 2>&1; then pacman -Q 2>/dev/null | awk '{print \"pacman\\t\" $1 \"\\t\" $2 \"\\t\"}'; fi; " +
+                       "if command -v apk >/dev/null 2>&1; then apk list -I 2>/dev/null | awk '{print \"apk\\t\" $1 \"\\t\\t\" $2}'; fi",
         ["uptime"] = "cat /proc/uptime 2>/dev/null",
         ["virt"] = "systemd-detect-virt 2>/dev/null || true",
         ["services"] = "systemctl list-units --type=service --all --no-legend --no-pager --plain 2>/dev/null | head -400",
@@ -145,8 +147,10 @@ public static class UnixCollector
         if (who.Length > 0) doc.Users.LoggedOn = who.Split(' ')[0];
 
         if (doc.Hardware.IsVirtual == true) doc.Device.Chassis = "virtual";
-        doc.Os.IsServer = true; // Linux hosts reached over SSH are treated as servers unless the chassis says otherwise
+        doc.Os.IsServer = true;
         doc.Device.Category = doc.Device.Chassis == "laptop" || doc.Device.Chassis == "desktop" ? "endpoint" : "server";
+        // Distribution, edition (server / desktop) and the rest, when those commands ran (agent, or SSH since build 100).
+        if (o.ContainsKey("osroles")) EnrichLinux(doc, o, doc.Os.Build);
         if (doc.Device.SerialNumber is null && doc.Device.SmbiosUuid is null) doc.Errors.Add("serial/uuid: readable only by root (/sys/class/dmi/id); use an agent or a sudo-capable account for these fields.");
         return doc;
     }
