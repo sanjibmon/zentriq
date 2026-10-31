@@ -4,6 +4,7 @@
   <PropertyGroup>
     <OutputName>Zentriq-LicenseServer-Setup</OutputName>
     <OutputType>Package</OutputType>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
     <Platform Condition="'$(Platform)' == ''">x64</Platform>
     <InstallerPlatform>x64</InstallerPlatform>
     <Cultures>en-US</Cultures>
