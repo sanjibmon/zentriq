@@ -211,7 +211,8 @@ Check 'S07' 'Uninstall keeps the data; reinstall continues with the same key and
     Assert ($r.Status -eq 200) "portal after reinstall: $($r.Status) (setup should stay finished)"
     Login
     Assert ((Api GET '/catalog').signing.fingerprint -eq $script:fp) 'different key after reinstall'
-    Assert (@(Api GET '/licenses').Count -ge 3) 'licenses lost'
+    $lics = @(Api GET '/licenses' | ForEach-Object { $_ })
+    Assert ($lics.Count -ge 3) "licenses lost ($($lics.Count))"
     'uninstall removed services, firewall rule and program, kept data; reinstall: setup finished, same key, licenses kept'
 }
 
