@@ -5,6 +5,8 @@
     <OutputName>Zentriq-LicenseServer-Setup</OutputName>
     <OutputType>Package</OutputType>
     <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+    <!-- Per-machine package: the Start-menu shortcuts are in the all-users menu (the ICEs assume a per-user menu). -->
+    <SuppressIces>ICE38;ICE43;ICE57</SuppressIces>
     <Platform Condition="'$(Platform)' == ''">x64</Platform>
     <InstallerPlatform>x64</InstallerPlatform>
     <Cultures>en-US</Cultures>
