@@ -1,0 +1,47 @@
+name: scm-experiment
+
+# Temporary: how the Service Control Manager treats a service that declines a stop request.
+on:
+  push:
+    branches: ['dev/scm-experiment']
+
+permissions:
+  contents: write
+
+jobs:
+  exp:
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Experiment
+        shell: pwsh
+        run: |
+          $csc = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+          & $csc /nologo /out:C:\TestSvc.exe tests\scm-experiment\TestSvc.cs
+          $report = [System.Collections.Generic.List[string]]::new()
+          foreach ($mode in 5, 1061, 0, 120) {
+            Remove-Item C:\scm-exp.log -ErrorAction SilentlyContinue
+            & sc.exe create ZqScmExp binPath= "C:\TestSvc.exe $mode" | Out-Null
+            & sc.exe start ZqScmExp | Out-Null
+            Start-Sleep 2
+            $report.Add("==== mode $mode")
+            foreach ($i in 1..4) {
+              $out = (& sc.exe stop ZqScmExp 2>&1) -join ' '
+              $report.Add("sc stop #$i exit $LASTEXITCODE : $(($out -replace '\s+',' ').Trim())")
+              Start-Sleep 2
+              $q = (& sc.exe query ZqScmExp 2>&1) -join ' '
+              $report.Add("  query: $((($q -replace '\s+',' ') -replace '.*STATE\s*:\s*','STATE ').Substring(0, [Math]::Min(120, (($q -replace '\s+',' ') -replace '.*STATE\s*:\s*','STATE ').Length)))")
+            }
+            if (Test-Path C:\scm-exp.log) { Get-Content C:\scm-exp.log | ForEach-Object { $report.Add("  log: $_") } }
+            & sc.exe stop ZqScmExp | Out-Null; Start-Sleep 2
+            Stop-Process -Name TestSvc -Force -ErrorAction SilentlyContinue
+            & sc.exe delete ZqScmExp | Out-Null
+            Start-Sleep 2
+          }
+          $report | Set-Content scm-experiment.txt
+          $report
+          $d = Join-Path $env:RUNNER_TEMP 'l'; New-Item -ItemType Directory $d | Out-Null; Copy-Item scm-experiment.txt $d
+          Set-Location $d; git init -q; git checkout -q -b scm-experiment-logs; git add -A
+          git -c user.name=ci -c user.email=ci@localhost commit -q -m log
+          git push -f -q "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" scm-experiment-logs
