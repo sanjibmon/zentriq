@@ -12,26 +12,45 @@ public partial class Program
 {
     public static async Task<int> Main(string[] args)
     {
-        // Commands: (none) | serve  — run the service;  keygen --out <dir> [--key-id <id>];  key-info;  migrate;
-        //           create-admin --email <e> --name <n>  (the passphrase is read from ZLS_ADMIN_PASSPHRASE or standard input).
+        // Commands: (none) | serve [--data <folder>]  — run the service (with --data: an installed server, see ServerData);
+        //           keygen --out <dir> [--key-id <id>];  key-info;  migrate;  create-admin --email <e> --name <n>
+        //           (passphrase from ZLS_ADMIN_PASSPHRASE or standard input);  install --data <folder> / uninstall (Windows installer).
         var command = args.Length > 0 && !args[0].StartsWith('-') ? args[0] : "serve";
         var rest = args.Length > 0 && !args[0].StartsWith('-') ? args[1..] : args;
         if (command == "keygen") return Keygen(rest);
+        if (command is "install" or "uninstall")
+        {
+            if (!OperatingSystem.IsWindows()) { Console.Error.WriteLine("install / uninstall are for Windows (the Setup MSI runs them)."); return 2; }
+            return command == "install" ? await Installation.InstallAsync(Arg(rest, "--data") ?? Installation.DefaultDataRoot, Arg(rest, "--version")) : Installation.Uninstall();
+        }
 
         var app = Build(rest);
+        var installed = app.Services.GetService<ServerData>() is not null;
         if (command is "serve" or "key-info")
         {
             // Load and self-test the signing key before anything else (wrong passphrase or file: stop here, clearly).
+            // An installed server starts without one until the setup wizard has created or imported it.
             try
             {
-                var key = app.Services.GetRequiredService<SigningKey>();
-                app.Logger.LogInformation("Signing key {KeyId} loaded and self-tested. Fingerprint {Fingerprint}", key.KeyId, key.Fingerprint);
-                if (command == "key-info") { Console.WriteLine($"Key id:      {key.KeyId}\nFingerprint: {key.Fingerprint}\n{key.PublicPem}"); return 0; }
+                var key = app.Services.GetRequiredService<SigningKeyHolder>().Current;
+                if (key is not null) app.Logger.LogInformation("Signing key {KeyId} loaded and self-tested. Fingerprint {Fingerprint}", key.KeyId, key.Fingerprint);
+                else app.Logger.LogWarning("No signing key yet: {Reason}", app.Services.GetRequiredService<SigningKeyHolder>().LoadError ?? NotSetUpException.Message);
+                if (command == "key-info")
+                {
+                    if (key is null) { Console.Error.WriteLine("No signing key is set up."); return 3; }
+                    Console.WriteLine($"Key id:      {key.KeyId}\nFingerprint: {key.Fingerprint}\n{key.PublicPem}"); return 0;
+                }
             }
             catch (InvalidOperationException ex) { Console.Error.WriteLine(ex.Message); return 3; }
         }
         var ds = app.Services.GetRequiredService<NpgsqlDataSource>();
-        var applied = await MigrationRunner.MigrateAsync(ds);
+        int applied;
+        for (var attempt = 1; ; attempt++)
+        {
+            // An installed server may start before its database service accepts connections (after a reboot).
+            try { applied = await MigrationRunner.MigrateAsync(ds); break; }
+            catch (NpgsqlException ex) when (installed && attempt < 60) { app.Logger.LogInformation("Waiting for the database: {Message}", ex.Message); await Task.Delay(2000); }
+        }
         if (applied > 0) app.Logger.LogInformation("Applied {Count} database migration(s).", applied);
 
         switch (command)
@@ -48,16 +67,23 @@ public partial class Program
 
     public static WebApplication Build(string[] args, Action<WebApplicationBuilder>? configure = null)
     {
-        var builder = WebApplication.CreateBuilder(args);
+        // An installed server runs as a Windows service (working folder System32): its files are next to the program.
+        var installedMode = Array.IndexOf(args, "--data") >= 0;
+        var builder = WebApplication.CreateBuilder(installedMode ? new WebApplicationOptions { Args = args, ContentRootPath = AppContext.BaseDirectory } : new WebApplicationOptions { Args = args });
         configure?.Invoke(builder);
         var options = builder.Configuration.GetSection("LicenseServer").Get<LicenseServerOptions>() ?? new LicenseServerOptions();
-        var cs = builder.Configuration.GetConnectionString("LicenseServer")
+        var dataDir = builder.Configuration["data"];
+        var data = string.IsNullOrWhiteSpace(dataDir) ? null : new ServerData(dataDir);
+        var cs = data?.GetSecret("database") is not null ? data.ConnectionString(data.State) : builder.Configuration.GetConnectionString("LicenseServer")
                  ?? throw new InvalidOperationException("ConnectionStrings:LicenseServer is not set.");
 
         builder.Services.AddSingleton(options);
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddSingleton(NpgsqlDataSource.Create(cs));
-        builder.Services.AddSingleton(sp => SigningKey.Load(options));
+        if (data is null)
+            builder.Services.AddSingleton(sp => new SigningKeyHolder(SigningKey.Load(options)));
+        else
+            InstalledServer.Configure(builder, data, options);
         builder.Services.AddSingleton<LicenseIssuer>();
         builder.Services.AddSingleton<LicenseService>();
         builder.Services.AddSingleton<Audit>();
@@ -103,7 +129,17 @@ public partial class Program
         });
 
         var app = builder.Build();
+        app.Use(async (ctx, next) =>
+        {
+            try { await next(); }
+            catch (NotSetUpException) when (!ctx.Response.HasStarted)
+            {
+                ctx.Response.StatusCode = 503;
+                await Results.Problem(statusCode: 503, title: NotSetUpException.Message).ExecuteAsync(ctx);
+            }
+        });
         app.UseForwardedHeaders();
+        if (data is not null) InstalledServer.UseGates(app, data);
         app.Use(async (ctx, next) =>
         {
             var h = ctx.Response.Headers;
@@ -120,11 +156,12 @@ public partial class Program
         app.UseAuthorization();
         app.MapPublicApi();
         app.MapAdminApi();
+        if (data is not null) app.MapSetupApi();
         app.MapFallbackToFile("/admin/{*path:nonfile}", "admin/index.html");
         return app;
     }
 
-    private static string? Arg(string[] args, string name)
+    internal static string? Arg(string[] args, string name)
     {
         var i = Array.IndexOf(args, name);
         return i >= 0 && i + 1 < args.Length ? args[i + 1] : null;
