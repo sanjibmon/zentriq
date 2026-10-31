@@ -11,7 +11,4 @@
   <Folder Name="/tests/">
     <Project Path="Zentriq.Tests/Zentriq.Tests.csproj" />
   </Folder>
-  <Folder Name="/tools/">
-    <Project Path="../tools/Zentriq.LicenseSigner/Zentriq.LicenseSigner.csproj" />
-  </Folder>
 </Solution>

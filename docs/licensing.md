@@ -1,8 +1,8 @@
 # Licensing, trial, free tier and activation
 
-Zentriq is licensed by what it manages. A license is activated **online** with a license key (the normal case) or
-**offline** with a license file (air-gapped servers). The licenses are issued by the Zentriq license server
-([license-server.md](license-server.md)).
+Zentriq is licensed by what it manages. Zentriq sends you a **license file** (`.zlic`). You import it under
+*Licensing*; Zentriq checks it and has it **validated by the Zentriq license server** before activating it. Servers
+without internet access are activated offline with the same file.
 
 ## What is counted (build 93)
 
@@ -72,73 +72,63 @@ Data is **never** deleted, and sign-in, viewing data, backup, restore and licens
 * **Editions**: Standard (Overview, Discover & inventory, Infrastructure, Insight & admin) or Advanced (everything,
   including Remote support and Secure & remediate). A license can add single modules to its edition.
 
-## Online activation (license key)
+## Activation with the license file (normal case)
 
-1. *Licensing › Activate*: enter the license key (`ZQL-XXXXX-XXXXX-XXXXX-XXXXX`) and choose **Activate online**.
-2. Zentriq sends the activation request (installation ID, version, organization, current usage; no secrets) to the
-   license server over HTTPS. The server binds the key to this installation and returns a signed license file and an
-   activation token (stored encrypted).
-3. The server **checks in daily** (hourly in the last 10 days of the lease). Each check-in reports usage and receives
+1. *Licensing › Activate › Import license file*: choose the `.zlic` file from Zentriq.
+2. Zentriq checks the file's signature (it must come from Zentriq, unchanged), then sends it with an activation
+   request (installation ID, version, organization, current usage; no secrets) to the Zentriq license server over
+   HTTPS.
+3. The license server **validates** it: the license exists, is active (not suspended or revoked), the file is the
+   newest one issued for it, and an activation is free. It returns the license bound to this installation and an
+   activation token (stored encrypted). **Only then is the license activated.** If the license server cannot be
+   reached or refuses the file, nothing changes and the reason is shown.
+4. The server **checks in daily** (hourly in the last 10 days of the lease). Each check-in reports usage and receives
    a refreshed license: renewals, upgrades, entitlement changes and support extensions arrive automatically.
    *Check in now* runs one at once.
 
+* **License key**: a license can also be activated with its key (`ZQL-XXXXX-XXXXX-XXXXX-XXXXX`) under *Activate with
+  a license key instead*; the license server validates it the same way.
+* **New license file**: if Zentriq issues a new file for your license (e.g. after it was lost or shared), the earlier
+  file can no longer activate; servers that are already activated keep running.
 * **Lease**: an online license must be refreshed within **30 days**. When the lease ends without a check-in, a
   warning appears and the license keeps working for **30 more days**; then the state is *Lease expired* and features
   pause until the server can check in (or is activated offline).
 * **Suspended / revoked / deactivated** at the license server: the next check-in removes the license and the server
   falls back to the free tier. A suspended license returns at the first check-in after it is resumed.
-* **Moving to another server**: *Deactivate* releases the activation on the license server; activate the key on the
-  new server. A key activates on as many servers as the license allows (normally one).
-* **License server address**: `https://license.zentriq.com` by default (*Licensing › License server*,
-  system setting `licensing.server_url`). The server's outbound proxy settings apply; port 443 must be allowed.
-  Plain `http://` is accepted only for a license server on the same computer (`http://localhost:5080`, the local
-  edition used for testing).
+* **Moving to another server**: *Deactivate* releases the activation on the license server; import the license file
+  on the new server. A license activates on as many servers as it allows (normally one).
+* **License server address**: `https://license.zentriq.com` (*Licensing › License server*, system setting
+  `licensing.server_url`; change it only when Zentriq asks). The server's outbound proxy settings apply; port 443
+  must be allowed. Plain `http://` is accepted only for `localhost`.
 
-API: `POST /api/v1/licensing/activate {licenseKey}`, `POST /licensing/checkin`, `POST /licensing/deactivate`,
+API: `POST /api/v1/licensing/import {document}` (license file: validated online; file for this server: imported),
+`POST /licensing/activate {licenseKey}`, `POST /licensing/checkin`, `POST /licensing/deactivate`,
 `PUT /licensing/server {url}`, `GET /licensing/status`. All require *licensing.manage* (status: signed in).
 
 ## Offline activation (air-gapped servers)
 
 1. *Licensing › Offline activation › Download activation request* (`POST /api/v1/licensing/activation-request`).
-2. On any computer with internet access, open the license server's page (`https://license.zentriq.com/`), enter the
-   license key and upload the request; download the license file (`.zlic`). Alternatively send the request to
-   Zentriq, who issue the file from the license portal.
-3. *Import license file* (`POST /api/v1/licensing/import`).
+2. On any computer with internet access, open `https://license.zentriq.com/`, upload the **license file** from
+   Zentriq (or enter the license key) together with the activation request, and download the license file for this
+   server. Alternatively send both files to Zentriq.
+3. *Import license file* with the file you received for this server.
 
-Offline licenses carry no lease and do not check in: import a new file after a renewal, upgrade or support
-extension. Perpetual licenses can be activated offline in the same way.
+The license server validates the license the same way as online. Offline licenses carry no lease and do not check
+in: import a new file after a renewal, upgrade or support extension. Perpetual licenses are activated offline in the
+same way.
 
-## License file format (`.zlic`, schema 1–3)
+## License files
 
-```json
-{ "format": "zentriq-license", "keyId": "zentriq-prod-2026-11", "algorithm": "ES256",
-  "payload": "<base64 UTF-8 JSON>", "signature": "<base64 ECDSA P-256/SHA-256, IEEE P1363>" }
-```
+Two kinds of `.zlic` file exist, both signed by Zentriq (ECDSA P-256 / SHA-256) and checked before any field is read:
 
-The payload holds `schemaVersion, licenseId, customer, installationId, issuedAt, notBefore, expiresAt, graceDays,
-modules, entitlements, requestId`, optionally `edition` and `licensee { … }` (schema 2), and in schema 3:
-`licenseType` (subscription | perpetual), `termYears`, `supportUntil`, `activation` (online | offline) and
-`leaseUntil`. Entitlement keys are the metrics above (`devices`, `nonit_assets`, `cloud_instances`,
-`technicians`); a missing `nonit_assets` means unlimited.
+| File | Bound to | Use |
+|---|---|---|
+| License file from Zentriq | no server | Proof of purchase: activates only after the license server validates it. |
+| License for this server | this installation | Returned by the license server (online, or offline activation). Carries the entitlements, term or support and, online, the lease. |
 
-Zentriq verifies the signature over the exact payload bytes **before** reading any field, then checks: known and
-non-revoked key, supported schema, installation binding, validity window and grace, known modules and metrics, and
-schema-3 rules (perpetual needs `supportUntil`; `termYears` 1–10; lease not before issue). A newer license with the
-same ID (a refreshed online license or a re-issued file) replaces the current one; the previous record is kept as
-*superseded*.
-
-## Keys and rotation
-
-* Only **public** verification keys are compiled into Zentriq
-  (`backend/Zentriq.Infrastructure/Resources/license-public-keys.json`); customers cannot add keys.
-  `zentriq-dev-2026-10` is a **development key**: add your production key before the first customer release.
-* The license server signs with its private key (`keygen` command, see [license-server.md](license-server.md)); the
-  portal shows the exact entry to add to `license-public-keys.json` under *Settings › Signing key*.
-* Rotation: add the new public key (keep the old one), release; switch the license server to the new key; later set
-  `notAfter` on the old key, or `revoked: true` if it was compromised (licenses signed by it stop validating; online
-  servers get re-signed licenses at their next check-in, offline servers need new files).
-* `tools/Zentriq.LicenseSigner` remains for emergencies (`--type subscription|perpetual`, `--years`,
-  `--support-until`, `--entitle devices=… --entitle nonit_assets=…`).
+Zentriq trusts only the Zentriq signing keys built into the product; a changed file is rejected. A newer license with
+the same ID (a refreshed online license or a re-issued file) replaces the current one; the previous record is kept
+as *superseded*.
 
 ## Limits of offline licensing (by design)
 

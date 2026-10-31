@@ -69,6 +69,11 @@ public static class LicenseFormats
     public const string Perpetual = "perpetual";
     public const string Online = "online";
     public const string Offline = "offline";
+    /// <summary>
+    /// The license file Zentriq sends to a customer: signed, but bound to no installation. It is only a proof of purchase
+    /// for activation; the license server validates it and returns the license bound to the customer's installation.
+    /// </summary>
+    public const string Certificate = "certificate";
     /// <summary>Days an online license keeps working after its lease ended without a successful check-in.</summary>
     public const int LeaseGraceDays = 30;
     /// <summary>Lease given to an online activation at each successful check-in.</summary>
@@ -153,9 +158,11 @@ public static class LicenseServerProtocol
     public const string DefaultServerUrl = "https://license.zentriq.com";
 }
 
+/// <summary>Activation with a license key or with the license file (activation "certificate") Zentriq sent to the customer.</summary>
 public sealed record OnlineActivateRequest(
-    [property: JsonPropertyName("licenseKey")] string LicenseKey,
-    [property: JsonPropertyName("request")] ActivationRequest Request);
+    [property: JsonPropertyName("licenseKey")] string? LicenseKey,
+    [property: JsonPropertyName("request")] ActivationRequest Request,
+    [property: JsonPropertyName("licenseFile")] string? LicenseFile = null);
 
 public sealed record OnlineActivateResponse(
     [property: JsonPropertyName("license")] string License,

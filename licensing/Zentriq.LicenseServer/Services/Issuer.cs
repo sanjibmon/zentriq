@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using Npgsql;
 using Zentriq.Application.Licensing;
+using Zentriq.Licensing.Signing;
 using Zentriq.Domain;
 using Zentriq.Domain.Licensing;
 
@@ -56,6 +57,7 @@ public sealed class LicenseIssuer(SigningKey key, LicenseServerOptions options, 
     {
         // Online activations carry a lease: the product needs a check-in before it ends (30 more days of grace follow).
         DateTimeOffset? lease = activation == LicenseFormats.Online ? now.AddDays(options.LeaseDays) : null;
+        var certificate = activation == LicenseFormats.Certificate;
         if (lease is { } le && !l.IsPerpetual && le > l.ExpiresAt.AddDays(l.GraceDays)) lease = l.ExpiresAt.AddDays(l.GraceDays);
         if (lease is { } le2 && le2 < now) lease = now;
         return new LicensePayload(
@@ -69,7 +71,7 @@ public sealed class LicenseIssuer(SigningKey key, LicenseServerOptions options, 
             GraceDays: l.GraceDays,
             Modules: l.ExtraModules.Where(m => Modules.All.Contains(m)).Distinct().OrderBy(m => m, StringComparer.Ordinal).ToList(),
             Entitlements: l.Entitlements(),
-            RequestId: requestId,
+            RequestId: certificate ? null : requestId,
             Licensee: c.ToLicensee(),
             Edition: l.Edition,
             LicenseType: l.LicenseType,
@@ -77,6 +79,44 @@ public sealed class LicenseIssuer(SigningKey key, LicenseServerOptions options, 
             SupportUntil: l.SupportUntil,
             Activation: activation,
             LeaseUntil: lease);
+    }
+
+    /// <summary>
+    /// The license file sent to the customer: signed, bound to no installation, valid only as proof for activation.
+    /// Its fingerprint is stored on the license; a newer file replaces it (the earlier one no longer activates).
+    /// </summary>
+    public async Task<(string Document, LicensePayload Payload)> IssueLicenseFileAsync(NpgsqlConnection conn, NpgsqlTransaction? tx, License l, Customer c, CancellationToken ct)
+    {
+        var now = Now;
+        var payload = Payload(l, c, Guid.Empty, null, LicenseFormats.Certificate, now);
+        var doc = LicenseSigning.Sign(payload, key.Key, key.KeyId);
+        await conn.ExecAsync("UPDATE zls.licenses SET file_hash = @h, file_issued_at = @at, updated_at = now() WHERE id = @id",
+            new { h = FileHash(doc), at = now, id = l.Id }, ct, tx);
+        await conn.ExecAsync("""
+            INSERT INTO zls.issued_documents (id, license_id, activation_id, issued_at, lease_until, reason, document)
+            VALUES (@id, @lic, NULL, @at, NULL, 'license-file', @doc)
+            """, new { id = Guid.NewGuid(), lic = l.Id, at = now, doc }, ct, tx);
+        return (doc, payload);
+    }
+
+    /// <summary>SHA-256 of the signed payload of a license file (formatting of the outer JSON does not matter).</summary>
+    public static string? FileHash(string document)
+    {
+        try
+        {
+            using var d = System.Text.Json.JsonDocument.Parse(document);
+            var p = d.RootElement.GetProperty("payload").GetString();
+            return p is null ? null : Convert.ToHexString(SHA256.HashData(System.Text.Encoding.ASCII.GetBytes(p))).ToLowerInvariant();
+        }
+        catch (Exception ex) when (ex is System.Text.Json.JsonException or KeyNotFoundException or InvalidOperationException) { return null; }
+    }
+
+    /// <summary>Checks a license file against this server's key: the license id it is for, or null when it is not genuine.</summary>
+    public LicensePayload? ReadLicenseFile(string document)
+    {
+        var verifier = new LicenseVerifier(new InMemoryPublicKeyStore([new LicensePublicKey(key.KeyId, key.PublicPem, null, false)]));
+        var r = verifier.Verify(document, Guid.Empty, Now, enforceValidityWindow: false);
+        return r.IsValid && r.Payload!.Activation == LicenseFormats.Certificate ? r.Payload : null;
     }
 
     public async Task<(string Document, LicensePayload Payload)> IssueAsync(NpgsqlConnection conn, NpgsqlTransaction? tx, License l, Customer c,

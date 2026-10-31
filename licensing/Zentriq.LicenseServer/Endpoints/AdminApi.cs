@@ -298,6 +298,21 @@ public static class AdminApi
             return Results.NoContent();
         });
 
+        // The license file for the customer. Issuing a new one makes the earlier file unusable for activation.
+        g.MapPost("/licenses/{id}/file", async (string id, NpgsqlDataSource ds, LicenseIssuer issuer, Audit audit, ClaimsPrincipal u, HttpContext http, CancellationToken ct) =>
+        {
+            await using var conn = await ds.OpenConnectionAsync(ct);
+            await using var tx = await conn.BeginTransactionAsync(ct);
+            var l = await conn.FirstAsync($"SELECT {License.Columns} FROM zls.licenses WHERE id = @id FOR UPDATE", new { id }, License.Read, ct, tx);
+            if (l is null) return Results.NotFound();
+            if (l.Status != "active") return Bad("id", $"The license is {l.Status}.");
+            var c = (await conn.FirstAsync($"SELECT {Customer.Columns} FROM zls.customers WHERE id = @id", new { id = l.CustomerId }, Customer.Read, ct, tx))!;
+            var (doc, _) = await issuer.IssueLicenseFileAsync(conn, tx, l, c, ct);
+            await audit.WriteAsync(Actor(u), "license.file", id, PublicApi.Ip(http), new { replaced = l.FileHash is not null }, ct, conn, tx);
+            await tx.CommitAsync(ct);
+            return Results.Ok(new { license = doc, fileName = $"zentriq-license-{id}.zlic", replaced = l.FileHash is not null });
+        });
+
         // New key (lost or leaked). Existing activations keep working through their tokens; the old key no longer activates.
         g.MapPost("/licenses/{id}/rekey", async (string id, NpgsqlDataSource ds, Audit audit, ClaimsPrincipal u, HttpContext http, CancellationToken ct) =>
         {

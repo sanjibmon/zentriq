@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- VENDOR-SIDE: license signing. Used by the license server and the signing tool; never part of the Zentriq product. -->
+  <PropertyGroup>
+    <RootNamespace>Zentriq.Licensing.Signing</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\backend\Zentriq.Domain\Zentriq.Domain.csproj" />
+  </ItemGroup>
+</Project>

@@ -112,17 +112,17 @@ public sealed class LicensingPlanTests
     [Fact]
     public void Signed_schema3_license_round_trips_through_the_verifier()
     {
-        var (priv, pub) = LicenseSigning.NewKeyPair();
-        using var key = LicenseSigning.LoadPrivateKey(priv);
+        var (priv, pub) = TestSigning.NewKeyPair();
+        using var key = TestSigning.LoadPrivateKey(priv);
         var verifier = new LicenseVerifier(new InMemoryPublicKeyStore([new LicensePublicKey("k1", pub, null, false)]));
-        var doc = LicenseSigning.Sign(Lic(LicenseFormats.Perpetual, activation: LicenseFormats.Online, lease: Now.AddDays(30)), key, "k1");
+        var doc = TestSigning.Sign(Lic(LicenseFormats.Perpetual, activation: LicenseFormats.Online, lease: Now.AddDays(30)), key, "k1");
         var r = verifier.Verify(doc, Install, Now);
         Assert.True(r.IsValid, r.Message);
         Assert.Equal(LicenseFormats.Perpetual, r.Payload!.LicenseType);
         Assert.Equal(500, r.Payload.Entitlements[Workloads.TotalDevices]);
 
         // Perpetual licenses must state their support end.
-        var bad = LicenseSigning.Sign(Lic(LicenseFormats.Perpetual) with { SupportUntil = null }, key, "k1");
+        var bad = TestSigning.Sign(Lic(LicenseFormats.Perpetual) with { SupportUntil = null }, key, "k1");
         Assert.Equal(LicenseRejection.InvalidContent, verifier.Verify(bad, Install, Now).Rejection);
     }
 }

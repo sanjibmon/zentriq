@@ -117,9 +117,17 @@ public static class LicensingEndpoints
             return Results.File(Encoding.UTF8.GetBytes(json), "application/json", $"zentriq-activation-request-{req.RequestId:N}.json");
         }).RequireAuthorization(Permissions.LicensingManage);
 
-        g.MapPost("/import", async (ImportBody body, LicenseImporter importer, RequestContext rc, CancellationToken ct) =>
+        g.MapPost("/import", async (ImportBody body, LicenseImporter importer, OnlineLicensing online, RequestContext rc, CancellationToken ct) =>
         {
             var r = await importer.ImportAsync(body.Document ?? "", rc.UserId, ct);
+            if (r.Reason == nameof(LicenseRejection.ActivationRequired))
+            {
+                // The license file Zentriq sent: active only after the license server has validated it.
+                var a = await online.ActivateWithFileAsync(body.Document!, rc.UserId, rc.UserName, ct);
+                if (!a.Ok) await rc.AuditAsync("license.activate_file", null, "Failure", new { reason = a.Message });
+                return a.Ok ? Results.Ok(new { imported = true, validated = true, message = a.Message })
+                            : Results.Problem(statusCode: a.Status, title: a.Message, extensions: new Dictionary<string, object?> { ["reason"] = a.Status == 502 ? "LicenseServerUnreachable" : "ValidationFailed" });
+            }
             if (!r.Ok)
             {
                 await rc.AuditAsync("license.import", null, "Failure", new { reason = r.Reason ?? r.Message });
@@ -127,7 +135,7 @@ public static class LicensingEndpoints
             }
             var p = r.Payload!;
             await rc.AuditAsync("license.import", p.LicenseId, detail: new { p.Customer, p.ExpiresAt, p.Entitlements, p.Modules, p.LicenseType, p.SupportUntil });
-            return Results.Ok(new { imported = true, p.LicenseId, p.Customer, p.ExpiresAt, p.Entitlements });
+            return Results.Ok(new { imported = true, validated = false, message = "License imported.", p.LicenseId, p.Customer, p.ExpiresAt, p.Entitlements });
         }).RequireAuthorization(Permissions.LicensingManage);
     }
 }

@@ -76,3 +76,4 @@ dialog .dfoot { padding: 12px 18px; border-top: 1px solid var(--line); display: 
 @media (max-width: 760px) { .kv { grid-template-columns: 1fr; } }
 .mt { margin-top: 12px; }
 summary { cursor: pointer; margin: 8px 0; }
+hr { border: 0; border-top: 1px solid var(--line); margin: 14px 0; }

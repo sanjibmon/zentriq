@@ -9,7 +9,7 @@ frontend/     web console (React + TypeScript + Vite) — see "Status" below
 installer/    WiX 5 MSI (msi/), Burn bootstrapper (bootstrapper/), custom actions, artwork, prerequisite manifest
 deployment/   shared build helpers
 tests/        installer acceptance suite (installer/), SQL integration assertions (integration/db)
-tools/        vendor-only license signer (never shipped)
+licensing/    license server, signing tool and vendor docs: a separate product, never shipped
 docs/         installation, administrator, upgrade, backup/restore, licensing, troubleshooting, security
 ```
 

@@ -1,5 +1,5 @@
 # Zentriq License Server: PostgreSQL + the service + Caddy (automatic HTTPS for the public name).
-# See docs/license-server.md. In short:
+# See licensing/docs/license-server.md. In short:
 #   1. Signing key (once, on this machine; keep an offline copy):
 #        docker compose run --rm --no-deps -it license keygen --out /keys
 #      copy keys/<id>.private.pem to secrets/signing.pem, put its passphrase (one line) into secrets/signing.passphrase,

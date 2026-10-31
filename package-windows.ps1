@@ -86,7 +86,10 @@ if (Test-Path (Join-Path $dist 'index.html')) {
 }
 $docs = Join-Path $staging 'docs'
 New-Item -ItemType Directory -Force -Path $docs | Out-Null
-Copy-Item (Join-Path $root 'docs/*.md') $docs -Force
+# Customer documentation only: internal build notes stay in the repository (vendor docs live under licensing/docs).
+$internalDocs = @('test-report.md', 'code-signing.md')
+$customerDocs = Get-ChildItem (Join-Path $root 'docs') -Filter '*.md' | Where-Object { $_.Name -notin $internalDocs }
+$customerDocs | Copy-Item -Destination $docs -Force
 Copy-Item (Join-Path $root 'installer/assets/THIRD-PARTY-NOTICES.txt') $docs -Force
 
 # ---- 2a. remote support engine (Node.js + MeshCentral, Apache-2.0) ------------------------------------
@@ -224,7 +227,7 @@ $kitZip = Join-Path $release "Zentriq-$Version-msi-offline-kit.zip"
 Compress-Archive -Path (Join-Path $kit '*') -DestinationPath $kitZip -CompressionLevel Optimal
 
 $docZip = Join-Path $release "Zentriq-$Version-docs.zip"
-Compress-Archive -Path (Join-Path $root 'docs/*') -DestinationPath $docZip
+Compress-Archive -Path $customerDocs.FullName -DestinationPath $docZip
 
 $signatures = @{}
 foreach ($f in Get-ChildItem $release -File | Where-Object Extension -in '.exe', '.msi') {

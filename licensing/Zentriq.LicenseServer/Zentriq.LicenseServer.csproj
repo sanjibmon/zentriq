@@ -12,6 +12,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\backend\Zentriq.Domain\Zentriq.Domain.csproj" />
     <ProjectReference Include="..\..\backend\Zentriq.Application\Zentriq.Application.csproj" />
+    <ProjectReference Include="..\Zentriq.Licensing.Signing\Zentriq.Licensing.Signing.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Npgsql" />

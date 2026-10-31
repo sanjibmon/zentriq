@@ -245,7 +245,7 @@
       const t = val('n_type');
       const r = await api('/licenses', { method: 'POST', body: { customerId: val('n_cust'), licenseType: t, termYears: t === 'subscription' ? intOrNull('n_term') : null,
         supportYears: t === 'perpetual' ? intOrNull('n_sup') : null, startsAt: val('n_start') ? val('n_start') + 'T00:00:00Z' : null, ...entitlementBody() } });
-      await showKey(r.licenseKey, 'License created');
+      await showKey(r.licenseKey, 'License created', r.id);
       return r.id;
     } }]).catch(() => null);
     if (id) location.hash = '#/licenses/' + encodeURIComponent(id);
@@ -257,16 +257,26 @@
     $('n_termw').classList.toggle('hidden', p); $('n_supw').classList.toggle('hidden', !p);
   });
 
-  function showKey(key, title) {
+  // Issues the customer's license file (replaces any earlier one) and saves it.
+  async function issueFile(id) {
+    const r = await api('/licenses/' + encodeURIComponent(id) + '/file', { method: 'POST', body: {} });
+    download(r.fileName, r.license);
+    return r;
+  }
+
+  function showKey(key, title, licenseId) {
     return new Promise((resolve) => {
       const d = document.createElement('dialog');
       d.innerHTML = `<div class="dhead">${esc(title)}</div><div class="dbody">
-        <p>Give this license key to the customer. <b>It is shown only once</b>; the portal keeps only a fingerprint.</p>
+        ${licenseId ? `<p><b>Send the customer the license file.</b> They import it in Zentriq › Licensing; Zentriq has it validated by this
+          license server and only then activates it.</p><div class="row"><button type="button" class="primary file">Download license file</button></div><hr class="mt">` : ''}
+        <p>License key (an alternative to the file, e.g. read out on the phone). <b>It is shown only once</b>; the portal keeps only a fingerprint.</p>
         <div class="keybox">${esc(key)}</div>
-        <p class="small muted">Online: Zentriq › Licensing › Activate online. Air-gapped: the customer uses this key on the offline activation page, or you issue the file from the license page.</p></div>
-        <div class="dfoot"><button type="button" class="copy">Copy</button><button type="button" class="primary done">I have saved the key</button></div>`;
+        <p class="small muted">Air-gapped servers: the customer uploads the license file (or key) with the server's activation request on the offline activation page, or you issue the file from the license page.</p></div>
+        <div class="dfoot"><button type="button" class="copy">Copy key</button><button type="button" class="done">Done</button></div>`;
       document.body.appendChild(d);
       d.querySelector('.copy').addEventListener('click', () => navigator.clipboard?.writeText(key));
+      if (licenseId) d.querySelector('.file').addEventListener('click', () => issueFile(licenseId).catch((e) => alertMsg(e.message)));
       d.querySelector('.done').addEventListener('click', () => { d.close(); d.remove(); resolve(); });
       d.addEventListener('cancel', (e) => e.preventDefault());
       d.showModal();
@@ -281,6 +291,7 @@
       <div class="between"><div><a href="#/licenses" class="small">← Licenses</a><h1 class="mono">${esc(l.id)}</h1>
         <p class="muted">${esc(c.company)} · ${l.edition === 'advanced' ? 'Advanced' : 'Standard'} edition · ${typeText(l)} · ${statusChip(l.status)}</p></div>
         <div class="row">
+          ${l.status === 'active' ? '<button id="a_file" class="primary">License file for customer</button>' : ''}
           ${l.licenseType === 'perpetual' ? '<button id="a_support">Extend support</button>' : '<button id="a_renew">Renew</button>'}
           <button id="a_edit">Change entitlements</button><button id="a_offline">Offline activation</button><button id="a_rekey">New key</button>
           ${l.status === 'active' ? '<button id="a_suspend">Suspend</button>' : l.status === 'suspended' ? '<button id="a_resume">Resume</button>' : ''}
@@ -292,6 +303,7 @@
           <div>${l.licenseType === 'perpetual' ? 'License' : 'Subscription ends'}</div><div>${l.licenseType === 'perpetual' ? 'Perpetual (does not expire)' : day(l.expiresAt)}</div>
           <div>Support until</div><div>${day(l.supportUntil)}</div>
           <div>Grace after the end</div><div>${l.graceDays} days</div>
+          <div>License file</div><div>${l.fileIssuedAt ? `issued ${when(l.fileIssuedAt)}` : '<span class="warn">not issued yet</span>'}</div>
           <div>License key</div><div class="mono">${esc(l.keyHint)}</div>
           <div>Activations</div><div>${active} of ${l.maxActivations}</div>
         </div></div>
@@ -338,6 +350,14 @@
     on('a_edit', async () => {
       const ok = await dialog('Change entitlements', entitlementFields(l) + '<p class="small muted">Online servers pick up the change at their next check-in.</p>',
         [{ label: 'Cancel' }, { label: 'Save', kind: 'primary', run: () => api('/licenses/' + encodeURIComponent(id), { method: 'PUT', body: entitlementBody() }).then(() => true) }]);
+      if (ok) reload();
+    });
+    on('a_file', async () => {
+      const ok = await dialog('License file for the customer', `<p>The customer imports this file in <b>Zentriq › Licensing › Import license file</b>.
+        Zentriq checks its signature, has it validated by this license server (license active, not revoked, an activation free)
+        and only then activates it. Air-gapped servers use it on the offline activation page.</p>
+        ${l.fileIssuedAt ? `<p class="warn">A license file was issued on ${when(l.fileIssuedAt)}. A new file replaces it: the earlier file can no longer activate (servers already activated keep running).</p>` : ''}`,
+      [{ label: 'Cancel' }, { label: l.fileIssuedAt ? 'Issue a new file' : 'Download license file', kind: 'primary', run: () => issueFile(id) }]);
       if (ok) reload();
     });
     on('a_rekey', async () => {

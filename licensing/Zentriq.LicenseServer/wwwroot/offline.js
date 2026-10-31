@@ -1,6 +1,12 @@
 (() => {
   const $ = (id) => document.getElementById(id);
   let request = null;
+  let licenseFile = null;
+  $('lic').addEventListener('change', async (e) => {
+    licenseFile = null;
+    const f = e.target.files[0];
+    if (f && f.size < 65536) licenseFile = await f.text();
+  });
   $('file').addEventListener('change', async (e) => {
     request = null; $('fileinfo').textContent = '';
     const f = e.target.files[0];
@@ -17,10 +23,11 @@
     e.preventDefault();
     const out = $('out'); out.className = 'msg hidden'; $('done').classList.add('hidden');
     if (!request) { out.textContent = 'Choose the activation request file.'; out.className = 'msg bad'; return; }
+    if (!licenseFile && !$('key').value.trim()) { out.textContent = 'Choose the license file from Zentriq (or enter the license key).'; out.className = 'msg bad'; return; }
     $('go').disabled = true;
     try {
       const r = await fetch('/api/v1/offline/activate', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ licenseKey: $('key').value, request }) });
+        body: JSON.stringify({ licenseKey: $('key').value || null, licenseFile: licenseFile || null, request }) });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) { out.textContent = j.title || (r.status === 429 ? 'Too many attempts. Wait a minute and try again.' : `Activation failed (${r.status}).`); out.className = 'msg bad'; return; }
       const url = URL.createObjectURL(new Blob([j.license], { type: 'application/json' }));

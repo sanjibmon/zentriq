@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Zentriq.Application.Licensing;
+using Zentriq.Licensing.Signing;
 using Zentriq.Domain.Licensing;
 
 namespace Zentriq.LicenseServer.Services;

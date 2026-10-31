@@ -12,16 +12,18 @@
   <main class="wrap narrow">
     <section class="card">
       <h1>Offline activation</h1>
-      <p class="muted">For Zentriq servers without internet access. Servers that can reach this site activate directly from <b>Licensing › Activate online</b> with the license key.</p>
+      <p class="muted">For Zentriq servers without internet access. Servers that can reach this site activate directly: <b>Licensing › Import license file</b> (validated online).</p>
       <ol class="muted small">
         <li>On the Zentriq server, open <b>Licensing › Offline activation</b> and download the activation request file.</li>
-        <li>Bring the file to a computer with internet access and upload it here with your license key.</li>
+        <li>Bring the file to a computer with internet access and upload it here with the license file you received from Zentriq (or your license key).</li>
         <li>Download the license file and import it under <b>Licensing › Offline activation › Import license</b>.</li>
       </ol>
       <form id="f" autocomplete="off">
         <div class="card">
-          <label for="key">License key</label>
-          <input id="key" class="mono" placeholder="ZQL-XXXXX-XXXXX-XXXXX-XXXXX" required>
+          <label for="lic">License file from Zentriq (.zlic)</label>
+          <div class="drop"><input id="lic" type="file" accept=".zlic,.json,application/json"></div>
+          <p class="small muted mt">or the license key instead of the file:</p>
+          <input id="key" class="mono" placeholder="ZQL-XXXXX-XXXXX-XXXXX-XXXXX">
           <h3>Activation request</h3>
           <div class="drop"><input id="file" type="file" accept=".json,application/json" required></div>
           <p id="fileinfo" class="small muted"></p>

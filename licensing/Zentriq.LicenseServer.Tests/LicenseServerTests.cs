@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using Zentriq.Application.Licensing;
+using Zentriq.Licensing.Signing;
 using Zentriq.Domain;
 using Zentriq.Domain.Licensing;
 using Zentriq.LicenseServer.Services;
@@ -296,6 +297,47 @@ public sealed class LicenseServerFlowTests : IAsyncLifetime
         var bad = await OkJson(await AdminAsync(HttpMethod.Post, "/verify", new { document = tampered }));
         Assert.False(bad.GetProperty("valid").GetBoolean());
         Assert.Equal(JsonValueKind.Null, bad.GetProperty("payload").ValueKind);
+    }
+
+    [DbFact]
+    public async Task License_file_is_validated_by_the_server_before_it_activates()
+    {
+        await LoginAsync();
+        var (id, _) = await NewLicenseAsync(max: 1);
+        var file = (await OkJson(await AdminAsync(HttpMethod.Post, $"/licenses/{id}/file"))).GetProperty("license").GetString()!;
+
+        // The product: the file is genuine but is not a license by itself (ActivationRequired), on any installation.
+        var product = Verifier();
+        var install = Guid.NewGuid();
+        var asImported = product.Verify(file, install, DateTimeOffset.UtcNow);
+        Assert.Equal(LicenseRejection.ActivationRequired, asImported.Rejection);
+        Assert.False(asImported.IsValid);
+        Assert.True(product.Verify(file, Guid.Empty, DateTimeOffset.UtcNow).IsValid);
+
+        // The license server validates it and returns the license bound to the installation.
+        var act = await OkJson(await _client.PostAsJsonAsync("/" + LicenseServerProtocol.ActivatePath, new OnlineActivateRequest(null, Request(install), file)));
+        var bound = product.Verify(act.GetProperty("license").GetString()!, install, DateTimeOffset.UtcNow);
+        Assert.True(bound.IsValid, bound.Message);
+        Assert.Equal(LicenseFormats.Online, bound.Payload!.Activation);
+        Assert.False(string.IsNullOrEmpty(act.GetProperty("activationToken").GetString()));
+
+        // One activation only; a changed file and an unknown signature are refused.
+        Assert.Equal(HttpStatusCode.Conflict, (await _client.PostAsJsonAsync("/" + LicenseServerProtocol.ActivatePath, new OnlineActivateRequest(null, Request(Guid.NewGuid()), file))).StatusCode);
+        var env = JsonSerializer.Deserialize<SignedDocument>(file)!;
+        var forged = JsonSerializer.Serialize(env with { Payload = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(
+            System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(env.Payload)).Replace("\"devices\":300", "\"devices\":3000"))) });
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await _client.PostAsJsonAsync("/" + LicenseServerProtocol.ActivatePath, new OnlineActivateRequest(null, Request(Guid.NewGuid()), forged))).StatusCode);
+
+        // A new file replaces the old one; suspension stops activation with the file too.
+        var detail = await OkJson(await AdminAsync(HttpMethod.Get, "/licenses/" + id));
+        await OkJson(await AdminAsync(HttpMethod.Post, $"/activations/{detail.GetProperty("activations")[0].GetProperty("id").GetGuid()}/deactivate"));
+        var newer = (await OkJson(await AdminAsync(HttpMethod.Post, $"/licenses/{id}/file"))).GetProperty("license").GetString()!;
+        Assert.Equal(HttpStatusCode.Forbidden, (await _client.PostAsJsonAsync("/" + LicenseServerProtocol.ActivatePath, new OnlineActivateRequest(null, Request(Guid.NewGuid()), file))).StatusCode);
+        await OkJson(await AdminAsync(HttpMethod.Post, $"/licenses/{id}/status", new { status = "suspended" }));
+        Assert.Equal(HttpStatusCode.Forbidden, (await _client.PostAsJsonAsync("/" + LicenseServerProtocol.ActivatePath, new OnlineActivateRequest(null, Request(Guid.NewGuid()), newer))).StatusCode);
+        await OkJson(await AdminAsync(HttpMethod.Post, $"/licenses/{id}/status", new { status = "active" }));
+        var off = await OkJson(await _client.PostAsJsonAsync("/" + LicenseServerProtocol.OfflineActivatePath, new { licenseFile = newer, request = Request(install) }));
+        Assert.Equal(LicenseFormats.Offline, product.Verify(off.GetProperty("license").GetString()!, install, DateTimeOffset.UtcNow).Payload!.Activation);
     }
 
     [DbFact]

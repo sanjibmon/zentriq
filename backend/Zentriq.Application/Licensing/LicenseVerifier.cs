@@ -21,7 +21,9 @@ public enum LicenseRejection
     InvalidContent,
     WrongInstallation,
     NotYetValid,
-    Expired
+    Expired,
+    /// <summary>A license file for activation: valid, but it must be validated by the license server first.</summary>
+    ActivationRequired
 }
 
 public sealed record LicenseVerificationResult(LicenseRejection Rejection, string Message, LicensePayload? Payload)
@@ -102,6 +104,10 @@ public sealed class LicenseVerifier(ILicensePublicKeyStore keys)
 
         if (key.NotAfter is { } keyNotAfter && payload.IssuedAt > keyNotAfter)
             return LicenseVerificationResult.Fail(LicenseRejection.KeyExpired, "The license was issued after its signing key was retired.");
+        // A license file for activation is never a license by itself: the license server must validate it first.
+        if (payload.Activation == LicenseFormats.Certificate && installationId != Guid.Empty)
+            return new LicenseVerificationResult(LicenseRejection.ActivationRequired,
+                "This license file must be validated by the Zentriq license server before it is activated.", payload);
         if (payload.InstallationId != installationId)
             return LicenseVerificationResult.Fail(LicenseRejection.WrongInstallation, "This license was issued for a different Zentriq installation.");
 
@@ -120,7 +126,9 @@ public sealed class LicenseVerifier(ILicensePublicKeyStore keys)
     {
         if (string.IsNullOrWhiteSpace(p.LicenseId) || p.LicenseId.Length > 64) return "License ID is missing or too long.";
         if (string.IsNullOrWhiteSpace(p.Customer) || p.Customer.Length > 200) return "Customer name is missing or too long.";
-        if (p.InstallationId == Guid.Empty) return "Installation binding is missing.";
+        var certificate = p.Activation == LicenseFormats.Certificate;
+        if (p.InstallationId == Guid.Empty && !certificate) return "Installation binding is missing.";
+        if (certificate && (p.InstallationId != Guid.Empty || p.LeaseUntil is not null || p.SchemaVersion < 3)) return "A license file for activation must not be bound to an installation.";
         if (p.ExpiresAt <= p.NotBefore) return "License validity window is empty.";
         if (p.IssuedAt > p.ExpiresAt) return "License issue date is after its expiry.";
         if (p.GraceDays is < 0 or > 60) return "Grace period is out of range.";
@@ -137,7 +145,7 @@ public sealed class LicenseVerifier(ILicensePublicKeyStore keys)
         if (p.SchemaVersion < 2 && p.Licensee is not null) return "Licensee details require license schema 2.";
         if (p.SchemaVersion < 3 && (p.LicenseType ?? p.Activation ?? (object?)p.LeaseUntil ?? p.SupportUntil) is not null) return "License type, support and activation require license schema 3.";
         if (p.LicenseType is { } lt && lt is not (LicenseFormats.Subscription or LicenseFormats.Perpetual)) return $"Unknown license type '{lt}'.";
-        if (p.Activation is { } act && act is not (LicenseFormats.Online or LicenseFormats.Offline)) return $"Unknown activation mode '{act}'.";
+        if (p.Activation is { } act && act is not (LicenseFormats.Online or LicenseFormats.Offline or LicenseFormats.Certificate)) return $"Unknown activation mode '{act}'.";
         if (p.LicenseType == LicenseFormats.Perpetual && p.SupportUntil is null) return "A perpetual license must state its support end.";
         if (p.TermYears is { } ty && ty is < 1 or > 10) return "Subscription term is out of range.";
         if (p.LeaseUntil is { } lu && lu < p.IssuedAt) return "The lease ends before the license was issued.";

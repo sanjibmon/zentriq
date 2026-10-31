@@ -116,9 +116,9 @@ internal static class Signer
             SupportUntil: perpetual ? supportUntil : expires,
             Activation: LicenseFormats.Offline);
 
-        using var key = Zentriq.Application.Licensing.LicenseSigning.LoadPrivateKey(File.ReadAllText(One(o, "key")));
+        using var key = Zentriq.Licensing.Signing.LicenseSigning.LoadPrivateKey(File.ReadAllText(One(o, "key")));
         var outFile = One(o, "out");
-        File.WriteAllText(outFile, Zentriq.Application.Licensing.LicenseSigning.Sign(payload, key, One(o, "key-id")));
+        File.WriteAllText(outFile, Zentriq.Licensing.Signing.LicenseSigning.Sign(payload, key, One(o, "key-id")));
         Console.WriteLine($"Issued {payload.LicenseId} for {payload.Customer} (installation {payload.InstallationId}), {type}{(perpetual ? $", support until {supportUntil:yyyy-MM-dd}" : $", expires {payload.ExpiresAt:yyyy-MM-dd}")}: {outFile}");
         return 0;
     }

@@ -80,29 +80,6 @@ jobs:
           Move-Item artifacts/release artifacts/release-main
           Get-Content artifacts/prereqs/prereqs.lock.json
 
-      - name: Package the license server (vendor-hosted; not part of the customer installer)
-        shell: pwsh
-        run: |
-          $out = "$env:RUNNER_TEMP/license-server"
-          dotnet publish licensing/Zentriq.LicenseServer/Zentriq.LicenseServer.csproj -c Release -o $out "-p:Version=$($env:ZQ_VERSION)" --nologo *>&1 | Tee-Object -FilePath "$env:RUNNER_TEMP/ci-logs/3b-license-server.log"
-          if ($LASTEXITCODE -ne 0) { throw "license server publish failed" }
-          Copy-Item licensing/Dockerfile, licensing/docker-compose.yml, licensing/env.example, docs/license-server.md $out
-          $zip = "artifacts/release-main/Zentriq-LicenseServer-$($env:ZQ_VERSION).zip"
-          Compress-Archive -Path "$out/*" -DestinationPath $zip
-          $h = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
-          Add-Content artifacts/release-main/SHA256SUMS.txt "$h  $(Split-Path $zip -Leaf)" -Encoding ascii
-
-      - name: Local license server package (Windows, bundled PostgreSQL) and its end-to-end test
-        shell: pwsh
-        run: |
-          $zip = ./licensing/local/Build-LocalPackage.ps1 -Version $env:ZQ_VERSION -OutDir artifacts/release-main *>&1 | Tee-Object -FilePath "$env:RUNNER_TEMP/ci-logs/3c-license-server-local.log" | Select-Object -Last 1
-          $zip = "artifacts/release-main/Zentriq-LicenseServer-Local-win-x64-$($env:ZQ_VERSION).zip"
-          if (-not (Test-Path $zip)) { throw "local package missing" }
-          $h = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
-          Add-Content artifacts/release-main/SHA256SUMS.txt "$h  $(Split-Path $zip -Leaf)" -Encoding ascii
-          New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP/acceptance" | Out-Null
-          ./tests/license-server/Test-LocalLicenseServer.ps1 -Zip $zip -Report "$env:RUNNER_TEMP/acceptance/local-license-server.md" *>&1 | Tee-Object -FilePath "$env:RUNNER_TEMP/ci-logs/3d-license-server-local-test.log"
-
       - name: Package upgrade target
         shell: pwsh
         run: |
@@ -172,8 +149,6 @@ jobs:
           if (Test-Path $md) { Get-Content $md | Out-File $env:GITHUB_STEP_SUMMARY -Append; Get-Content $md }
           $um = Join-Path $env:RUNNER_TEMP 'acceptance-upgrade/upgrade-results.md'
           if (Test-Path $um) { Get-Content $um | Out-File $env:GITHUB_STEP_SUMMARY -Append; Get-Content $um }
-          $lm = Join-Path $env:RUNNER_TEMP 'acceptance/local-license-server.md'
-          if (Test-Path $lm) { Get-Content $lm | Out-File $env:GITHUB_STEP_SUMMARY -Append; Get-Content $lm }
           foreach ($sub in 'same-version', 'half-updated') {
             $sm = Join-Path $env:RUNNER_TEMP "acceptance-upgrade/$sub/upgrade-results.md"
             if (Test-Path $sm) { Get-Content $sm | Out-File $env:GITHUB_STEP_SUMMARY -Append; Get-Content $sm }
@@ -201,7 +176,6 @@ jobs:
         run: |
           $tag = "v$($env:ZQ_VERSION)-build.$($env:GITHUB_RUN_NUMBER)"
           Copy-Item "$env:RUNNER_TEMP/acceptance/installer-test-results.md" artifacts/release-main/
-          Copy-Item "$env:RUNNER_TEMP/acceptance/local-license-server.md" artifacts/release-main/local-license-server-test-results.md -ErrorAction SilentlyContinue
           Copy-Item artifacts/test-results/summary.txt artifacts/release-main/unit-test-summary.txt -ErrorAction SilentlyContinue
           $notes = "Automated build $($env:GITHUB_SHA). Unsigned unless a signing certificate is configured. Acceptance results attached (installer-test-results.md)."
           gh release create $tag --prerelease --title "Zentriq $($env:ZQ_VERSION) (build $($env:GITHUB_RUN_NUMBER))" --notes $notes --target $env:GITHUB_SHA (Get-ChildItem artifacts/release-main -File).FullName

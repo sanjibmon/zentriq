@@ -125,6 +125,26 @@ Check 'L05' 'Perpetual license: online activation, support extension arrives wit
     "$($lic.id): activated online, support $($before.ToString('yyyy-MM-dd')) -> $($after.ToString('yyyy-MM-dd')) via check-in; usage 15 recorded"
 }
 
+Check 'L08' 'License file for the customer: validated and bound by the server; a reissued file replaces the old one' {
+    $lic = Api POST '/licenses' @{ customerId = $script:cust; licenseType = 'subscription'; termYears = 1; edition = 'standard'; devices = 50; maxActivations = 2 }
+    $file = Api POST "/licenses/$($lic.id)/file" @{}
+    $v = Api POST '/verify' @{ document = $file.license }
+    Assert ($v.valid -and $v.payload.activation -eq 'certificate' -and $v.payload.installationId -eq '00000000-0000-0000-0000-000000000000') "file: $($v.payload | ConvertTo-Json -Compress)"
+    function Req { @{ format = 'zentriq-activation-request'; schemaVersion = 3; requestId = [guid]::NewGuid(); installationId = [guid]::NewGuid(); productVersion = '1.1.1';
+                       machineName = 'ZQ-CUSTOMER'; organization = 'Local Test'; createdAt = (Get-Date).ToUniversalTime().ToString('o'); currentUsage = @{} } }
+    $r1 = Req
+    $act = Invoke-RestMethod "$base/api/v1/activate" -Method Post -ContentType 'application/json' -Body (@{ licenseFile = $file.license; request = $r1 } | ConvertTo-Json -Depth 5)
+    $bound = Api POST '/verify' @{ document = $act.license }
+    Assert ($act.activationToken -and $bound.valid -and $bound.payload.activation -eq 'online' -and $bound.payload.installationId -eq $r1.installationId) "bound: $($bound.payload | ConvertTo-Json -Compress)"
+    $new = Api POST "/licenses/$($lic.id)/file" @{}
+    Assert ($new.replaced) 'reissue not reported as replacing'
+    $old = Invoke-WebRequest "$base/api/v1/activate" -Method Post -ContentType 'application/json' -SkipHttpErrorCheck -Body (@{ licenseFile = $file.license; request = (Req) } | ConvertTo-Json -Depth 5)
+    Assert ($old.StatusCode -eq 403) "old file after reissue: $($old.StatusCode)"
+    $off = Invoke-RestMethod "$base/api/v1/offline/activate" -Method Post -ContentType 'application/json' -Body (@{ licenseFile = $new.license; request = (Req) } | ConvertTo-Json -Depth 5)
+    Assert ((Api POST '/verify' @{ document = $off.license }).payload.activation -eq 'offline') 'offline activation with the file'
+    "$($lic.id): file validated online and bound; reissued file works offline; old file refused (403)"
+}
+
 Check 'L06' 'A changed license file is rejected' {
     $doc = $script:subDoc | ConvertFrom-Json
     $json = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($doc.payload)) -replace '"devices":250', '"devices":25000'

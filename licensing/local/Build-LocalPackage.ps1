@@ -46,7 +46,7 @@ foreach ($f in 'zls.ps1', 'zls.cmd', 'README.txt') {
     if ([IO.File]::ReadAllBytes((Join-Path $PSScriptRoot $f)) | Where-Object { $_ -gt 127 } | Select-Object -First 1) { throw "$f contains non-ASCII characters" }
 }
 Copy-Item (Join-Path $PSScriptRoot 'zls.ps1'), (Join-Path $PSScriptRoot 'zls.cmd'), (Join-Path $PSScriptRoot 'README.txt') $pkg
-Copy-Item (Join-Path $repo 'docs\license-server.md') $pkg
+Copy-Item (Join-Path $repo 'licensing\docs\license-server.md') $pkg
 Set-Content (Join-Path $pkg 'VERSION.txt') "Zentriq License Server (local edition) $Version`r`nPostgreSQL $PgVersion (EnterpriseDB binaries, SHA256 $hash)" -Encoding ascii
 
 $zip = Join-Path $OutDir "Zentriq-LicenseServer-Local-win-x64-$Version.zip"

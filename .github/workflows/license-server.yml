@@ -1,0 +1,113 @@
+name: license-server
+
+# The Zentriq License Server is a separate product (vendor-hosted; never shipped to customers). It has its own
+# version (licensing/version.txt), its own tests and its own releases (tags license-server-v<version>-build.<n>);
+# nothing of it goes into the customer release made by windows-release.
+#   dev/** : Linux tests (PostgreSQL) + Windows local edition end-to-end test
+#   main   : the same, then a pre-release with the Docker/server package and the Windows local edition
+
+on:
+  push:
+    branches: ['main', 'dev/**']
+    paths: ['licensing/**', 'tests/license-server/**', 'backend/Zentriq.Domain/**', 'backend/Zentriq.Application/**', '.github/workflows/license-server.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write   # releases and the license-server-logs branch
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: '1'
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: root
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Build and test
+        env:
+          ZENTRIQ_TEST_PG: Host=localhost;Port=5432;Username=postgres;Password=root
+        run: |
+          set -o pipefail
+          dotnet build licensing/tools/Zentriq.LicenseSigner/Zentriq.LicenseSigner.csproj -c Release 2>&1 | tee build.log
+          dotnet test licensing/Zentriq.LicenseServer.Tests/Zentriq.LicenseServer.Tests.csproj -c Release --logger "console;verbosity=normal" 2>&1 | tee test.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: license-server-linux-logs
+          path: |
+            build.log
+            test.log
+
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 40
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Version
+        shell: pwsh
+        run: |
+          $v = (Get-Content licensing/version.txt -Raw).Trim()
+          "ZLS_VERSION=$v" | Out-File $env:GITHUB_ENV -Append
+          New-Item -ItemType Directory -Force -Path out | Out-Null
+      - name: Server package (Docker / any OS with .NET)
+        shell: pwsh
+        run: |
+          $o = "$env:RUNNER_TEMP/server"
+          dotnet publish licensing/Zentriq.LicenseServer/Zentriq.LicenseServer.csproj -c Release -o $o "-p:Version=$env:ZLS_VERSION" --nologo
+          if ($LASTEXITCODE -ne 0) { throw 'publish failed' }
+          Copy-Item licensing/Dockerfile, licensing/docker-compose.yml, licensing/env.example, licensing/docs/*.md $o
+          Compress-Archive -Path "$o/*" -DestinationPath "out/Zentriq-LicenseServer-$env:ZLS_VERSION.zip"
+      - name: Windows local edition
+        shell: pwsh
+        run: ./licensing/local/Build-LocalPackage.ps1 -Version $env:ZLS_VERSION -OutDir out
+      - name: Windows local edition end-to-end test
+        shell: pwsh
+        run: ./tests/license-server/Test-LocalLicenseServer.ps1 -Zip "out/Zentriq-LicenseServer-Local-win-x64-$($env:ZLS_VERSION).zip" -Report out/license-server-test-results.md *>&1 | Tee-Object -FilePath "$env:RUNNER_TEMP/test.log"
+      - name: Summary
+        if: always()
+        shell: pwsh
+        run: if (Test-Path out/license-server-test-results.md) { Get-Content out/license-server-test-results.md | Out-File $env:GITHUB_STEP_SUMMARY -Append }
+      - name: Publish license server pre-release
+        if: success() && github.ref == 'refs/heads/main'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          Get-ChildItem out -Filter *.zip | ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant())  $($_.Name)" } | Set-Content out/SHA256SUMS.txt -Encoding ascii
+          $tag = "license-server-v$($env:ZLS_VERSION)-build.$($env:GITHUB_RUN_NUMBER)"
+          $notes = "Zentriq License Server $($env:ZLS_VERSION) (vendor-hosted; not for customers). Commit $($env:GITHUB_SHA). Windows local edition test results attached."
+          gh release create $tag --prerelease --title "Zentriq License Server $($env:ZLS_VERSION) (build $($env:GITHUB_RUN_NUMBER))" --notes $notes --target $env:GITHUB_SHA (Get-ChildItem out -File).FullName
+      - name: Push logs to the license-server-logs branch
+        if: always()
+        shell: pwsh
+        run: |
+          $d = Join-Path $env:RUNNER_TEMP 'logs'; New-Item -ItemType Directory -Force -Path $d | Out-Null
+          Copy-Item "$env:RUNNER_TEMP/test.log", out/license-server-test-results.md, out/SHA256SUMS.txt $d -ErrorAction SilentlyContinue
+          $data = Join-Path $env:RUNNER_TEMP 'zls-local-test/ZentriqLicenseServer/data/logs'
+          if (Test-Path $data) { Copy-Item "$data/*" $d }
+          "run $env:GITHUB_RUN_ID number $env:GITHUB_RUN_NUMBER commit $env:GITHUB_SHA branch $env:GITHUB_REF_NAME status ${{ job.status }}" | Set-Content "$d/RUN.txt"
+          Set-Location $d
+          git init -q; git checkout -q -b license-server-logs; git add -A
+          git -c user.name=ci -c user.email=ci@localhost commit -q -m "license-server logs $env:GITHUB_RUN_ID"
+          git push -f -q "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" license-server-logs

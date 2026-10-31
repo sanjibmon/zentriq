@@ -16,7 +16,8 @@ public static class PublicApi
     /// <summary>Offline activation (browser page or API): the license key plus the activation request exported by the air-gapped server.</summary>
     public sealed record OfflineBody(
         [property: JsonPropertyName("licenseKey")] string? LicenseKey,
-        [property: JsonPropertyName("request")] JsonElement Request);
+        [property: JsonPropertyName("request")] JsonElement Request,
+        [property: JsonPropertyName("licenseFile")] string? LicenseFile = null);
 
     private static readonly JsonSerializerOptions RequestJson = new(JsonSerializerDefaults.Web);
 
@@ -34,7 +35,7 @@ public static class PublicApi
 
         g.MapPost(LicenseServerProtocol.ActivatePath, async (OnlineActivateRequest body, LicenseService svc, HttpContext http, CancellationToken ct) =>
         {
-            var r = await svc.ActivateAsync(body.LicenseKey, body.Request, LicenseFormats.Online, Ip(http), ct);
+            var r = await svc.ActivateAsync(body.LicenseKey, body.Request, LicenseFormats.Online, Ip(http), ct, body.LicenseFile);
             return r.Ok
                 ? Results.Ok(new OnlineActivateResponse(r.Value.Document, r.Value.Token, r.Message))
                 : Results.Problem(statusCode: r.Status, title: r.Message);
@@ -58,7 +59,7 @@ public static class PublicApi
             try { request = body.Request.ValueKind == JsonValueKind.Object ? body.Request.Deserialize<ActivationRequest>(RequestJson) : null; }
             catch (JsonException) { request = null; }
             if (request is null) return Results.Problem(statusCode: 400, title: "Attach the activation request file (zentriq-activation-request-….json) from Licensing › Offline activation.");
-            var r = await svc.ActivateAsync(body.LicenseKey, request, LicenseFormats.Offline, Ip(http), ct);
+            var r = await svc.ActivateAsync(body.LicenseKey, request, LicenseFormats.Offline, Ip(http), ct, body.LicenseFile);
             if (!r.Ok) return Results.Problem(statusCode: r.Status, title: r.Message);
             return Results.Ok(new
             {

@@ -7,6 +7,7 @@ COPY backend/Directory.Build.props backend/Directory.Packages.props backend/
 COPY backend/Zentriq.Domain backend/Zentriq.Domain
 COPY backend/Zentriq.Application backend/Zentriq.Application
 COPY licensing/Directory.Build.props licensing/Directory.Packages.props licensing/
+COPY licensing/Zentriq.Licensing.Signing licensing/Zentriq.Licensing.Signing
 COPY licensing/Zentriq.LicenseServer licensing/Zentriq.LicenseServer
 RUN dotnet publish licensing/Zentriq.LicenseServer/Zentriq.LicenseServer.csproj -c Release -o /app --nologo
 

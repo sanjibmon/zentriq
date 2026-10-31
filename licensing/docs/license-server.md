@@ -1,7 +1,20 @@
 # Zentriq License Server
 
-The license server is the service **Zentriq (the vendor) hosts** for online activation, check-ins, offline
-activation of air-gapped servers, and license administration. It is not part of the customer installer.
+The license server is the service **Zentriq (the vendor) hosts** for license generation, validation of license
+files, check-ins, offline activation of air-gapped servers, and license administration. It is a separate product:
+its own build, version, release (`license-server-v...` tags) and documentation (`licensing/docs`). Nothing of it is in
+the customer installer, the customer documentation or the customer releases.
+
+## How a customer gets licensed
+
+1. In the portal: create the customer and the license, then **License file for customer** and send the `.zlic` file.
+2. The customer imports it in *Zentriq › Licensing*. Zentriq checks the signature and calls `POST /api/v1/activate`
+   with the file. The server validates it (license known and active, the newest file issued, an activation free),
+   binds it to the customer's installation and returns the bound license with an activation token. Only then is it
+   active in the customer's console.
+3. Daily check-ins keep it current; suspension, revocation and deactivation reach the customer at the next check-in.
+4. Air-gapped: the customer uploads the same file with the server's activation request on the public page (`/`), or
+   sends both to you and you use *Offline activation* on the license page.
 
 Source: `licensing/Zentriq.LicenseServer` (ASP.NET Core 10, PostgreSQL). It shares the license contracts and signing
 code with the product (`backend/Zentriq.Domain`, `backend/Zentriq.Application`), so both always agree on the format.
@@ -10,10 +23,10 @@ code with the product (`backend/Zentriq.Domain`, `backend/Zentriq.Application`),
 
 | Area | Address | Who |
 |---|---|---|
-| Online activation | `POST /api/v1/activate` | Zentriq servers (license key + activation request → signed license + activation token) |
+| Validation and activation | `POST /api/v1/activate` | Zentriq servers (license file or license key + activation request → signed license + activation token) |
 | Check-in | `POST /api/v1/checkin` (Bearer token) | Zentriq servers, daily: usage report → refreshed license, or *suspended / revoked / deactivated* |
 | Deactivation | `POST /api/v1/deactivate` (Bearer token) | Zentriq servers (*Licensing › Deactivate*) |
-| Offline activation | `/` (page) and `POST /api/v1/offline/activate` | Customers with air-gapped servers: license key + activation request file → license file |
+| Offline activation | `/` (page) and `POST /api/v1/offline/activate` | Customers with air-gapped servers: license file (or key) + activation request file → license file |
 | License portal | `/admin` | Zentriq staff: customers, licenses, renewals, support, activations, audit |
 | Health | `GET /health` | Monitoring |
 

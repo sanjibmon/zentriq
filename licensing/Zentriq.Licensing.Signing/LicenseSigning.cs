@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using Zentriq.Domain.Licensing;
 
-namespace Zentriq.Application.Licensing;
+namespace Zentriq.Licensing.Signing;
 
 /// <summary>Signing of license files (vendor side only: the license server and the offline signing tool).</summary>
 public static class LicenseSigning

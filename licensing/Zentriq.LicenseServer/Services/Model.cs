@@ -19,11 +19,12 @@ public sealed record License(
     string Id, Guid CustomerId, string KeyHint, string Edition, string LicenseType, int? TermYears,
     DateTimeOffset StartsAt, DateTimeOffset ExpiresAt, DateTimeOffset SupportUntil,
     int Devices, int? NonItPack, int CloudInstances, int Technicians, string[] ExtraModules,
-    int MaxActivations, int GraceDays, string Status, string? Notes, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt)
+    int MaxActivations, int GraceDays, string Status, string? Notes, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt,
+    string? FileHash = null, DateTimeOffset? FileIssuedAt = null)
 {
     public const string Columns = """
         id, customer_id, key_hint, edition, license_type, term_years, starts_at, expires_at, support_until, devices, nonit_pack,
-        cloud_instances, technicians, extra_modules, max_activations, grace_days, status, notes, created_at, updated_at
+        cloud_instances, technicians, extra_modules, max_activations, grace_days, status, notes, created_at, updated_at, file_hash, file_issued_at
         """;
 
     public static License Read(NpgsqlDataReader r) => new(
@@ -31,7 +32,7 @@ public sealed record License(
         r.Time("starts_at")!.Value, r.Time("expires_at")!.Value, r.Time("support_until")!.Value,
         r.GetInt32(r.GetOrdinal("devices")), r.Int("nonit_pack"), r.GetInt32(r.GetOrdinal("cloud_instances")), r.GetInt32(r.GetOrdinal("technicians")),
         r.GetFieldValue<string[]>(r.GetOrdinal("extra_modules")), r.GetInt32(r.GetOrdinal("max_activations")), r.GetInt32(r.GetOrdinal("grace_days")),
-        r.GetString(r.GetOrdinal("status")), r.Str("notes"), r.Time("created_at")!.Value, r.Time("updated_at")!.Value);
+        r.GetString(r.GetOrdinal("status")), r.Str("notes"), r.Time("created_at")!.Value, r.Time("updated_at")!.Value, r.Str("file_hash"), r.Time("file_issued_at"));
 
     public bool IsPerpetual => LicenseType == LicenseFormats.Perpetual;
 

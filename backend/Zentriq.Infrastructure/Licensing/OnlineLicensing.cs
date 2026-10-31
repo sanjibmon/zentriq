@@ -108,12 +108,13 @@ public sealed class OnlineState
 public sealed record OnlineResult(bool Ok, string Message, int Status = 200);
 
 /// <summary>
-/// Online activation with a license key, daily check-ins (usage report, refreshed license, renewals, revocation) and
+/// Activation through the Zentriq license server — with the license file Zentriq sent (validated by the server before it
+/// is activated) or a license key — daily check-ins (usage report, refreshed license, renewals, revocation) and
 /// deactivation (to move the license to another server). Air-gapped servers use the activation request / license file.
 /// </summary>
 public sealed class OnlineLicensing(
     ZentriqDbContext db, NpgsqlDataSource ds, LicensingService licensing, LicenseImporter importer, CredentialProtector protector,
-    AuditWriter audit, LicenseServerHttp http, ZentriqOptions options, IClock clock)
+    AuditWriter audit, LicenseServerHttp http, ZentriqOptions options, IClock clock, LicenseVerifier verifier)
 {
     public const string StateKey = "licensing.online";
     public const string ServerKey = "licensing.server_url";
@@ -185,32 +186,50 @@ public sealed class OnlineLicensing(
     {
         var key = LicenseKeys.Normalize(licenseKey);
         if (key is null) return new(false, "A license key has the form ZQL-XXXXX-XXXXX-XXXXX-XXXXX.", 400);
+        return await ActivateCoreAsync(request => new OnlineActivateRequest(key, request), LicenseKeys.Hint(key), "key", userId, userName, ct);
+    }
+
+    /// <summary>
+    /// Imports the license file Zentriq sent: its signature is checked here, then the license server validates it (known,
+    /// active, not revoked or replaced, an activation free) and returns the license bound to this installation. Nothing is
+    /// activated unless the license server confirms it.
+    /// </summary>
+    public async Task<OnlineResult> ActivateWithFileAsync(string document, Guid? userId, string? userName, CancellationToken ct)
+    {
+        var v = verifier.Verify(document ?? "", Guid.Empty, clock.UtcNow);
+        if (!v.IsValid || v.Payload!.Activation != LicenseFormats.Certificate)
+            return new(false, v.IsValid ? "This is not a license file for activation." : "License file rejected: " + v.Message, 422);
+        return await ActivateCoreAsync(request => new OnlineActivateRequest(null, request, document), $"License file {v.Payload.LicenseId}", "file", userId, userName, ct);
+    }
+
+    private async Task<OnlineResult> ActivateCoreAsync(Func<ActivationRequest, OnlineActivateRequest> body, string hint, string method, Guid? userId, string? userName, CancellationToken ct)
+    {
         var server = await ServerUrlAsync(ct);
         var request = await RequestAsync(ct);
         OnlineActivateResponse? answer;
         try
         {
-            using var resp = await http.Client.PostAsJsonAsync(Endpoint(server, LicenseServerProtocol.ActivatePath), new OnlineActivateRequest(key, request), Json, ct);
+            using var resp = await http.Client.PostAsJsonAsync(Endpoint(server, LicenseServerProtocol.ActivatePath), body(request), Json, ct);
             if (!resp.IsSuccessStatusCode) return new(false, await ProblemAsync(resp, ct), (int)resp.StatusCode is >= 400 and < 500 ? 422 : 502);
             answer = await resp.Content.ReadFromJsonAsync<OnlineActivateResponse>(Json, ct);
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException)
         {
-            return new(false, $"The license server at {server} could not be reached ({ex.Message}). Check this server's internet access and proxy, or use offline activation.", 502);
+            return new(false, $"The license server at {server} could not be reached ({ex.Message}). The license was not activated: it must be validated by the license server. Check this server's internet access and proxy, or use offline activation.", 502);
         }
         if (answer is null || string.IsNullOrEmpty(answer.License)) return new(false, "The license server sent no license.", 502);
         var imported = await importer.ImportAsync(answer.License, userId, ct);
         if (!imported.Ok) return new(false, "The license from the license server was not accepted: " + imported.Message, 502);
         await SaveStateAsync(new OnlineState
         {
-            ServerUrl = server, LicenseId = imported.Payload!.LicenseId, KeyHint = LicenseKeys.Hint(key),
+            ServerUrl = server, LicenseId = imported.Payload!.LicenseId, KeyHint = hint,
             Token = answer.ActivationToken is { Length: > 0 } t ? protector.Protect(TokenPurpose, new CredentialSecret { Password = t }) : null,
             ActivatedAt = clock.UtcNow, ActivatedBy = userName, LastAttemptAt = clock.UtcNow, LastCheckinAt = clock.UtcNow, LastStatus = "active",
             LastMessage = answer.Message, Active = true,
         }, ct);
         await audit.WriteAsync(new AuditActor(userId, userName ?? "Zentriq", null), "license.activate_online", imported.Payload.LicenseId,
-            detail: new { server, key = LicenseKeys.Hint(key), imported.Payload.Customer, imported.Payload.Edition, imported.Payload.Entitlements }, ct: ct);
-        return new(true, $"Activated: {imported.Payload.Customer}, {Editions.Title(imported.Payload.Edition)} edition. {answer.Message}".Trim());
+            detail: new { server, method, credential = hint, imported.Payload.Customer, imported.Payload.Edition, imported.Payload.Entitlements }, ct: ct);
+        return new(true, $"Validated by the Zentriq license server and activated: {imported.Payload.Customer}, {Editions.Title(imported.Payload.Edition)} edition. {answer.Message}".Trim());
     }
 
     /// <summary>

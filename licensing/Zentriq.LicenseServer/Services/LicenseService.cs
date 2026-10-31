@@ -45,6 +45,14 @@ public sealed class LicenseService(NpgsqlDataSource ds, LicenseIssuer issuer, Au
         return (l, c!);
     }
 
+    public async Task<(License L, Customer C)?> FindByIdAsync(NpgsqlConnection conn, NpgsqlTransaction? tx, string id, CancellationToken ct)
+    {
+        var l = await conn.FirstAsync($"SELECT {License.Columns} FROM zls.licenses WHERE id = @id FOR UPDATE", new { id }, License.Read, ct, tx);
+        if (l is null) return null;
+        var c = await conn.FirstAsync($"SELECT {Customer.Columns} FROM zls.customers WHERE id = @id", new { id = l.CustomerId }, Customer.Read, ct, tx);
+        return (l, c!);
+    }
+
     private static string? Refusal(License l, DateTimeOffset now) => l.Status switch
     {
         "revoked" => "This license key has been revoked. Contact Zentriq.",
@@ -68,21 +76,41 @@ public sealed class LicenseService(NpgsqlDataSource ds, LicenseIssuer issuer, Au
 
     /// <summary>Binds a license key to an installation (online or offline) and returns the signed license.</summary>
     public async Task<ServiceResult<(string Document, string? Token, LicensePayload Payload)>> ActivateAsync(
-        string? licenseKey, ActivationRequest? request, string mode, string? ip, CancellationToken ct)
+        string? licenseKey, ActivationRequest? request, string mode, string? ip, CancellationToken ct, string? licenseFile = null)
     {
-        var key = LicenseKeys.Normalize(licenseKey);
-        if (key is null) return new(false, 400, "A license key has the form ZQL-XXXXX-XXXXX-XXXXX-XXXXX.");
+        var byFile = !string.IsNullOrWhiteSpace(licenseFile);
+        var key = byFile ? null : LicenseKeys.Normalize(licenseKey);
+        if (!byFile && key is null) return new(false, 400, "Use the license file from Zentriq, or a license key of the form ZQL-XXXXX-XXXXX-XXXXX-XXXXX.");
         if (Validate(request) is { } bad) return new(false, 400, bad);
         var now = issuer.Now;
 
         await using var conn = await ds.OpenConnectionAsync(ct);
         await using var tx = await conn.BeginTransactionAsync(ct);
-        var found = await FindByKeyAsync(conn, tx, key, ct);
+        (License L, Customer C)? found;
+        if (byFile)
+        {
+            // The license file proves the purchase: genuine (our signature), for a known license, and the newest file issued.
+            var payload = licenseFile!.Length <= LicenseFormats.MaxDocumentBytes ? issuer.ReadLicenseFile(licenseFile) : null;
+            if (payload is null)
+            {
+                await audit.WriteAsync("public", "activate.bad_file", null, ip, new { mode }, ct, conn, tx);
+                await tx.CommitAsync(ct);
+                return new(false, 422, "This is not a valid Zentriq license file. Use the file Zentriq sent you, unchanged.");
+            }
+            found = await FindByIdAsync(conn, tx, payload.LicenseId, ct);
+            if (found is { } ff && ff.L.FileHash != LicenseIssuer.FileHash(licenseFile))
+            {
+                await audit.WriteAsync("public", "activate.replaced_file", ff.L.Id, ip, new { mode }, ct, conn, tx);
+                await tx.CommitAsync(ct);
+                return new(false, 403, "This license file has been replaced by a newer one. Use the latest license file from Zentriq.");
+            }
+        }
+        else found = await FindByKeyAsync(conn, tx, key!, ct);
         if (found is not { } f)
         {
-            await audit.WriteAsync("public", "activate.unknown_key", LicenseKeys.Hint(key), ip, new { mode }, ct, conn, tx);
+            await audit.WriteAsync("public", byFile ? "activate.unknown_file" : "activate.unknown_key", byFile ? null : LicenseKeys.Hint(key!), ip, new { mode }, ct, conn, tx);
             await tx.CommitAsync(ct);
-            return new(false, 404, "This license key is not known. Check the key, or contact Zentriq.");
+            return new(false, 404, byFile ? "This license is not known to the license server. Contact Zentriq." : "This license key is not known. Check the key, or contact Zentriq.");
         }
         var (l, c) = f;
         if (Refusal(l, now) is { } refusal)
@@ -129,7 +157,7 @@ public sealed class LicenseService(NpgsqlDataSource ds, LicenseIssuer issuer, Au
 
         var (doc, payload) = await issuer.IssueAsync(conn, tx, l, c, request.InstallationId, request.RequestId, activationId, mode, existing is null ? "activate" : "reactivate", ct);
         await audit.WriteAsync("public", mode == LicenseFormats.Online ? "activate.online" : "activate.offline", l.Id, ip,
-            new { request.InstallationId, request.MachineName, request.Organization, request.ProductVersion, again = existing is not null }, ct, conn, tx);
+            new { request.InstallationId, request.MachineName, request.Organization, request.ProductVersion, again = existing is not null, with = byFile ? "license file" : "license key" }, ct, conn, tx);
         await tx.CommitAsync(ct);
         var msg = l.IsPerpetual
             ? $"Perpetual license, support until {l.SupportUntil:yyyy-MM-dd}."

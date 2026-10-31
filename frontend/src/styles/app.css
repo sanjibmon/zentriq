@@ -373,3 +373,5 @@ fieldset.plain { border: 0; padding: 0; margin: 0; min-width: 0; }
 .lic-steps { margin: 0 0 12px; padding-left: 18px; font-size: 13px; display: grid; gap: 4px; }
 .lic-span { grid-column: 1 / -1; }
 .btn.danger { color: var(--crit); border-color: var(--crit); }
+.lic-key { margin: 4px 0 10px; font-size: 13px; }
+.lic-key summary { cursor: pointer; margin-bottom: 8px; }

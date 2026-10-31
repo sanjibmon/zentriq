@@ -48,6 +48,7 @@ export function LicensingPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [serverUrl, setServerUrl] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const offRef = useRef<HTMLInputElement>(null);
   const d = st.data;
   const manage = can('licensing.manage');
 
@@ -82,15 +83,19 @@ export function LicensingPage() {
     }
   }
 
-  async function importLicense(file: File) {
+  async function importLicense(file: File, ref = fileRef) {
     await run('import', async () => {
       try {
-        await api.post('/licensing/import', { document: await file.text() });
-        return 'License imported and activated.';
+        // A license file from Zentriq is validated by the Zentriq license server first; a file for this server
+        // (offline activation, renewal) is imported directly.
+        const r = await api.post<{ message?: string; validated?: boolean }>('/licensing/import', { document: await file.text() });
+        return r.message ?? 'License imported and activated.';
       } catch (e) {
-        throw new Error(e instanceof ApiError ? `License rejected: ${e.message}` : String(e));
+        if (e instanceof ApiError && (e.body as { reason?: string } | null)?.reason === 'LicenseServerUnreachable')
+          throw new Error(`${e.message} For a server without internet access, use Offline activation below with the same license file.`);
+        throw new Error(e instanceof ApiError ? `License not activated: ${e.message}` : String(e));
       } finally {
-        if (fileRef.current) fileRef.current.value = '';
+        if (ref.current) ref.current.value = '';
       }
     });
   }
@@ -104,7 +109,7 @@ export function LicensingPage() {
 
   return (
     <>
-      <PageHead title="Licensing" desc="Your plan, what it covers and how much of it is in use. Activate online with a license key, or offline for servers without internet access." />
+      <PageHead title="Licensing" desc="Your plan, what it covers and how much of it is in use. Import the license file from Zentriq: it is validated by the Zentriq license server, then activated." />
       {msg && <Callout tone={msg.tone} icon={msg.tone === 'ok' ? 'info' : 'alert'}>{msg.text}</Callout>}
       <ErrorBox error={st.error} />
       {!d ? <Loading /> : (
@@ -135,11 +140,11 @@ export function LicensingPage() {
               </small></div>
             </Panel></div>
 
-            <Panel title={isOnline ? 'Online activation' : 'Activate'} sub={isOnline ? `License server ${online?.serverUrl ?? ''}` : 'With the license key from your order'}>
+            <Panel title={isOnline ? 'Activation' : 'Activate'} sub={isOnline ? `Validated by the license server ${online?.serverUrl ?? ''}` : 'With the license file you received from Zentriq'}>
               {isOnline ? (
                 <>
                   <dl className="dl2">
-                    <dt>License key</dt><dd className="mono">{online?.keyHint ?? '—'}</dd>
+                    <dt>Activated with</dt><dd className="mono">{online?.keyHint ?? '—'}</dd>
                     <dt>License</dt><dd className="mono">{online?.licenseId ?? '—'}</dd>
                     <dt>Activated</dt><dd>{fmt.date(online?.activatedAt ?? null)}{online?.activatedBy ? ` by ${online.activatedBy}` : ''}</dd>
                     <dt>Last check-in</dt><dd>{fmt.date(online?.lastCheckinAt ?? null)} {online?.lastStatus && <Pill tone={online.lastStatus === 'active' ? 'ok' : online.lastStatus === 'error' ? 'warn' : 'crit'}>{online.lastStatus}</Pill>}</dd>
@@ -153,13 +158,23 @@ export function LicensingPage() {
                 </>
               ) : manage ? (
                 <>
-                  <label className="field"><span>License key</span>
-                    <input className="in mono" value={key} placeholder="ZQL-XXXXX-XXXXX-XXXXX-XXXXX" onChange={(e) => setKey(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && key && void activate()} />
-                  </label>
+                  <ol className="lic-steps">
+                    <li>Choose <b>Import license file</b> and select the <span className="mono">.zlic</span> file from Zentriq.</li>
+                    <li>Zentriq checks its signature and asks the Zentriq license server to validate it (license active, not revoked, an activation free).</li>
+                    <li>Once validated, the license is activated for this server and refreshed by a daily check-in.</li>
+                  </ol>
                   <div className="row-actions lic-actions">
-                    <button className="btn primary" disabled={!key.trim() || !!busy} onClick={() => void activate()}>{busy === 'activate' ? 'Activating…' : 'Activate online'}</button>
+                    <button className="btn primary" disabled={!!busy} onClick={() => fileRef.current?.click()}>{busy === 'import' ? 'Validating…' : 'Import license file…'}</button>
+                    <input ref={fileRef} type="file" accept=".zlic,.json,application/json" hidden onChange={(e) => e.target.files?.[0] && void importLicense(e.target.files[0])} />
                   </div>
-                  <small className="muted">This server contacts {online?.serverUrl ?? 'the Zentriq license server'} over HTTPS. Subscriptions (1, 3 or 5 years) and perpetual licenses are both activated here.</small>
+                  <details className="lic-key">
+                    <summary className="muted">Activate with a license key instead</summary>
+                    <label className="field"><span>License key</span>
+                      <input className="in mono" value={key} placeholder="ZQL-XXXXX-XXXXX-XXXXX-XXXXX" onChange={(e) => setKey(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && key && void activate()} />
+                    </label>
+                    <button className="btn" disabled={!key.trim() || !!busy} onClick={() => void activate()}>{busy === 'activate' ? 'Activating…' : 'Activate with key'}</button>
+                  </details>
+                  <small className="muted">This server contacts {online?.serverUrl ?? 'the Zentriq license server'} over HTTPS (port 443). Without internet access, use Offline activation.</small>
                 </>
               ) : <p className="muted">Ask an administrator with the licensing right to activate a license.</p>}
             </Panel>
@@ -168,13 +183,13 @@ export function LicensingPage() {
               <Panel title="Offline activation" sub="For servers without internet access (air-gapped)">
                 <ol className="lic-steps">
                   <li>Download the activation request from this server.</li>
-                  <li>On a computer with internet access, open <span className="mono">{offlinePage}</span> and upload the request with your license key (or send it to Zentriq).</li>
-                  <li>Import the license file (.zlic) you receive.</li>
+                  <li>On a computer with internet access, open <span className="mono">{offlinePage}</span> and upload the request with the license file from Zentriq (or send both to Zentriq).</li>
+                  <li>Import the license file for this server that you receive back.</li>
                 </ol>
                 <div className="row-actions lic-actions">
                   <button className="btn" onClick={() => void exportRequest()}>Download activation request</button>
-                  <button className="btn primary" disabled={!!busy} onClick={() => fileRef.current?.click()}>Import license file…</button>
-                  <input ref={fileRef} type="file" accept=".zlic,.json,application/json" hidden onChange={(e) => e.target.files?.[0] && void importLicense(e.target.files[0])} />
+                  <button className="btn primary" disabled={!!busy} onClick={() => offRef.current?.click()}>Import license file…</button>
+                  <input ref={offRef} type="file" accept=".zlic,.json,application/json" hidden onChange={(e) => e.target.files?.[0] && void importLicense(e.target.files[0], offRef)} />
                 </div>
                 <small className="muted">Offline licenses do not check in; import a new file after a renewal or upgrade.</small>
               </Panel>
