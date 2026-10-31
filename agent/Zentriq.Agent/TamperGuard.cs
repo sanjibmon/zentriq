@@ -20,7 +20,9 @@ namespace Zentriq.Agent;
 /// local or domain administrators included — can stop, disable, reconfigure or delete the agent service, change its
 /// registry key or its program files:
 /// <list type="bullet">
-/// <item>the service grants Administrators query and start only (no stop, change configuration, delete or permission changes);</item>
+/// <item>the service grants Administrators query, start and stop requests only (no change of configuration or startup type,
+/// no delete or permission changes); a stop or restart request (Services console, net stop, sc stop) is held until a code
+/// is entered in the dialog the agent shows (see AgentService / StopPrompt), otherwise the service keeps running;</item>
 /// <item>HKLM\SYSTEM\CurrentControlSet\Services\ZentriqAgent and the program folder are read-only for Administrators;</item>
 /// <item>the service checks every two minutes that this is still so (an administrator can take ownership of an object),
 /// restores what was changed and reports it to the console;</item>
@@ -35,7 +37,7 @@ namespace Zentriq.Agent;
 internal static class TamperGuard
 {
     public const string DefaultSddl = "D:(A;;CCLCSWRPWPDTLOCRRC;;;SY)(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;BA)(A;;CCLCSWLOCRRC;;;IU)(A;;CCLCSWLOCRRC;;;SU)";
-    public const string HardenedSddl = "D:(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;SY)(A;;CCLCSWRPLOCRRC;;;BA)(A;;CCLCSWLOCRRC;;;IU)(A;;CCLCSWLOCRRC;;;SU)";
+    public const string HardenedSddl = "D:(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;SY)(A;;CCLCSWRPWPLOCRRC;;;BA)(A;;CCLCSWLOCRRC;;;IU)(A;;CCLCSWLOCRRC;;;SU)";
     public const string ServiceKey = @"SYSTEM\CurrentControlSet\Services\" + Program.ServiceName;
     public const string TaskName = @"\Zentriq\Zentriq Agent watchdog";
     public static readonly TimeSpan PauseLength = TimeSpan.FromHours(1);
@@ -392,6 +394,7 @@ internal static class TamperGuard
     /// <summary>Stops (and optionally disables) this service shortly after the answer has gone out.</summary>
     private static void StopSoon(bool disable)
     {
+        StopGate.AuthorizeInternal(disable ? "disabled with a code" : "stopped with a code");
         new Thread(() =>
         {
             Thread.Sleep(1500);
@@ -481,9 +484,32 @@ internal static class TamperGuard
             return r is null ? Reply(false, "The agent did not finish contacting the server within 2½ minutes. Run 'ZentriqAgent.exe --diagnose'.")
                 : Reply(r.Ok, r.Message + (r.Ok ? "" : " Run 'ZentriqAgent.exe --diagnose' for details."));
         }
+        // The code dialog for a stop or restart from the Services console (net stop, sc stop) that is waiting.
+        if (action == "cancel-stop") { StopGate.Cancel(); return Reply(true, "Cancelled; the agent keeps running."); }
+        if (action == "authorize-stop")
+        {
+            if (!StopGate.Pending) return Reply(false, "No stop request is waiting; the dialog can be closed.");
+            lock (Failures)
+            {
+                Failures.RemoveAll(f => f < DateTime.UtcNow.AddMinutes(-15));
+                if (Failures.Count >= 5) return Reply(false, "Too many wrong codes. Wait 15 minutes and try again with a new code from the Zentriq console.");
+            }
+            if (!CodeAccepted(code, out var refused))
+            {
+                lock (Failures) Failures.Add(DateTime.UtcNow);
+                Record("tamper", "Wrong code entered to stop the agent service: " + refused);
+                return Reply(false, refused);
+            }
+            SetMarker("StoppedByCode", DateTime.UtcNow);
+            Set(false);
+            Record("control", "Agent service stopped with a code (Services console, net stop or sc stop); a restart starts it again at once, otherwise it starts again when the device restarts.");
+            StopGate.Authorize();
+            return Reply(true, "Code accepted. The Zentriq Agent service stops now.");
+        }
         if (action == "restart")
         {
             Record("control", "Agent service restart requested on the device.");
+            StopGate.AuthorizeInternal("restart requested on the device (--restart)");
             var cmd = Path.Combine(Environment.SystemDirectory, "cmd.exe");
             Process.Start(new ProcessStartInfo(cmd, $"/c ping -n 3 127.0.0.1 >nul & net stop {Program.ServiceName} & net start {Program.ServiceName}")
             { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = Path.GetTempPath() });

@@ -375,3 +375,13 @@ fieldset.plain { border: 0; padding: 0; margin: 0; min-width: 0; }
 .btn.danger { color: var(--crit); border-color: var(--crit); }
 .lic-key { margin: 4px 0 10px; font-size: 13px; }
 .lic-key summary { cursor: pointer; margin-bottom: 8px; }
+
+/* IT accessory categories */
+.cat-add { display: flex; gap: 6px; align-items: center; }
+.cat-add .in { flex: 1; min-width: 0; }
+.cat-list { display: grid; gap: 2px; max-height: 50vh; overflow: auto; border: 1px solid var(--line); border-radius: 8px; }
+.cat-row { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.cat-row:last-child { border-bottom: 0; }
+.cat-name { font-weight: 500; }
+.cat-count { margin-left: auto; font-size: 12px; }
+.cat-actions { display: flex; gap: 4px; }

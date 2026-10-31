@@ -7,6 +7,7 @@ import { Modal } from '../../components/Modal';
 import { Callout } from '../../components/ui';
 import { DepartmentSelect, useDepartments } from '../departments/Departments';
 import { LocationSelect, type Location } from '../locations/Locations';
+import { addCategory } from './CategoriesDialog';
 import { ISSUE_REASONS, WRITEOFF_REASONS, type AccessoryItem, type MovementKind } from './types';
 
 const errText = (e: unknown) => {
@@ -24,7 +25,19 @@ export function ItemDialog({ item, categories, onClose, onSaved }: { item: Acces
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [cats, setCats] = useState<string[]>(() => [...new Set([...categories, ...(item?.category ? [item.category] : [])])].sort((a, b) => a.localeCompare(b)));
+  const [newCat, setNewCat] = useState<string | null>(null);
   const set = (k: keyof typeof f, v: string | boolean) => setF({ ...f, [k]: v });
+  async function saveCategory() {
+    if (!newCat?.trim()) return;
+    setError(null);
+    try {
+      const name = await addCategory(newCat);
+      setCats([...new Set([...cats, name])].sort((a, b) => a.localeCompare(b)));
+      set('category', name);
+      setNewCat(null);
+    } catch (x) { setError(errText(x)); }
+  }
   async function save(e: FormEvent) {
     e.preventDefault();
     setBusy(true); setError(null);
@@ -44,8 +57,20 @@ export function ItemDialog({ item, categories, onClose, onSaved }: { item: Acces
         <div className="grid-2 tight">
           <label>Name<input className="in" value={f.name} onChange={(e) => set('name', e.target.value)} placeholder="e.g. Logitech M90 USB mouse" autoFocus /></label>
           <label>Category
-            <input className="in" list="acc-cats" value={f.category} onChange={(e) => set('category', e.target.value)} placeholder="Mouse, Keyboard, Headset…" />
-            <datalist id="acc-cats">{categories.map((c) => <option key={c} value={c} />)}</datalist>
+            {newCat === null ? (
+              <select className="in" value={f.category} onChange={(e) => e.target.value === '__add' ? setNewCat('') : set('category', e.target.value)}>
+                <option value="">Choose a category…</option>
+                {cats.map((c) => <option key={c} value={c}>{c}</option>)}
+                <option value="__add">+ Add category…</option>
+              </select>
+            ) : (
+              <span className="cat-add">
+                <input className="in" value={newCat} maxLength={60} autoFocus placeholder="New category name" onChange={(e) => setNewCat(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void saveCategory(); } if (e.key === 'Escape') { e.stopPropagation(); setNewCat(null); } }} />
+                <button type="button" className="btn sm primary" disabled={!newCat.trim()} onClick={() => void saveCategory()}>Add</button>
+                <button type="button" className="btn sm" onClick={() => setNewCat(null)}>Cancel</button>
+              </span>
+            )}
           </label>
           <label>Brand<input className="in" value={f.brand} onChange={(e) => set('brand', e.target.value)} /></label>
           <label>Model<input className="in" value={f.model} onChange={(e) => set('model', e.target.value)} /></label>

@@ -43,9 +43,78 @@ public static class AccessoryEndpoints
             {
                 items = r.GetInt64(0), inStock = Convert.ToInt64(r.GetValue(1)), stockValue = r.GetDecimal(2), lowStock = r.GetInt64(3),
                 issued30d = Convert.ToInt64(r.GetValue(4)), faulty = Convert.ToInt64(r.GetValue(5)), locations = r.GetInt64(6), outstanding = Convert.ToInt64(r.GetValue(7)),
-                categories = AccessoryStore.DefaultCategories,
+                categories = await CategoryNamesAsync(ds, ct),
             });
         });
+
+        // ---- categories (a managed list: built-in ones plus those administrators add) ------------------------------
+        g.MapGet("/categories", async (NpgsqlDataSource ds, CancellationToken ct) =>
+        {
+            await using var cmd = ds.CreateCommand("""
+                SELECT c.id, c.name, c.built_in, (SELECT count(*) FROM zentriq.accessory_items i WHERE lower(i.category) = lower(c.name))
+                  FROM zentriq.accessory_categories c ORDER BY lower(c.name)
+                """);
+            await using var r = await cmd.ExecuteReaderAsync(ct);
+            var list = new List<object>();
+            while (await r.ReadAsync(ct)) list.Add(new { id = r.GetGuid(0), name = r.GetString(1), builtIn = r.GetBoolean(2), items = r.GetInt64(3) });
+            return Results.Ok(list);
+        });
+
+        g.MapPost("/categories", async (CategoryBody body, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
+        {
+            var name = body.Name?.Trim();
+            if (string.IsNullOrEmpty(name) || name.Length > 60) return Validation.Problem("name", "Enter the category name (up to 60 characters).");
+            await using var cmd = ds.CreateCommand("INSERT INTO zentriq.accessory_categories (name) VALUES (@n) ON CONFLICT DO NOTHING RETURNING id");
+            cmd.Parameters.AddWithValue("n", name);
+            if (await cmd.ExecuteScalarAsync(ct) is not Guid id) return Validation.Problem("name", "This category already exists.");
+            await rc.AuditAsync("accessory.category_create", name);
+            return Results.Created($"/api/v1/accessories/categories/{id}", new { id, name });
+        }).RequireAuthorization(Permissions.AccessoriesManage);
+
+        g.MapPut("/categories/{id:guid}", async (Guid id, CategoryBody body, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
+        {
+            var name = body.Name?.Trim();
+            if (string.IsNullOrEmpty(name) || name.Length > 60) return Validation.Problem("name", "Enter the category name (up to 60 characters).");
+            await using var conn = await ds.OpenConnectionAsync(ct);
+            await using var tx = await conn.BeginTransactionAsync(ct);
+            string? old;
+            await using (var get = new NpgsqlCommand("SELECT name FROM zentriq.accessory_categories WHERE id = @id FOR UPDATE", conn, tx))
+            {
+                get.Parameters.AddWithValue("id", id);
+                old = await get.ExecuteScalarAsync(ct) as string;
+            }
+            if (old is null) return Results.NotFound();
+            try
+            {
+                await using var upd = new NpgsqlCommand("UPDATE zentriq.accessory_categories SET name = @n WHERE id = @id", conn, tx);
+                upd.Parameters.AddWithValue("n", name); upd.Parameters.AddWithValue("id", id);
+                await upd.ExecuteNonQueryAsync(ct);
+            }
+            catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation) { return Validation.Problem("name", "Another category has this name."); }
+            // The accessories of the category move with it.
+            await using (var items = new NpgsqlCommand("UPDATE zentriq.accessory_items SET category = @n, updated_at = now() WHERE lower(category) = lower(@o)", conn, tx))
+            {
+                items.Parameters.AddWithValue("n", name); items.Parameters.AddWithValue("o", old);
+                await items.ExecuteNonQueryAsync(ct);
+            }
+            await tx.CommitAsync(ct);
+            await rc.AuditAsync("accessory.category_rename", name, detail: new { from = old });
+            return Results.NoContent();
+        }).RequireAuthorization(Permissions.AccessoriesManage);
+
+        g.MapDelete("/categories/{id:guid}", async (Guid id, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
+        {
+            await using var cmd = ds.CreateCommand("""
+                DELETE FROM zentriq.accessory_categories c WHERE c.id = @id
+                   AND NOT EXISTS (SELECT 1 FROM zentriq.accessory_items i WHERE lower(i.category) = lower(c.name)) RETURNING name
+                """);
+            cmd.Parameters.AddWithValue("id", id);
+            if (await cmd.ExecuteScalarAsync(ct) is string name) { await rc.AuditAsync("accessory.category_delete", name); return Results.NoContent(); }
+            await using var ex = ds.CreateCommand("SELECT 1 FROM zentriq.accessory_categories WHERE id = @id");
+            ex.Parameters.AddWithValue("id", id);
+            return await ex.ExecuteScalarAsync(ct) is null ? Results.NotFound()
+                : Results.Problem(statusCode: 409, title: "Accessories use this category. Move them to another category first, or rename the category.");
+        }).RequireAuthorization(Permissions.AccessoriesManage);
 
         // ---- catalogue ---------------------------------------------------------------------------------------
         g.MapGet("/items", async (NpgsqlDataSource ds, string? q, string? category, bool? all, CancellationToken ct) =>
@@ -94,6 +163,7 @@ public static class AccessoryEndpoints
             Fill(cmd, id, body);
             try { await cmd.ExecuteNonQueryAsync(ct); }
             catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation) { return Validation.Problem(ex.ConstraintName?.Contains("sku") == true ? "sku" : "name", ex.ConstraintName?.Contains("sku") == true ? "Another accessory has this SKU / part number." : "An accessory with this name already exists."); }
+            await EnsureCategoryAsync(ds, body.Category!, ct);
             await rc.AuditAsync("accessory.item_create", body.Name.Trim());
             return Results.Created($"/api/v1/accessories/items/{id}", new { id, name = body.Name.Trim() });
         }).RequireAuthorization(Permissions.AccessoriesManage);
@@ -122,6 +192,7 @@ public static class AccessoryEndpoints
             catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation) { return Validation.Problem("name", "Another accessory has this name or SKU."); }
             await AccessoryStore.RefreshLowAsync(conn, tx, id, ct);
             await tx.CommitAsync(ct);
+            await EnsureCategoryAsync(ds, body.Category!, ct);
             await rc.AuditAsync("accessory.item_update", body.Name.Trim(), detail: new { id });
             return Results.NoContent();
         }).RequireAuthorization(Permissions.AccessoriesManage);
@@ -330,6 +401,24 @@ public static class AccessoryEndpoints
                 if (seen.Add(r.GetString(0))) list.Add(new { name = r.GetString(0), source = r.GetString(1) });
             return Results.Ok(list);
         });
+    }
+
+    public sealed record CategoryBody(string? Name);
+
+    private static async Task<string[]> CategoryNamesAsync(NpgsqlDataSource ds, CancellationToken ct)
+    {
+        await using var cmd = ds.CreateCommand("SELECT name FROM zentriq.accessory_categories ORDER BY lower(name)");
+        await using var r = await cmd.ExecuteReaderAsync(ct);
+        var list = new List<string>();
+        while (await r.ReadAsync(ct)) list.Add(r.GetString(0));
+        return list.ToArray();
+    }
+
+    private static async Task EnsureCategoryAsync(NpgsqlDataSource ds, string category, CancellationToken ct)
+    {
+        await using var cmd = ds.CreateCommand("INSERT INTO zentriq.accessory_categories (name) VALUES (@n) ON CONFLICT DO NOTHING");
+        cmd.Parameters.AddWithValue("n", category.Trim());
+        await cmd.ExecuteNonQueryAsync(ct);
     }
 
     private static IResult? Check(ItemBody b)

@@ -582,7 +582,7 @@ if (-not $installed) {
             $p2b = Start-Process msiexec.exe -ArgumentList '/x', $product, '/qn', "UNINSTALLCODE=$($first.code)", '/l*v', "`"$(Join-Path $OutDir 'agent-uninstall-oldcode.log')`"" -Wait -PassThru
             Assert ($p2b.ExitCode -ne 0 -and (Get-Service ZentriqAgent -ErrorAction SilentlyContinue)) "the replaced code still removed the agent (exit $($p2b.ExitCode))"
             # ---- T78: stopping and disabling need a code too (checked here while protection is on) ----
-            Check 'T78' 'Agent stop and disable protection: Services, sc and the registry refused; wrong code refused and reported; stop / disable / enable with a code; console pause, resume and per-device code' {
+            Check 'T78' 'Agent stop and disable protection: a stop request waits for a code (dialog) and is refused without one; disabling refused; wrong code refused and reported; stop / disable / enable with a code; console pause, resume and per-device code' {
                 $svcKey = 'HKLM:\SYSTEM\CurrentControlSet\Services\ZentriqAgent'
                 function Svc { Get-CimInstance Win32_Service -Filter "Name='ZentriqAgent'" }
                 function WaitFor([scriptblock] $Cond, [int] $Seconds, [string] $What) {
@@ -591,10 +591,38 @@ if (-not $installed) {
                     Assert (& $Cond) "timed out: $What"
                 }
                 function Refused([scriptblock] $Do) { try { & $Do; $false } catch { $true } }
-                function Hardened { ((& sc.exe sdshow ZentriqAgent) -join '') -match [regex]::Escape('(A;;CCLCSWRPLOCRRC;;;BA)') }
+                function Hardened { ((& sc.exe sdshow ZentriqAgent) -join '') -match [regex]::Escape('(A;;CCLCSWRPWPLOCRRC;;;BA)') }
+                # What the code dialog sends to the service over the local control pipe.
+                function PipeSend([string] $Action, [string] $Code) {
+                    $p = New-Object System.IO.Pipes.NamedPipeClientStream('.', 'ZentriqAgentControl', [System.IO.Pipes.PipeDirection]::InOut)
+                    $p.Connect(5000)
+                    $w = New-Object System.IO.StreamWriter($p); $w.AutoFlush = $true
+                    $r = New-Object System.IO.StreamReader($p)
+                    $w.WriteLine((@{ action = $Action; code = $Code } | ConvertTo-Json -Compress))
+                    $line = $r.ReadLine(); $p.Dispose()
+                    $line | ConvertFrom-Json
+                }
+                # Stop request without a code (as Stop in the Services console): held, then refused; with the code: stops.
+                function StopRequest([string] $Code) {
+                    & sc.exe stop ZentriqAgent | Out-Null
+                    Start-Sleep 3
+                    $st = (Get-Service ZentriqAgent).Status
+                    if ($st -eq 'StopPending') {
+                        $script:dialogs = @(Get-CimInstance Win32_Process -Filter "Name='ZentriqAgent.exe'" | Where-Object CommandLine -match '--stop-prompt').Count
+                        $bad = PipeSend 'authorize-stop' 'ABCD-EFGH-JKMN-PQRS'
+                        Assert (-not $bad.ok) 'a wrong code was accepted in the stop dialog'
+                        if ($Code) { $ok = PipeSend 'authorize-stop' $Code; Assert ($ok.ok) "code refused in the stop dialog: $($ok.message)" }
+                        else { PipeSend 'cancel-stop' $null | Out-Null }
+                    }
+                    return $st
+                }
                 # Wait for the agent to have applied tamper protection (registry key read-only for administrators).
                 WaitFor { Refused { Set-ItemProperty $svcKey -Name Description -Value 'x' -ErrorAction Stop } } 180 'service registry key still writable for administrators'
                 Assert (Refused { Set-Service ZentriqAgent -StartupType Disabled -ErrorAction Stop }) 'an administrator could disable the protected service'
+                # Stop without a code: the request is held (dialog on an administrator's desktop) or refused; it keeps running.
+                $first = StopRequest $null
+                WaitFor { (Get-Service ZentriqAgent).Status -eq 'Running' } 60 'the agent did not keep running after a stop request without a code'
+                $script:stopNoCode = "stop request without a code: $first, then Running"
                 & sc.exe config ZentriqAgent start= disabled | Out-Null
                 Assert ((Svc).StartMode -eq 'Auto') "startup type changed with sc.exe: $((Svc).StartMode)"
                 Assert (Refused { Set-ItemProperty $svcKey -Name Start -Value 4 -ErrorAction Stop }) 'the Start value could be set to Disabled in the registry'
@@ -607,8 +635,17 @@ if (-not $installed) {
                 WaitFor { $a = @(Api GET '/agents' -Session $s | ForEach-Object { $_ }) | Where-Object id -eq $script:agentId; $a.tamper.lastAt } 120 'refused code not reported to the console'
                 $aud = Api GET '/audit?action=agent.tamper' -Session $s
                 Assert ($aud.total -ge 1) 'agent.tamper not in the audit log'
-                # Stop with this device's own code; enable again.
+                # Stop request with the code entered in the dialog (when an administrator's desktop is available): stops.
                 $dev = Api POST "/agents/$($script:agentId)/code" -Session $s
+                $held = StopRequest $dev.code
+                if ($held -eq 'StopPending') {
+                    WaitFor { (Get-Service ZentriqAgent).Status -eq 'Stopped' } 60 'the agent did not stop after the code was entered in the dialog'
+                    Start-Service ZentriqAgent
+                    WaitFor { (Get-Service ZentriqAgent).Status -eq 'Running' } 60 'agent did not start again'
+                    WaitFor { Hardened } 120 'protection not back after the dialog stop'
+                    $script:stopDialog = "dialog shown in $($script:dialogs) session(s); wrong code refused; valid code stopped it"
+                } else { $script:stopDialog = 'no administrator desktop on this runner: the request was refused at once (dialog path covered by the pipe test above when a desktop exists)' }
+                # Stop with this device's own code; enable again.
                 & $exe --stop $dev.code | Out-Host
                 Assert ($LASTEXITCODE -eq 0) "--stop with the device code exit $LASTEXITCODE"
                 WaitFor { (Get-Service ZentriqAgent).Status -eq 'Stopped' } 60 'agent did not stop with the device code'
@@ -630,10 +667,11 @@ if (-not $installed) {
                 WaitFor { $a = @(Api GET '/agents' -Session $s | ForEach-Object { $_ }) | Where-Object id -eq $script:agentId; $a.tamper.state -eq 'paused' -and $a.online } 180 'paused state not reported'
                 Api POST "/agents/$($script:agentId)/control" @{ operation = 'resume' } -Session $s | Out-Null
                 WaitFor { Hardened } 180 'console resume did not restore protection'
-                Assert (Refused { Stop-Service ZentriqAgent -ErrorAction Stop }) 'the service could be stopped after resume'
+                StopRequest $null | Out-Null
+                WaitFor { (Get-Service ZentriqAgent).Status -eq 'Running' } 60 'the service could be stopped after resume'
                 $acts = Api GET '/activity?kind=agent-control' -Session $s
                 Assert (@($acts.items | Where-Object status -eq 'succeeded').Count -ge 2) 'console pause / resume not completed in the Activity log'
-                "Services, sc.exe and the registry refused; program folder read-only; watchdog task present; wrong code refused and reported (audit + agents list); stop with the device code and --enable; disable with the code for all and --enable; protection back each time; console pause allowed Stop-Service, resume refused it again"
+                "$($script:stopNoCode); $($script:stopDialog); disabling (Set-Service, sc.exe, registry) refused; program folder read-only; watchdog task present; wrong code refused and reported; stop with the device code and --enable; disable with the code for all and --enable; protection back each time; console pause allowed Stop-Service, resume held stop requests again"
             } | Out-Null
 
             $p3 = Start-Process $exe -ArgumentList '--uninstall', $code.code -Wait -PassThru
@@ -1631,7 +1669,7 @@ if (-not $installed) {
         "group added, category joined it (case-insensitive), rename followed, department counted 1 non-IT asset; cleaned up"
     } | Out-Null
 
-    Check 'T69' 'Locations and IT accessories: location on devices and hardware inventory; receive, issue, return, transfer; no negative stock; holdings; reorder alert' {
+    Check 'T69' 'Locations and IT accessories: location on devices and hardware inventory; categories; receive, issue, return, transfer; no negative stock; holdings; reorder alert' {
         $s = Login
         function Raw([string] $Method, [string] $Path, $Body) {
             $p = @{ Uri = "$base/api/v1$Path"; Method = $Method; WebSession = $s; Headers = @{ 'X-Zentriq-Request' = '1' }; ContentType = 'application/json'; SkipHttpErrorCheck = $true }
@@ -1654,6 +1692,21 @@ if (-not $installed) {
         Assert (@($listed).Count -eq 1 -and $listed[0].location -eq 'CI head office store') "asset list by location: $(@($listed).Count)"
         $hw = (Api GET "/inventory/hardware?location=$($hq.id)" -Session $s).items
         $hwNote = if (@($hw).Count -gt 0) { "hardware inventory filter: $(@($hw).Count) device(s), location $($hw[0].location)" } else { 'device has no hardware inventory' }
+
+        # Accessory categories: built-in list, add, duplicate refused, rename moves accessories, delete only when unused.
+        $cats = @(Api GET '/accessories/categories' -Session $s | ForEach-Object { $_ })
+        Assert (@($cats | Where-Object { $_.name -eq 'Mouse' -and $_.builtIn }).Count -eq 1) "built-in categories: $(@($cats).Count)"
+        $cat = Api POST '/accessories/categories' @{ name = 'CI stylus pen' } -Session $s
+        Assert ((Raw POST '/accessories/categories' @{ name = 'ci STYLUS pen' }).StatusCode -eq 400) 'duplicate category accepted'
+        $pen = Api POST '/accessories/items' @{ name = 'CI stylus'; category = 'CI stylus pen'; reorderLevel = 0 } -Session $s
+        Api PUT "/accessories/categories/$($cat.id)" @{ name = 'CI pens' } -Session $s | Out-Null
+        $penItem = @(Api GET '/accessories/items?all=true' -Session $s | ForEach-Object { $_ }) | Where-Object id -eq $pen.id
+        Assert ($penItem.category -eq 'CI pens') "rename did not move the accessory: $($penItem.category)"
+        Assert ((Raw DELETE "/accessories/categories/$($cat.id)").StatusCode -eq 409) 'a category in use was deleted'
+        Assert ((Api GET '/accessories/summary' -Session $s).categories -contains 'CI pens') 'new category not offered in the accessory form'
+        $tmp = Api POST '/accessories/categories' @{ name = 'CI temporary' } -Session $s
+        Assert ((Raw DELETE "/accessories/categories/$($tmp.id)").StatusCode -eq 204) 'unused category not deleted'
+        $catNote = "categories: built-in $(@($cats | Where-Object builtIn).Count), added, renamed (accessory moved), in-use delete refused, unused deleted"
 
         # Accessories.
         $item = Api POST '/accessories/items' @{ name = 'CI USB mouse'; category = 'Mouse'; reorderLevel = 5; unitCost = 400 } -Session $s
@@ -1679,7 +1732,7 @@ if (-not $installed) {
         $delItem = Raw DELETE "/accessories/items/$($item.id)" $null
         Assert ($delItem.StatusCode -eq 409) "accessory with history deleted ($($delItem.StatusCode))"
         Api POST '/assets/location' @{ assetIds = @($asset.id); locationId = $null } -Session $s | Out-Null
-        "location assigned and filtered ($hwNote); received 10, issued 6 to CI Person (stock 4, below reorder 5), issue of 5 refused (Only 4), returned 1 faulty, transferred 2; $moves movements; location and accessory with history protected"
+        "location assigned and filtered ($hwNote); received 10, issued 6 to CI Person (stock 4, below reorder 5), issue of 5 refused (Only 4), returned 1 faulty, transferred 2; $moves movements; location and accessory with history protected; $catNote"
     } | Out-Null
 
     Check 'T70' 'Manual hardware details: entered where not detected, linked to the fixed identities, searchable, detected values keep priority, removable' {

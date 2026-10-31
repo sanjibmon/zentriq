@@ -11,6 +11,7 @@ import { Callout, DataTable, ErrorBox, fmt, Kpis, PageHead, Pager, Panel, Pill, 
 import { useDepartments } from '../departments/Departments';
 import { ManageOrgDialog, useAddLocation, useLocations } from '../locations/Locations';
 import { ItemDialog, MovementDialog, type MovementPreset } from './AccessoryDialogs';
+import { CategoriesDialog } from './CategoriesDialog';
 import { KIND, money, type AccessoryItem, type AccessorySummary, type Holding, type MovementKind, type MovementRow, type StockRow } from './types';
 
 type Tab = 'stock' | 'issued' | 'movements' | 'catalogue';
@@ -30,6 +31,7 @@ export function AccessoriesPage() {
   const [move, setMove] = useState<{ kind: MovementKind; preset?: MovementPreset } | null>(null);
   const [editing, setEditing] = useState<AccessoryItem | 'new' | null>(null);
   const [manageOrg, setManageOrg] = useState(false);
+  const [manageCats, setManageCats] = useState(false);
   const s = summary.data;
   const changed = (text: string) => { setMsg({ tone: 'info', text }); setTick((x) => x + 1); locs.reload(); };
   const noLocations = locs.data && locs.data.items.length === 0;
@@ -39,6 +41,7 @@ export function AccessoriesPage() {
     <>
       <PageHead title="IT Accessories" actions={<>
         <button className="btn" onClick={() => setManageOrg(true)}>Departments &amp; locations</button>
+        <button className="btn" onClick={() => setManageCats(true)}>Categories</button>
         {canEdit && <button className="btn" onClick={() => setEditing('new')}><Icon name="plus" size={13} /> Add accessory</button>}
         {canEdit && <button className="btn" disabled={!!noItems || !!noLocations} onClick={() => setMove({ kind: 'receive' })}>Receive stock</button>}
         {canEdit && <button className="btn primary" disabled={!!noItems || !!noLocations} onClick={() => setMove({ kind: 'issue' })}>Issue</button>}
@@ -76,6 +79,7 @@ export function AccessoriesPage() {
           onClose={() => setMove(null)} onDone={(m) => { setMove(null); changed(m); }} />
       )}
       {editing && <ItemDialog item={editing === 'new' ? null : editing} categories={s?.categories ?? []} onClose={() => setEditing(null)} onSaved={(m) => { setEditing(null); changed(m); }} />}
+      {manageCats && <CategoriesDialog canEdit={canEdit} onClose={(changedAny) => { setManageCats(false); if (changedAny) { summary.reload(); items.reload(); setTick((x) => x + 1); } }} />}
       {manageOrg && <ManageOrgDialog canEdit={canEdit} onClose={() => { setManageOrg(false); locs.reload(); setTick((x) => x + 1); }} />}
     </>
   );

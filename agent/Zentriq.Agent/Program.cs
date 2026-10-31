@@ -25,11 +25,8 @@ internal static class Program
     private static int Main(string[] args)
     {
         ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
-        if (args.Length == 0 && !Environment.UserInteractive)
-        {
-            ServiceBase.Run(new AgentService());
-            return 0;
-        }
+        if (args.Length == 0 && !Environment.UserInteractive) return AgentService.RunAsService();
+        if (args.Length > 0 && args[0].Equals("--stop-prompt", StringComparison.OrdinalIgnoreCase)) return StopPrompt.RunDialog();
         Log.Console = true;
         var cmd = args.Length > 0 ? args[0].ToLowerInvariant() : "--help";
         try
@@ -118,6 +115,7 @@ internal static class Program
                         "  --collect-now        contact the server now and send inventory\n" +
                         "  --diagnose           check service, enrollment, certificate, DNS, port and server key\n" +
                         "  --restart            restart the agent service (no code needed)\n" +
+                        "  Stop / Restart in the Services console ask for the code in a dialog while tamper protection is on.\n" +
                         "  --collect <file>     write this device's inventory to a JSON file (nothing is sent)\n" +
                         "  --run                run in the foreground (troubleshooting)\n" +
                         "Logs: " + Log.Directory);
@@ -267,19 +265,10 @@ internal static class Program
     }
 }
 
-internal sealed class AgentService : ServiceBase
+internal sealed partial class AgentService
 {
     private CancellationTokenSource? _cts;
     private Thread? _thread;
-
-    public AgentService()
-    {
-        ServiceName = Program.ServiceName;
-        CanStop = true;
-        CanShutdown = true;
-        CanHandlePowerEvent = true;
-        AutoLog = true;
-    }
 
     /// <summary>Set to run the next cycle early: the network changed or the device woke from sleep.</summary>
     internal static readonly AutoResetEvent Wake = new AutoResetEvent(false);
@@ -329,13 +318,7 @@ internal sealed class AgentService : ServiceBase
         Wake.Set();
     }
 
-    protected override bool OnPowerEvent(PowerBroadcastStatus powerStatus)
-    {
-        if (powerStatus == PowerBroadcastStatus.ResumeSuspend || powerStatus == PowerBroadcastStatus.ResumeAutomatic) RequestWake("Resumed from sleep");
-        return true;
-    }
-
-    protected override void OnStart(string[] args)
+    private void OnStart()
     {
         try { Process.GetCurrentProcess().PriorityClass = ProcessPriorityClass.BelowNormal; } catch (Exception) { }
         AgentState.Secure();
@@ -358,16 +341,13 @@ internal sealed class AgentService : ServiceBase
         _pipe.Start();
     }
 
-    protected override void OnStop()
+    private void OnStop()
     {
-        RequestAdditionalTime(30000);
         _cts?.Cancel();
         _presence?.Join(TimeSpan.FromSeconds(3));   // closing the live connection shows the device offline at once
         _thread?.Join(TimeSpan.FromSeconds(25));
         Log.Info("Zentriq Agent stopped.");
     }
-
-    protected override void OnShutdown() => OnStop();
 
     public static void Loop(CancellationToken ct, TimeSpan initialDelay)
     {

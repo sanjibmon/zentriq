@@ -463,14 +463,12 @@ function SettingsTab({ onSaved, onAll }: { onSaved: (msg: string) => void; onAll
   );
 }
 
-/** Tamper protection state and the last tampering the agent undid or refused (under the device name). */
+/** Tamper protection paused on the device (under the device name). Blocked attempts are listed in the device's agent menu. */
 function TamperState({ r }: { r: AgentRow }) {
   const t = r.tamper;
-  if (r.status !== 'active' || !t) return null;
-  const recent = t.lastAt && Date.now() - new Date(t.lastAt).getTime() < 7 * 86400000;
+  if (r.status !== 'active' || !t || t.state !== 'paused') return null;
   return <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 2 }}>
-    {t.state === 'paused' && <Pill tone="warn">Protection paused{t.until ? ` until ${new Date(t.until).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}` : ''}</Pill>}
-    {recent && <span title={`${fmt.date(t.lastAt)}: ${t.last ?? ''}`}><Pill tone="crit">Tampering blocked · {fmt.ago(t.lastAt)}</Pill></span>}
+    <Pill tone="warn">Protection paused{t.until ? ` until ${new Date(t.until).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}` : ''}</Pill>
   </div>;
 }
 
@@ -501,7 +499,7 @@ function AgentControlDialog({ agent, onClose, onDone }: { agent: AgentRow; onClo
     <Modal title={`Agent on ${name}`} onClose={onClose} footer={<button className="btn" onClick={onClose}>Close</button>}>
       <div className="form-v">
         {err && <Callout tone="crit" icon="alert">{err}</Callout>}
-        <p style={{ margin: 0 }}>Tamper protection on this device: <b>{state}</b>{t?.lastAt ? <> · last tampering blocked {fmt.date(t.lastAt)}<br /><span className="muted" style={{ fontSize: 12.5 }}>{t.last}</span></> : null}</p>
+        <p style={{ margin: 0 }}>Tamper protection on this device: <b>{state}</b></p>
         {!agent.canControl && <Callout tone="warn" icon="alert">This agent ({agent.version}) predates console control. Update it first; uninstall codes work already.</Callout>}
         <div className="field-title">Code for this device</div>
         {code ? <><div className="big-code" aria-label="Device code">{code.code}</div>

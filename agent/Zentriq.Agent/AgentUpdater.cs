@@ -49,6 +49,8 @@ internal static class AgentUpdater
         client.ReportActionAsync(actionId, true, "started", started, ct).GetAwaiter().GetResult();
         var msiexec = Environment.ExpandEnvironmentVariables(@"%SystemRoot%\System32\msiexec.exe");
         // A separate process: Windows Installer stops this service during the upgrade and msiexec carries on without it.
+        // Windows Installer stops the service while it replaces the files (also covered while its mutex is held).
+        StopGate.AuthorizeInternal("agent update", TimeSpan.FromMinutes(15));
         var psi = new ProcessStartInfo(msiexec, $"/i \"{file}\" /qn /norestart REBOOT=ReallySuppress MSIRESTARTMANAGERCONTROL=Disable /l*v \"{log}\"")
         {
             UseShellExecute = false,

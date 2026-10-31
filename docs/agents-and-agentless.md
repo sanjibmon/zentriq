@@ -195,17 +195,24 @@ Intune command-line arguments, the Configuration Manager install command. Zentri
 * *Agents › Settings › Require a code to uninstall, stop or disable the agent* (on by default). Each device then keeps
   its protection data readable by **SYSTEM only** (`HKLM\SOFTWARE\Zentriq\Agent\Protection`), and nobody on the device —
   users, local administrators and domain administrators alike — can remove, stop or disable the agent without a code:
-  * the agent **service** grants administrators query and start only: *Stop* and *Startup type* in Services,
-    `sc stop` / `sc config`, `Stop-Service` / `Set-Service` are refused;
+  * **Stop and Restart need a code.** *Stop* and *Restart* in the Services console (and `net stop`, `sc stop`,
+    `Stop-Service`) are available, but the agent holds the request: the service shows *Stopping* and a dialog opens on
+    the desktop of each signed-in administrator, **"A code is needed to stop or restart the Zentriq Agent"**. With a
+    valid code (the device's code or the code for all) the service stops — and *Restart* starts it again at once;
+    after a plain *Stop* it starts again when the device restarts, or with `--enable`. Cancel, a wrong code, or no code
+    within two minutes (20 seconds when nobody is signed in to show the dialog to): the service reports *Running* again,
+    keeps working, and the attempt is reported like tampering;
+  * *Startup type* (Disabled / Manual) in Services, `sc config` and `Set-Service` are refused;
   * its **registry key** (`HKLM\SYSTEM\CurrentControlSet\Services\ZentriqAgent`) and its **program folder** are
     read-only for administrators, so the startup type cannot be changed in the registry and the program cannot be
     replaced or renamed;
   * every two minutes the agent checks that this is still so. A change made behind its back (an administrator can take
-    ownership of an object) is **undone** and reported: *Agents* shows **Tampering blocked** on the device, the audit
-    log records `agent.tamper`, and administrators get a notification (at most one per device every 30 minutes);
+    ownership of an object) is **undone** and reported: the audit log records `agent.tamper`, and administrators get a
+    notification (at most one per device every 30 minutes);
   * a **watchdog task** (`\Zentriq\Zentriq Agent watchdog`, SYSTEM, at startup and every 15 minutes) sets the startup
     type back to Automatic and starts the service if it was disabled behind its back and the device restarted;
-  * Windows Installer runs as SYSTEM, so agent **updates** from the console keep working.
+  * stops that are already authorized need no code: protection off or paused, a stop or disable with a code, console
+    control (restart, disable), `--restart`, agent updates and Windows Installer (updates, uninstall with a code).
 * **Codes.** *Agents › Agent code* creates **one random code for all devices** (16 characters, `ABCD-EFGH-JKMN-PQRS`),
   valid for **one hour**; creating a new one replaces it, *Cancel code* withdraws it. *Agents › Agent… › Show a one-hour
   code* gives a code that works on **that device only**. Both are audited. Online agents receive the code for all within

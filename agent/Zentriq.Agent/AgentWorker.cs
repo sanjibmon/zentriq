@@ -477,6 +477,7 @@ internal sealed class AgentWorker
 
     private static void RestartService()
     {
+        StopGate.AuthorizeInternal("restart from the Zentriq console");
         // A separate process stops and starts this service (this process ends with the stop).
         var cmd = Path.Combine(Environment.SystemDirectory, "cmd.exe");
         System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(cmd, $"/c ping -n 3 127.0.0.1 >nul & net stop {Program.ServiceName} & net start {Program.ServiceName}")
@@ -485,6 +486,7 @@ internal sealed class AgentWorker
 
     private static void DisableService()
     {
+        StopGate.AuthorizeInternal("disabled from the Zentriq console");
         var sc = Path.Combine(Environment.SystemDirectory, "sc.exe");
         using (var p = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(sc, $"config {Program.ServiceName} start= disabled") { UseShellExecute = false, CreateNoWindow = true })) p?.WaitForExit(15000);
         try { using var svc = new System.ServiceProcess.ServiceController(Program.ServiceName); svc.Stop(); } catch (Exception ex) { Log.Warn("Could not stop the agent service: " + ex.Message); }

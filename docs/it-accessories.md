@@ -8,8 +8,11 @@ record per item), accessories are kept as **quantities in stock per location**, 
 
 1. **Locations** — stock is kept per location (store, office, floor). Add them under *Departments & locations*, or
    choose *＋ Add new location…* in any location list. The same locations are used for IT assets.
-2. **Catalogue › Add accessory** — name, category (Mouse, Keyboard, Headset, Webcam, Docking station, Adapter / dongle,
-   or your own), brand, model, SKU / part number / barcode, unit cost and:
+2. **Categories** — *IT Accessories › Categories* lists the built-in categories (Mouse, Keyboard, Headset, Webcam,
+   Docking station, Adapter / dongle …) and yours: **Add category**, **Rename** (its accessories move with it) and
+   **Delete** (only when no accessory uses it). In the accessory form, *＋ Add category…* in the category list adds one
+   on the spot.
+3. **Catalogue › Add accessory** — name, category, brand, model, SKU / part number / barcode, unit cost and:
    - **Reorder level** — when the quantity at a location falls to this number, the accessory is flagged *Reorder*
      (*Out of stock* at 0), counted on the dashboard and an **IT accessory stock low** event is raised.
    - **Returnable** — expected back when the person leaves (headset, docking station). Untick for consumables (cables,
