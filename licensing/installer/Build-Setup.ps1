@@ -19,7 +19,7 @@ New-Item -ItemType Directory -Force -Path $stage, $OutDir | Out-Null
 
 Write-Host 'Publishing the license server (self-contained, win-x64)...'
 dotnet publish (Join-Path $repo 'licensing\Zentriq.LicenseServer\Zentriq.LicenseServer.csproj') -c Release -r win-x64 --self-contained true `
-    -o (Join-Path $stage 'server') "-p:Version=$Version" --nologo | Out-Host
+    -o (Join-Path $stage 'server') "-p:Version=$Version" --nologo 2>&1 | Write-Host
 if ($LASTEXITCODE -ne 0) { throw 'dotnet publish failed' }
 Get-ChildItem (Join-Path $stage 'server') -Recurse -Include '*.pdb' | Remove-Item -Force
 
@@ -56,7 +56,7 @@ Remove-Item $pgTmp -Recurse -Force
 
 Write-Host 'Building the MSI...'
 $msiOut = Join-Path $stage 'msi'
-dotnet build (Join-Path $PSScriptRoot 'Zentriq.LicenseServer.Setup.wixproj') -c Release "-p:ProductVersion=$Version" "-p:StageDir=$stage" "-p:OutputPath=$msiOut\" --nologo | Out-Host
+dotnet build (Join-Path $PSScriptRoot 'Zentriq.LicenseServer.Setup.wixproj') -c Release "-p:ProductVersion=$Version" "-p:StageDir=$stage" "-p:OutputPath=$msiOut/" --nologo 2>&1 | Write-Host
 if ($LASTEXITCODE -ne 0) { throw 'MSI build failed' }
 $msi = Get-ChildItem $msiOut -Filter '*.msi' -Recurse | Select-Object -First 1
 $target = Join-Path $OutDir "Zentriq-LicenseServer-Setup-$Version.msi"
