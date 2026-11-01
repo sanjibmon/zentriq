@@ -1,11 +1,17 @@
 {
-  "_comment": "License VERIFICATION keys trusted by this build. Public keys only. Replace the development key with your production key before shipping (see docs/licensing.md).",
+  "_comment": "License VERIFICATION keys trusted by this build. Public keys only. zentriq-prod-2026-11: production key from the license server's key ceremony (fingerprint SHA256:56:39:37:29:89:E5:08:18:1F:DC:2A:CB:94:7D:64:1A:8B:C4:93:A6:E6:A6:3D:44:21:11:67:BB:32:F8:94:81). The development key is revoked.",
   "keys": [
+    {
+      "keyId": "zentriq-prod-2026-11",
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEeYqYWRnEEatT9xUvvvTKIvq4tylH\nynXOoqd0JiiupjInVVkaqNsELfklU69Rz/v8k6kbow2w15cTBYGwYxYbrQ==\n-----END PUBLIC KEY-----\n",
+      "notAfter": null,
+      "revoked": false
+    },
     {
       "keyId": "zentriq-dev-2026-10",
       "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE4sDdddoJzSpvwusNbdPwWMzCbziD\n5xcJNyZm0QMCc3j9BOsnmJj/viiZThvEiuP4UM7fMnKLloUgUAWVP7G4UA==\n-----END PUBLIC KEY-----\n",
       "notAfter": null,
-      "revoked": false
+      "revoked": true
     }
   ]
 }

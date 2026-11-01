@@ -74,8 +74,10 @@ keys:
 | Backed up offline, rotatable | Two offline copies of the encrypted key, passphrase stored separately. Rotation: new key, Zentriq release with both public keys, switch the server, then retire the old key (`notAfter`) or revoke it if compromised. |
 | Next step for the public server | Move the key into a hardware-backed store (HSM, or a cloud KMS such as Azure Key Vault Managed HSM) so it cannot be copied at all. |
 
-`zentriq-dev-2026-10`, the key the product trusts today, is a development key; it is removed (revoked) in the build
-that adds your production key.
+Zentriq trusts the production key **`zentriq-prod-2026-11`** (fingerprint
+`SHA256:56:39:37:29:89:E5:08:18:1F:DC:2A:CB:94:7D:64:1A:8B:C4:93:A6:E6:A6:3D:44:21:11:67:BB:32:F8:94:81`) from build 103
+on; the development key `zentriq-dev-2026-10` is revoked in that build. A Zentriq build older than that reports
+"The license was signed with an unknown key (zentriq-prod-2026-11)": install build 103 or later.
 
 ## Security
 

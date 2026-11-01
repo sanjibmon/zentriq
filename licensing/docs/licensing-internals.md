@@ -33,7 +33,7 @@ customer* in the portal issues a new file and replaces the hash, so earlier file
 
 * Only **public** verification keys are compiled into Zentriq
   (`backend/Zentriq.Infrastructure/Resources/license-public-keys.json`); customers cannot add keys.
-  `zentriq-dev-2026-10` is a development key, revoked in the build that adds the production key.
+  `zentriq-prod-2026-11` (fingerprint `SHA256:56:39:37:29:89:E5:08:18:1F:DC:2A:CB:94:7D:64:1A:8B:C4:93:A6:E6:A6:3D:44:21:11:67:BB:32:F8:94:81`) is the production key Zentriq trusts from build 103; the development key `zentriq-dev-2026-10` is revoked there.
 * The license server signs with its private key (key ceremony: [license-server.md](license-server.md)); the portal
   shows the entry for `license-public-keys.json` under *Settings › Signing key*.
 * Rotation: add the new public key (keep the old one), release; switch the license server to the new key; later set

@@ -89,6 +89,13 @@ public sealed class LicenseVerifierTests
             using var e = InMemoryPublicKeyStore.Import(k);
             Assert.Equal(256, e.KeySize);
         }
+        // The production key from the license server's key ceremony is trusted; the development key is revoked.
+        var prod = Assert.Single(store.All, k => k.KeyId == "zentriq-prod-2026-11");
+        Assert.False(prod.Revoked);
+        using (var pk = InMemoryPublicKeyStore.Import(prod))
+            Assert.Equal("56393729" + "89E50818" + "1FDC2ACB" + "947D641A" + "8BC493A6" + "E6A63D44" + "211167BB" + "32F89481",
+                Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(pk.ExportSubjectPublicKeyInfo())));
+        Assert.True(Assert.Single(store.All, k => k.KeyId == "zentriq-dev-2026-10").Revoked);
     }
 }
 
