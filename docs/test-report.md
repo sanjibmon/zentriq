@@ -1,9 +1,13 @@
 # Test report
 
-Latest: GitHub Actions run 41243876015, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
-10.0.20348** VM plus an Ubuntu job for the Linux agent. Release: `v1.1.1-build.102` (pre-release, **unsigned**), package
-version **1.1.1.102**. Results: unit + PostgreSQL integration tests **369 PASS, 2 skipped** (ci-quick: 371/371);
-installer acceptance **72 passed, 0 failed**; Linux agent on 11 distributions **11/11**; in-place updates PASS (schema 32).
+Latest: GitHub Actions run 41283941378, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
+10.0.20348** VM plus an Ubuntu job for the Linux agent. Release: `v1.1.1-build.103` (pre-release, **unsigned**), package
+version **1.1.1.103**. Results: unit + PostgreSQL integration tests **369 PASS, 2 skipped**; installer acceptance
+**72 passed, 0 failed**; Linux agent on 11 distributions **11/11**.
+
+New in build 103: Zentriq trusts the **production license signing key** `zentriq-prod-2026-11` (fingerprint
+`SHA256:56:39:37:29:89:E5:08:18:1F:DC:2A:CB:94:7D:64:1A:8B:C4:93:A6:E6:A6:3D:44:21:11:67:BB:32:F8:94:81`, confirmed by
+the key owner); the development key `zentriq-dev-2026-10` is revoked. A unit test pins the fingerprint.
 
 New in build 102: **Zentriq Agent for Linux** (builds 100-101 failed only on test assertions and were not released).
 
