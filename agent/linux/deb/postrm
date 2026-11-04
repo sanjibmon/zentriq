@@ -5,7 +5,7 @@ case "$1" in
   remove|purge) rm -f /opt/zentriq-agent/installed-by; rmdir /opt/zentriq-agent 2>/dev/null || true ;;
 esac
 if [ "$1" = "purge" ]; then
-  rm -rf /var/lib/zentriq-agent /var/log/zentriq-agent /etc/systemd/system/zentriq-agent.service.d
+  rm -rf /var/lib/zentriq-agent /var/log/zentriq-agent /var/spool/zentriq-agent /etc/systemd/system/zentriq-agent.service.d
 fi
 if [ -d /run/systemd/system ]; then systemctl daemon-reload >/dev/null 2>&1 || true; fi
 exit 0

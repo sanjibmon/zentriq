@@ -11,6 +11,8 @@ public static class Permissions
     public const string PatchApprove = "patch.approve";
     public const string PatchDeploy = "patch.deploy";
     public const string DeployRun = "deploy.run";
+    public const string DeployView = "deploy.view";
+    public const string DeployManage = "deploy.manage";
     public const string RemoteStart = "remote.start";
     public const string RemoteUnattended = "remote.unattended";
     public const string ReportsDesign = "reports.design";
@@ -58,7 +60,7 @@ public static class Permissions
         DeployRun, RemoteStart, RemoteUnattended, ReportsDesign, ReportsExport, DashboardsShare, VulnExcept,
         JobsView, UsersManage, LicensingManage, BackupRun, SettingsManage, AuditView, AgentsManage, DirectoryManage, AssetsControl, SoftwareUninstall, VulnView, VulnManage,
         SecurityView, SecurityManage, IntegrationsManage, RemoteManage, DashboardView, ReportsView, ActivityView, NonItView, NonItManage,
-        AccessoriesView, AccessoriesManage, LifecycleView, LifecycleManage, CloudView, CloudManage
+        AccessoriesView, AccessoriesManage, LifecycleView, LifecycleManage, CloudView, CloudManage, DeployView, DeployManage
     ];
 }
 

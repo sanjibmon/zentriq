@@ -102,6 +102,30 @@ internal static class Program
                 }
                 case "--watchdog":
                     return ServiceControl.Watchdog();
+                // Software Deployment: the package-manager hooks, requests and the state on this device.
+                case "--check-dpkg":
+                    return AppControlAgent.CheckDpkg();
+                case "--check-packages":
+                    return AppControlAgent.CheckPackages(Console.In, args.Length > 1 ? args[1] : "package manager");
+                case "--zypp-plugin":
+                    return AppControlAgent.ZyppPlugin();
+                case "--request":
+                    return AppControlAgent.Request(args);
+                case "--cleanup-hooks":
+                    PackageHooks.Remove();
+                    RemoteGuard.Release();
+                    return 0;
+                case "--app-control":
+                {
+                    var pol = AppControlAgent.Policy;
+                    Console.WriteLine($"Application control: {pol.Mode} (policy {pol.Revision}, {pol.Rules.Count} rule(s)); package-manager hooks {(PackageHooks.Installed ? "installed" : "not installed")}; remote support protection {RemoteGuard.State}.");
+                    if (args.Length > 2 && args[1] == "--test")
+                    {
+                        var d = Zentriq.Inventory.AppControl.Evaluate(pol, new Zentriq.Inventory.SoftwareCandidate { Name = args[2], Platform = "linux" });
+                        Console.WriteLine($"{args[2]}: {(d.Approved ? "allowed" : "not approved")} - {d.Reason}");
+                    }
+                    return 0;
+                }
                 case "--run":
                 {
                     if (!RequireRoot()) return 1;
@@ -119,6 +143,9 @@ internal static class Program
                         "  --checkin-now        contact the server now (also --once); --collect-now also sends inventory\n" +
                         "  --collect <file|->   write this device's inventory as JSON (nothing is sent)\n" +
                         "  --diagnose           check service, enrollment, certificate and the connection to the server\n" +
+                        "  --app-control        application control on this device (mode, approved rules, hooks)\n" +
+                        "  --request <software> [--version <v>] [--reason <text>]\n" +
+                        "                       ask your administrator to approve software that was blocked (any user)\n" +
                         "  --uninstall <code>   remove the agent (code from the console, valid for 1 hour, when protection is on)\n" +
                         "  --stop <code>        stop the agent until the device restarts (code from the console when protection is on)\n" +
                         "  --disable <code>     disable the agent until --enable (code from the console when protection is on)\n" +
@@ -244,6 +271,10 @@ internal static class AgentService
 
     public static void RequestServerWake() => ServerWake.Set();
 
+    private static int _forceInventory;
+    /// <summary>Inventory at the next check-in (soon): software was installed or removed.</summary>
+    public static void RequestInventory() { Interlocked.Exchange(ref _forceInventory, 1); ServerWake.Set(); }
+
     public static int Run()
     {
         Log.Journal = true;
@@ -265,6 +296,7 @@ internal static class AgentService
         if (p.StoppedByCode is not null) { p.StoppedByCode = null; if (p.Enabled) p.Save(); }
         try { File.Delete(Paths.UninstallAllowed); } catch (IOException) { }
         StopGuard.Sync(p);
+        AppControlAgent.OnServiceStart();
         NetworkChange.NetworkAddressChanged += (_, _) => { Presence.Retry.Set(); ServerWake.Set(); };
         var presence = new Thread(() => Presence.Loop(ct)) { IsBackground = true, Name = "presence" };
         presence.Start();
@@ -278,12 +310,12 @@ internal static class AgentService
         {
             if (woke || DateTime.UtcNow >= next)
             {
-                var r = worker.RunOnce(ct);
+                var r = worker.RunOnce(ct, forceInventory: Interlocked.Exchange(ref _forceInventory, 0) == 1);
                 Log.Info((r.Ok ? "" : "Not done: ") + r.Message + $" Next in {Math.Max(1, (int)Math.Round(r.NextRun.TotalMinutes))} min.");
                 next = DateTime.UtcNow + r.NextRun;
             }
             // Re-check the stop protection now and then (a pause ends by itself).
-            if (DateTime.UtcNow - lastProtection > TimeSpan.FromMinutes(5)) { StopGuard.Sync(Protection.Load()); lastProtection = DateTime.UtcNow; }
+            if (DateTime.UtcNow - lastProtection > TimeSpan.FromMinutes(5)) { StopGuard.Sync(Protection.Load()); RemoteGuard.Sync(); lastProtection = DateTime.UtcNow; }
             var wait = next - DateTime.UtcNow;
             if (wait < TimeSpan.FromSeconds(1)) wait = TimeSpan.FromSeconds(1);
             if (wait > TimeSpan.FromMinutes(5)) wait = TimeSpan.FromMinutes(5);

@@ -27,6 +27,7 @@ internal static class Program
         ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
         if (args.Length == 0 && !Environment.UserInteractive) return AgentService.RunAsService();
         if (args.Length > 0 && args[0].Equals("--stop-prompt", StringComparison.OrdinalIgnoreCase)) return StopPrompt.RunDialog();
+        if (args.Length > 0 && args[0].Equals("--app-notice", StringComparison.OrdinalIgnoreCase)) return Notice.RunDialog(args.Length > 1 ? args[1] : null);
         Log.Console = true;
         var cmd = args.Length > 0 ? args[0].ToLowerInvariant() : "--help";
         try
@@ -88,6 +89,17 @@ internal static class Program
                     return TamperGuard.Enable();
                 case "--protection":
                     return TamperGuard.Client("status", null);
+                case "--app-control":
+                {
+                    var p = AppControlAgent.Policy;
+                    Console.WriteLine($"Application control: {p.Mode} (policy {p.Revision}, {p.Rules.Count} rule(s)); WDAC {Wdac.State}; remote support protection {RemoteGuard.State}.");
+                    if (args.Length > 2 && args[1] == "--test")
+                    {
+                        var d = AppControlAgent.Evaluate(new Zentriq.Inventory.SoftwareCandidate { Name = args[2], Publisher = Option(args, "--publisher"), Version = Option(args, "--version") });
+                        Console.WriteLine($"{args[2]}: {(d.Approved ? "allowed" : "not approved")} - {d.Reason}");
+                    }
+                    return 0;
+                }
                 case "--watchdog":
                     return TamperGuard.Watchdog();
                 case "--uninstall-run":
@@ -111,6 +123,7 @@ internal static class Program
                         "  --pause <code>       pause tamper protection for 1 hour (Services can then stop or disable it)\n" +
                         "  --enable             set the agent service to Automatic and start it\n" +
                         "  --protection         show whether tamper protection is on\n" +
+                        "  --app-control        show application control on this device (mode, approved rules, WDAC)\n" +
                         "  --checkin-now        contact the server now (also --once); shows the result\n" +
                         "  --collect-now        contact the server now and send inventory\n" +
                         "  --diagnose           check service, enrollment, certificate, DNS, port and server key\n" +
@@ -132,6 +145,9 @@ internal static class Program
     /// <summary>Uninstall: delete the agent certificate/key, state and local data (run by the MSI as SYSTEM).</summary>
     private static int Cleanup()
     {
+        // Software Deployment: the WDAC policy is removed and the remote support agent is no longer protected.
+        try { Wdac.Apply("off", false); } catch (Exception ex) { Console.Error.WriteLine("WDAC cleanup: " + ex.Message); }
+        try { RemoteGuard.Release(); } catch (Exception ex) { Console.Error.WriteLine("Remote support protection cleanup: " + ex.Message); }
         try
         {
             var s = AgentState.Load();
@@ -278,6 +294,9 @@ internal sealed partial class AgentService
 
     internal static void RequestServerWake() => ServerWake.Set();
 
+    /// <summary>Inventory at the next check-in (soon): software was installed or removed.</summary>
+    internal static void RequestInventory() { Interlocked.Exchange(ref _forceInventory, 1); ServerWake.Set(); }
+
     private static int _forceInventory;
     private static readonly object OutcomeGate = new object();
     private static DateTime _outcomeAt;
@@ -324,6 +343,7 @@ internal sealed partial class AgentService
         AgentState.Secure();
         Log.Info($"Zentriq Agent {Program.Version} starting.");
         TamperGuard.OnServiceStart();
+        AppControlAgent.OnServiceStart();
         _cts = new CancellationTokenSource();
         var initial = TimeSpan.FromSeconds(new Random().Next(10, 60));
         if (!string.IsNullOrEmpty(AgentState.Load().EnrollmentCode)) initial = TimeSpan.FromSeconds(2); // just installed

@@ -1,0 +1,3828 @@
+{
+ "version": "2026.11",
+ "entries": [
+  {
+   "key": "google-chrome",
+   "name": "Google Chrome",
+   "publisher": "Google LLC",
+   "category": "Browsers",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Google Chrome*",
+    "google-chrome-stable"
+   ],
+   "publisherPatterns": [
+    "Google LLC",
+    "Google Inc*"
+   ],
+   "website": "https://www.google.com/chrome/",
+   "windowsSilentArgs": "/silent /install",
+   "debPackage": "google-chrome-stable",
+   "rpmPackage": "google-chrome-stable"
+  },
+  {
+   "key": "mozilla-firefox",
+   "name": "Mozilla Firefox",
+   "publisher": "Mozilla",
+   "category": "Browsers",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Mozilla Firefox*",
+    "firefox",
+    "firefox-esr"
+   ],
+   "publisherPatterns": [
+    "Mozilla*"
+   ],
+   "website": "https://www.mozilla.org/firefox/",
+   "windowsSilentArgs": "/S",
+   "debPackage": "firefox",
+   "rpmPackage": "firefox"
+  },
+  {
+   "key": "microsoft-edge",
+   "name": "Microsoft Edge",
+   "publisher": "Microsoft Corporation",
+   "category": "Browsers",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Microsoft Edge",
+    "microsoft-edge-stable"
+   ],
+   "publisherPatterns": [
+    "Microsoft Corporation"
+   ],
+   "website": "https://www.microsoft.com/edge",
+   "windowsSilentArgs": "/silent /install",
+   "debPackage": "microsoft-edge-stable",
+   "rpmPackage": "microsoft-edge-stable"
+  },
+  {
+   "key": "brave-browser",
+   "name": "Brave Browser",
+   "publisher": "Brave Software, Inc.",
+   "category": "Browsers",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Brave*",
+    "brave-browser"
+   ],
+   "publisherPatterns": [
+    "Brave Software*"
+   ],
+   "website": "https://brave.com/",
+   "windowsSilentArgs": "--silent --install",
+   "debPackage": "brave-browser",
+   "rpmPackage": "brave-browser"
+  },
+  {
+   "key": "opera",
+   "name": "Opera",
+   "publisher": "Opera Norway AS",
+   "category": "Browsers",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Opera*"
+   ],
+   "publisherPatterns": [
+    "Opera Norway AS",
+    "Opera Software*"
+   ],
+   "website": "https://www.opera.com/",
+   "windowsSilentArgs": "/silent /launchopera=0"
+  },
+  {
+   "key": "vivaldi",
+   "name": "Vivaldi",
+   "publisher": "Vivaldi Technologies AS",
+   "category": "Browsers",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Vivaldi*",
+    "vivaldi-stable"
+   ],
+   "publisherPatterns": [
+    "Vivaldi Technologies*"
+   ],
+   "website": "https://vivaldi.com/",
+   "windowsSilentArgs": "--vivaldi-silent --do-not-launch-chrome",
+   "debPackage": "vivaldi-stable",
+   "rpmPackage": "vivaldi-stable"
+  },
+  {
+   "key": "chromium",
+   "name": "Chromium",
+   "publisher": "The Chromium Authors",
+   "category": "Browsers",
+   "platforms": [
+    "linux"
+   ],
+   "namePatterns": [
+    "chromium",
+    "chromium-browser"
+   ],
+   "publisherPatterns": [],
+   "website": "https://www.chromium.org/",
+   "debPackage": "chromium",
+   "rpmPackage": "chromium"
+  },
+  {
+   "key": "microsoft-365-apps",
+   "name": "Microsoft 365 Apps",
+   "publisher": "Microsoft Corporation",
+   "category": "Office & productivity",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Microsoft 365*",
+    "Microsoft Office*",
+    "Office 16 Click-to-Run*"
+   ],
+   "publisherPatterns": [
+    "Microsoft Corporation"
+   ],
+   "website": "https://www.microsoft.com/microsoft-365",
+   "windowsSilentArgs": "/configure configuration.xml"
+  },
+  {
+   "key": "microsoft-teams",
+   "name": "Microsoft Teams",
+   "publisher": "Microsoft Corporation",
+   "category": "Communication",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Microsoft Teams*",
+    "Teams Machine-Wide Installer"
+   ],
+   "publisherPatterns": [
+    "Microsoft Corporation"
+   ],
+   "website": "https://www.microsoft.com/microsoft-teams",
+   "windowsSilentArgs": "-s"
+  },
+  {
+   "key": "microsoft-onedrive",
+   "name": "Microsoft OneDrive",
+   "publisher": "Microsoft Corporation",
+   "category": "Cloud storage",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Microsoft OneDrive*"
+   ],
+   "publisherPatterns": [
+    "Microsoft Corporation"
+   ],
+   "website": "https://www.microsoft.com/microsoft-365/onedrive",
+   "windowsSilentArgs": "/silent /allusers"
+  },
+  {
+   "key": "libreoffice",
+   "name": "LibreOffice",
+   "publisher": "The Document Foundation",
+   "category": "Office & productivity",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "LibreOffice*",
+    "libreoffice*"
+   ],
+   "publisherPatterns": [
+    "The Document Foundation"
+   ],
+   "website": "https://www.libreoffice.org/",
+   "windowsSilentArgs": "/qn /norestart",
+   "debPackage": "libreoffice",
+   "rpmPackage": "libreoffice"
+  },
+  {
+   "key": "onlyoffice-desktop-editors",
+   "name": "OnlyOffice Desktop Editors",
+   "publisher": "Ascensio System SIA",
+   "category": "Office & productivity",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "ONLYOFFICE*",
+    "onlyoffice-desktopeditors"
+   ],
+   "publisherPatterns": [
+    "Ascensio System SIA"
+   ],
+   "website": "https://www.onlyoffice.com/",
+   "windowsSilentArgs": "/VERYSILENT /NORESTART",
+   "debPackage": "onlyoffice-desktopeditors",
+   "rpmPackage": "onlyoffice-desktopeditors"
+  },
+  {
+   "key": "wps-office",
+   "name": "WPS Office",
+   "publisher": "Kingsoft Corp.",
+   "category": "Office & productivity",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "WPS Office*",
+    "wps-office"
+   ],
+   "publisherPatterns": [
+    "Kingsoft*",
+    "Zhuhai Kingsoft*"
+   ],
+   "website": "https://www.wps.com/",
+   "windowsSilentArgs": "/S",
+   "debPackage": "wps-office",
+   "rpmPackage": "wps-office"
+  },
+  {
+   "key": "adobe-acrobat-reader",
+   "name": "Adobe Acrobat Reader",
+   "publisher": "Adobe Inc.",
+   "category": "PDF",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Adobe Acrobat*Reader*",
+    "Adobe Acrobat (64-bit)"
+   ],
+   "publisherPatterns": [
+    "Adobe*"
+   ],
+   "website": "https://get.adobe.com/reader/",
+   "windowsSilentArgs": "/sAll /rs /msi EULA_ACCEPT=YES"
+  },
+  {
+   "key": "adobe-acrobat",
+   "name": "Adobe Acrobat",
+   "publisher": "Adobe Inc.",
+   "category": "PDF",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Adobe Acrobat DC*",
+    "Adobe Acrobat Pro*",
+    "Adobe Acrobat Standard*"
+   ],
+   "publisherPatterns": [
+    "Adobe*"
+   ],
+   "website": "https://www.adobe.com/acrobat.html",
+   "windowsSilentArgs": "/sAll /rs"
+  },
+  {
+   "key": "foxit-pdf-reader",
+   "name": "Foxit PDF Reader",
+   "publisher": "Foxit Software Inc.",
+   "category": "PDF",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Foxit PDF Reader*",
+    "Foxit Reader*"
+   ],
+   "publisherPatterns": [
+    "Foxit Software*"
+   ],
+   "website": "https://www.foxit.com/pdf-reader/",
+   "windowsSilentArgs": "/VERYSILENT /NORESTART"
+  },
+  {
+   "key": "foxit-pdf-editor",
+   "name": "Foxit PDF Editor",
+   "publisher": "Foxit Software Inc.",
+   "category": "PDF",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Foxit PDF Editor*",
+    "Foxit PhantomPDF*"
+   ],
+   "publisherPatterns": [
+    "Foxit Software*"
+   ],
+   "website": "https://www.foxit.com/pdf-editor/",
+   "windowsSilentArgs": "/VERYSILENT /NORESTART"
+  },
+  {
+   "key": "pdf24-creator",
+   "name": "PDF24 Creator",
+   "publisher": "Geek Software GmbH",
+   "category": "PDF",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "PDF24*"
+   ],
+   "publisherPatterns": [
+    "Geek Software GmbH"
+   ],
+   "website": "https://www.pdf24.org/",
+   "windowsSilentArgs": "/VERYSILENT /NORESTART"
+  },
+  {
+   "key": "sumatra-pdf",
+   "name": "Sumatra PDF",
+   "publisher": "Krzysztof Kowalczyk",
+   "category": "PDF",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "SumatraPDF*",
+    "Sumatra PDF*"
+   ],
+   "publisherPatterns": [
+    "Krzysztof Kowalczyk"
+   ],
+   "website": "https://www.sumatrapdfreader.org/",
+   "windowsSilentArgs": "-install -s -all-users"
+  },
+  {
+   "key": "evince",
+   "name": "Evince",
+   "publisher": "The GNOME Project",
+   "category": "PDF",
+   "platforms": [
+    "linux"
+   ],
+   "namePatterns": [
+    "evince"
+   ],
+   "publisherPatterns": [],
+   "website": "https://wiki.gnome.org/Apps/Evince",
+   "debPackage": "evince",
+   "rpmPackage": "evince"
+  },
+  {
+   "key": "okular",
+   "name": "Okular",
+   "publisher": "KDE",
+   "category": "PDF",
+   "platforms": [
+    "linux"
+   ],
+   "namePatterns": [
+    "okular"
+   ],
+   "publisherPatterns": [],
+   "website": "https://okular.kde.org/",
+   "debPackage": "okular",
+   "rpmPackage": "okular"
+  },
+  {
+   "key": "7-zip",
+   "name": "7-Zip",
+   "publisher": "Igor Pavlov",
+   "category": "Utilities",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "7-Zip*",
+    "p7zip*",
+    "7zip"
+   ],
+   "publisherPatterns": [
+    "Igor Pavlov"
+   ],
+   "website": "https://www.7-zip.org/",
+   "windowsSilentArgs": "/S",
+   "debPackage": "7zip",
+   "rpmPackage": "p7zip"
+  },
+  {
+   "key": "winrar",
+   "name": "WinRAR",
+   "publisher": "win.rar GmbH",
+   "category": "Utilities",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "WinRAR*"
+   ],
+   "publisherPatterns": [
+    "win.rar GmbH",
+    "Alexander Roshal"
+   ],
+   "website": "https://www.win-rar.com/",
+   "windowsSilentArgs": "/S"
+  },
+  {
+   "key": "winzip",
+   "name": "WinZip",
+   "publisher": "Corel Corporation",
+   "category": "Utilities",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "WinZip*"
+   ],
+   "publisherPatterns": [
+    "Corel*",
+    "WinZip Computing*"
+   ],
+   "website": "https://www.winzip.com/",
+   "windowsSilentArgs": "/qn"
+  },
+  {
+   "key": "peazip",
+   "name": "PeaZip",
+   "publisher": "Giorgio Tani",
+   "category": "Utilities",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "PeaZip*"
+   ],
+   "publisherPatterns": [
+    "Giorgio Tani"
+   ],
+   "website": "https://peazip.github.io/",
+   "windowsSilentArgs": "/VERYSILENT"
+  },
+  {
+   "key": "notepad",
+   "name": "Notepad++",
+   "publisher": "Notepad++ Team",
+   "category": "Developer tools",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Notepad++*"
+   ],
+   "publisherPatterns": [
+    "Notepad++*",
+    "Don HO*"
+   ],
+   "website": "https://notepad-plus-plus.org/",
+   "windowsSilentArgs": "/S"
+  },
+  {
+   "key": "visual-studio-code",
+   "name": "Visual Studio Code",
+   "publisher": "Microsoft Corporation",
+   "category": "Developer tools",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Microsoft Visual Studio Code*",
+    "code"
+   ],
+   "publisherPatterns": [
+    "Microsoft Corporation"
+   ],
+   "website": "https://code.visualstudio.com/",
+   "windowsSilentArgs": "/VERYSILENT /MERGETASKS=!runcode",
+   "debPackage": "code",
+   "rpmPackage": "code"
+  },
+  {
+   "key": "visual-studio",
+   "name": "Visual Studio",
+   "publisher": "Microsoft Corporation",
+   "category": "Developer tools",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Visual Studio Community*",
+    "Visual Studio Professional*",
+    "Visual Studio Enterprise*",
+    "Visual Studio Build Tools*"
+   ],
+   "publisherPatterns": [
+    "Microsoft Corporation"
+   ],
+   "website": "https://visualstudio.microsoft.com/",
+   "windowsSilentArgs": "--quiet --norestart"
+  },
+  {
+   "key": "jetbrains-intellij-idea",
+   "name": "JetBrains IntelliJ IDEA",
+   "publisher": "JetBrains s.r.o.",
+   "category": "Developer tools",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "IntelliJ IDEA*"
+   ],
+   "publisherPatterns": [
+    "JetBrains*"
+   ],
+   "website": "https://www.jetbrains.com/idea/",
+   "windowsSilentArgs": "/S"
+  },
+  {
+   "key": "jetbrains-pycharm",
+   "name": "JetBrains PyCharm",
+   "publisher": "JetBrains s.r.o.",
+   "category": "Developer tools",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "PyCharm*"
+   ],
+   "publisherPatterns": [
+    "JetBrains*"
+   ],
+   "website": "https://www.jetbrains.com/pycharm/",
+   "windowsSilentArgs": "/S"
+  },
+  {
+   "key": "jetbrains-rider",
+   "name": "JetBrains Rider",
+   "publisher": "JetBrains s.r.o.",
+   "category": "Developer tools",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "JetBrains Rider*"
+   ],
+   "publisherPatterns": [
+    "JetBrains*"
+   ],
+   "website": "https://www.jetbrains.com/rider/",
+   "windowsSilentArgs": "/S"
+  },
+  {
+   "key": "jetbrains-toolbox",
+   "name": "JetBrains Toolbox",
+   "publisher": "JetBrains s.r.o.",
+   "category": "Developer tools",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "JetBrains Toolbox*"
+   ],
+   "publisherPatterns": [
+    "JetBrains*"
+   ],
+   "website": "https://www.jetbrains.com/toolbox-app/",
+   "windowsSilentArgs": "/S"
+  },
+  {
+   "key": "android-studio",
+   "name": "Android Studio",
+   "publisher": "Google LLC",
+   "category": "Developer tools",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Android Studio*"
+   ],
+   "publisherPatterns": [
+    "Google LLC"
+   ],
+   "website": "https://developer.android.com/studio",
+   "windowsSilentArgs": "/S"
+  },
+  {
+   "key": "eclipse-ide",
+   "name": "Eclipse IDE",
+   "publisher": "Eclipse Foundation",
+   "category": "Developer tools",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Eclipse*"
+   ],
+   "publisherPatterns": [
+    "Eclipse*"
+   ],
+   "website": "https://www.eclipse.org/",
+   "debPackage": "eclipse",
+   "rpmPackage": "eclipse"
+  },
+  {
+   "key": "sublime-text",
+   "name": "Sublime Text",
+   "publisher": "Sublime HQ Pty Ltd",
+   "category": "Developer tools",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Sublime Text*",
+    "sublime-text"
+   ],
+   "publisherPatterns": [
+    "Sublime HQ*"
+   ],
+   "website": "https://www.sublimetext.com/",
+   "windowsSilentArgs": "/VERYSILENT /NORESTART",
+   "debPackage": "sublime-text",
+   "rpmPackage": "sublime-text"
+  },
+  {
+   "key": "git",
+   "name": "Git",
+   "publisher": "The Git Development Community",
+   "category": "Developer tools",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Git",
+    "Git version *",
+    "git"
+   ],
+   "publisherPatterns": [
+    "The Git Development Community",
+    "Johannes Schindelin"
+   ],
+   "website": "https://git-scm.com/",
+   "windowsSilentArgs": "/VERYSILENT /NORESTART",
+   "debPackage": "git",
+   "rpmPackage": "git"
+  },
+  {
+   "key": "github-desktop",
+   "name": "GitHub Desktop",
+   "publisher": "GitHub, Inc.",
+   "category": "Developer tools",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "GitHub Desktop*"
+   ],
+   "publisherPatterns": [
+    "GitHub*"
+   ],
+   "website": "https://desktop.github.com/",
+   "windowsSilentArgs": "-s"
+  },
+  {
+   "key": "tortoisegit",
+   "name": "TortoiseGit",
+   "publisher": "TortoiseGit",
+   "category": "Developer tools",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "TortoiseGit*"
+   ],
+   "publisherPatterns": [
+    "TortoiseGit"
+   ],
+   "website": "https://tortoisegit.org/",
+   "windowsSilentArgs": "/qn /norestart"
+  },
+  {
+   "key": "tortoisesvn",
+   "name": "TortoiseSVN",
+   "publisher": "TortoiseSVN",
+   "category": "Developer tools",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "TortoiseSVN*"
+   ],
+   "publisherPatterns": [
+    "TortoiseSVN"
+   ],
+   "website": "https://tortoisesvn.net/",
+   "windowsSilentArgs": "/qn /norestart"
+  },
+  {
+   "key": "python",
+   "name": "Python",
+   "publisher": "Python Software Foundation",
+   "category": "Developer tools",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Python 3*",
+    "python3"
+   ],
+   "publisherPatterns": [
+    "Python Software Foundation"
+   ],
+   "website": "https://www.python.org/",
+   "windowsSilentArgs": "/quiet InstallAllUsers=1 PrependPath=1",
+   "debPackage": "python3",
+   "rpmPackage": "python3"
+  },
+  {
+   "key": "node-js",
+   "name": "Node.js",
+   "publisher": "OpenJS Foundation",
+   "category": "Developer tools",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Node.js*",
+    "nodejs"
+   ],
+   "publisherPatterns": [
+    "Node.js Foundation",
+    "OpenJS Foundation"
+   ],
+   "website": "https://nodejs.org/",
+   "windowsSilentArgs": "/qn /norestart",
+   "debPackage": "nodejs",
+   "rpmPackage": "nodejs"
+  },
+  {
+   "key": "java-oracle-jdk",
+   "name": "Java (Oracle JDK)",
+   "publisher": "Oracle Corporation",
+   "category": "Runtimes",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Java*",
+    "Java(TM)*",
+    "jdk-*"
+   ],
+   "publisherPatterns": [
+    "Oracle*"
+   ],
+   "website": "https://www.oracle.com/java/",
+   "windowsSilentArgs": "/s"
+  },
+  {
+   "key": "eclipse-temurin-openjdk",
+   "name": "Eclipse Temurin (OpenJDK)",
+   "publisher": "Eclipse Adoptium",
+   "category": "Runtimes",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Eclipse Temurin*",
+    "temurin-*",
+    "Adoptium*"
+   ],
+   "publisherPatterns": [
+    "Eclipse Adoptium*",
+    "Eclipse Foundation"
+   ],
+   "website": "https://adoptium.net/",
+   "windowsSilentArgs": "/qn /norestart",
+   "debPackage": "temurin-21-jdk",
+   "rpmPackage": "temurin-21-jdk"
+  },
+  {
+   "key": "microsoft-openjdk",
+   "name": "Microsoft OpenJDK",
+   "publisher": "Microsoft Corporation",
+   "category": "Runtimes",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Microsoft Build of OpenJDK*",
+    "msopenjdk-*"
+   ],
+   "publisherPatterns": [
+    "Microsoft Corporation"
+   ],
+   "website": "https://www.microsoft.com/openjdk",
+   "windowsSilentArgs": "/qn /norestart",
+   "debPackage": "msopenjdk-21",
+   "rpmPackage": "msopenjdk-21"
+  },
+  {
+   "key": "amazon-corretto",
+   "name": "Amazon Corretto",
+   "publisher": "Amazon.com Inc.",
+   "category": "Runtimes",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Amazon Corretto*",
+    "java-*-amazon-corretto*"
+   ],
+   "publisherPatterns": [
+    "Amazon*"
+   ],
+   "website": "https://aws.amazon.com/corretto/",
+   "windowsSilentArgs": "/qn /norestart",
+   "debPackage": "java-21-amazon-corretto-jdk",
+   "rpmPackage": "java-21-amazon-corretto-devel"
+  },
+  {
+   "key": "openjdk",
+   "name": "OpenJDK",
+   "publisher": "Linux distribution",
+   "category": "Runtimes",
+   "platforms": [
+    "linux"
+   ],
+   "namePatterns": [
+    "openjdk-*",
+    "java-*-openjdk*"
+   ],
+   "publisherPatterns": [],
+   "website": "https://openjdk.org/",
+   "debPackage": "openjdk-21-jre",
+   "rpmPackage": "java-21-openjdk"
+  },
+  {
+   "key": "net-sdk",
+   "name": ".NET SDK",
+   "publisher": "Microsoft Corporation",
+   "category": "Runtimes",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Microsoft .NET SDK*",
+    "dotnet-sdk-*"
+   ],
+   "publisherPatterns": [
+    "Microsoft Corporation"
+   ],
+   "website": "https://dotnet.microsoft.com/",
+   "windowsSilentArgs": "/quiet /norestart",
+   "debPackage": "dotnet-sdk-8.0",
+   "rpmPackage": "dotnet-sdk-8.0"
+  },
+  {
+   "key": "powershell-7",
+   "name": "PowerShell 7",
+   "publisher": "Microsoft Corporation",
+   "category": "Developer tools",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "PowerShell 7*",
+    "powershell"
+   ],
+   "publisherPatterns": [
+    "Microsoft Corporation"
+   ],
+   "website": "https://github.com/PowerShell/PowerShell",
+   "windowsSilentArgs": "/qn /norestart",
+   "debPackage": "powershell",
+   "rpmPackage": "powershell"
+  },
+  {
+   "key": "windows-terminal",
+   "name": "Windows Terminal",
+   "publisher": "Microsoft Corporation",
+   "category": "Developer tools",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Windows Terminal*"
+   ],
+   "publisherPatterns": [
+    "Microsoft Corporation"
+   ],
+   "website": "https://aka.ms/terminal"
+  },
+  {
+   "key": "docker-desktop",
+   "name": "Docker Desktop",
+   "publisher": "Docker Inc.",
+   "category": "Developer tools",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Docker Desktop*"
+   ],
+   "publisherPatterns": [
+    "Docker Inc*"
+   ],
+   "website": "https://www.docker.com/products/docker-desktop/",
+   "windowsSilentArgs": "install --quiet --accept-license"
+  },
+  {
+   "key": "docker-engine",
+   "name": "Docker Engine",
+   "publisher": "Docker Inc.",
+   "category": "Developer tools",
+   "platforms": [
+    "linux"
+   ],
+   "namePatterns": [
+    "docker-ce",
+    "docker-ce-cli",
+    "containerd.io",
+    "docker.io",
+    "moby-engine"
+   ],
+   "publisherPatterns": [],
+   "website": "https://docs.docker.com/engine/",
+   "debPackage": "docker-ce",
+   "rpmPackage": "docker-ce"
+  },
+  {
+   "key": "podman",
+   "name": "Podman",
+   "publisher": "Red Hat",
+   "category": "Developer tools",
+   "platforms": [
+    "linux"
+   ],
+   "namePatterns": [
+    "podman"
+   ],
+   "publisherPatterns": [],
+   "website": "https://podman.io/",
+   "debPackage": "podman",
+   "rpmPackage": "podman"
+  },
+  {
+   "key": "postman",
+   "name": "Postman",
+   "publisher": "Postman, Inc.",
+   "category": "Developer tools",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Postman*"
+   ],
+   "publisherPatterns": [
+    "Postman*"
+   ],
+   "website": "https://www.postman.com/",
+   "windowsSilentArgs": "-s"
+  },
+  {
+   "key": "insomnia",
+   "name": "Insomnia",
+   "publisher": "Kong Inc.",
+   "category": "Developer tools",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Insomnia*"
+   ],
+   "publisherPatterns": [
+    "Kong*"
+   ],
+   "website": "https://insomnia.rest/",
+   "windowsSilentArgs": "--silent"
+  },
+  {
+   "key": "winscp",
+   "name": "WinSCP",
+   "publisher": "Martin Prikryl",
+   "category": "Network tools",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "WinSCP*"
+   ],
+   "publisherPatterns": [
+    "Martin Prikryl"
+   ],
+   "website": "https://winscp.net/",
+   "windowsSilentArgs": "/VERYSILENT /ALLUSERS /NORESTART"
+  },
+  {
+   "key": "filezilla",
+   "name": "FileZilla",
+   "publisher": "Tim Kosse",
+   "category": "Network tools",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "FileZilla*",
+    "filezilla"
+   ],
+   "publisherPatterns": [
+    "Tim Kosse"
+   ],
+   "website": "https://filezilla-project.org/",
+   "windowsSilentArgs": "/S /user=all",
+   "debPackage": "filezilla",
+   "rpmPackage": "filezilla"
+  },
+  {
+   "key": "putty",
+   "name": "PuTTY",
+   "publisher": "Simon Tatham",
+   "category": "Network tools",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "PuTTY*",
+    "putty"
+   ],
+   "publisherPatterns": [
+    "Simon Tatham"
+   ],
+   "website": "https://www.putty.org/",
+   "windowsSilentArgs": "/qn /norestart",
+   "debPackage": "putty",
+   "rpmPackage": "putty"
+  },
+  {
+   "key": "mobaxterm",
+   "name": "MobaXterm",
+   "publisher": "Mobatek",
+   "category": "Network tools",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "MobaXterm*"
+   ],
+   "publisherPatterns": [
+    "Mobatek"
+   ],
+   "website": "https://mobaxterm.mobatek.net/",
+   "windowsSilentArgs": "/qn /norestart"
+  },
+  {
+   "key": "wireshark",
+   "name": "Wireshark",
+   "publisher": "The Wireshark developer community",
+   "category": "Network tools",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Wireshark*",
+    "wireshark*"
+   ],
+   "publisherPatterns": [
+    "The Wireshark developer community",
+    "Wireshark Foundation*"
+   ],
+   "website": "https://www.wireshark.org/",
+   "windowsSilentArgs": "/S",
+   "debPackage": "wireshark",
+   "rpmPackage": "wireshark"
+  },
+  {
+   "key": "nmap",
+   "name": "Nmap",
+   "publisher": "Insecure.Com LLC",
+   "category": "Network tools",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Nmap*",
+    "nmap"
+   ],
+   "publisherPatterns": [
+    "Insecure.Com*"
+   ],
+   "website": "https://nmap.org/",
+   "windowsSilentArgs": "/S",
+   "debPackage": "nmap",
+   "rpmPackage": "nmap"
+  },
+  {
+   "key": "advanced-ip-scanner",
+   "name": "Advanced IP Scanner",
+   "publisher": "Famatech Corp.",
+   "category": "Network tools",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Advanced IP Scanner*"
+   ],
+   "publisherPatterns": [
+    "Famatech*"
+   ],
+   "website": "https://www.advanced-ip-scanner.com/",
+   "windowsSilentArgs": "/VERYSILENT /NORESTART"
+  },
+  {
+   "key": "openvpn-connect",
+   "name": "OpenVPN Connect",
+   "publisher": "OpenVPN Inc.",
+   "category": "Network tools",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "OpenVPN*",
+    "openvpn*"
+   ],
+   "publisherPatterns": [
+    "OpenVPN*"
+   ],
+   "website": "https://openvpn.net/",
+   "windowsSilentArgs": "/qn /norestart",
+   "debPackage": "openvpn",
+   "rpmPackage": "openvpn"
+  },
+  {
+   "key": "wireguard",
+   "name": "WireGuard",
+   "publisher": "WireGuard LLC",
+   "category": "Network tools",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "WireGuard*",
+    "wireguard*"
+   ],
+   "publisherPatterns": [
+    "WireGuard LLC"
+   ],
+   "website": "https://www.wireguard.com/",
+   "windowsSilentArgs": "/qn /norestart",
+   "debPackage": "wireguard-tools",
+   "rpmPackage": "wireguard-tools"
+  },
+  {
+   "key": "cisco-secure-client-anyconnect",
+   "name": "Cisco Secure Client (AnyConnect)",
+   "publisher": "Cisco Systems, Inc.",
+   "category": "Network tools",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Cisco Secure Client*",
+    "Cisco AnyConnect*"
+   ],
+   "publisherPatterns": [
+    "Cisco Systems*"
+   ],
+   "website": "https://www.cisco.com/",
+   "windowsSilentArgs": "/qn /norestart"
+  },
+  {
+   "key": "forticlient",
+   "name": "FortiClient",
+   "publisher": "Fortinet Inc",
+   "category": "Security",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "FortiClient*",
+    "forticlient"
+   ],
+   "publisherPatterns": [
+    "Fortinet*"
+   ],
+   "website": "https://www.fortinet.com/support/product-downloads",
+   "windowsSilentArgs": "/qn /norestart",
+   "debPackage": "forticlient",
+   "rpmPackage": "forticlient"
+  },
+  {
+   "key": "globalprotect",
+   "name": "GlobalProtect",
+   "publisher": "Palo Alto Networks",
+   "category": "Network tools",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "GlobalProtect*",
+    "globalprotect"
+   ],
+   "publisherPatterns": [
+    "Palo Alto Networks"
+   ],
+   "website": "https://www.paloaltonetworks.com/",
+   "windowsSilentArgs": "/qn /norestart",
+   "debPackage": "globalprotect",
+   "rpmPackage": "globalprotect"
+  },
+  {
+   "key": "zoom-workplace",
+   "name": "Zoom Workplace",
+   "publisher": "Zoom Video Communications, Inc.",
+   "category": "Communication",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Zoom*",
+    "zoom"
+   ],
+   "publisherPatterns": [
+    "Zoom Video Communications*"
+   ],
+   "website": "https://zoom.us/download",
+   "windowsSilentArgs": "/qn /norestart ZoomAutoUpdate=1",
+   "debPackage": "zoom",
+   "rpmPackage": "zoom"
+  },
+  {
+   "key": "slack",
+   "name": "Slack",
+   "publisher": "Slack Technologies",
+   "category": "Communication",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Slack*",
+    "slack-desktop"
+   ],
+   "publisherPatterns": [
+    "Slack Technologies*",
+    "Salesforce*"
+   ],
+   "website": "https://slack.com/downloads",
+   "windowsSilentArgs": "/qn /norestart",
+   "debPackage": "slack-desktop",
+   "rpmPackage": "slack"
+  },
+  {
+   "key": "webex",
+   "name": "Webex",
+   "publisher": "Cisco Webex LLC",
+   "category": "Communication",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Webex*",
+    "Cisco Webex*"
+   ],
+   "publisherPatterns": [
+    "Cisco*"
+   ],
+   "website": "https://www.webex.com/downloads.html",
+   "windowsSilentArgs": "/qn /norestart"
+  },
+  {
+   "key": "skype",
+   "name": "Skype",
+   "publisher": "Skype Technologies S.A.",
+   "category": "Communication",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Skype*"
+   ],
+   "publisherPatterns": [
+    "Skype Technologies*",
+    "Microsoft Corporation"
+   ],
+   "website": "https://www.skype.com/",
+   "windowsSilentArgs": "/VERYSILENT /NORESTART"
+  },
+  {
+   "key": "discord",
+   "name": "Discord",
+   "publisher": "Discord Inc.",
+   "category": "Communication",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Discord*",
+    "discord"
+   ],
+   "publisherPatterns": [
+    "Discord Inc*"
+   ],
+   "website": "https://discord.com/",
+   "windowsSilentArgs": "-s",
+   "debPackage": "discord",
+   "rpmPackage": "discord"
+  },
+  {
+   "key": "telegram-desktop",
+   "name": "Telegram Desktop",
+   "publisher": "Telegram FZ-LLC",
+   "category": "Communication",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Telegram Desktop*",
+    "telegram-desktop"
+   ],
+   "publisherPatterns": [
+    "Telegram*"
+   ],
+   "website": "https://desktop.telegram.org/",
+   "windowsSilentArgs": "/VERYSILENT /NORESTART",
+   "debPackage": "telegram-desktop",
+   "rpmPackage": "telegram-desktop"
+  },
+  {
+   "key": "whatsapp",
+   "name": "WhatsApp",
+   "publisher": "WhatsApp LLC",
+   "category": "Communication",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "WhatsApp*"
+   ],
+   "publisherPatterns": [
+    "WhatsApp*",
+    "Meta*"
+   ],
+   "website": "https://www.whatsapp.com/download"
+  },
+  {
+   "key": "signal",
+   "name": "Signal",
+   "publisher": "Signal Messenger, LLC",
+   "category": "Communication",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Signal*",
+    "signal-desktop"
+   ],
+   "publisherPatterns": [
+    "Signal Messenger*"
+   ],
+   "website": "https://signal.org/download/",
+   "windowsSilentArgs": "/S",
+   "debPackage": "signal-desktop",
+   "rpmPackage": "signal-desktop"
+  },
+  {
+   "key": "mozilla-thunderbird",
+   "name": "Mozilla Thunderbird",
+   "publisher": "Mozilla",
+   "category": "Communication",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Mozilla Thunderbird*",
+    "thunderbird"
+   ],
+   "publisherPatterns": [
+    "Mozilla*"
+   ],
+   "website": "https://www.thunderbird.net/",
+   "windowsSilentArgs": "/S",
+   "debPackage": "thunderbird",
+   "rpmPackage": "thunderbird"
+  },
+  {
+   "key": "ringcentral",
+   "name": "RingCentral",
+   "publisher": "RingCentral, Inc.",
+   "category": "Communication",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "RingCentral*"
+   ],
+   "publisherPatterns": [
+    "RingCentral*"
+   ],
+   "website": "https://www.ringcentral.com/download.html",
+   "windowsSilentArgs": "/qn /norestart"
+  },
+  {
+   "key": "goto-meeting",
+   "name": "GoTo Meeting",
+   "publisher": "GoTo Technologies",
+   "category": "Communication",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "GoTo*"
+   ],
+   "publisherPatterns": [
+    "GoTo*",
+    "LogMeIn*"
+   ],
+   "website": "https://www.goto.com/meeting",
+   "windowsSilentArgs": "/qn /norestart"
+  },
+  {
+   "key": "google-drive",
+   "name": "Google Drive",
+   "publisher": "Google LLC",
+   "category": "Cloud storage",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Google Drive*"
+   ],
+   "publisherPatterns": [
+    "Google LLC"
+   ],
+   "website": "https://www.google.com/drive/download/",
+   "windowsSilentArgs": "--silent --desktop_shortcut"
+  },
+  {
+   "key": "dropbox",
+   "name": "Dropbox",
+   "publisher": "Dropbox, Inc.",
+   "category": "Cloud storage",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Dropbox*",
+    "nautilus-dropbox"
+   ],
+   "publisherPatterns": [
+    "Dropbox*"
+   ],
+   "website": "https://www.dropbox.com/install",
+   "windowsSilentArgs": "/s",
+   "debPackage": "nautilus-dropbox",
+   "rpmPackage": "nautilus-dropbox"
+  },
+  {
+   "key": "box-drive",
+   "name": "Box Drive",
+   "publisher": "Box, Inc.",
+   "category": "Cloud storage",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Box*"
+   ],
+   "publisherPatterns": [
+    "Box, Inc*"
+   ],
+   "website": "https://www.box.com/resources/downloads",
+   "windowsSilentArgs": "/qn /norestart"
+  },
+  {
+   "key": "nextcloud-desktop",
+   "name": "Nextcloud Desktop",
+   "publisher": "Nextcloud GmbH",
+   "category": "Cloud storage",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Nextcloud*",
+    "nextcloud-desktop"
+   ],
+   "publisherPatterns": [
+    "Nextcloud*"
+   ],
+   "website": "https://nextcloud.com/install/",
+   "windowsSilentArgs": "/qn /norestart",
+   "debPackage": "nextcloud-desktop",
+   "rpmPackage": "nextcloud-client"
+  },
+  {
+   "key": "vlc-media-player",
+   "name": "VLC media player",
+   "publisher": "VideoLAN",
+   "category": "Media",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "VLC media player*",
+    "vlc"
+   ],
+   "publisherPatterns": [
+    "VideoLAN"
+   ],
+   "website": "https://www.videolan.org/vlc/",
+   "windowsSilentArgs": "/S /L=1033",
+   "debPackage": "vlc",
+   "rpmPackage": "vlc"
+  },
+  {
+   "key": "spotify",
+   "name": "Spotify",
+   "publisher": "Spotify AB",
+   "category": "Media",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Spotify*",
+    "spotify-client"
+   ],
+   "publisherPatterns": [
+    "Spotify*"
+   ],
+   "website": "https://www.spotify.com/download/",
+   "windowsSilentArgs": "/silent",
+   "debPackage": "spotify-client",
+   "rpmPackage": "spotify-client"
+  },
+  {
+   "key": "audacity",
+   "name": "Audacity",
+   "publisher": "Audacity Team",
+   "category": "Media",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Audacity*",
+    "audacity"
+   ],
+   "publisherPatterns": [
+    "Audacity Team",
+    "Muse Group*"
+   ],
+   "website": "https://www.audacityteam.org/",
+   "windowsSilentArgs": "/VERYSILENT /NORESTART",
+   "debPackage": "audacity",
+   "rpmPackage": "audacity"
+  },
+  {
+   "key": "obs-studio",
+   "name": "OBS Studio",
+   "publisher": "OBS Project",
+   "category": "Media",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "OBS Studio*",
+    "obs-studio"
+   ],
+   "publisherPatterns": [
+    "OBS Project"
+   ],
+   "website": "https://obsproject.com/",
+   "windowsSilentArgs": "/S",
+   "debPackage": "obs-studio",
+   "rpmPackage": "obs-studio"
+  },
+  {
+   "key": "handbrake",
+   "name": "HandBrake",
+   "publisher": "The HandBrake Team",
+   "category": "Media",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "HandBrake*",
+    "handbrake*"
+   ],
+   "publisherPatterns": [
+    "The HandBrake Team"
+   ],
+   "website": "https://handbrake.fr/",
+   "windowsSilentArgs": "/S",
+   "debPackage": "handbrake",
+   "rpmPackage": "HandBrake-gui"
+  },
+  {
+   "key": "k-lite-codec-pack",
+   "name": "K-Lite Codec Pack",
+   "publisher": "KLCP",
+   "category": "Media",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "K-Lite Codec Pack*"
+   ],
+   "publisherPatterns": [
+    "KLCP"
+   ],
+   "website": "https://codecguide.com/",
+   "windowsSilentArgs": "/VERYSILENT /NORESTART"
+  },
+  {
+   "key": "itunes",
+   "name": "iTunes",
+   "publisher": "Apple Inc.",
+   "category": "Media",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "iTunes*"
+   ],
+   "publisherPatterns": [
+    "Apple Inc*"
+   ],
+   "website": "https://www.apple.com/itunes/",
+   "windowsSilentArgs": "/qn /norestart"
+  },
+  {
+   "key": "gimp",
+   "name": "GIMP",
+   "publisher": "The GIMP Team",
+   "category": "Graphics & design",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "GIMP*",
+    "gimp"
+   ],
+   "publisherPatterns": [
+    "The GIMP Team"
+   ],
+   "website": "https://www.gimp.org/",
+   "windowsSilentArgs": "/VERYSILENT /NORESTART /ALLUSERS",
+   "debPackage": "gimp",
+   "rpmPackage": "gimp"
+  },
+  {
+   "key": "inkscape",
+   "name": "Inkscape",
+   "publisher": "Inkscape Project",
+   "category": "Graphics & design",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Inkscape*",
+    "inkscape"
+   ],
+   "publisherPatterns": [
+    "Inkscape*"
+   ],
+   "website": "https://inkscape.org/",
+   "windowsSilentArgs": "/qn /norestart",
+   "debPackage": "inkscape",
+   "rpmPackage": "inkscape"
+  },
+  {
+   "key": "paint-net",
+   "name": "Paint.NET",
+   "publisher": "dotPDN LLC",
+   "category": "Graphics & design",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "paint.net*"
+   ],
+   "publisherPatterns": [
+    "dotPDN LLC"
+   ],
+   "website": "https://www.getpaint.net/",
+   "windowsSilentArgs": "/auto"
+  },
+  {
+   "key": "krita",
+   "name": "Krita",
+   "publisher": "Krita Foundation",
+   "category": "Graphics & design",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Krita*",
+    "krita"
+   ],
+   "publisherPatterns": [
+    "Krita Foundation",
+    "Stichting Krita*"
+   ],
+   "website": "https://krita.org/",
+   "windowsSilentArgs": "/S",
+   "debPackage": "krita",
+   "rpmPackage": "krita"
+  },
+  {
+   "key": "blender",
+   "name": "Blender",
+   "publisher": "Blender Foundation",
+   "category": "Graphics & design",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Blender*",
+    "blender"
+   ],
+   "publisherPatterns": [
+    "Blender Foundation"
+   ],
+   "website": "https://www.blender.org/",
+   "windowsSilentArgs": "/qn /norestart",
+   "debPackage": "blender",
+   "rpmPackage": "blender"
+  },
+  {
+   "key": "adobe-creative-cloud",
+   "name": "Adobe Creative Cloud",
+   "publisher": "Adobe Inc.",
+   "category": "Graphics & design",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Adobe Creative Cloud*",
+    "Adobe Photoshop*",
+    "Adobe Illustrator*",
+    "Adobe Premiere*",
+    "Adobe InDesign*",
+    "Adobe After Effects*",
+    "Adobe Lightroom*"
+   ],
+   "publisherPatterns": [
+    "Adobe*"
+   ],
+   "website": "https://www.adobe.com/creativecloud.html",
+   "windowsSilentArgs": "--silent"
+  },
+  {
+   "key": "figma",
+   "name": "Figma",
+   "publisher": "Figma, Inc.",
+   "category": "Graphics & design",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Figma*"
+   ],
+   "publisherPatterns": [
+    "Figma*"
+   ],
+   "website": "https://www.figma.com/downloads/",
+   "windowsSilentArgs": "-s"
+  },
+  {
+   "key": "canva",
+   "name": "Canva",
+   "publisher": "Canva Pty Ltd",
+   "category": "Graphics & design",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Canva*"
+   ],
+   "publisherPatterns": [
+    "Canva*"
+   ],
+   "website": "https://www.canva.com/download/"
+  },
+  {
+   "key": "irfanview",
+   "name": "IrfanView",
+   "publisher": "Irfan Skiljan",
+   "category": "Graphics & design",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "IrfanView*"
+   ],
+   "publisherPatterns": [
+    "Irfan Skiljan"
+   ],
+   "website": "https://www.irfanview.com/",
+   "windowsSilentArgs": "/silent /allusers=1"
+  },
+  {
+   "key": "sharex",
+   "name": "ShareX",
+   "publisher": "ShareX Team",
+   "category": "Utilities",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "ShareX*"
+   ],
+   "publisherPatterns": [
+    "ShareX Team"
+   ],
+   "website": "https://getsharex.com/",
+   "windowsSilentArgs": "/VERYSILENT /NORESTART"
+  },
+  {
+   "key": "greenshot",
+   "name": "Greenshot",
+   "publisher": "Greenshot",
+   "category": "Utilities",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Greenshot*"
+   ],
+   "publisherPatterns": [
+    "Greenshot"
+   ],
+   "website": "https://getgreenshot.org/",
+   "windowsSilentArgs": "/VERYSILENT /NORESTART"
+  },
+  {
+   "key": "microsoft-powertoys",
+   "name": "Microsoft PowerToys",
+   "publisher": "Microsoft Corporation",
+   "category": "Utilities",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "PowerToys*"
+   ],
+   "publisherPatterns": [
+    "Microsoft Corporation"
+   ],
+   "website": "https://aka.ms/powertoys",
+   "windowsSilentArgs": "/quiet /norestart"
+  },
+  {
+   "key": "everything",
+   "name": "Everything",
+   "publisher": "voidtools",
+   "category": "Utilities",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Everything*"
+   ],
+   "publisherPatterns": [
+    "voidtools"
+   ],
+   "website": "https://www.voidtools.com/",
+   "windowsSilentArgs": "/S"
+  },
+  {
+   "key": "treesize",
+   "name": "TreeSize",
+   "publisher": "JAM Software GmbH",
+   "category": "Utilities",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "TreeSize*"
+   ],
+   "publisherPatterns": [
+    "JAM Software*"
+   ],
+   "website": "https://www.jam-software.com/treesize",
+   "windowsSilentArgs": "/VERYSILENT /NORESTART"
+  },
+  {
+   "key": "windirstat",
+   "name": "WinDirStat",
+   "publisher": "WinDirStat Team",
+   "category": "Utilities",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "WinDirStat*"
+   ],
+   "publisherPatterns": [
+    "WinDirStat*"
+   ],
+   "website": "https://windirstat.net/",
+   "windowsSilentArgs": "/S"
+  },
+  {
+   "key": "ccleaner",
+   "name": "CCleaner",
+   "publisher": "Piriform Software Ltd",
+   "category": "Utilities",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "CCleaner*"
+   ],
+   "publisherPatterns": [
+    "Piriform*",
+    "Gen Digital*"
+   ],
+   "website": "https://www.ccleaner.com/",
+   "windowsSilentArgs": "/S"
+  },
+  {
+   "key": "sysinternals-suite",
+   "name": "Sysinternals Suite",
+   "publisher": "Microsoft Corporation",
+   "category": "Utilities",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Sysinternals*"
+   ],
+   "publisherPatterns": [
+    "Microsoft Corporation"
+   ],
+   "website": "https://learn.microsoft.com/sysinternals/"
+  },
+  {
+   "key": "keepass-password-safe",
+   "name": "KeePass Password Safe",
+   "publisher": "Dominik Reichl",
+   "category": "Security",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "KeePass*"
+   ],
+   "publisherPatterns": [
+    "Dominik Reichl"
+   ],
+   "website": "https://keepass.info/",
+   "windowsSilentArgs": "/VERYSILENT /NORESTART"
+  },
+  {
+   "key": "keepassxc",
+   "name": "KeePassXC",
+   "publisher": "KeePassXC Team",
+   "category": "Security",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "KeePassXC*",
+    "keepassxc"
+   ],
+   "publisherPatterns": [
+    "KeePassXC Team",
+    "DroidMonkey*"
+   ],
+   "website": "https://keepassxc.org/",
+   "windowsSilentArgs": "/qn /norestart",
+   "debPackage": "keepassxc",
+   "rpmPackage": "keepassxc"
+  },
+  {
+   "key": "bitwarden",
+   "name": "Bitwarden",
+   "publisher": "Bitwarden Inc.",
+   "category": "Security",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Bitwarden*",
+    "bitwarden"
+   ],
+   "publisherPatterns": [
+    "Bitwarden*",
+    "8bit Solutions*"
+   ],
+   "website": "https://bitwarden.com/download/",
+   "windowsSilentArgs": "/allusers /S",
+   "debPackage": "bitwarden",
+   "rpmPackage": "bitwarden"
+  },
+  {
+   "key": "1password",
+   "name": "1Password",
+   "publisher": "AgileBits Inc.",
+   "category": "Security",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "1Password*",
+    "1password"
+   ],
+   "publisherPatterns": [
+    "AgileBits*"
+   ],
+   "website": "https://1password.com/downloads/",
+   "windowsSilentArgs": "--silent",
+   "debPackage": "1password",
+   "rpmPackage": "1password"
+  },
+  {
+   "key": "lastpass",
+   "name": "LastPass",
+   "publisher": "LastPass US LP",
+   "category": "Security",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "LastPass*"
+   ],
+   "publisherPatterns": [
+    "LastPass*"
+   ],
+   "website": "https://www.lastpass.com/",
+   "windowsSilentArgs": "/qn /norestart"
+  },
+  {
+   "key": "veracrypt",
+   "name": "VeraCrypt",
+   "publisher": "IDRIX",
+   "category": "Security",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "VeraCrypt*",
+    "veracrypt"
+   ],
+   "publisherPatterns": [
+    "IDRIX"
+   ],
+   "website": "https://www.veracrypt.fr/",
+   "windowsSilentArgs": "/qn /norestart ACCEPTLICENSE=YES",
+   "debPackage": "veracrypt",
+   "rpmPackage": "veracrypt"
+  },
+  {
+   "key": "gpg4win",
+   "name": "Gpg4win",
+   "publisher": "g10 Code GmbH",
+   "category": "Security",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Gpg4win*"
+   ],
+   "publisherPatterns": [
+    "g10 Code*"
+   ],
+   "website": "https://www.gpg4win.org/",
+   "windowsSilentArgs": "/S"
+  },
+  {
+   "key": "malwarebytes",
+   "name": "Malwarebytes",
+   "publisher": "Malwarebytes",
+   "category": "Security",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Malwarebytes*"
+   ],
+   "publisherPatterns": [
+    "Malwarebytes*"
+   ],
+   "website": "https://www.malwarebytes.com/",
+   "windowsSilentArgs": "/VERYSILENT /NORESTART"
+  },
+  {
+   "key": "crowdstrike-falcon-sensor",
+   "name": "CrowdStrike Falcon Sensor",
+   "publisher": "CrowdStrike, Inc.",
+   "category": "Security",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "CrowdStrike*",
+    "falcon-sensor"
+   ],
+   "publisherPatterns": [
+    "CrowdStrike*"
+   ],
+   "website": "https://www.crowdstrike.com/",
+   "windowsSilentArgs": "/install /quiet /norestart",
+   "debPackage": "falcon-sensor",
+   "rpmPackage": "falcon-sensor"
+  },
+  {
+   "key": "sentinelone-agent",
+   "name": "SentinelOne Agent",
+   "publisher": "SentinelOne",
+   "category": "Security",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Sentinel Agent*",
+    "SentinelOne*",
+    "sentinelagent"
+   ],
+   "publisherPatterns": [
+    "Sentinel Labs*",
+    "SentinelOne*"
+   ],
+   "website": "https://www.sentinelone.com/",
+   "windowsSilentArgs": "/qn /norestart",
+   "debPackage": "sentinelagent",
+   "rpmPackage": "SentinelAgent"
+  },
+  {
+   "key": "sophos-endpoint",
+   "name": "Sophos Endpoint",
+   "publisher": "Sophos Limited",
+   "category": "Security",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Sophos*"
+   ],
+   "publisherPatterns": [
+    "Sophos*"
+   ],
+   "website": "https://www.sophos.com/",
+   "windowsSilentArgs": "--quiet"
+  },
+  {
+   "key": "eset-endpoint-security",
+   "name": "ESET Endpoint Security",
+   "publisher": "ESET, spol. s r.o.",
+   "category": "Security",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "ESET*",
+    "eea"
+   ],
+   "publisherPatterns": [
+    "ESET*"
+   ],
+   "website": "https://www.eset.com/",
+   "windowsSilentArgs": "/qn /norestart"
+  },
+  {
+   "key": "trend-micro-apex-one",
+   "name": "Trend Micro Apex One",
+   "publisher": "Trend Micro Inc.",
+   "category": "Security",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Trend Micro*"
+   ],
+   "publisherPatterns": [
+    "Trend Micro*"
+   ],
+   "website": "https://www.trendmicro.com/",
+   "windowsSilentArgs": "/qn /norestart"
+  },
+  {
+   "key": "bitdefender-endpoint-security",
+   "name": "Bitdefender Endpoint Security",
+   "publisher": "Bitdefender",
+   "category": "Security",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Bitdefender*"
+   ],
+   "publisherPatterns": [
+    "Bitdefender*"
+   ],
+   "website": "https://www.bitdefender.com/",
+   "windowsSilentArgs": "/bdparams /silent"
+  },
+  {
+   "key": "kaspersky-endpoint-security",
+   "name": "Kaspersky Endpoint Security",
+   "publisher": "AO Kaspersky Lab",
+   "category": "Security",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Kaspersky*"
+   ],
+   "publisherPatterns": [
+    "Kaspersky*"
+   ],
+   "website": "https://www.kaspersky.com/",
+   "windowsSilentArgs": "/s"
+  },
+  {
+   "key": "microsoft-defender-for-endpoint-linux",
+   "name": "Microsoft Defender for Endpoint (Linux)",
+   "publisher": "Microsoft Corporation",
+   "category": "Security",
+   "platforms": [
+    "linux"
+   ],
+   "namePatterns": [
+    "mdatp"
+   ],
+   "publisherPatterns": [],
+   "website": "https://learn.microsoft.com/defender-endpoint/",
+   "debPackage": "mdatp",
+   "rpmPackage": "mdatp"
+  },
+  {
+   "key": "clamav",
+   "name": "ClamAV",
+   "publisher": "Cisco Talos",
+   "category": "Security",
+   "platforms": [
+    "linux"
+   ],
+   "namePatterns": [
+    "clamav*"
+   ],
+   "publisherPatterns": [],
+   "website": "https://www.clamav.net/",
+   "debPackage": "clamav",
+   "rpmPackage": "clamav"
+  },
+  {
+   "key": "teamviewer",
+   "name": "TeamViewer",
+   "publisher": "TeamViewer Germany GmbH",
+   "category": "Remote access",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "TeamViewer*",
+    "teamviewer"
+   ],
+   "publisherPatterns": [
+    "TeamViewer*"
+   ],
+   "website": "https://www.teamviewer.com/",
+   "windowsSilentArgs": "/S",
+   "debPackage": "teamviewer",
+   "rpmPackage": "teamviewer"
+  },
+  {
+   "key": "anydesk",
+   "name": "AnyDesk",
+   "publisher": "AnyDesk Software GmbH",
+   "category": "Remote access",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "AnyDesk*",
+    "anydesk"
+   ],
+   "publisherPatterns": [
+    "AnyDesk Software*",
+    "philandro Software*"
+   ],
+   "website": "https://anydesk.com/",
+   "windowsSilentArgs": "--install \"C:\\Program Files (x86)\\AnyDesk\" --start-with-win --silent",
+   "debPackage": "anydesk",
+   "rpmPackage": "anydesk"
+  },
+  {
+   "key": "chrome-remote-desktop",
+   "name": "Chrome Remote Desktop",
+   "publisher": "Google LLC",
+   "category": "Remote access",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Chrome Remote Desktop*",
+    "chrome-remote-desktop"
+   ],
+   "publisherPatterns": [
+    "Google LLC"
+   ],
+   "website": "https://remotedesktop.google.com/",
+   "windowsSilentArgs": "/qn /norestart",
+   "debPackage": "chrome-remote-desktop",
+   "rpmPackage": "chrome-remote-desktop"
+  },
+  {
+   "key": "realvnc-viewer",
+   "name": "RealVNC Viewer",
+   "publisher": "RealVNC Ltd",
+   "category": "Remote access",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "VNC Viewer*",
+    "realvnc-vnc-viewer"
+   ],
+   "publisherPatterns": [
+    "RealVNC*"
+   ],
+   "website": "https://www.realvnc.com/",
+   "windowsSilentArgs": "/qn /norestart",
+   "debPackage": "realvnc-vnc-viewer",
+   "rpmPackage": "realvnc-vnc-viewer"
+  },
+  {
+   "key": "tightvnc",
+   "name": "TightVNC",
+   "publisher": "GlavSoft LLC",
+   "category": "Remote access",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "TightVNC*"
+   ],
+   "publisherPatterns": [
+    "GlavSoft*"
+   ],
+   "website": "https://www.tightvnc.com/",
+   "windowsSilentArgs": "/qn /norestart"
+  },
+  {
+   "key": "ultravnc",
+   "name": "UltraVNC",
+   "publisher": "uvnc bvba",
+   "category": "Remote access",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "UltraVNC*"
+   ],
+   "publisherPatterns": [
+    "uvnc*"
+   ],
+   "website": "https://uvnc.com/",
+   "windowsSilentArgs": "/VERYSILENT /NORESTART"
+  },
+  {
+   "key": "remmina",
+   "name": "Remmina",
+   "publisher": "Remmina Team",
+   "category": "Remote access",
+   "platforms": [
+    "linux"
+   ],
+   "namePatterns": [
+    "remmina*"
+   ],
+   "publisherPatterns": [],
+   "website": "https://remmina.org/",
+   "debPackage": "remmina",
+   "rpmPackage": "remmina"
+  },
+  {
+   "key": "microsoft-remote-desktop",
+   "name": "Microsoft Remote Desktop",
+   "publisher": "Microsoft Corporation",
+   "category": "Remote access",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Remote Desktop*"
+   ],
+   "publisherPatterns": [
+    "Microsoft Corporation"
+   ],
+   "website": "https://learn.microsoft.com/windows-server/remote/remote-desktop-services/clients/",
+   "windowsSilentArgs": "/qn /norestart"
+  },
+  {
+   "key": "royal-ts",
+   "name": "Royal TS",
+   "publisher": "code4ward.net",
+   "category": "Remote access",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Royal TS*"
+   ],
+   "publisherPatterns": [
+    "code4ward*"
+   ],
+   "website": "https://www.royalapps.com/",
+   "windowsSilentArgs": "/qn /norestart"
+  },
+  {
+   "key": "mremoteng",
+   "name": "mRemoteNG",
+   "publisher": "mRemoteNG",
+   "category": "Remote access",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "mRemoteNG*"
+   ],
+   "publisherPatterns": [
+    "mRemoteNG*"
+   ],
+   "website": "https://mremoteng.org/",
+   "windowsSilentArgs": "/qn /norestart"
+  },
+  {
+   "key": "microsoft-sql-server-management-studio",
+   "name": "Microsoft SQL Server Management Studio",
+   "publisher": "Microsoft Corporation",
+   "category": "Databases",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "*SQL Server Management Studio*"
+   ],
+   "publisherPatterns": [
+    "Microsoft Corporation"
+   ],
+   "website": "https://learn.microsoft.com/sql/ssms/",
+   "windowsSilentArgs": "/install /quiet /norestart"
+  },
+  {
+   "key": "azure-data-studio",
+   "name": "Azure Data Studio",
+   "publisher": "Microsoft Corporation",
+   "category": "Databases",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Azure Data Studio*",
+    "azuredatastudio"
+   ],
+   "publisherPatterns": [
+    "Microsoft Corporation"
+   ],
+   "website": "https://learn.microsoft.com/azure-data-studio/",
+   "windowsSilentArgs": "/VERYSILENT /MERGETASKS=!runcode",
+   "debPackage": "azuredatastudio",
+   "rpmPackage": "azuredatastudio"
+  },
+  {
+   "key": "dbeaver",
+   "name": "DBeaver",
+   "publisher": "DBeaver Corp",
+   "category": "Databases",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "DBeaver*",
+    "dbeaver-ce"
+   ],
+   "publisherPatterns": [
+    "DBeaver Corp*"
+   ],
+   "website": "https://dbeaver.io/",
+   "windowsSilentArgs": "/S /allusers",
+   "debPackage": "dbeaver-ce",
+   "rpmPackage": "dbeaver-ce"
+  },
+  {
+   "key": "pgadmin-4",
+   "name": "pgAdmin 4",
+   "publisher": "The pgAdmin Development Team",
+   "category": "Databases",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "pgAdmin 4*",
+    "pgadmin4*"
+   ],
+   "publisherPatterns": [
+    "The pgAdmin Development Team"
+   ],
+   "website": "https://www.pgadmin.org/",
+   "windowsSilentArgs": "/VERYSILENT /NORESTART /ALLUSERS",
+   "debPackage": "pgadmin4",
+   "rpmPackage": "pgadmin4"
+  },
+  {
+   "key": "mysql-workbench",
+   "name": "MySQL Workbench",
+   "publisher": "Oracle Corporation",
+   "category": "Databases",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "MySQL Workbench*",
+    "mysql-workbench*"
+   ],
+   "publisherPatterns": [
+    "Oracle*"
+   ],
+   "website": "https://www.mysql.com/products/workbench/",
+   "windowsSilentArgs": "/qn /norestart",
+   "debPackage": "mysql-workbench-community",
+   "rpmPackage": "mysql-workbench-community"
+  },
+  {
+   "key": "heidisql",
+   "name": "HeidiSQL",
+   "publisher": "Ansgar Becker",
+   "category": "Databases",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "HeidiSQL*"
+   ],
+   "publisherPatterns": [
+    "Ansgar Becker"
+   ],
+   "website": "https://www.heidisql.com/",
+   "windowsSilentArgs": "/VERYSILENT /NORESTART"
+  },
+  {
+   "key": "postgresql",
+   "name": "PostgreSQL",
+   "publisher": "PostgreSQL Global Development Group",
+   "category": "Databases",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "PostgreSQL*",
+    "postgresql*"
+   ],
+   "publisherPatterns": [
+    "PostgreSQL Global Development Group",
+    "EnterpriseDB*"
+   ],
+   "website": "https://www.postgresql.org/",
+   "windowsSilentArgs": "--mode unattended",
+   "debPackage": "postgresql",
+   "rpmPackage": "postgresql-server"
+  },
+  {
+   "key": "mysql-server",
+   "name": "MySQL Server",
+   "publisher": "Oracle Corporation",
+   "category": "Databases",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "MySQL Server*",
+    "mysql-server*"
+   ],
+   "publisherPatterns": [
+    "Oracle*"
+   ],
+   "website": "https://www.mysql.com/",
+   "windowsSilentArgs": "/qn /norestart",
+   "debPackage": "mysql-server",
+   "rpmPackage": "mysql-server"
+  },
+  {
+   "key": "mariadb",
+   "name": "MariaDB",
+   "publisher": "MariaDB Corporation Ab",
+   "category": "Databases",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "MariaDB*",
+    "mariadb-server*"
+   ],
+   "publisherPatterns": [
+    "MariaDB*"
+   ],
+   "website": "https://mariadb.org/",
+   "windowsSilentArgs": "/qn /norestart",
+   "debPackage": "mariadb-server",
+   "rpmPackage": "mariadb-server"
+  },
+  {
+   "key": "redis",
+   "name": "Redis",
+   "publisher": "Redis Ltd.",
+   "category": "Databases",
+   "platforms": [
+    "linux"
+   ],
+   "namePatterns": [
+    "redis*"
+   ],
+   "publisherPatterns": [],
+   "website": "https://redis.io/",
+   "debPackage": "redis-server",
+   "rpmPackage": "redis"
+  },
+  {
+   "key": "microsoft-power-bi-desktop",
+   "name": "Microsoft Power BI Desktop",
+   "publisher": "Microsoft Corporation",
+   "category": "Office & productivity",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Microsoft Power BI Desktop*"
+   ],
+   "publisherPatterns": [
+    "Microsoft Corporation"
+   ],
+   "website": "https://powerbi.microsoft.com/desktop/",
+   "windowsSilentArgs": "-quiet -norestart ACCEPT_EULA=1"
+  },
+  {
+   "key": "tableau-desktop",
+   "name": "Tableau Desktop",
+   "publisher": "Tableau Software",
+   "category": "Office & productivity",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Tableau*"
+   ],
+   "publisherPatterns": [
+    "Tableau Software*",
+    "Salesforce*"
+   ],
+   "website": "https://www.tableau.com/",
+   "windowsSilentArgs": "/quiet /norestart ACCEPTEULA=1"
+  },
+  {
+   "key": "notion",
+   "name": "Notion",
+   "publisher": "Notion Labs, Inc.",
+   "category": "Office & productivity",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Notion*"
+   ],
+   "publisherPatterns": [
+    "Notion Labs*"
+   ],
+   "website": "https://www.notion.so/desktop",
+   "windowsSilentArgs": "/S"
+  },
+  {
+   "key": "obsidian",
+   "name": "Obsidian",
+   "publisher": "Obsidian.md",
+   "category": "Office & productivity",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Obsidian*"
+   ],
+   "publisherPatterns": [
+    "Obsidian*",
+    "Dynalist*"
+   ],
+   "website": "https://obsidian.md/",
+   "windowsSilentArgs": "/S"
+  },
+  {
+   "key": "evernote",
+   "name": "Evernote",
+   "publisher": "Evernote Corporation",
+   "category": "Office & productivity",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Evernote*"
+   ],
+   "publisherPatterns": [
+    "Evernote*",
+    "Bending Spoons*"
+   ],
+   "website": "https://evernote.com/download",
+   "windowsSilentArgs": "/qn /norestart"
+  },
+  {
+   "key": "microsoft-visio",
+   "name": "Microsoft Visio",
+   "publisher": "Microsoft Corporation",
+   "category": "Office & productivity",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Microsoft Visio*"
+   ],
+   "publisherPatterns": [
+    "Microsoft Corporation"
+   ],
+   "website": "https://www.microsoft.com/microsoft-365/visio",
+   "windowsSilentArgs": "/configure configuration.xml"
+  },
+  {
+   "key": "microsoft-project",
+   "name": "Microsoft Project",
+   "publisher": "Microsoft Corporation",
+   "category": "Office & productivity",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Microsoft Project*"
+   ],
+   "publisherPatterns": [
+    "Microsoft Corporation"
+   ],
+   "website": "https://www.microsoft.com/microsoft-365/project",
+   "windowsSilentArgs": "/configure configuration.xml"
+  },
+  {
+   "key": "draw-io-desktop",
+   "name": "draw.io Desktop",
+   "publisher": "JGraph Ltd",
+   "category": "Office & productivity",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "draw.io*",
+    "drawio"
+   ],
+   "publisherPatterns": [
+    "JGraph*"
+   ],
+   "website": "https://www.drawio.com/",
+   "windowsSilentArgs": "/S",
+   "debPackage": "drawio",
+   "rpmPackage": "drawio"
+  },
+  {
+   "key": "xmind",
+   "name": "XMind",
+   "publisher": "XMind Ltd.",
+   "category": "Office & productivity",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "XMind*"
+   ],
+   "publisherPatterns": [
+    "XMind*"
+   ],
+   "website": "https://xmind.app/",
+   "windowsSilentArgs": "/S"
+  },
+  {
+   "key": "citrix-workspace",
+   "name": "Citrix Workspace",
+   "publisher": "Citrix Systems, Inc.",
+   "category": "Remote access",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Citrix Workspace*",
+    "icaclient"
+   ],
+   "publisherPatterns": [
+    "Citrix*",
+    "Cloud Software Group*"
+   ],
+   "website": "https://www.citrix.com/downloads/workspace-app/",
+   "windowsSilentArgs": "/silent /noreboot",
+   "debPackage": "icaclient",
+   "rpmPackage": "ICAClient"
+  },
+  {
+   "key": "vmware-workstation",
+   "name": "VMware Workstation",
+   "publisher": "Broadcom Inc.",
+   "category": "Virtualization",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "VMware Workstation*"
+   ],
+   "publisherPatterns": [
+    "VMware*",
+    "Broadcom*"
+   ],
+   "website": "https://www.vmware.com/products/desktop-hypervisor.html",
+   "windowsSilentArgs": "/s /v\"/qn EULAS_AGREED=1\""
+  },
+  {
+   "key": "vmware-horizon-client",
+   "name": "VMware Horizon Client",
+   "publisher": "Broadcom Inc.",
+   "category": "Remote access",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "VMware Horizon Client*",
+    "Omnissa Horizon*"
+   ],
+   "publisherPatterns": [
+    "VMware*",
+    "Broadcom*",
+    "Omnissa*"
+   ],
+   "website": "https://customerconnect.omnissa.com/",
+   "windowsSilentArgs": "/silent /norestart"
+  },
+  {
+   "key": "virtualbox",
+   "name": "VirtualBox",
+   "publisher": "Oracle Corporation",
+   "category": "Virtualization",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Oracle VirtualBox*",
+    "Oracle VM VirtualBox*",
+    "virtualbox*"
+   ],
+   "publisherPatterns": [
+    "Oracle*"
+   ],
+   "website": "https://www.virtualbox.org/",
+   "windowsSilentArgs": "--silent",
+   "debPackage": "virtualbox",
+   "rpmPackage": "VirtualBox"
+  },
+  {
+   "key": "vmware-tools",
+   "name": "VMware Tools",
+   "publisher": "Broadcom Inc.",
+   "category": "Virtualization",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "VMware Tools*",
+    "open-vm-tools*"
+   ],
+   "publisherPatterns": [
+    "VMware*",
+    "Broadcom*"
+   ],
+   "website": "https://www.vmware.com/",
+   "windowsSilentArgs": "/S /v\"/qn REBOOT=R\"",
+   "debPackage": "open-vm-tools",
+   "rpmPackage": "open-vm-tools"
+  },
+  {
+   "key": "hyper-v-integration-services",
+   "name": "Hyper-V Integration Services",
+   "publisher": "Microsoft Corporation",
+   "category": "Virtualization",
+   "platforms": [
+    "linux"
+   ],
+   "namePatterns": [
+    "hyperv-daemons",
+    "linux-cloud-tools*"
+   ],
+   "publisherPatterns": [],
+   "website": "https://learn.microsoft.com/virtualization/",
+   "debPackage": "linux-cloud-tools-generic",
+   "rpmPackage": "hyperv-daemons"
+  },
+  {
+   "key": "qemu-guest-agent",
+   "name": "QEMU Guest Agent",
+   "publisher": "QEMU",
+   "category": "Virtualization",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "QEMU guest agent*",
+    "qemu-guest-agent"
+   ],
+   "publisherPatterns": [
+    "*Red Hat*"
+   ],
+   "website": "https://www.qemu.org/",
+   "windowsSilentArgs": "/qn /norestart",
+   "debPackage": "qemu-guest-agent",
+   "rpmPackage": "qemu-guest-agent"
+  },
+  {
+   "key": "aws-cli",
+   "name": "AWS CLI",
+   "publisher": "Amazon Web Services",
+   "category": "Cloud tools",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "AWS Command Line Interface*",
+    "awscli"
+   ],
+   "publisherPatterns": [
+    "Amazon*"
+   ],
+   "website": "https://aws.amazon.com/cli/",
+   "windowsSilentArgs": "/qn /norestart",
+   "debPackage": "awscli",
+   "rpmPackage": "awscli"
+  },
+  {
+   "key": "azure-cli",
+   "name": "Azure CLI",
+   "publisher": "Microsoft Corporation",
+   "category": "Cloud tools",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Microsoft Azure CLI*",
+    "azure-cli"
+   ],
+   "publisherPatterns": [
+    "Microsoft Corporation"
+   ],
+   "website": "https://learn.microsoft.com/cli/azure/",
+   "windowsSilentArgs": "/qn /norestart",
+   "debPackage": "azure-cli",
+   "rpmPackage": "azure-cli"
+  },
+  {
+   "key": "google-cloud-sdk",
+   "name": "Google Cloud SDK",
+   "publisher": "Google LLC",
+   "category": "Cloud tools",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Google Cloud SDK*",
+    "google-cloud-cli*"
+   ],
+   "publisherPatterns": [
+    "Google LLC"
+   ],
+   "website": "https://cloud.google.com/sdk",
+   "windowsSilentArgs": "/S /allusers",
+   "debPackage": "google-cloud-cli",
+   "rpmPackage": "google-cloud-cli"
+  },
+  {
+   "key": "terraform",
+   "name": "Terraform",
+   "publisher": "HashiCorp",
+   "category": "Cloud tools",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "terraform"
+   ],
+   "publisherPatterns": [
+    "HashiCorp*"
+   ],
+   "website": "https://www.terraform.io/",
+   "debPackage": "terraform",
+   "rpmPackage": "terraform"
+  },
+  {
+   "key": "kubectl",
+   "name": "kubectl",
+   "publisher": "Kubernetes",
+   "category": "Cloud tools",
+   "platforms": [
+    "linux"
+   ],
+   "namePatterns": [
+    "kubectl"
+   ],
+   "publisherPatterns": [],
+   "website": "https://kubernetes.io/",
+   "debPackage": "kubectl",
+   "rpmPackage": "kubectl"
+  },
+  {
+   "key": "ansible",
+   "name": "Ansible",
+   "publisher": "Red Hat",
+   "category": "Cloud tools",
+   "platforms": [
+    "linux"
+   ],
+   "namePatterns": [
+    "ansible*"
+   ],
+   "publisherPatterns": [],
+   "website": "https://www.ansible.com/",
+   "debPackage": "ansible",
+   "rpmPackage": "ansible-core"
+  },
+  {
+   "key": "microsoft-azure-storage-explorer",
+   "name": "Microsoft Azure Storage Explorer",
+   "publisher": "Microsoft Corporation",
+   "category": "Cloud tools",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Microsoft Azure Storage Explorer*"
+   ],
+   "publisherPatterns": [
+    "Microsoft Corporation"
+   ],
+   "website": "https://azure.microsoft.com/products/storage/storage-explorer/",
+   "windowsSilentArgs": "/VERYSILENT /NORESTART /ALLUSERS"
+  },
+  {
+   "key": "dell-command-update",
+   "name": "Dell Command Update",
+   "publisher": "Dell Inc.",
+   "category": "Drivers & vendor tools",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Dell Command*Update*",
+    "Dell Update*"
+   ],
+   "publisherPatterns": [
+    "Dell Inc*"
+   ],
+   "website": "https://www.dell.com/support/",
+   "windowsSilentArgs": "/s"
+  },
+  {
+   "key": "dell-supportassist",
+   "name": "Dell SupportAssist",
+   "publisher": "Dell Inc.",
+   "category": "Drivers & vendor tools",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Dell SupportAssist*"
+   ],
+   "publisherPatterns": [
+    "Dell Inc*"
+   ],
+   "website": "https://www.dell.com/support/",
+   "windowsSilentArgs": "/qn /norestart"
+  },
+  {
+   "key": "hp-support-assistant",
+   "name": "HP Support Assistant",
+   "publisher": "HP Inc.",
+   "category": "Drivers & vendor tools",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "HP Support Assistant*",
+    "HP Image Assistant*"
+   ],
+   "publisherPatterns": [
+    "HP Inc*",
+    "HP Development Company*"
+   ],
+   "website": "https://support.hp.com/",
+   "windowsSilentArgs": "/s /a /f"
+  },
+  {
+   "key": "lenovo-vantage-system-update",
+   "name": "Lenovo Vantage / System Update",
+   "publisher": "Lenovo",
+   "category": "Drivers & vendor tools",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Lenovo Vantage*",
+    "Lenovo System Update*",
+    "Lenovo Commercial Vantage*"
+   ],
+   "publisherPatterns": [
+    "Lenovo*"
+   ],
+   "website": "https://support.lenovo.com/",
+   "windowsSilentArgs": "/VERYSILENT /NORESTART"
+  },
+  {
+   "key": "intel-driver-support-assistant",
+   "name": "Intel Driver & Support Assistant",
+   "publisher": "Intel Corporation",
+   "category": "Drivers & vendor tools",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Intel(R) Driver & Support Assistant*",
+    "Intel Driver*"
+   ],
+   "publisherPatterns": [
+    "Intel Corporation"
+   ],
+   "website": "https://www.intel.com/content/www/us/en/support/detect.html",
+   "windowsSilentArgs": "/quiet /norestart"
+  },
+  {
+   "key": "nvidia-graphics-driver",
+   "name": "NVIDIA Graphics Driver",
+   "publisher": "NVIDIA Corporation",
+   "category": "Drivers & vendor tools",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "NVIDIA*",
+    "nvidia-driver*"
+   ],
+   "publisherPatterns": [
+    "NVIDIA Corporation"
+   ],
+   "website": "https://www.nvidia.com/Download/index.aspx",
+   "windowsSilentArgs": "-s -noreboot",
+   "debPackage": "nvidia-driver-550",
+   "rpmPackage": "nvidia-driver"
+  },
+  {
+   "key": "amd-software",
+   "name": "AMD Software",
+   "publisher": "Advanced Micro Devices, Inc.",
+   "category": "Drivers & vendor tools",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "AMD Software*",
+    "AMD Chipset*",
+    "AMD Radeon*"
+   ],
+   "publisherPatterns": [
+    "Advanced Micro Devices*"
+   ],
+   "website": "https://www.amd.com/support",
+   "windowsSilentArgs": "-install -silent"
+  },
+  {
+   "key": "realtek-audio-driver",
+   "name": "Realtek Audio Driver",
+   "publisher": "Realtek Semiconductor Corp.",
+   "category": "Drivers & vendor tools",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Realtek*"
+   ],
+   "publisherPatterns": [
+    "Realtek*"
+   ],
+   "website": "https://www.realtek.com/",
+   "windowsSilentArgs": "-s"
+  },
+  {
+   "key": "logitech-options",
+   "name": "Logitech Options+",
+   "publisher": "Logitech",
+   "category": "Drivers & vendor tools",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Logi Options*",
+    "Logitech*"
+   ],
+   "publisherPatterns": [
+    "Logitech*"
+   ],
+   "website": "https://www.logitech.com/software",
+   "windowsSilentArgs": "/quiet"
+  },
+  {
+   "key": "microsoft-intune-management-extension",
+   "name": "Microsoft Intune Management Extension",
+   "publisher": "Microsoft Corporation",
+   "category": "Management agents",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Microsoft Intune Management Extension*"
+   ],
+   "publisherPatterns": [
+    "Microsoft Corporation"
+   ],
+   "website": "https://learn.microsoft.com/mem/intune/"
+  },
+  {
+   "key": "configuration-manager-client",
+   "name": "Configuration Manager Client",
+   "publisher": "Microsoft Corporation",
+   "category": "Management agents",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Configuration Manager Client*"
+   ],
+   "publisherPatterns": [
+    "Microsoft Corporation"
+   ],
+   "website": "https://learn.microsoft.com/mem/configmgr/"
+  },
+  {
+   "key": "azure-monitor-agent",
+   "name": "Azure Monitor Agent",
+   "publisher": "Microsoft Corporation",
+   "category": "Management agents",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Azure Monitor Agent*",
+    "azuremonitoragent",
+    "Microsoft Monitoring Agent*"
+   ],
+   "publisherPatterns": [
+    "Microsoft Corporation"
+   ],
+   "website": "https://learn.microsoft.com/azure/azure-monitor/agents/",
+   "windowsSilentArgs": "/qn /norestart",
+   "debPackage": "azuremonitoragent",
+   "rpmPackage": "azuremonitoragent"
+  },
+  {
+   "key": "amazon-ssm-agent",
+   "name": "Amazon SSM Agent",
+   "publisher": "Amazon Web Services",
+   "category": "Management agents",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Amazon SSM Agent*",
+    "amazon-ssm-agent"
+   ],
+   "publisherPatterns": [
+    "Amazon*"
+   ],
+   "website": "https://docs.aws.amazon.com/systems-manager/",
+   "windowsSilentArgs": "/install /quiet",
+   "debPackage": "amazon-ssm-agent",
+   "rpmPackage": "amazon-ssm-agent"
+  },
+  {
+   "key": "zabbix-agent",
+   "name": "Zabbix Agent",
+   "publisher": "Zabbix SIA",
+   "category": "Management agents",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Zabbix Agent*",
+    "zabbix-agent*"
+   ],
+   "publisherPatterns": [
+    "Zabbix*"
+   ],
+   "website": "https://www.zabbix.com/",
+   "windowsSilentArgs": "/qn /norestart",
+   "debPackage": "zabbix-agent2",
+   "rpmPackage": "zabbix-agent2"
+  },
+  {
+   "key": "datadog-agent",
+   "name": "Datadog Agent",
+   "publisher": "Datadog, Inc.",
+   "category": "Management agents",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Datadog Agent*",
+    "datadog-agent"
+   ],
+   "publisherPatterns": [
+    "Datadog*"
+   ],
+   "website": "https://www.datadoghq.com/",
+   "windowsSilentArgs": "/qn /norestart",
+   "debPackage": "datadog-agent",
+   "rpmPackage": "datadog-agent"
+  },
+  {
+   "key": "splunk-universal-forwarder",
+   "name": "Splunk Universal Forwarder",
+   "publisher": "Splunk Inc.",
+   "category": "Management agents",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "UniversalForwarder*",
+    "Splunk*Forwarder*",
+    "splunkforwarder"
+   ],
+   "publisherPatterns": [
+    "Splunk*"
+   ],
+   "website": "https://www.splunk.com/",
+   "windowsSilentArgs": "/qn /norestart AGREETOLICENSE=Yes",
+   "debPackage": "splunkforwarder",
+   "rpmPackage": "splunkforwarder"
+  },
+  {
+   "key": "wazuh-agent",
+   "name": "Wazuh Agent",
+   "publisher": "Wazuh, Inc.",
+   "category": "Security",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Wazuh Agent*",
+    "wazuh-agent"
+   ],
+   "publisherPatterns": [
+    "Wazuh*"
+   ],
+   "website": "https://wazuh.com/",
+   "windowsSilentArgs": "/qn /norestart",
+   "debPackage": "wazuh-agent",
+   "rpmPackage": "wazuh-agent"
+  },
+  {
+   "key": "osquery",
+   "name": "osquery",
+   "publisher": "osquery",
+   "category": "Management agents",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "osquery*"
+   ],
+   "publisherPatterns": [
+    "osquery*",
+    "Linux Foundation*"
+   ],
+   "website": "https://osquery.io/",
+   "windowsSilentArgs": "/qn /norestart",
+   "debPackage": "osquery",
+   "rpmPackage": "osquery"
+  },
+  {
+   "key": "salt-minion",
+   "name": "Salt Minion",
+   "publisher": "VMware, Inc.",
+   "category": "Management agents",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Salt Minion*",
+    "salt-minion"
+   ],
+   "publisherPatterns": [
+    "VMware*",
+    "Broadcom*",
+    "SaltStack*"
+   ],
+   "website": "https://saltproject.io/",
+   "windowsSilentArgs": "/S",
+   "debPackage": "salt-minion",
+   "rpmPackage": "salt-minion"
+  },
+  {
+   "key": "puppet-agent",
+   "name": "Puppet Agent",
+   "publisher": "Puppet, Inc.",
+   "category": "Management agents",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Puppet Agent*",
+    "puppet-agent"
+   ],
+   "publisherPatterns": [
+    "Puppet*"
+   ],
+   "website": "https://www.puppet.com/",
+   "windowsSilentArgs": "/qn /norestart",
+   "debPackage": "puppet-agent",
+   "rpmPackage": "puppet-agent"
+  },
+  {
+   "key": "microsoft-teams-rooms-skype-for-business",
+   "name": "Microsoft Teams Rooms / Skype for Business",
+   "publisher": "Microsoft Corporation",
+   "category": "Communication",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Skype for Business*"
+   ],
+   "publisherPatterns": [
+    "Microsoft Corporation"
+   ],
+   "website": "https://www.microsoft.com/"
+  },
+  {
+   "key": "steam",
+   "name": "Steam",
+   "publisher": "Valve Corporation",
+   "category": "Games & entertainment",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "Steam*",
+    "steam*"
+   ],
+   "publisherPatterns": [
+    "Valve*"
+   ],
+   "website": "https://store.steampowered.com/about/",
+   "windowsSilentArgs": "/S",
+   "debPackage": "steam-installer",
+   "rpmPackage": "steam"
+  },
+  {
+   "key": "epic-games-launcher",
+   "name": "Epic Games Launcher",
+   "publisher": "Epic Games, Inc.",
+   "category": "Games & entertainment",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Epic Games Launcher*"
+   ],
+   "publisherPatterns": [
+    "Epic Games*"
+   ],
+   "website": "https://store.epicgames.com/",
+   "windowsSilentArgs": "/qn /norestart"
+  },
+  {
+   "key": "utorrent",
+   "name": "uTorrent",
+   "publisher": "BitTorrent Inc.",
+   "category": "File sharing",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "µTorrent*",
+    "uTorrent*"
+   ],
+   "publisherPatterns": [
+    "BitTorrent*",
+    "Rainberry*"
+   ],
+   "website": "https://www.utorrent.com/",
+   "windowsSilentArgs": "/S"
+  },
+  {
+   "key": "bittorrent",
+   "name": "BitTorrent",
+   "publisher": "BitTorrent Inc.",
+   "category": "File sharing",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "BitTorrent*"
+   ],
+   "publisherPatterns": [
+    "BitTorrent*",
+    "Rainberry*"
+   ],
+   "website": "https://www.bittorrent.com/",
+   "windowsSilentArgs": "/S"
+  },
+  {
+   "key": "qbittorrent",
+   "name": "qBittorrent",
+   "publisher": "The qBittorrent project",
+   "category": "File sharing",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "qBittorrent*",
+    "qbittorrent"
+   ],
+   "publisherPatterns": [
+    "The qBittorrent project"
+   ],
+   "website": "https://www.qbittorrent.org/",
+   "windowsSilentArgs": "/S",
+   "debPackage": "qbittorrent",
+   "rpmPackage": "qbittorrent"
+  },
+  {
+   "key": "transmission",
+   "name": "Transmission",
+   "publisher": "Transmission Project",
+   "category": "File sharing",
+   "platforms": [
+    "linux"
+   ],
+   "namePatterns": [
+    "transmission*"
+   ],
+   "publisherPatterns": [],
+   "website": "https://transmissionbt.com/",
+   "debPackage": "transmission-gtk",
+   "rpmPackage": "transmission-gtk"
+  },
+  {
+   "key": "cpu-z",
+   "name": "CPU-Z",
+   "publisher": "CPUID",
+   "category": "Utilities",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "CPU-Z*"
+   ],
+   "publisherPatterns": [
+    "CPUID*"
+   ],
+   "website": "https://www.cpuid.com/",
+   "windowsSilentArgs": "/VERYSILENT /NORESTART"
+  },
+  {
+   "key": "hwinfo",
+   "name": "HWiNFO",
+   "publisher": "Martin Malik - REALiX",
+   "category": "Utilities",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "HWiNFO*"
+   ],
+   "publisherPatterns": [
+    "Martin Malik*",
+    "REALiX*"
+   ],
+   "website": "https://www.hwinfo.com/",
+   "windowsSilentArgs": "/VERYSILENT /NORESTART"
+  },
+  {
+   "key": "rufus",
+   "name": "Rufus",
+   "publisher": "Pete Batard",
+   "category": "Utilities",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Rufus*"
+   ],
+   "publisherPatterns": [
+    "Pete Batard",
+    "Akeo*"
+   ],
+   "website": "https://rufus.ie/"
+  },
+  {
+   "key": "balena-etcher",
+   "name": "Balena Etcher",
+   "publisher": "Balena Ltd.",
+   "category": "Utilities",
+   "platforms": [
+    "windows",
+    "linux"
+   ],
+   "namePatterns": [
+    "balenaEtcher*",
+    "balena-etcher*"
+   ],
+   "publisherPatterns": [
+    "Balena*"
+   ],
+   "website": "https://etcher.balena.io/",
+   "windowsSilentArgs": "/S",
+   "debPackage": "balena-etcher",
+   "rpmPackage": "balena-etcher"
+  },
+  {
+   "key": "microsoft-remote-help",
+   "name": "Microsoft Remote Help",
+   "publisher": "Microsoft Corporation",
+   "category": "Remote access",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Remote Help*"
+   ],
+   "publisherPatterns": [
+    "Microsoft Corporation"
+   ],
+   "website": "https://learn.microsoft.com/mem/intune/fundamentals/remote-help",
+   "windowsSilentArgs": "/quiet acceptTerms=1"
+  },
+  {
+   "key": "grammarly",
+   "name": "Grammarly",
+   "publisher": "Grammarly, Inc.",
+   "category": "Office & productivity",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Grammarly*"
+   ],
+   "publisherPatterns": [
+    "Grammarly*"
+   ],
+   "website": "https://www.grammarly.com/desktop",
+   "windowsSilentArgs": "/S"
+  },
+  {
+   "key": "deepl",
+   "name": "DeepL",
+   "publisher": "DeepL SE",
+   "category": "Office & productivity",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "DeepL*"
+   ],
+   "publisherPatterns": [
+    "DeepL*"
+   ],
+   "website": "https://www.deepl.com/app",
+   "windowsSilentArgs": "/S"
+  },
+  {
+   "key": "chatgpt-desktop",
+   "name": "ChatGPT Desktop",
+   "publisher": "OpenAI",
+   "category": "Office & productivity",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "ChatGPT*"
+   ],
+   "publisherPatterns": [
+    "OpenAI*"
+   ],
+   "website": "https://openai.com/chatgpt/desktop/"
+  },
+  {
+   "key": "claude-desktop",
+   "name": "Claude Desktop",
+   "publisher": "Anthropic, PBC",
+   "category": "Office & productivity",
+   "platforms": [
+    "windows"
+   ],
+   "namePatterns": [
+    "Claude*"
+   ],
+   "publisherPatterns": [
+    "Anthropic*"
+   ],
+   "website": "https://claude.ai/download"
+  }
+ ]
+}

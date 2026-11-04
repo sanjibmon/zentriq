@@ -136,6 +136,8 @@ public sealed class Provisioner(ProvisionInput input, ZentriqPaths paths, Report
         WindowsHost.SecureDirectory(paths.Backups, (api, read));
         // Backup files uploaded in the console for a restore.
         WindowsHost.SecureDirectory(paths.RestoreUploads, (api, modify));
+        // Software packages uploaded for deployment (the API stores them and serves them to the agents).
+        WindowsHost.SecureDirectory(paths.DeploymentPackages, (api, modify));
         log.Info($"Data root {paths.Root} secured (services: {input.ApiService}, {input.WorkerService}).");
         return Task.CompletedTask;
     }

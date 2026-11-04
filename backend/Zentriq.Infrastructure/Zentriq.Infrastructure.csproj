@@ -21,6 +21,7 @@
     <EmbeddedResource Include="..\..\database\bootstrap.sql" LogicalName="Zentriq.Database.bootstrap.sql" />
     <EmbeddedResource Include="..\..\database\migrations\V*.sql" LogicalName="Zentriq.Database.Migrations.%(Filename)%(Extension)" />
     <EmbeddedResource Include="Resources\license-public-keys.json" LogicalName="Zentriq.Licensing.PublicKeys.json" />
+    <EmbeddedResource Include="Resources\software-catalog.json" LogicalName="Zentriq.Deployment.SoftwareCatalog.json" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Zentriq.Tests" />

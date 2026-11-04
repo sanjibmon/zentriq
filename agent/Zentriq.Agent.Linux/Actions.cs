@@ -206,6 +206,14 @@ internal static class RemoteSupportActions
 
     public static (bool Ok, string? State, string Message) Run(ServerClient client, string operation, string? sha256, CancellationToken ct)
     {
+        // The console installs or removes it: its tamper protection is lifted first (and applied again afterwards).
+        RemoteGuard.Release();
+        try { return RunInstaller(client, operation, sha256, ct); }
+        finally { RemoteGuard.Sync(); }
+    }
+
+    private static (bool Ok, string? State, string Message) RunInstaller(ServerClient client, string operation, string? sha256, CancellationToken ct)
+    {
         if (operation is not ("install" or "uninstall")) return (false, null, "Unknown remote support operation '" + operation + "'.");
         if (operation == "uninstall" && !Installed()) return (true, "absent", "Zentriq Remote Support is not installed.");
         if (operation == "uninstall" && InstalledBinary() is { } installedBinary)

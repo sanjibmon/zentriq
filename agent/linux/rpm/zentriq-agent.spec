@@ -52,6 +52,7 @@ exit 0
 if [ "$1" = "0" ]; then
   if [ -x /opt/zentriq-agent/zentriq-agent ]; then
     /opt/zentriq-agent/zentriq-agent --check-uninstall || exit 1
+    /opt/zentriq-agent/zentriq-agent --cleanup-hooks >/dev/null 2>&1 || :
   fi
   if [ -d /run/systemd/system ]; then
     rm -f /etc/systemd/system/zentriq-agent.service.d/10-protection.conf
@@ -68,7 +69,7 @@ exit 0
 
 %postun
 if [ "$1" = "0" ]; then
-  rm -rf /var/lib/zentriq-agent /var/log/zentriq-agent /etc/systemd/system/zentriq-agent.service.d
+  rm -rf /var/lib/zentriq-agent /var/log/zentriq-agent /var/spool/zentriq-agent /etc/systemd/system/zentriq-agent.service.d
   rm -f /opt/zentriq-agent/installed-by
 fi
 if [ -d /run/systemd/system ]; then systemctl daemon-reload >/dev/null 2>&1 || :; fi

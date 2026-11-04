@@ -24,7 +24,7 @@ namespace Zentriq.Api.Endpoints;
 ///   POST /api/agent/v1/inventory  gzip JSON InventoryDocument
 ///   POST /api/agent/v1/renew      new CSR → new client certificate (authenticated with the current one)
 /// </summary>
-public static class AgentEndpoints
+public static partial class AgentEndpoints
 {
     /// <summary>Check-in (connectivity) and inventory intervals offered in the console and the agent installer, in minutes.</summary>
     public static readonly int[] CheckinChoices = [5, 15, 30, 60, 120, 180];
@@ -41,7 +41,12 @@ public static class AgentEndpoints
     public sealed record RenewRequest(string Csr);
     public sealed record CheckinRequest(string? AgentVersion, string? Hostname, string? OsName, string? LastError, string[]? Capabilities = null,
         DateTimeOffset? OfflineSince = null, bool? UninstallProtected = null, List<AgentEvent>? Events = null, TamperReport? TamperProtection = null,
-        string? Platform = null);
+        string? Platform = null, AppControlReport? AppControl = null);
+    /// <summary>
+    /// Application control on the device: the policy revision applied, the mode in force (off, audit, block), WDAC (off,
+    /// audit, enforce, unsupported) and the remote support agent's protection (on, off, absent).
+    /// </summary>
+    public sealed record AppControlReport(long? Revision, string? Mode, string? Wdac, string? RemoteProtection);
     /// <summary>Reported by the agent: "tamper" (a change it undid, a wrong code) or "control" (stopped, disabled, paused with a code).</summary>
     public sealed record AgentEvent(string? Kind, DateTimeOffset? At, string? Text);
     /// <summary>Tamper protection on the device: on, pending, paused (until) or off.</summary>
@@ -81,6 +86,7 @@ public static class AgentEndpoints
     public static void MapAgentEndpoints(this WebApplication app)
     {
         var g = app.MapGroup("/api/agent/v1").WithTags("Agent protocol");
+        MapAgentDeploymentEndpoints(g);
 
         // Short enrollment codes carry no server key pins: before sending the code, the agent asks the server to prove that
         // it knows the code, bound to the key it serves (see AgentCodes.EnrollProof).
@@ -256,7 +262,8 @@ public static class AgentEndpoints
         }).AllowAnonymous();
 
         g.MapPost("/checkin", async (CheckinRequest req, HttpContext http, NpgsqlDataSource ds, AgentServer server,
-            Zentriq.Infrastructure.Secrets.CredentialProtector protector, ILoggerFactory lf, AuditWriter audit, IWebHostEnvironment env, CancellationToken ct) =>
+            Zentriq.Infrastructure.Secrets.CredentialProtector protector, ILoggerFactory lf, AuditWriter audit, IWebHostEnvironment env,
+            Zentriq.Infrastructure.Remote.RemoteSupportService remote, CancellationToken ct) =>
         {
             var (agent, error) = await AuthenticateAsync(http, ds, server, ct);
             if (agent is null) return error!;
@@ -273,7 +280,9 @@ public static class AgentEndpoints
                        last_outage_from = COALESCE(@off, last_outage_from), last_outage_to = CASE WHEN @off::timestamptz IS NULL THEN last_outage_to ELSE now() END,
                        uninstall_protected = COALESCE(@up, uninstall_protected),
                        tamper_state = COALESCE(@ts, tamper_state), tamper_until = CASE WHEN @ts::text IS NULL THEN tamper_until ELSE @tu END,
-                       platform = COALESCE(@pf, platform)
+                       platform = COALESCE(@pf, platform),
+                       app_policy_revision = COALESCE(@apr, app_policy_revision), app_control_state = COALESCE(@acs, app_control_state),
+                       wdac_state = COALESCE(@wds, wdac_state), remote_protection = COALESCE(@rps, remote_protection)
                  WHERE id = @id
                 RETURNING last_inventory_at, cert_not_after, checkin_minutes, inventory_minutes, uninstall_key_protected, platform
                 """);
@@ -282,6 +291,10 @@ public static class AgentEndpoints
             var ts = req.TamperProtection?.State is "on" or "pending" or "paused" or "off" ? req.TamperProtection.State : null;
             cmd.Parameters.Add(Text("ts", ts));
             cmd.Parameters.Add(Text("pf", req.Platform is null ? null : AgentPackages.Normalize(req.Platform)));
+            cmd.Parameters.Add(new NpgsqlParameter("apr", NpgsqlDbType.Bigint) { Value = (object?)req.AppControl?.Revision ?? DBNull.Value });
+            cmd.Parameters.Add(Text("acs", Trunc(req.AppControl?.Mode, 20)));
+            cmd.Parameters.Add(Text("wds", Trunc(req.AppControl?.Wdac, 20)));
+            cmd.Parameters.Add(Text("rps", Trunc(req.AppControl?.RemoteProtection, 20)));
             cmd.Parameters.Add(new NpgsqlParameter("tu", NpgsqlDbType.TimestampTz) { Value = ts == "paused" && req.TamperProtection!.Until is { } tu ? tu : DBNull.Value });
             cmd.Parameters.AddWithValue("id", agent.Id);
             cmd.Parameters.Add(new NpgsqlParameter("ip", NpgsqlDbType.Inet) { Value = (object?)ClientIp(http) ?? DBNull.Value });
@@ -329,15 +342,20 @@ public static class AgentEndpoints
             if (caps.Contains("self-update")) kinds.Add("agent-update");
             if (caps.Contains("remote-support")) kinds.Add("remote-support");
             if (caps.Contains("tamper-protection")) kinds.Add("agent-control");
+            if (caps.Contains("software-deploy")) kinds.Add("deploy");
             await CompleteUpdatesAsync(ds, agent.Id, req.AgentVersion, ct);
             if (settings.AutoUpdate && caps.Contains("self-update") && agent.AssetId is not null)
                 await QueueAutoUpdateAsync(ds, env, agent.Id, agent.AssetId.Value, req.AgentVersion, settings.AutoUpdateMax, platform, ct);
+            // The remote support agent was removed from the device behind the console's back while it is protected: install it again.
+            if (req.AppControl?.RemoteProtection == "missing" && caps.Contains("remote-support") && agent.AssetId is not null)
+                await ReinstallRemoteAgentAsync(ds, remote, agent.Id, agent.AssetId.Value, platform, lf, ct);
             if (kinds.Count > 0)
             {
                 // Hand out new actions, and re-send ones whose result never arrived (e.g. the device restarted mid-action).
                 await using var act = ds.CreateCommand("""
                     UPDATE zentriq.asset_actions SET status = 'sent', sent_at = now()
-                     WHERE agent_id = @a AND channel = 'agent' AND kind = ANY(@k) AND requested_at > now() - interval '24 hours'
+                     WHERE agent_id = @a AND channel = 'agent' AND kind = ANY(@k)
+                       AND requested_at > now() - CASE WHEN kind = 'deploy' THEN interval '7 days' ELSE interval '24 hours' END
                        AND (status = 'queued' OR (status = 'sent' AND sent_at < now() - interval '30 minutes'))
                     RETURNING id, kind, target, operation, argument
                     """);
@@ -364,6 +382,8 @@ public static class AgentEndpoints
                 // reaches the agent; the agent stores it readable by SYSTEM only.
                 uninstallKey = settings.UninstallProtection && uninstallKey is not null ? Convert.ToBase64String(uninstallKey) : null,
                 uninstallCode = CodeForAgents(await LoadCodeForAllAsync(ds, ct), settings.UninstallProtection),
+                // Application control: the agent fetches its policy (/app-control/policy) when the revision differs from its own.
+                appControl = caps.Contains("app-control") ? new { revision = (await Zentriq.Infrastructure.Deployment.AppControlStore.LoadSettingsAsync(ds, ct)).Revision } : null,
             });
         }).AllowAnonymous();
 
@@ -371,6 +391,8 @@ public static class AgentEndpoints
         {
             var (agent, error) = await AuthenticateAsync(http, ds, server, ct);
             if (agent is null) return error!;
+            // A removal by application control is recorded as an application control event (before the action's text is replaced by the result).
+            if (body.State != "started") await Zentriq.Infrastructure.Deployment.AppControlStore.RecordRemovalAsync(ds, actionId, body.Ok, Trunc(body.Message, 2000), ct);
             var ok = await AssetActionEndpoints.CompleteAsync(ds, actionId, agent.Id, body.Ok, Trunc(body.State, 40), Trunc(body.Message, 2000), ct);
             return ok ? Results.NoContent() : Results.NotFound();
         }).AllowAnonymous();
@@ -475,6 +497,17 @@ public static class AgentEndpoints
                 upd.Parameters.AddWithValue("req", RequestKey(agent.Id));
                 await upd.ExecuteNonQueryAsync(ct);
             }
+            // The safety net of application control: software that is not approved and was installed anyway.
+            try
+            {
+                await using var capCmd = new NpgsqlCommand("SELECT COALESCE(capabilities, ARRAY[]::text[]), platform FROM zentriq.agent_registrations WHERE id = @id", conn);
+                capCmd.Parameters.AddWithValue("id", agent.Id);
+                string[] agentCaps = []; var agentPlatform = AgentPackages.Windows;
+                await using (var cr = await capCmd.ExecuteReaderAsync(ct)) if (await cr.ReadAsync(ct)) { agentCaps = cr.GetFieldValue<string[]>(0); agentPlatform = cr.GetString(1); }
+                if (agentCaps.Contains("app-control"))
+                    await Zentriq.Infrastructure.Deployment.AppControlStore.CheckInventoryAsync(ds, result.AssetId.Value, agent.Id, agentPlatform, doc.Software, agentCaps, ct);
+            }
+            catch (Exception ex) when (ex is NpgsqlException or InvalidOperationException) { lf.CreateLogger("Zentriq.Agents").LogWarning(ex, "Application control check of the inventory from agent {AgentId} failed", agent.Id); }
             return Results.Ok(new { assetId = result.AssetId, created = result.Created, software = doc.Software.Count });
         }).AllowAnonymous();
 
@@ -1134,7 +1167,9 @@ public static class AgentEndpoints
 
     private const string PendingSql = """
         EXISTS (SELECT 1 FROM zentriq.asset_actions x WHERE x.agent_id = @id AND x.channel = 'agent' AND x.status = 'queued'
-                   AND x.requested_at > now() - interval '24 hours')
+                   AND x.requested_at > now() - CASE WHEN x.kind = 'deploy' THEN interval '7 days' ELSE interval '24 hours' END)
+        OR EXISTS (SELECT 1 FROM zentriq.agent_registrations ar WHERE ar.id = @id AND 'app-control' = ANY(COALESCE(ar.capabilities, ARRAY[]::text[]))
+                   AND COALESCE(ar.app_policy_revision, -1) <> COALESCE((SELECT (v.value ->> 'revision')::bigint FROM zentriq.system_settings v WHERE v.key = 'appcontrol.settings'), 0))
         OR EXISTS (SELECT 1 FROM zentriq.system_settings s WHERE s.key = @rk)
         """;
 
@@ -1159,6 +1194,34 @@ public static class AgentEndpoints
         cmd.Parameters.Add(new NpgsqlParameter("ip", NpgsqlDbType.Inet) { Value = (object?)ip ?? DBNull.Value });
         await using var r = await cmd.ExecuteReaderAsync(ct);
         return await r.ReadAsync(ct) ? (r.GetBoolean(0), r.GetBoolean(1)) : (false, false);
+    }
+
+    private static async Task ReinstallRemoteAgentAsync(NpgsqlDataSource ds, Zentriq.Infrastructure.Remote.RemoteSupportService remote, Guid agentId, Guid assetId,
+        string platform, ILoggerFactory lf, CancellationToken ct)
+    {
+        try
+        {
+            if (!(await Zentriq.Infrastructure.Deployment.AppControlStore.LoadSettingsAsync(ds, ct)).ProtectRemoteAgent) return;
+            await using (var open = ds.CreateCommand("SELECT 1 FROM zentriq.asset_actions WHERE agent_id = @ag AND kind = 'remote-support' AND requested_at > now() - interval '1 hour' LIMIT 1"))
+            {
+                open.Parameters.AddWithValue("ag", agentId);
+                if (await open.ExecuteScalarAsync(ct) is not null) return;
+            }
+            var sha = (await remote.AgentInstallerAsync(platform, ct)).Sha256;
+            await using var ins = ds.CreateCommand("""
+                INSERT INTO zentriq.asset_actions (asset_id, agent_id, channel, kind, target, operation, argument, detail)
+                VALUES (@as, @ag, 'agent', 'remote-support', 'Zentriq Remote Support', 'install', @sha, 'Reinstalled automatically: the protected remote support agent was removed on the device.')
+                """);
+            ins.Parameters.AddWithValue("as", assetId);
+            ins.Parameters.AddWithValue("ag", agentId);
+            ins.Parameters.AddWithValue("sha", sha);
+            await ins.ExecuteNonQueryAsync(ct);
+            lf.CreateLogger("Zentriq.Agents").LogWarning("The remote support agent was removed on the device of agent {AgentId}; reinstalling it.", agentId);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            lf.CreateLogger("Zentriq.Agents").LogWarning(ex, "Could not queue the reinstallation of the remote support agent for agent {AgentId}", agentId);
+        }
     }
 
     private static async Task<bool> PendingWorkAsync(NpgsqlDataSource ds, Guid agentId, CancellationToken ct)

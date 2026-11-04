@@ -24,6 +24,14 @@ internal static class RemoteSupportActions
         if (string.IsNullOrWhiteSpace(sha256) || sha256!.Trim().Length != 64) return (false, null, "The server did not send an installer checksum; refused.");
         if (operation == "uninstall" && !Installed()) return (true, "absent", "Zentriq Remote Support is not installed.");
 
+        // The console installs or removes it: lift its tamper protection first (restored after an installation).
+        if (UninstallProtection.CanManage) RemoteGuard.Release();
+        try { return RunInstaller(client, operation, sha256!, ct); }
+        finally { if (UninstallProtection.CanManage) try { RemoteGuard.Sync(); } catch (Exception ex) { Log.Warn("Remote support protection: " + ex.Message); } }
+    }
+
+    private static (bool Ok, string? State, string Message) RunInstaller(ServerClient client, string operation, string sha256, CancellationToken ct)
+    {
         AgentUpdater.PrepareFolder(Folder);
         var file = Path.Combine(Folder, "ZentriqRemoteSupport.exe");
         try { File.Delete(file); } catch (IOException) { }

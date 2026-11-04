@@ -75,6 +75,7 @@ internal sealed class AgentWorker
                 if (resp.RenewCertificate) Renew(state, client, ct);
                 if (resp.Actions is { Count: > 0 }) RunActions(client, resp.Actions, ct);
                 else AgentUpdater.CleanUp();
+                AppControlAgent.Sync(client, resp.AppControl, ct);
 
                 state.LastError = null;
                 var due = forceInventory || resp.InventoryDue || state.LastInventoryUtc is null || state.LastInventoryUtc < DateTime.UtcNow.AddMinutes(-state.InventoryMinutes);
@@ -419,6 +420,7 @@ internal sealed class AgentWorker
                 {
                     "uninstall" => SoftwareActions.Uninstall(a.Target, a.Argument, TimeSpan.FromMinutes(20)),
                     "remote-support" => RemoteSupportActions.Run(client, a.Operation, a.Argument, ct),
+                    "deploy" => Deployer.Run(client, a, ct),
                     _ => ServiceActions.Run(a.Kind, a.Target, a.Operation, TimeSpan.FromSeconds(60)),
                 };
             }

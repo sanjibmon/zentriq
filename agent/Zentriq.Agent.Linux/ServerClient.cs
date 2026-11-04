@@ -50,6 +50,12 @@ internal sealed class CheckinResponse
     [JsonPropertyName("serverPins")] public List<string>? ServerPins { get; set; }
     [JsonPropertyName("actions")] public List<AgentAction>? Actions { get; set; }
     [JsonPropertyName("uninstallCode")] public UninstallCodeInfo? UninstallCode { get; set; }
+    [JsonPropertyName("appControl")] public AppControlInfo? AppControl { get; set; }
+}
+
+internal sealed class AppControlInfo
+{
+    [JsonPropertyName("revision")] public long Revision { get; set; }
 }
 
 /// <summary>The uninstall code for all agents: its hash and expiry (the code itself never reaches the agents).</summary>
@@ -176,11 +182,42 @@ internal sealed class ServerClient : IDisposable
         PostJsonAsync<CheckinResponse>("api/agent/v1/checkin", new Dictionary<string, object?>
         {
             ["agentVersion"] = AgentVersion.Current, ["hostname"] = hostname, ["osName"] = osName, ["lastError"] = lastError, ["platform"] = Platform.Id,
-            ["capabilities"] = new[] { "service-control", "software-uninstall", "self-update", "remote-support", "schedule", "uninstall-protection", "presence", "tamper-protection", "linux" },
+            ["capabilities"] = new[] { "service-control", "software-uninstall", "self-update", "remote-support", "schedule", "uninstall-protection", "presence", "tamper-protection", "linux", "app-control", "software-deploy" },
             ["offlineSince"] = offlineSince?.ToString("o"), ["uninstallProtected"] = uninstallProtected,
             ["events"] = events is { Count: > 0 } ? events : null,
             ["tamperProtection"] = Protection.Reported(),
+            ["appControl"] = AppControlAgent.Report(),
         }, ct);
+
+    public async Task<string> GetAppControlPolicyAsync(CancellationToken ct)
+    {
+        using var resp = await _http.GetAsync(new Uri(_base, "api/agent/v1/app-control/policy"), ct).ConfigureAwait(false);
+        await EnsureAsync(resp).ConfigureAwait(false);
+        return await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+    }
+
+    public async Task PostAppControlEventsAsync(List<Dictionary<string, object?>> events, CancellationToken ct)
+    {
+        using var content = new StringContent(JsonSerializer.Serialize(new Dictionary<string, object?> { ["events"] = events }), Encoding.UTF8, "application/json");
+        using var resp = await _http.PostAsync(new Uri(_base, "api/agent/v1/app-control/events"), content, ct).ConfigureAwait(false);
+        await EnsureAsync(resp).ConfigureAwait(false);
+    }
+
+    public async Task PostAppControlRequestAsync(Dictionary<string, object?> request, CancellationToken ct)
+    {
+        using var content = new StringContent(JsonSerializer.Serialize(request), Encoding.UTF8, "application/json");
+        using var resp = await _http.PostAsync(new Uri(_base, "api/agent/v1/app-control/requests"), content, ct).ConfigureAwait(false);
+        await EnsureAsync(resp).ConfigureAwait(false);
+    }
+
+    public async Task DownloadDeploymentAsync(string packageId, string file, CancellationToken ct)
+    {
+        using var resp = await _http.GetAsync(new Uri(_base, "api/agent/v1/deploy/" + Uri.EscapeDataString(packageId)), HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+        await EnsureAsync(resp).ConfigureAwait(false);
+        using var src = await resp.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+        using var dst = new FileStream(file, FileMode.Create, FileAccess.Write, FileShare.None);
+        await src.CopyToAsync(dst, 81920, ct).ConfigureAwait(false);
+    }
 
     /// <summary>The live connection (held open by the server for about 25 seconds; see <see cref="Presence"/>).</summary>
     public Task<PresenceResponse> PresenceAsync(string? uninstallCodeHash, CancellationToken ct) =>

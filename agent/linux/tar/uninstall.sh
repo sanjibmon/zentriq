@@ -4,6 +4,8 @@
 set -eu
 [ "$(id -u)" = "0" ] || { echo "Run as root." >&2; exit 1; }
 /opt/zentriq-agent/zentriq-agent --check-uninstall
+/opt/zentriq-agent/zentriq-agent --cleanup-hooks >/dev/null 2>&1 || true
+rm -rf /var/spool/zentriq-agent
 if [ -d /run/systemd/system ]; then
   rm -f /etc/systemd/system/zentriq-agent.service.d/10-protection.conf
   systemctl daemon-reload >/dev/null 2>&1 || true

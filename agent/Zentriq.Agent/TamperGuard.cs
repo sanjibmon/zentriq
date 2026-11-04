@@ -268,6 +268,7 @@ internal static class TamperGuard
     {
         if (!UninstallProtection.CanManage) return;
         Sync();
+        try { RemoteGuard.Sync(); } catch (Exception ex) { Log.Warn("Remote support protection check failed: " + ex.Message); }
         if (!Wanted || _hardened != true) return;
         lock (Gate)
         {

@@ -212,6 +212,33 @@ public sealed class IntegrationStore(NpgsqlDataSource ds, CredentialProtector pr
               FROM zentriq.cloud_accounts c
              WHERE c.last_error_at > @from AND c.last_error_at <= @to AND c.last_status = 'failed'
             """),
+        new("appcontrol.blocked", """
+            SELECT 'appcontrol.blocked', CASE e.kind WHEN 'blocked' THEN 'medium' ELSE 'low' END, 'appcontrol.event:' || e.id,
+                   CASE e.kind WHEN 'blocked' THEN 'Unauthorized software blocked on ' ELSE 'Unauthorized software removed from ' END ||
+                       COALESCE(a.hostname, 'a device') || ': ' || e.name || COALESCE(' ' || e.version, ''),
+                   concat_ws(E'\n', 'Publisher: ' || e.publisher, 'User: ' || e.user_name, 'File: ' || e.path, e.detail),
+                   e.asset_id, jsonb_build_object('eventId', e.id, 'kind', e.kind, 'name', e.name, 'publisher', e.publisher), '/modules/deploy?tab=events'
+              FROM zentriq.app_control_events e LEFT JOIN zentriq.assets a ON a.id = e.asset_id
+             WHERE e.received_at > @from AND e.received_at <= @to AND e.kind IN ('blocked','removed')
+            """),
+        new("appcontrol.request", """
+            SELECT 'appcontrol.request', 'low', 'appcontrol.request:' || q.id,
+                   COALESCE(q.user_name, 'A user') || ' asks to install ' || q.name || COALESCE(' ' || q.version, '') || ' on ' || COALESCE(a.hostname, 'a device'),
+                   concat_ws(E'\n', 'Reason: ' || q.reason, 'Publisher: ' || q.publisher, 'File: ' || q.path),
+                   q.asset_id, jsonb_build_object('requestId', q.id, 'name', q.name), '/modules/deploy?tab=requests'
+              FROM zentriq.app_control_requests q LEFT JOIN zentriq.assets a ON a.id = q.asset_id
+             WHERE q.created_at > @from AND q.created_at <= @to
+            """),
+        new("deployment.failed", """
+            SELECT 'deployment.failed', 'medium', 'deployment.failed:' || x.id,
+                   initcap(j.operation) || ' of ' || p.name || COALESCE(' ' || p.version, '') || ' failed on ' || COALESCE(a.hostname, 'a device'),
+                   COALESCE(left(x.detail, 1000), 'No message.'),
+                   x.asset_id, jsonb_build_object('jobId', j.id, 'packageId', p.id), '/modules/deploy?tab=deployments&job=' || j.id
+              FROM zentriq.deployment_job_devices d JOIN zentriq.asset_actions x ON x.id = d.action_id
+              JOIN zentriq.deployment_jobs j ON j.id = d.job_id JOIN zentriq.deployment_packages p ON p.id = j.package_id
+              LEFT JOIN zentriq.assets a ON a.id = x.asset_id
+             WHERE x.status = 'failed' AND x.completed_at > @from AND x.completed_at <= @to
+            """),
         new("job.failed", """
             SELECT 'job.failed', 'medium', 'job.failed:' || j.id,
                    'Background job failed: ' || j.job_type,

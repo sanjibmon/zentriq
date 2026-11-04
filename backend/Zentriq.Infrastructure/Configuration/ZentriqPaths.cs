@@ -43,6 +43,8 @@ public sealed class ZentriqPaths
     public string Logs => Path.Combine(Root, "Logs");
     public string Packages => Path.Combine(Root, "Packages");
     public string Backups => Path.Combine(Root, "Backups");
+    /// <summary>Software packages uploaded for deployment (Software Deployment › Packages); the API writes and serves them.</summary>
+    public string DeploymentPackages => Path.Combine(Root, "Deployment");
     public string Exports => Path.Combine(Root, "Exports");
     /// <summary>Exported audit and activity logs (Audit Logs › Retention &amp; export).</summary>
     public string LogArchives => Path.Combine(Exports, "LogArchives");
