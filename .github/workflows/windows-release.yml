@@ -158,6 +158,7 @@ jobs:
           Get-NetTCPConnection -LocalPort 5432 -State Listen -ErrorAction SilentlyContinue | Format-Table | Out-String | Write-Host
 
       - name: Upgrade from the previous published release
+        timeout-minutes: 20
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -167,6 +168,7 @@ jobs:
           ./tests/installer/Invoke-UpgradeFromRelease.ps1 -OldBundle "$env:RUNNER_TEMP/previous/Zentriq-Setup-x64.exe" -NewBundle "$PWD/artifacts/release-main/Zentriq-Setup-x64.exe" -OutDir "$env:RUNNER_TEMP/acceptance-upgrade" *>&1 | Tee-Object -FilePath "$env:RUNNER_TEMP/ci-logs/5a-upgrade-from-release.log"
 
       - name: Update the last published build of the same version in place
+        timeout-minutes: 20
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -187,6 +189,7 @@ jobs:
             -OutDir $out *>&1 | Tee-Object -FilePath "$env:RUNNER_TEMP/ci-logs/5b-upgrade-same-version.log"
 
       - name: Update a half-updated server (build 27, then build 29 over it) in place
+        timeout-minutes: 20
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -203,6 +206,7 @@ jobs:
             -OutDir $out *>&1 | Tee-Object -FilePath "$env:RUNNER_TEMP/ci-logs/5c-upgrade-half-updated.log"
 
       - name: Installer acceptance suite
+        timeout-minutes: 75
         shell: pwsh
         run: ./tests/installer/Invoke-InstallerAcceptance.ps1 -Bundle "$PWD/artifacts/release-main/Zentriq-Setup-x64.exe" -UpgradeBundle "$PWD/artifacts/release-upgrade/Zentriq-Setup-x64.exe" -OutDir "$env:RUNNER_TEMP/acceptance" *>&1 | Tee-Object -FilePath "$env:RUNNER_TEMP/ci-logs/5-acceptance.log"
 

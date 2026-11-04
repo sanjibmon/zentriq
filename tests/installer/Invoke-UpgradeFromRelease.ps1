@@ -210,8 +210,9 @@ if ($withAgent) {
         try { $code = (Api POST '/agents/uninstall-code' @{} $s).code } catch { Write-Warning "uninstall code: $_" }
         $xa = @("/x", $a.PSChildName, '/qn', '/l*v', "`"$(Join-Path $OutDir 'agent-cleanup-uninstall.log')`"")
         if ($code) { $xa += "UNINSTALLCODE=$code" }
-        $p = Start-Process msiexec.exe -ArgumentList $xa -Wait -PassThru
-        Write-Host "Agent cleanup uninstall: exit $($p.ExitCode)"
+        $p = Start-Process msiexec.exe -ArgumentList $xa -PassThru
+        if (-not $p.WaitForExit(300000)) { Write-Warning 'the agent cleanup uninstall did not finish in 5 minutes; stopping it'; try { $p.Kill() } catch {} }
+        else { Write-Host "Agent cleanup uninstall: exit $($p.ExitCode)" }
         if (Get-Service ZentriqAgent -ErrorAction SilentlyContinue) { Write-Warning 'the Zentriq Agent is still installed after the cleanup' }
     }
 }
