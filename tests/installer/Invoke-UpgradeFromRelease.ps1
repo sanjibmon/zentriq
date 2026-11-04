@@ -208,11 +208,16 @@ if ($withAgent) {
     if ($a) {
         $code = $null
         try { $code = (Api POST '/agents/uninstall-code' @{} $s).code } catch { Write-Warning "uninstall code: $_" }
-        $xa = @("/x", $a.PSChildName, '/qn', '/l*v', "`"$(Join-Path $OutDir 'agent-cleanup-uninstall.log')`"")
-        if ($code) { $xa += "UNINSTALLCODE=$code" }
-        $p = Start-Process msiexec.exe -ArgumentList $xa -PassThru
-        if (-not $p.WaitForExit(300000)) { Write-Warning 'the agent cleanup uninstall did not finish in 5 minutes; stopping it'; try { $p.Kill() } catch {} }
-        else { Write-Host "Agent cleanup uninstall: exit $($p.ExitCode)" }
+        # The device accepts the code once it has received it at a check-in (the server wakes it), so retry for a while.
+        $deadline = (Get-Date).AddMinutes(3); $try = 0
+        do {
+            $try++; Start-Sleep 10
+            $xa = @("/x", $a.PSChildName, '/qn', '/l*v', "`"$(Join-Path $OutDir "agent-cleanup-uninstall-$try.log")`"")
+            if ($code) { $xa += "UNINSTALLCODE=$code" }
+            $p = Start-Process msiexec.exe -ArgumentList $xa -PassThru
+            if (-not $p.WaitForExit(300000)) { Write-Warning 'the agent cleanup uninstall did not finish in 5 minutes; stopping it'; try { $p.Kill() } catch {}; break }
+            Write-Host "Agent cleanup uninstall (attempt $try): exit $($p.ExitCode)"
+        } while ($p.ExitCode -ne 0 -and (Get-Service ZentriqAgent -ErrorAction SilentlyContinue) -and (Get-Date) -lt $deadline)
         if (Get-Service ZentriqAgent -ErrorAction SilentlyContinue) { Write-Warning 'the Zentriq Agent is still installed after the cleanup' }
     }
 }
