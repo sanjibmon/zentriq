@@ -249,6 +249,10 @@ Intune command-line arguments, the Configuration Manager install command. Zentri
   full control of the machine can still interfere (and is reported when the agent can see it); combine it with your
   EDR's tamper protection where required.
 
+* The **remote support agent** gets the same protection (Software Deployment › *Protect the remote support agent*,
+  on by default), and **application control** (approved software, *Software Deployment*) runs in the agent, so a local
+  administrator cannot turn either off without a code. See [Software Deployment](software-deployment.md).
+
 ### Automatic agent updates
 
 * *Agents › Settings › Update agents automatically when this server has a newer agent* (off by default). When it is on

@@ -13,7 +13,7 @@ cases=(
   "debian:12|deb|Debian 12 (dpkg -i)|dpkg-i|apt-get remove -y -q|yes"
   "rockylinux:9|rpm|Rocky Linux 9 (dnf)|dnf install -y -q|dnf remove -y -q|yes"
   "amazonlinux:2023|rpm|Amazon Linux 2023 (dnf)|dnf install -y -q|dnf remove -y -q|yes"
-  "opensuse/leap:15.6|rpm|openSUSE Leap 15.6 (zypper)|zypper --non-interactive install|zypper --non-interactive remove|no"
+  "opensuse/leap:15.6|rpm|openSUSE Leap 15.6 (zypper: reported, not stopped)|zypper --non-interactive install|zypper --non-interactive remove|report"
 )
 
 policy() {  # mode
@@ -37,6 +37,19 @@ for c in "${cases[@]}"; do
   else
     get_zip="$install zip"; get_tree="$install tree"
   fi
+  if [ "$fatal" = "report" ]; then
+    block_check="($get_zip) >/tmp/zip.log 2>&1 || { cat /tmp/zip.log; fail 'zip install failed'; }
+grep -l '\"audited\"' /var/lib/zentriq-agent/appcontrol/spool/*.event >/dev/null 2>&1 || fail 'no event recorded for the unapproved package'
+echo 'unapproved package reported (zypper cannot be stopped from a plugin): OK'
+rm -f /var/lib/zentriq-agent/appcontrol/spool/*.event"
+  else
+    block_check="if ($get_zip) >/tmp/zip.log 2>&1; then cat /tmp/zip.log; fail 'zip was installed although not approved'; fi
+tail -8 /tmp/zip.log
+grep -q 'unauthorized software' /tmp/zip.log || fail 'the message was not shown'
+command -v zip >/dev/null && fail 'zip present after refusal'
+grep -l '\"blocked\"' /var/lib/zentriq-agent/appcontrol/spool/*.event >/dev/null 2>&1 || fail 'no blocked event recorded'
+echo 'unapproved package refused with the message: OK'"
+  fi
   script=$(cat <<SCRIPT
 set -u
 fail() { echo "FAILED: \$*"; exit 1; }
@@ -53,12 +66,7 @@ zentriq-agent --app-control
 ($get_tree) >/tmp/tree.log 2>&1 || { cat /tmp/tree.log; fail "the approved package tree was not installed"; }
 command -v tree >/dev/null || fail "tree missing after install"
 echo "approved package installed: OK"
-if ($get_zip) >/tmp/zip.log 2>&1; then cat /tmp/zip.log; fail "zip was installed although not approved"; fi
-cat /tmp/zip.log | tail -8
-grep -q "unauthorized software" /tmp/zip.log || fail "the message was not shown"
-command -v zip >/dev/null && fail "zip present after refusal"
-grep -l '"blocked"' /var/lib/zentriq-agent/appcontrol/spool/*.event >/dev/null 2>&1 || fail "no blocked event recorded"
-echo "unapproved package refused with the message: OK"
+$block_check
 if command -v useradd >/dev/null && command -v su >/dev/null; then
   useradd -m tester >/dev/null 2>&1
   su tester -c "zentriq-agent --request zip --reason 'needed for backups'" || fail "request by a user failed"
@@ -68,6 +76,7 @@ fi
 cat > /var/lib/zentriq-agent/appcontrol/policy.json <<'JSON'
 $(policy audit)
 JSON
+command -v zip >/dev/null && $remove zip >/dev/null 2>&1
 ($get_zip) >/tmp/zip2.log 2>&1 || { cat /tmp/zip2.log; fail "audit mode refused zip"; }
 grep -l '"audited"' /var/lib/zentriq-agent/appcontrol/spool/*.event >/dev/null 2>&1 || fail "no audited event recorded"
 echo "audit mode: installed and reported: OK"
@@ -83,8 +92,6 @@ SCRIPT
   summary=$(echo "$out" | grep -E ': OK$|FAILED' | tr '\n' ';' | sed 's/|/\//g')
   if [ $code -eq 0 ] && echo "$out" | grep -q ALLDONE; then
     rows+=("| $id | $label | **PASS** | $summary |")
-  elif [ "$fatal" = "no" ]; then
-    rows+=("| $id | $label | not blocking (reported by the inventory check) | $summary |")
   else
     failed=$((failed+1)); rows+=("| $id | $label | **FAIL** | exit $code; $summary $(echo "$out" | tail -3 | tr '\n|' ' /') |")
   fi

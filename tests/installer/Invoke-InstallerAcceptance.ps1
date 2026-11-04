@@ -119,7 +119,7 @@ Remove-Item $answer -Force   # contains the administrator password
 
 if (-not $installed) {
     foreach ($t in 'T02 PostgreSQL provisioning', 'T03 Database migration', 'T04 Administrator sign-in', 'T05 API and worker services', 'T06 Trial initialization',
-                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection', 'T68 Live agent connection', 'T69 Locations and IT accessories', 'T70 Manual hardware details', 'T71 Standard and Advanced installation', 'T72 Asset lifecycle', 'T73 Cloud and infrastructure', 'T74 Own asset tags, people and bulk upload', 'T75 Backup and restore', 'T76 Roles and groups', 'T77 Log retention and export', 'T78 Agent stop and disable protection', 'T79 Automatic agent update', 'T80 Agent check-in and diagnosis commands', 'T81 Licensing plans and online activation') {
+                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection', 'T68 Live agent connection', 'T69 Locations and IT accessories', 'T70 Manual hardware details', 'T71 Standard and Advanced installation', 'T72 Asset lifecycle', 'T73 Cloud and infrastructure', 'T74 Own asset tags, people and bulk upload', 'T75 Backup and restore', 'T76 Roles and groups', 'T77 Log retention and export', 'T78 Agent stop and disable protection', 'T79 Automatic agent update', 'T80 Agent check-in and diagnosis commands', 'T81 Licensing plans and online activation', 'T82 Software Deployment policy', 'T83 Application control on Windows', 'T84 Push deployment', 'T85 Remote support agent tamper protection') {
         Record $t.Substring(0, 3) $t.Substring(4) 'BLOCKED' 'installation failed'
     }
 } else {
@@ -727,6 +727,151 @@ if (-not $installed) {
             "no code: exit $($p1.ExitCode); wrong code: exit $($p2.ExitCode); stop without a code: held, started again; code for all agents $($code.code) (valid until $($code.expiresAt)) removed the agent, the replaced code did not; reinstalled and protection switched off"
         } | Out-Null
     } else { Record 'T67' 'Agent uninstall protection' 'BLOCKED' 'agent install failed' }
+
+    # ---- Software Deployment: approved software, application control, push deployment (Windows agent) ------------
+    if ($agentInstalled) {
+        function Dep-Wait([scriptblock] $Cond, [int] $Seconds, [string] $What) {
+            $deadline = (Get-Date).AddSeconds($Seconds)
+            do { $v = & $Cond; if ($v) { return $v }; Start-Sleep 4 } while ((Get-Date) -lt $deadline)
+            throw "timed out after $Seconds s: $What"
+        }
+        function Dep-Device($s) { @(Api GET '/deployment/devices' -Session $s | ForEach-Object { $_ }) | Where-Object agentId -eq $script:agentId | Select-Object -First 1 }
+        function Dep-Upload($s, [string] $File) {
+            Invoke-RestMethod "$base/api/v1/deployment/packages/upload?fileName=$([uri]::EscapeDataString((Split-Path $File -Leaf)))" -Method Post -InFile $File `
+                -ContentType 'application/octet-stream' -Headers @{ 'X-Zentriq-Request' = '1' } -WebSession $s
+        }
+        $agentExe = Join-Path $env:ProgramFiles 'Zentriq Agent\ZentriqAgent.exe'
+        $depOk = Check 'T82' 'Software Deployment: standard catalogue, approve from the catalogue and from inventory, block rule, test, settings; the policy reaches the agent at once' {
+            $s = Login
+            $sum = Api GET '/deployment/summary' -Session $s
+            Assert ($sum.settings.mode -eq 'off') "application control should be off by default: $($sum.settings.mode)"
+            Assert ($sum.catalog.entries -ge 150) "standard catalogue: $($sum.catalog.entries) entries"
+            Assert ($sum.settings.message -like 'This is unauthorized software. Please contact your administrator*') "default message: $($sum.settings.message)"
+            $cat = Api GET '/deployment/catalog' -Session $s
+            Assert (@($cat.entries | Where-Object key -eq 'google-chrome').Count -eq 1) 'Google Chrome missing from the catalogue'
+            $r = Api POST '/deployment/catalog/approve' @{ keys = @('google-chrome', '7-zip'); action = 'allow' } -Session $s
+            Assert ($r.created -eq 4) "catalogue approval created $($r.created) rules (expected 4: Windows and Linux each)"
+            $again = Api POST '/deployment/catalog/approve' @{ keys = @('google-chrome'); action = 'allow' } -Session $s
+            Assert ($again.created -eq 0) 'approving again created duplicate rules'
+            $t1 = Api POST '/deployment/rules/test' @{ name = 'Google Chrome'; publisher = 'Google LLC'; platform = 'windows' } -Session $s
+            Assert ($t1.approved) "Google Chrome not approved: $($t1.reason)"
+            $t2 = Api POST '/deployment/rules/test' @{ name = 'Some Game'; publisher = 'Games Inc'; platform = 'windows' } -Session $s
+            Assert (-not $t2.approved -and $t2.effect -like 'installs (application control is off)*') "unknown software: $($t2 | ConvertTo-Json -Compress)"
+            $bad = Api POST '/deployment/rules' @{ action = 'block'; name = 'Bad Tool*'; platform = 'windows' } -Session $s
+            Assert ((Api POST '/deployment/rules/test' @{ name = 'Bad Tool 2'; platform = 'windows' } -Session $s).outcome -eq 'blocked') 'block rule not applied'
+            $inv = @(Api GET '/deployment/inventory?status=unapproved&platform=windows' -Session $s | ForEach-Object { $_ })
+            Assert ($inv.Count -gt 0) 'no unapproved software found on the runner'
+            $fromInv = Api POST '/deployment/rules/from-inventory' @{ items = @($inv | ForEach-Object { @{ name = $_.name; publisher = $_.publisher; platform = $_.platform } }); withPublisher = $true } -Session $s
+            Assert ($fromInv.created -ge 1) 'nothing approved from the inventory'
+            $left = @(Api GET '/deployment/inventory?status=unapproved&platform=windows' -Session $s | ForEach-Object { $_ }).Count
+            Assert ($left -eq 0) "$left item(s) still not approved after approving the inventory"
+            $v = Api PUT '/deployment/settings' @{ mode = 'audit' } -Session $s
+            Assert ($v.mode -eq 'audit' -and $v.enabledAt) 'audit mode not saved'
+            $dev = Dep-Wait { $d = Dep-Device $s; if ($d -and $d.appControl -eq 'audit' -and $d.policyCurrent) { $d } } 120 'the agent to apply audit mode'
+            $local = (& $agentExe --app-control) -join ' '
+            Assert ($local -match 'Application control: audit') "on the device: $local"
+            "catalogue $($sum.catalog.entries) entries; 4 rules from the catalogue (no duplicates); $($fromInv.created) approved from the inventory; block rule; audit mode applied by the agent within seconds ($local)"
+        }
+
+        $sessionId = (Get-Process -Id $PID).SessionId
+        if ($depOk -and $sessionId -ne 0) {
+            Check 'T83' 'Application control on Windows: an installer that is not approved is reported in audit mode, stopped with the message in block mode; the user requests approval from the message; once approved it runs' {
+                $s = Login
+                $setup = Join-Path $OutDir 'ZqDemoSetup.exe'
+                Copy-Item (Join-Path $env:windir 'System32\PING.EXE') $setup -Force
+                $sha = (Get-FileHash $setup -Algorithm SHA256).Hash.ToLowerInvariant()
+                function Run-Setup { Start-Process $setup -ArgumentList '-n', '25', '127.0.0.1' -PassThru -WindowStyle Hidden }
+                # Audit: it runs and is reported.
+                $p = Run-Setup; Start-Sleep 6
+                Assert (-not $p.HasExited) 'audit mode stopped the installer'
+                Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+                $ev = Dep-Wait { @(Api GET '/deployment/events?kind=audited&days=1' -Session $s | ForEach-Object { $_ }) | Where-Object { $_.path -like '*ZqDemoSetup.exe' -and $_.sha256 -eq $sha } | Select-Object -First 1 } 90 'the audited installation in Events'
+                # Block for a device group with this device.
+                $g = Api POST '/deployment/groups' @{ name = 'CI devices'; assetIds = @($script:agentAsset); appMode = 'block' } -Session $s
+                $script:ciGroup = $g.id
+                Dep-Wait { $d = Dep-Device $s; if ($d -and $d.appControl -eq 'block' -and $d.policyCurrent) { $d } } 120 'the agent to apply block mode (device group)' | Out-Null
+                $p = Run-Setup
+                $deadline = (Get-Date).AddSeconds(15)
+                while (-not $p.HasExited -and (Get-Date) -lt $deadline) { Start-Sleep 1 }
+                Assert ($p.HasExited) 'block mode did not stop the installer'
+                $stopSec = [int]((Get-Date) - $p.StartTime).TotalSeconds
+                $blk = Dep-Wait { @(Api GET '/deployment/events?kind=blocked&days=1' -Session $s | ForEach-Object { $_ }) | Where-Object { $_.path -like '*ZqDemoSetup.exe' } | Select-Object -First 1 } 90 'the blocked installation in Events'
+                # The message on the user's desktop; "Request approval" goes back to the agent over the notice's own pipe.
+                $notice = Dep-Wait { Get-CimInstance Win32_Process -Filter "Name='ZentriqAgent.exe'" | Where-Object CommandLine -match '--app-notice' | Select-Object -First 1 } 20 'the message on the desktop'
+                $details = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(($notice.CommandLine -split '\s+')[-1])) | ConvertFrom-Json
+                Assert ($details.message -like 'This is unauthorized software*') "message: $($details.message)"
+                $pipe = New-Object System.IO.Pipes.NamedPipeClientStream('.', $details.pipe, [System.IO.Pipes.PipeDirection]::InOut); $pipe.Connect(5000)
+                $w = New-Object System.IO.StreamWriter($pipe); $w.AutoFlush = $true; $rd = New-Object System.IO.StreamReader($pipe)
+                $w.WriteLine('{"reason":"CI test: needed for the network check"}'); $ack = $rd.ReadLine(); $pipe.Dispose()
+                Assert ($ack -match '"ok":true') "request not accepted by the agent: $ack"
+                Stop-Process -Id $notice.ProcessId -Force -ErrorAction SilentlyContinue
+                $req = Dep-Wait { @(Api GET '/deployment/requests?status=pending' -Session $s | ForEach-Object { $_ }) | Where-Object { $_.sha256 -eq $sha } | Select-Object -First 1 } 90 'the request in Requests'
+                Assert ($req.reason -like 'CI test*' -and $req.user) "request: $($req | ConvertTo-Json -Compress)"
+                # Approve exactly this file for this device: it runs.
+                $ap = Api POST "/deployment/requests/$($req.id)/approve" @{ scope = 'device'; match = 'hash' } -Session $s
+                Assert $ap.ruleId 'no rule from the approval'
+                Dep-Wait { $d = Dep-Device $s; if ($d -and $d.policyCurrent) { $d } } 120 'the agent to receive the approval' | Out-Null
+                Start-Sleep 3
+                $p = Run-Setup; Start-Sleep 6
+                Assert (-not $p.HasExited) 'the approved file was stopped'
+                Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+                $rq = @(Api GET '/deployment/requests?status=approved' -Session $s | ForEach-Object { $_ }) | Where-Object id -eq $req.id
+                Assert ($rq.ruleId -eq $ap.ruleId) 'request not marked approved'
+                "audit: ran and reported ($($ev.name)); block: stopped within $stopSec s, reported, message '$($details.message)' shown to the user; request '$($req.reason)' by $($req.user); approved for this device by SHA-256: runs"
+            } | Out-Null
+        } else { Record 'T83' 'Application control on Windows' 'NOT RUN' "the tests run in session $sessionId (services are not checked)" }
+
+        if ($depOk) {
+            Check 'T84' 'Push deployment: upload a package, install on the device with per-device status, a failing package and retry, uninstall; WDAC audit for a device group' {
+                $s = Login
+                $tool = Join-Path $OutDir 'zq-ci-tool-setup.exe'
+                Copy-Item (Join-Path $env:windir 'System32\cmd.exe') $tool -Force
+                $marker = Join-Path $env:ProgramData 'zq-ci-deploy.txt'
+                Remove-Item $marker -ErrorAction SilentlyContinue
+                $up = Dep-Upload $s $tool
+                Assert ($up.format -eq 'exe' -and $up.sha256 -eq (Get-FileHash $tool -Algorithm SHA256).Hash.ToLowerInvariant()) "upload: $($up | ConvertTo-Json -Compress)"
+                $pkg = Api POST '/deployment/packages' @{ uploadId = $up.uploadId; name = 'ZQ CI Tool'; version = '1.0'; installArgs = "/c echo deployed> `"$marker`""; detectName = 'ZQ CI Tool' } -Session $s
+                $job = Api POST '/deployment/jobs' @{ packageId = $pkg.id; operation = 'install'; assetIds = @($script:agentAsset) } -Session $s
+                Assert ($job.sent -eq 1 -and $job.skipped -eq 0) "job: $($job | ConvertTo-Json -Compress)"
+                $d = Dep-Wait { $x = @(Api GET "/deployment/jobs/$($job.id)" -Session $s | ForEach-Object { $_ }) | Select-Object -First 1; if ($x.status -in 'succeeded', 'failed') { $x } } 180 'the installation on the device'
+                Assert ($d.status -eq 'succeeded') "install: $($d.status) $($d.detail)"
+                Assert ((Test-Path $marker) -and (Get-Content $marker -Raw) -match 'deployed') 'the package did not run on the device'
+                # A package that fails, and a retry.
+                $up2 = Dep-Upload $s $tool
+                $bad = Api POST '/deployment/packages' @{ uploadId = $up2.uploadId; name = 'ZQ CI Broken'; version = '1.0'; installArgs = '/c exit 7'; approve = $false } -Session $s
+                $job2 = Api POST '/deployment/jobs' @{ packageId = $bad.id; operation = 'install'; assetIds = @($script:agentAsset) } -Session $s
+                $f = Dep-Wait { $x = @(Api GET "/deployment/jobs/$($job2.id)" -Session $s | ForEach-Object { $_ }) | Select-Object -First 1; if ($x.status -in 'succeeded', 'failed') { $x } } 180 'the failing installation'
+                Assert ($f.status -eq 'failed' -and $f.detail -match 'exit code 7') "failing package: $($f.status) $($f.detail)"
+                $rt = Api POST "/deployment/jobs/$($job2.id)/retry" -Session $s
+                Assert ($rt.retried -eq 1) 'retry not queued'
+                $jobs = @(Api GET '/deployment/jobs' -Session $s | ForEach-Object { $_ })
+                Assert (@($jobs | Where-Object { $_.id -eq $job.id -and $_.succeeded -eq 1 }).Count -eq 1) 'job list does not show the success'
+                # Uninstall (registered software): reported as done when it is not installed.
+                $job3 = Api POST '/deployment/jobs' @{ packageId = $pkg.id; operation = 'uninstall'; assetIds = @($script:agentAsset) } -Session $s
+                $u = Dep-Wait { $x = @(Api GET "/deployment/jobs/$($job3.id)" -Session $s | ForEach-Object { $_ }) | Select-Object -First 1; if ($x.status -in 'succeeded', 'failed') { $x } } 180 'the uninstall on the device'
+                Assert ($u.status -eq 'succeeded') "uninstall: $($u.status) $($u.detail)"
+                # WDAC in audit mode for the device group (or reported as not available on this edition).
+                $wdac = 'not tried'
+                if ($script:ciGroup) {
+                    Api PUT "/deployment/groups/$($script:ciGroup)" @{ name = 'CI devices'; assetIds = @($script:agentAsset); appMode = 'audit'; wdacMode = 'audit' } -Session $s | Out-Null
+                    $dw = Dep-Wait { $x = Dep-Device $s; if ($x -and $x.policyCurrent -and $x.wdac -in 'audit', 'unsupported', 'error') { $x } } 300 'WDAC audit on the device'
+                    Assert ($dw.wdac -in 'audit', 'unsupported') "WDAC: $($dw.wdac) (see the agent log)"
+                    $wdac = $dw.wdac
+                    if ($wdac -eq 'audit') { Assert (Test-Path (Join-Path $env:windir 'System32\CodeIntegrity\CiPolicies\Active\{7A5C1E3B-2F4D-4B8E-9C6A-5D3E2F1A0B9C}.cip')) 'WDAC policy file missing' }
+                    Api PUT "/deployment/groups/$($script:ciGroup)" @{ name = 'CI devices'; assetIds = @($script:agentAsset); appMode = 'audit'; wdacMode = 'off' } -Session $s | Out-Null
+                    Dep-Wait { $x = Dep-Device $s; if ($x -and $x.policyCurrent -and $x.wdac -in 'off', 'unsupported') { $x } } 300 'WDAC off again' | Out-Null
+                }
+                "installed through the agent ($($d.detail)); failing package reported ($($f.detail)) and retried; uninstall done; WDAC for the group: $wdac"
+            } | Out-Null
+            # Back to off for the remaining tests.
+            try {
+                $s = Login
+                Api PUT '/deployment/settings' @{ mode = 'off' } -Session $s | Out-Null
+                if ($script:ciGroup) { Api DELETE "/deployment/groups/$($script:ciGroup)" -Session $s | Out-Null }
+            } catch { Write-Host "Could not reset application control: $_" }
+        } else { Record 'T84' 'Push deployment' 'BLOCKED' 'T82 failed' }
+    }
+
 
     if ($agentInstalled) {
         Check 'T29' 'Agent revocation is enforced and uninstall removes the agent' {
@@ -1415,6 +1560,27 @@ if (-not $installed) {
             Assert ($r.queued -eq 1) "install not queued: $($r.message)"
             Remote-Wait { Get-Service ZentriqRemoteSupport -ErrorAction SilentlyContinue | Where-Object Status -eq 'Running' } 8 'the remote agent to be installed' | Out-Null
             $me = Remote-Wait { Remote-Me $s } 5 "$env:COMPUTERNAME back online in Remote Support"
+            # ---- T85: the remote support agent is tamper-protected like the Zentriq Agent ----
+            Check 'T85' 'Remote support agent tamper protection: with tamper protection on, administrators cannot stop, disable or reconfigure ZentriqRemoteSupport; the console shows it protected; lifted again when protection is switched off' {
+                $hardSddl = [regex]::Escape('(A;;CCLCSWRPLOCRRC;;;BA)')
+                Api PUT '/agents/settings' @{ checkinMinutes = 30; inventoryMinutes = 180; uninstallProtection = $true; autoUpdate = $false; autoUpdateMax = 25 } -Session $s | Out-Null
+                try {
+                    Remote-Wait { if (((& sc.exe sdshow ZentriqRemoteSupport) -join '') -match $hardSddl) { $true } } 6 'the remote support service to be protected' | Out-Null
+                    $out = (& sc.exe stop ZentriqRemoteSupport 2>&1) -join ' '
+                    $stopExit = $LASTEXITCODE
+                    Start-Sleep 2
+                    Assert ($stopExit -ne 0 -and (Get-Service ZentriqRemoteSupport).Status -eq 'Running') "an administrator could stop the protected remote support agent: $out"
+                    $cfg = (& sc.exe config ZentriqRemoteSupport start= disabled 2>&1) -join ' '
+                    Assert ($LASTEXITCODE -ne 0) "an administrator could disable the protected remote support agent: $cfg"
+                    $del = (& sc.exe delete ZentriqRemoteSupport 2>&1) -join ' '
+                    Assert ($LASTEXITCODE -ne 0 -and (Get-Service ZentriqRemoteSupport -ErrorAction SilentlyContinue)) "an administrator could delete the protected service: $del"
+                    $dev = Remote-Wait { @(Api GET '/deployment/devices' -Session $s | ForEach-Object { $_ }) | Where-Object { $_.remoteProtection -eq 'on' } | Select-Object -First 1 } 5 'the console to show the remote support agent protected'
+                    "stop refused (exit $stopExit); disable and delete refused; console: protected on $($dev.hostname)"
+                } finally {
+                    Api PUT '/agents/settings' @{ checkinMinutes = 30; inventoryMinutes = 180; uninstallProtection = $false; autoUpdate = $false; autoUpdateMax = 25 } -Session $s | Out-Null
+                    Remote-Wait { if (-not (((& sc.exe sdshow ZentriqRemoteSupport) -join '') -match $hardSddl)) { $true } } 6 'the remote support protection to be lifted' | Out-Null
+                }
+            } | Out-Null
             $done = @((Api GET '/activity?kind=remote-support' -Session $s).items | Where-Object { $_.status -eq 'succeeded' }).Count
             "removed and reinstalled through the Zentriq agent; $($me.name) online again; $done successful remote-support action(s) in the Activity log"
         } finally {

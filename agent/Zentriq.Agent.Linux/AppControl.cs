@@ -217,7 +217,7 @@ internal static class AppControlAgent
     /// Decides on packages about to be installed. Exit code 0: go ahead; 1: refused (block mode), with the message on
     /// standard error for the package manager to show.
     /// </summary>
-    public static int Check(IReadOnlyList<SoftwareCandidate> packages, string manager)
+    public static int Check(IReadOnlyList<SoftwareCandidate> packages, string manager, bool canBlock = true)
     {
         if (packages.Count == 0) return 0;
         var policy = Policy;
@@ -231,9 +231,17 @@ internal static class AppControlAgent
             var d = AppControl.Evaluate(policy, c);
             if (d.Approved) continue;
             refused.Add((c, d));
-            SpoolEvent(policy.Mode == "block" ? "blocked" : "audited", c, user, $"{d.Reason} ({manager})" + (policy.Mode == "block" ? "" : " Audit mode: the installation was allowed."));
+            var block = policy.Mode == "block" && canBlock;
+            SpoolEvent(block ? "blocked" : "audited", c, user, $"{d.Reason} ({manager})" + (block ? "" : policy.Mode == "block"
+                ? " The package manager cannot be stopped from a plugin; the installation went ahead and is removed by the inventory check when automatic removal is on."
+                : " Audit mode: the installation was allowed."));
         }
         if (refused.Count == 0 || policy.Mode != "block") return 0;
+        if (!canBlock)
+        {
+            Console.Error.WriteLine($"\nZentriq: {policy.Message}\n  Not approved (reported to your administrator): {string.Join(", ", refused.Select(r => r.C.Name))}");
+            return 0;
+        }
         var sb = new StringBuilder();
         sb.AppendLine();
         sb.AppendLine("Zentriq: " + policy.Message);
@@ -343,17 +351,9 @@ internal static class AppControlAgent
                         }
                 }
                 catch (JsonException) { }
-                var saved = Console.Error;
-                var err = new StringWriter();
-                Console.SetError(err);
-                var code = Check(list, "zypper");
-                Console.SetError(saved);
-                if (code != 0)
-                {
-                    saved.Write(err.ToString());
-                    WriteFrame(stdout, "ERROR", err.ToString().Trim());
-                    continue;
-                }
+                // libzypp does not let a commit plugin stop the commit: the packages are reported (and removed later by the
+                // inventory check when automatic removal is on).
+                Check(list, "zypper", canBlock: false);
             }
             WriteFrame(stdout, "ACK", "");
         }

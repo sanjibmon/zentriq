@@ -141,6 +141,11 @@ All three permissions are given to the Administrator role.
   **Remove** works the same way.
 - **Other Windows devices:** open Deployment & settings, click **Download ZentriqRemoteSupport.exe** and run `ZentriqRemoteSupport.exe -fullinstall` as administrator (or deploy it with GPO or Intune). Remove it with `-fulluninstall`.
 
+**Tamper protection.** While the Zentriq Agent's tamper protection is on, the remote support agent is protected the
+same way: administrators on the device cannot stop, disable or delete it, it is started again when stopped, and the
+server reinstalls it if it is removed. Installing and removing it from the console keeps working. See
+[Software Deployment › Remote support agent tamper protection](software-deployment.md#remote-support-agent-tamper-protection).
+
 Every 2 minutes the Worker syncs the engine's device list to Zentriq. Devices are matched to assets by host name; you can match one by hand if the names differ.
 
 ## Consent (Settings)

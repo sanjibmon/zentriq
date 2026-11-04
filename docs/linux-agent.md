@@ -107,6 +107,15 @@ The same settings are collected over SSH by agentless scans (with sudo for the r
 | Update the agent (*Agents › Update* or automatic updates) | The agent downloads the package for its platform and format from the server, checks the SHA-256 and installs it; enrollment and settings are kept |
 | Remote support (install / remove) | Installs the remote support agent for Linux (x64, ARM64) from your server |
 | Pause / resume tamper protection, restart, disable | As on Windows |
+| Deploy a package (*Software Deployment*) | Installs a .deb or .rpm package from your server with apt, dnf, zypper or yum (dependencies included); uninstall by package name |
+
+## Application control
+
+With *Software Deployment* in audit or block mode the agent checks every package **before** the package manager
+installs it — dpkg (also apt), dnf 4 and zypper hooks — against the organisation's approved software. In block mode a
+package that is not approved is refused with your message; users ask for approval with
+`zentriq-agent --request <package> --reason "…"`. Updates of installed packages, kernels, firmware and libraries are
+always allowed. Details: [Software Deployment](software-deployment.md#on-linux-devices).
 
 ## Tamper protection
 
@@ -122,6 +131,9 @@ While tamper protection is on (*Agents › Settings*):
   without a code.
 * Wrong codes (5 in 15 minutes lock it) and every undone change are reported to the console as tampering.
 
+The **remote support agent** is protected the same way (its `systemctl stop` is refused, it is restarted and enabled
+again, and reinstalled by the server if it is removed); see [Software Deployment](software-deployment.md#remote-support-agent-tamper-protection).
+
 Root can always defeat protection on its own machine (for example by deleting the files); Zentriq reports what it sees.
 
 ## Commands on the device
@@ -135,3 +147,5 @@ Root can always defeat protection on its own machine (for example by deleting th
 | `zentriq-agent --collect <file>` | Write the inventory as JSON (nothing is sent) |
 | `zentriq-agent --uninstall <code>` | Remove the agent |
 | `zentriq-agent --stop <code>`, `--disable <code>`, `--enable`, `--restart`, `--protection` | Service control |
+| `zentriq-agent --app-control [--test <package>]` | Application control on this device: mode, approved rules, hooks |
+| `zentriq-agent --request <package> [--version <v>] [--reason <text>]` | Ask for approval of a blocked package (any user) |
