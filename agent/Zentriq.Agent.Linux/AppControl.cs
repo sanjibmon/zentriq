@@ -89,6 +89,7 @@ internal static class AppControlAgent
                 // Readable by the hooks only (root): they run as root under the package manager.
                 Log.Info($"Application control policy {p.Revision}: {p.Mode}, {p.Rules.Count} rule(s)" + (old.Mode != p.Mode ? $" (was {old.Mode})" : "") + ".");
                 Apply(p);
+                AgentService.RequestServerWake();   // report the applied policy at once (the console shows it as current)
             }
             catch (Exception ex) { Log.Warn("Application control: could not fetch the policy: " + AgentWorker.Describe(ex)); }
         }

@@ -92,6 +92,7 @@ internal static class AppControlAgent
                 lock (Gate) _policy = p;
                 Log.Info($"Application control policy {p.Revision}: {p.Mode}, {p.Rules.Count} rule(s), WDAC {p.Wdac}" + (old.Mode != p.Mode ? $" (was {old.Mode})" : "") + ".");
                 Apply(p, startup: false);
+                AgentService.RequestServerWake();   // report the applied policy at once (the console shows it as current)
             }
             catch (Exception ex) { Log.Warn("Application control: could not fetch the policy: " + AgentWorker.Describe(ex)); }
         }
