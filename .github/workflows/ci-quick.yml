@@ -95,6 +95,11 @@ jobs:
         run: |
           set -o pipefail
           tests/linux-agent/test-distros.sh "$RUNNER_TEMP/linux-agent" linux-agent-distros.md 2>&1 | tee linux-agent-distros.log
+      - name: Linux application control (package-manager hooks)
+        if: always()
+        run: |
+          set -o pipefail
+          tests/linux-agent/test-app-control.sh "$RUNNER_TEMP/linux-agent" linux-app-control.md 2>&1 | tee linux-app-control.log
       - name: Web console
         if: always()
         working-directory: frontend
@@ -106,7 +111,7 @@ jobs:
         if: always()
         run: |
           d="$RUNNER_TEMP/logs"; mkdir -p "$d"
-          cp build.log test.log license-server-test.log mesh.log snmp.log linux-agent-build.log linux-agent-distros.log linux-agent-distros.md "$d/" 2>/dev/null || true
+          cp build.log test.log license-server-test.log mesh.log snmp.log linux-agent-build.log linux-agent-distros.log linux-agent-distros.md linux-app-control.log linux-app-control.md "$d/" 2>/dev/null || true
           if [ -d "$RUNNER_TEMP/linux-agent/results" ]; then cp -r "$RUNNER_TEMP/linux-agent/results" "$d/linux-agent-results"; fi
           cp frontend/build.log "$d/console.log" 2>/dev/null || true
           if [ -d frontend/dist ]; then cp -r frontend/dist "$d/dist"; fi

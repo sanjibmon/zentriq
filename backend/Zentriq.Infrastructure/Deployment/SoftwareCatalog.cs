@@ -69,7 +69,9 @@ public sealed class SoftwareCatalog
             {
                 var names = e.NamePatterns.Where(n => !n.Contains(' ')).Concat(new[] { e.DebPackage, e.RpmPackage }.Where(n => !string.IsNullOrEmpty(n))!)
                     .Select(n => n!).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-                if (names.Count > 0) yield return ("linux", string.Join(";", names), null);
+                // Package names have no spaces; without a known one, the name in package style ("cisco-secure-client*").
+                if (names.Count == 0) names.Add(System.Text.RegularExpressions.Regex.Replace(e.Name.ToLowerInvariant(), "[^a-z0-9+]+", "-").Trim('-') + "*");
+                yield return ("linux", string.Join(";", names), null);
             }
             else
             {

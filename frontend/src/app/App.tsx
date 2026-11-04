@@ -26,6 +26,7 @@ import { VulnerabilitiesPage } from '../features/vulnerabilities/Vulnerabilities
 import { SecurityPage } from '../features/security/SecurityPage';
 import { IntegrationsPage } from '../features/integrations/IntegrationsPage';
 import { RemotePage } from '../features/remote/RemotePage';
+import { DeploymentPage } from '../features/deployment/DeploymentPage';
 import { ActivityPage } from '../features/activity/ActivityPage';
 import { LoginPage } from '../features/login/LoginPage';
 import { ResetPasswordPage } from '../features/login/ResetPasswordPage';
@@ -97,6 +98,7 @@ function Routes() {
   if (path === '/security' || path === '/modules/config') return <SecurityPage />;
   if (path === '/integrations' || path === '/modules/integrations') return <IntegrationsPage />;
   if (path === '/remote' || path === '/modules/remote') return <RemotePage />;
+  if (path === '/deployment' || path === '/modules/deploy') return <DeploymentPage />;
   if (path.startsWith('/modules/')) return <ModulePage id={path.slice('/modules/'.length)} />;
   return <ModulePage id="" />;
 }

@@ -111,6 +111,13 @@ internal static class Program
                     return AppControlAgent.ZyppPlugin();
                 case "--request":
                     return AppControlAgent.Request(args);
+                case "--install-hooks":
+                    if (!RequireRoot()) return 1;
+                    AppControlAgent.PrepareSpools();
+                    if (AppControlAgent.Policy.Mode == "off") { PackageHooks.Remove(); Console.WriteLine("Application control is off: no hooks."); return 0; }
+                    PackageHooks.Install();
+                    Console.WriteLine(PackageHooks.Installed ? "Package-manager hooks installed." : "No supported package manager found (dpkg, dnf 4, zypper).");
+                    return PackageHooks.Installed ? 0 : 1;
                 case "--cleanup-hooks":
                     PackageHooks.Remove();
                     RemoteGuard.Release();

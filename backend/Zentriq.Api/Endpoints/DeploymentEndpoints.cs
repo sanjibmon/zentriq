@@ -349,8 +349,8 @@ public static class DeploymentEndpoints
                 SELECT g.id, g.name, g.description, g.department_ids, g.location_ids, g.asset_ids, g.platform, g.app_mode, g.wdac_mode, g.created_at,
                        (SELECT count(*) FROM zentriq.assets a WHERE a.status = 'active' AND {AppControlStore.MemberSql}),
                        (SELECT count(*) FROM zentriq.app_control_rules r WHERE r.group_id = g.id),
-                       COALESCE((SELECT array_agg(d.name ORDER BY d.name) FROM zentriq.departments d WHERE d.id = ANY(g.department_ids)), '{{}}'),
-                       COALESCE((SELECT array_agg(l.name ORDER BY l.name) FROM zentriq.locations l WHERE l.id = ANY(g.location_ids)), '{{}}')
+                       COALESCE((SELECT array_agg(d.name ORDER BY d.name) FROM zentriq.departments d WHERE d.id = ANY(g.department_ids)), ARRAY[]::text[]),
+                       COALESCE((SELECT array_agg(l.name ORDER BY l.name) FROM zentriq.locations l WHERE l.id = ANY(g.location_ids)), ARRAY[]::text[])
                   FROM zentriq.device_groups g ORDER BY lower(g.name)
                 """);
             var list = new List<object>();

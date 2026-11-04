@@ -37,7 +37,7 @@ export const NAV: [string, NavItem[]][] = [
     { id: 'patch', label: 'Patch Management', icon: 'patch', path: '/modules/patch', ready: false, permission: 'assets.view' },
     { id: 'vuln', label: 'Vulnerability Management', icon: 'bug', path: '/vulnerabilities', ready: true, permission: 'vuln.view' },
     { id: 'config', label: 'Security Configuration', icon: 'sliders', path: '/security', ready: true, permission: 'security.view' },
-    { id: 'deploy', label: 'Software Deployment', icon: 'package', path: '/modules/deploy', ready: false, permission: 'assets.view' },
+    { id: 'deploy', label: 'Software Deployment', icon: 'package', path: '/modules/deploy', ready: true, permission: 'deploy.view' },
     { id: 'licenses', label: 'Software Licenses', icon: 'key', path: '/modules/licenses', ready: false, permission: 'assets.view' },
     { id: 'webapps', label: 'Web Apps & Accounts', icon: 'globe', path: '/modules/webapps', ready: false, permission: 'assets.view' },
   ]],

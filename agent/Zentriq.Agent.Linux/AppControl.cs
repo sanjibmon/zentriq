@@ -37,16 +37,23 @@ internal static class AppControlAgent
         }
     }
 
+    /// <summary>The spool folders (events from the hooks; requests from any user: write-only, sticky).</summary>
+    public static void PrepareSpools()
+    {
+        Directory.CreateDirectory(Spool);
+        Directory.CreateDirectory(RequestSpool);
+        File.SetUnixFileMode(RequestSpool, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute | UnixFileMode.GroupWrite | UnixFileMode.GroupExecute
+                                           | UnixFileMode.OtherWrite | UnixFileMode.OtherExecute | UnixFileMode.StickyBit);
+        File.SetUnixFileMode("/var/spool/zentriq-agent", UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute | UnixFileMode.GroupExecute | UnixFileMode.OtherExecute);
+    }
+
     /// <summary>The service started: hooks and the remote support agent's protection as the saved policy says; watch the spools.</summary>
     public static void OnServiceStart()
     {
         if (!Shell.IsRoot) return;
         try
         {
-            Directory.CreateDirectory(Spool);
-            Directory.CreateDirectory(RequestSpool);
-            File.SetUnixFileMode(RequestSpool, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute | UnixFileMode.GroupWrite | UnixFileMode.GroupExecute
-                                               | UnixFileMode.OtherWrite | UnixFileMode.OtherExecute | UnixFileMode.StickyBit);
+            PrepareSpools();
             Apply(Policy);
             _spoolWatch = Watch(Spool);
             _requestWatch = Watch(RequestSpool);
@@ -239,7 +246,14 @@ internal static class AppControlAgent
     /// <summary>dpkg pre-invoke hook: the .deb files given to the dpkg process that runs the hook (dpkg -i, apt).</summary>
     public static int CheckDpkg()
     {
-        var debs = DpkgArguments().Where(a => a.EndsWith(".deb", StringComparison.OrdinalIgnoreCase) && File.Exists(a)).Distinct().ToList();
+        // apt passes the archives, or (many packages) a folder of links with --recursive.
+        var args = DpkgArguments();
+        var debs = args.Where(a => a.EndsWith(".deb", StringComparison.OrdinalIgnoreCase) && File.Exists(a))
+            .Concat(args.Where(a => (args.Contains("--recursive") || args.Contains("-R")) && !a.StartsWith('-') && Directory.Exists(a)).SelectMany(d =>
+            {
+                try { return Directory.EnumerateFiles(d, "*.deb", SearchOption.AllDirectories); } catch (Exception) { return []; }
+            }))
+            .Distinct().Take(5000).ToList();
         if (debs.Count == 0) return 0;
         var list = new List<SoftwareCandidate>();
         foreach (var deb in debs)
