@@ -279,6 +279,8 @@ if (-not $installed) {
 
     $script:agentAsset = $null
     $agentMsi = Join-Path $OutDir 'ZentriqAgent-x64.msi'
+    # An agent left from an earlier suite on this machine would keep its old enrollment: the clean-install suite needs none.
+    if (Get-Service ZentriqAgent -ErrorAction SilentlyContinue) { Write-Warning 'A Zentriq Agent is already installed on this machine before T26.' }
     $agentInstalled = Check 'T26' 'Agent: enrollment code, MSI download from the console, silent install, inventory received' {
         $s = Login
         $pkg = Api GET '/agents/package' -Session $s
@@ -300,7 +302,7 @@ if (-not $installed) {
         $deadline = (Get-Date).AddMinutes(4)
         do {
             Start-Sleep 5
-            $a = @(Api GET '/agents' -Session $s) | Where-Object { $_.assetId -and $_.lastInventoryAt } | Select-Object -First 1
+            $a = @(Api GET '/agents' -Session $s | ForEach-Object { $_ }) | Where-Object { $_.assetId -and $_.lastInventoryAt } | Select-Object -First 1
         } while (-not $a -and (Get-Date) -lt $deadline)
         if (-not $a) { & (Join-Path $env:ProgramFiles 'Zentriq Agent\ZentriqAgent.exe') --status | Out-Host; throw 'agent did not enroll and send inventory within 4 minutes' }
         $script:agentAsset = $a.assetId
@@ -2593,6 +2595,10 @@ $environment = [ordered]@{ os = "$($os.Caption) $($os.Version)"; machine = $env:
 $md = @("# Zentriq installer acceptance results", '', "Environment: $($environment.os) ($($environment.machine)), $($environment.finishedUtc)", '', '| ID | Test | Result | Detail |', '|---|---|---|---|')
 $md += $results | ForEach-Object { "| $($_.id) | $($_.test) | **$($_.outcome)** | $(($_.detail -replace '\|', '/') -replace "`r?`n", ' ') |" }
 $md | Set-Content (Join-Path $OutDir 'installer-test-results.md') -Encoding UTF8
+
+# The agent's own log (application control, deployments, tamper protection).
+New-Item -ItemType Directory -Force -Path (Join-Path $OutDir 'agent-logs') | Out-Null
+Get-ChildItem 'C:\ProgramData\Zentriq\Agent\Logs' -ErrorAction SilentlyContinue | Copy-Item -Destination (Join-Path $OutDir 'agent-logs') -ErrorAction SilentlyContinue
 
 # Collect logs for the artifact (secrets files are never copied).
 $logOut = Join-Path $OutDir 'logs'

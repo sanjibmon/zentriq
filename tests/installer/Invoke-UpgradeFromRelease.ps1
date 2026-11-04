@@ -203,8 +203,17 @@ if ($withAgent) {
             Record $P4 "Agent $($agentBefore.version) -> $($ag.version) updated in place (no enrollment code)" 'PASS' "old agent checked in to the upgraded server; same registration $($ag.id) and certificate; console updates now available; one 'Zentriq Agent' entry ($($entries[0].DisplayVersion)); service running"
         } catch { Record $P4 'Agent updated in place' 'FAIL' $_.Exception.Message; $ok = $false }
     } else { Record $P4 'Agent updated in place' 'BLOCKED' 'server upgrade or old agent failed' }
+    # Remove the agent while its server still runs: it is tamper-protected, so the uninstall needs a code from the console.
     $a = Arp 'Zentriq Agent' | Select-Object -First 1
-    if ($a) { Start-Process msiexec.exe -ArgumentList '/x', $a.PSChildName, '/qn' -Wait | Out-Null }
+    if ($a) {
+        $code = $null
+        try { $code = (Api POST '/agents/uninstall-code' @{} $s).code } catch { Write-Warning "uninstall code: $_" }
+        $xa = @("/x", $a.PSChildName, '/qn', '/l*v', "`"$(Join-Path $OutDir 'agent-cleanup-uninstall.log')`"")
+        if ($code) { $xa += "UNINSTALLCODE=$code" }
+        $p = Start-Process msiexec.exe -ArgumentList $xa -Wait -PassThru
+        Write-Host "Agent cleanup uninstall: exit $($p.ExitCode)"
+        if (Get-Service ZentriqAgent -ErrorAction SilentlyContinue) { Write-Warning 'the Zentriq Agent is still installed after the cleanup' }
+    }
 }
 
 # ---- clean the machine for the clean-install suite -----------------------------------------------
