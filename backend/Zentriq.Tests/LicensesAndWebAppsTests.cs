@@ -302,7 +302,8 @@ public sealed class LicensesAndWebAppsDbTests : IAsyncLifetime
     public async Task Microsoft_365_licences_users_and_products()
     {
         await using var ds = NpgsqlDataSource.Create(_db.AppConnection);
-        var protector = new CredentialProtector(() => new AppSecrets { CredentialKey = SecretStore.NewKey() });
+        var keys = new AppSecrets { CredentialKey = SecretStore.NewKey() };
+        var protector = new CredentialProtector(() => keys);
         var conn0 = Guid.NewGuid();
         await Scalar(ds, "INSERT INTO zentriq.sam_cloud_connections (id, name, tenant_id, client_id, client_protected) VALUES (@id, 'Contoso', 'contoso.onmicrosoft.com', @c, @s)",
             ("id", conn0), ("c", Guid.NewGuid().ToString()), ("s", M365Sync.Protect(protector, conn0, "value")));

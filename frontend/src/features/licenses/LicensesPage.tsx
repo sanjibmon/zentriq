@@ -298,7 +298,7 @@ function CloudTab({ tick, canManage, changed, failed }: Ctx) {
             {(k.inactiveAssigned ?? 0) > 0 && <> {' '}<button className="link-btn" onClick={(e) => { e.stopPropagation(); setUsers({ sku: k, filter: 'inactive' }); }}>{k.inactiveAssigned} inactive</button></>}</> },
           { key: 'e', label: 'Renews / Ends', render: (k) => k.nextLifecycle ? <>{fmt.day(k.nextLifecycle)}{k.isTrial && <Pill tone="warn">Trial</Pill>}</> : '—' },
           { key: 's', label: 'Status', render: (k) => <Pill tone={k.status === 'Enabled' ? 'ok' : k.status === 'Warning' ? 'warn' : k.status ? 'crit' : ''}>{k.status === 'Warning' ? 'Grace Period' : k.status ?? '—'}</Pill> },
-          { key: 'p', label: '', render: (k) => k.productId ? <Link to={`/modules/licenses/products/${k.productId}`} onClick={(e) => e.stopPropagation()}>Product</Link> : null },
+          { key: 'p', label: '', render: (k) => k.productId ? <Link to={`/modules/licenses/products/${k.productId}`}>Product</Link> : null },
         ]} />
       </Panel>
       {users && <CloudUsers sku={users.sku} initialFilter={users.filter} onClose={() => setUsers(null)} />}
