@@ -31,7 +31,8 @@ Licensed with the *Secure* section.
    see the message and can request approval; requests appear under *Requests* (and as the integration event
    *appcontrol.request*).
 
-Changes reach online agents within seconds (live connection); devices that are offline get them when they connect.
+Changes reach online agents within seconds (live connection) and the agent reports the applied policy at once, so
+*Devices* shows it as current; devices that are offline get them when they connect.
 Every agent keeps its policy, so it applies offline too.
 
 ## What is approved
@@ -162,4 +163,5 @@ with apt and with `dpkg -i`, dnf on Rocky Linux and Amazon Linux: approved packa
 with the message, event recorded, request by a normal user, audit mode, hooks removed with the agent; zypper on openSUSE: reported) and the Windows
 acceptance tests T82–T85 (catalogue and inventory approval, audit → block for a device group with the message and a
 request from the desktop, approval by SHA-256, push installation with status, retry and uninstall, WDAC audit, remote
-support agent protection). Results: [test report](test-report.md).
+support agent protection). First released in **build 1.1.1.109**: T82–T85 and Linux A01–A05 all pass. Results:
+[test report](test-report.md).
