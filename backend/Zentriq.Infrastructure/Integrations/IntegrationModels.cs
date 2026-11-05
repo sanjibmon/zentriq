@@ -31,6 +31,11 @@ public static class EventTypes
         new("appcontrol.blocked", "Unauthorized software blocked", "Installation of software that is not on the approved list was blocked, or such software was found and removed (Software Deployment › Application control).", true),
         new("appcontrol.request", "Software approval requested", "A user asked for software to be approved after its installation was blocked (Software Deployment › Requests).", true),
         new("deployment.failed", "Software deployment failed", "Installing or uninstalling a package on a device failed (Software Deployment › Deployments).", true),
+        new("license.compliance", "Software licence shortfall", "More installations, users or assigned cloud licences than licences owned, or software in use without a licence (Software Licenses).", false),
+        new("license.expiring", "Software licence expiring or expired", "A subscription, term licence, support contract or Microsoft 365 subscription ends soon, has ended or is in its grace period (Software Licenses).", false),
+        new("license.not_genuine", "Windows or Office not activated", "Windows or Office on a device is not activated or not genuine (Software Licenses › Activation).", true),
+        new("webapp.risk", "Web app risk", "An unsanctioned or blocked web app is in use, an account of a person who left or is disabled is still active, or accounts are inactive (Web Apps & Accounts).", false),
+        new("network.unknown_device", "Unknown device on the network", "A device that is not in the inventory was found on a switch port (Network Inventory › Connected Devices).", false),
         new("job.failed", "Background job failed", "A background job (report delivery, feed update, inventory...) failed.", false),
     ];
 

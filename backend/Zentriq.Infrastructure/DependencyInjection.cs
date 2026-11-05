@@ -54,6 +54,8 @@ public static class DependencyInjection
         services.AddSingleton<CredentialProtector>();
         services.AddSingleton<Zentriq.Infrastructure.ActiveDirectory.DirectoryStore>();
         services.AddSingleton<Zentriq.Infrastructure.Mail.MailService>();
+        services.AddSingleton<Zentriq.Infrastructure.Licenses.LicenseNotifier>();
+        services.AddSingleton(sp => new Zentriq.Infrastructure.Licenses.M365Sync(sp.GetRequiredService<NpgsqlDataSource>(), sp.GetRequiredService<CredentialProtector>()));
         services.AddSingleton<Zentriq.Infrastructure.Vulnerabilities.VulnStore>();
         services.AddSingleton<Zentriq.Infrastructure.Vulnerabilities.VulnFeedService>();
         services.AddSingleton<Zentriq.Infrastructure.Reports.ReportDelivery>();

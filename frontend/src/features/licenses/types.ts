@@ -1,0 +1,101 @@
+export type Metric = 'device' | 'user' | 'core' | 'concurrent' | 'site';
+export type LicenseType = 'perpetual' | 'subscription' | 'volume' | 'oem' | 'enterprise' | 'trial' | 'freeware' | 'open_source';
+export type Status = 'compliant' | 'shortfall' | 'unlicensed' | 'over_licensed' | 'not_measured' | 'not_required' | 'unused';
+
+export interface Compliance {
+  id: string; name: string; publisher: string | null; category: string; metric: Metric; kind: 'installed' | 'cloud'; needsLicense: boolean; webAppId: string | null;
+  cloudSkus: string[]; devices: number; users: number; cores: number; cloudConsumed: number | null; cloudUnits: number | null; accounts: number | null;
+  licenses: number; validLicenses: number; unlimited: boolean; entitled: number; nextEnd: string | null; cloudNextLifecycle: string | null;
+  cost: number | null; unitCost: number | null; expiring: number; allocations: number; consumed: number | null; status: Status;
+  shortfall: number; unused: number; shortfallCost: number | null; unusedValue: number | null;
+}
+
+export interface Renewal { id: string; name: string; product: string; productId: string; endDate: string; autoRenew: boolean; licenseType: LicenseType; quantity: number | null; totalCost: number | null; currency: string; vendor: string | null; days: number }
+
+export interface Summary {
+  products: number; tracked: number; compliant: number; shortfall: number; unlicensed: number; overLicensed: number; notMeasured: number;
+  shortfallUnits: number; unusedUnits: number; shortfallCost: number; unusedValue: number; compliancePercent: number; topIssues: Compliance[]; expiryDays: number;
+  detail: {
+    licenses: number; subscriptions: number; perpetual: number; expiring30: number; expired: number; maintenanceEnding: number; spend: number; renewalSpend: number;
+    currencies: string[]; cloudConnections: number; cloudFailed: number; cloudAssigned: number; cloudAvailable: number; cloudDisabledLicensed: number; cloudInactiveLicensed: number;
+    notActivated: number; activationKnown: number; alerts: Record<string, number>; renewals: Renewal[];
+  };
+}
+
+export interface License {
+  id: string; productId: string; product: string; publisher: string | null; name: string; licenseType: LicenseType; metric: Metric; metricFromProduct: boolean;
+  quantity: number | null; cloudQuantity: number | null; cloudConsumed: number | null; edition: string | null; version: string | null; downgradeRights: boolean;
+  vendor: string | null; reseller: string | null; poNumber: string | null; invoiceNumber: string | null; contractNumber: string | null; purchaseDate: string | null;
+  startDate: string | null; endDate: string | null; maintenanceEnd: string | null; autoRenew: boolean; billing: string | null; unitCost: number | null; totalCost: number | null;
+  currency: string; notifyDays: number; keyHint: string | null; hasKey: boolean; departmentId: string | null; department: string | null; owner: string | null;
+  cloudConnectionId: string | null; cloudConnection: string | null; cloudSku: string | null; synced: boolean; notes: string | null; createdBy: string | null;
+  createdAt: string; updatedAt: string; allocations: number; daysLeft: number | null; status: 'active' | 'expiring' | 'expired' | 'retired';
+}
+
+export interface Product {
+  id: string; name: string; publisher: string | null; category: string; namePatterns: string[]; excludePatterns: string[]; publisherPatterns: string[]; metric: Metric;
+  kind: 'installed' | 'cloud'; needsLicense: boolean; webAppId: string | null; webAppName: string | null; cloudSkus: string[]; catalogKey: string | null; notes: string | null;
+  createdBy: string | null; createdAt: string; updatedAt: string;
+}
+
+export interface CloudSku {
+  connectionId: string; connection: string; skuId: string; skuPart: string; name: string | null; enabled: number; warning: number; suspended: number; consumed: number;
+  available?: number; status: string | null; nextLifecycle: string | null; isTrial: boolean; syncedAt: string; disabledAssigned?: number; inactiveAssigned?: number; productId?: string | null;
+}
+
+export interface Alert {
+  id: number; kind: string; severity: 'info' | 'low' | 'medium' | 'high' | 'critical'; title: string; detail: string | null; link: string | null;
+  productId: string | null; licenseId: string | null; assetId: string | null; appId: string | null; firstAt: string; lastAt: string;
+  resolvedAt: string | null; notifiedAt: string | null; dismissed: boolean; dismissedBy: string | null;
+}
+
+export interface ProductDetail {
+  compliance: Compliance;
+  detail: {
+    product: Product; licenses: License[]; versions: { version: string; devices: number }[]; cloud: CloudSku[];
+    alerts: { id: number; kind: string; severity: Alert['severity']; title: string; detail: string | null; firstAt: string }[];
+  };
+}
+
+export interface Installation { assetId: string; hostname: string; software: string; version: string | null; user: string | null; os: string | null; department: string | null; lastSeen: string | null; cores: number | null; allocatedTo: string | null }
+
+export interface Connection {
+  id: string; name: string; provider: 'm365'; tenantId: string; clientId: string; hasSecret: boolean; enabled: boolean; syncApps: boolean;
+  lastSyncAt: string | null; lastStatus: string | null; lastError: string | null; lastNote: string | null; users: number; skus: number;
+}
+
+export interface CloudUser { connectionId: string; userId: string; upn: string; displayName: string | null; mail: string | null; department: string | null; enabled: boolean | null; lastSignIn: string | null; licenses: string[] }
+
+export interface Activation {
+  assetId: string; hostname: string; os: string | null; department: string | null; product: string; application: string; channel: string | null; status: string;
+  partialKey: string | null; graceMinutes: number | null; description: string | null; activated: boolean; collectedAt: string;
+}
+
+export interface Settings { notifyEmails: string[]; notifyInApp: boolean; expiryDays: number; unusedPercent: number; inactiveDays: number; webDiscovery: boolean }
+
+export interface Suggestion {
+  key: string; name: string; publisher: string | null; category: string; metric: Metric; license: string; namePatterns: string[]; excludePatterns: string[];
+  publisherPatterns: string[]; notes: string | null; matches: { name: string; devices: number }[]; devices: number;
+}
+
+export const METRIC_LABEL: Record<Metric, string> = { device: 'Per Device', user: 'Per User', core: 'Per Core', concurrent: 'Concurrent Users', site: 'Site / Unlimited' };
+export const TYPE_LABEL: Record<LicenseType, string> = {
+  perpetual: 'Perpetual', subscription: 'Subscription', volume: 'Volume', oem: 'OEM', enterprise: 'Enterprise Agreement', trial: 'Trial', freeware: 'Freeware', open_source: 'Open Source',
+};
+export const STATUS_LABEL: Record<Status, [string, 'ok' | 'warn' | 'crit' | 'info' | '']> = {
+  compliant: ['Compliant', 'ok'], shortfall: ['Under-Licensed', 'crit'], unlicensed: ['Unlicensed', 'crit'], over_licensed: ['Over-Licensed', 'info'],
+  not_measured: ['Not Measured', ''], not_required: ['No Licence Needed', ''], unused: ['Not in Use', ''],
+};
+export const SEVERITY_TONE: Record<string, 'ok' | 'warn' | 'crit' | 'info' | ''> = { critical: 'crit', high: 'crit', medium: 'warn', low: 'info', info: '' };
+export const ACTIVATION_LABEL: Record<string, string> = {
+  licensed: 'Activated', unlicensed: 'Not Activated', oob_grace: 'Grace Period', oot_grace: 'Grace (Hardware Change)', non_genuine_grace: 'Not Genuine',
+  notification: 'Notification Mode', extended_grace: 'Extended Grace', embedded: 'In Firmware', unknown: 'Unknown',
+};
+
+export const money = (v: number | null | undefined, currency?: string | null) =>
+  v == null ? '—' : currency && /^[A-Z]{3}$/.test(currency)
+    ? new Intl.NumberFormat(undefined, { style: 'currency', currency, maximumFractionDigits: v >= 1000 ? 0 : 2 }).format(v)
+    : v.toLocaleString(undefined, { maximumFractionDigits: 2 });
+
+export const consumptionLabel = (c: Compliance) =>
+  c.kind === 'cloud' ? 'assigned' : c.metric === 'user' ? 'users' : c.metric === 'core' ? 'cores' : c.metric === 'concurrent' ? 'installed (use not measured)' : 'installed';

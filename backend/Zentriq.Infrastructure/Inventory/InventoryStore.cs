@@ -62,6 +62,15 @@ public sealed class InventoryStore(LicensingService licensing)
         await UpdateAssetAsync(conn, tx, assetId.Value, doc, hints, ct);
         await UpsertHardwareAsync(conn, tx, assetId.Value, doc, ct);
         await ReplaceSoftwareAsync(conn, tx, assetId.Value, doc, ct);
+        // Host names from the DNS cache: only known web applications are kept (Web Apps & Accounts); never stored as such.
+        var webHosts = doc.WebHosts;
+        doc.WebHosts = null;
+        if (webHosts is { Count: > 0 })
+        {
+            await tx.SaveAsync("webapps", ct);
+            try { await Zentriq.Infrastructure.WebApps.WebAppUsage.RecordAsync(conn, tx, assetId.Value, webHosts, doc.Users.LoggedOn, ct); }
+            catch (PostgresException) { await tx.RollbackAsync("webapps", ct); }
+        }
         await UpsertDocumentAsync(conn, tx, assetId.Value, doc, ct);
         await AddIdentifiersAsync(conn, tx, assetId.Value, doc, hints, ct);
         // Manufacturer / model / serial entered by hand earlier for this machine (agent or OS reinstalled, device re-created).

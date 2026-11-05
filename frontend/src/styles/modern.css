@@ -545,3 +545,37 @@ a.kpi:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .mini-steps button { margin-top: 2px; }
 .stat-line { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12.5px; color: var(--muted); margin-top: 12px; }
 .stat-line b { color: var(--fg); font-weight: 650; }
+
+/* Build 111: every word on buttons, tabs and menu items starts with a capital letter. Values inside (code, file names) stay. */
+.btn, .tabs button, .pop-item { text-transform: capitalize; }
+.btn .mono, .btn code, .btn .keep-case, .tabs .cnt { text-transform: none; }
+
+/* Build 111: usage meters in tables, dashboard highlights, notification bell. */
+.meter { height: 6px; border-radius: 999px; background: var(--surface-3, var(--surface-2)); overflow: hidden; margin: 2px 0 3px; }
+.meter i { display: block; height: 100%; background: var(--accent); border-radius: inherit; }
+.highlights { display: flex; gap: 10px; align-items: flex-start; padding: 10px 14px; margin: 0 0 14px; border-radius: 12px; border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--warn-soft) 55%, var(--surface)); color: var(--fg); }
+.highlights.crit { background: color-mix(in srgb, var(--crit-soft) 50%, var(--surface)); border-color: color-mix(in srgb, var(--crit) 30%, var(--line)); }
+.highlights > svg { flex: none; margin-top: 3px; color: var(--warn); }
+.highlights.crit > svg { color: var(--crit); }
+.highlights .hl-items { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
+.highlights .hl { display: inline-flex; gap: 5px; align-items: baseline; padding: 3px 10px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line);
+  color: var(--fg); text-decoration: none; font-size: 13px; }
+.highlights .hl:hover { border-color: var(--accent); }
+.highlights .hl.crit b { color: var(--crit); }
+.highlights .hl.warn b { color: var(--warn); }
+.highlights .hl-next { font-size: 12.5px; color: var(--muted); }
+.icon-btn.bell { position: relative; }
+.bell-count { position: absolute; top: -3px; right: -4px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 999px; background: var(--crit); color: #fff;
+  font-size: 10.5px; font-weight: 700; line-height: 17px; text-align: center; }
+.popover.notes { width: min(380px, 92vw); padding: 0; }
+.notes-h { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.notes-list { max-height: 420px; overflow: auto; }
+.note { display: flex; gap: 10px; width: 100%; text-align: left; padding: 9px 12px; border: 0; border-bottom: 1px solid var(--line); background: none; color: var(--fg); cursor: pointer; }
+.note:hover { background: var(--surface-2); }
+.note > i { flex: none; width: 8px; height: 8px; margin-top: 6px; border-radius: 50%; background: var(--info); }
+.note.warn > i { background: var(--warn); } .note.crit > i { background: var(--crit); } .note.ok > i { background: var(--ok); }
+.note > span { display: grid; gap: 2px; font-size: 13px; min-width: 0; }
+.note > span .faint { font-size: 12px; overflow-wrap: anywhere; }
+.note:not(.unread) b { font-weight: 500; }
+.kv-list { display: grid; gap: 3px; font-size: 13px; }

@@ -14,20 +14,18 @@ function navFor(path: string): { group: string; item: NavItem } | null {
   return best;
 }
 
-const SMALL_WORDS = new Set(['a', 'an', 'and', 'as', 'at', 'by', 'for', 'from', 'in', 'into', 'of', 'on', 'or', 'per', 'the', 'to', 'via', 'vs', 'with', 'without']);
-
-/** Title Case for labels in tiles, tabs and panel headers ("Approved software" → "Approved Software"); acronyms, units and small words stay as they are. */
+/** Title Case for labels in tiles, tabs, panel headers, dialog titles and column headers: every word starts with a capital
+ *  ("Found on devices" → "Found On Devices"); acronyms (WDAC, IPv4), units (24 h), file names and e-mail addresses stay as they are. */
 export function titleCase(text: string): string {
   return text.replace(/[A-Za-z][A-Za-z'’]*/g, (w, at: number) => {
     if (/[A-Z]/.test(w.slice(1))) return w;                       // WDAC, IPv4, macOS
     if (w.length === 1 && w !== 'a') return w;                       // units: 24 h, 7 d
     const prev = text.slice(0, at);
     if (/[-.@/]$/.test(prev) || /\d$/.test(prev)) return w;           // up-to-date, e.g., file.exe, 10x
-    if (at > 0 && SMALL_WORDS.has(w.toLowerCase()) && !/[:(—–·]\s*$/.test(prev)) return w.toLowerCase();
     return w[0].toUpperCase() + w.slice(1);
   });
 }
-const tc = (x: ReactNode) => (typeof x === 'string' ? titleCase(x) : x);
+export const tc = (x: ReactNode) => (typeof x === 'string' ? titleCase(x) : x);
 
 export function PageHead({ title, desc, actions, crumbs = true, icon }: { title: string; desc?: ReactNode; actions?: ReactNode; crumbs?: boolean; icon?: IconName }) {
   const { path } = useRouter();
@@ -180,7 +178,7 @@ export function DataTable<T extends { id: string | number }>({ columns, rows, em
         <thead>
           <tr>
             {columns.map((c) => (
-              <th key={c.key}>{c.label}</th>
+              <th key={c.key}>{tc(c.label)}</th>
             ))}
           </tr>
         </thead>

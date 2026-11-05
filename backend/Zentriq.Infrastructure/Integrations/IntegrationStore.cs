@@ -239,6 +239,27 @@ public sealed class IntegrationStore(NpgsqlDataSource ds, CredentialProtector pr
               LEFT JOIN zentriq.assets a ON a.id = x.asset_id
              WHERE x.status = 'failed' AND x.completed_at > @from AND x.completed_at <= @to
             """),
+        new("license.alerts", """
+            SELECT CASE WHEN s.kind IN ('shortfall','unlicensed','cloud_overuse') THEN 'license.compliance'
+                        WHEN s.kind IN ('expiring','expired','maintenance','cloud_expiring') THEN 'license.expiring'
+                        WHEN s.kind = 'not_genuine' THEN 'license.not_genuine' ELSE 'webapp.risk' END,
+                   s.severity, 'sam.alert:' || s.id || ':' || extract(epoch FROM s.first_at)::bigint,
+                   s.title, COALESCE(s.detail, ''), s.asset_id,
+                   jsonb_build_object('alertId', s.id, 'kind', s.kind, 'productId', s.product_id, 'licenseId', s.license_id, 'appId', s.app_id),
+                   COALESCE(s.link, CASE WHEN s.kind LIKE 'webapp_%' THEN '/modules/webapps' ELSE '/modules/licenses' END)
+              FROM zentriq.sam_alerts s
+             WHERE s.first_at > @from AND s.first_at <= @to AND s.resolved_at IS NULL AND NOT s.dismissed AND s.severity <> 'info'
+            """),
+        new("network.unknown_device", """
+            SELECT 'network.unknown_device', 'low', 'network.unknown:' || e.mac::text || ':' || extract(epoch FROM e.first_seen)::bigint,
+                   'Unknown device on ' || COALESCE(sw.hostname, 'a switch') || ' ' || COALESCE(e.port, '') || ': ' || e.mac::text || COALESCE(' (' || e.vendor || ')', ''),
+                   concat_ws(E'\n', 'IP address: ' || host(e.ip), 'VLAN: ' || e.vlan, 'Vendor: ' || e.vendor, CASE WHEN e.behind_unmanaged THEN 'Behind an unmanaged switch or hub' END),
+                   NULL::uuid, jsonb_build_object('mac', e.mac::text, 'ip', host(e.ip), 'switchId', e.switch_id, 'port', e.port, 'vendor', e.vendor),
+                   '/network?tab=endpoints&filter=unknown'
+              FROM zentriq.network_endpoints e LEFT JOIN zentriq.assets sw ON sw.id = e.switch_id
+             WHERE e.first_seen > @from AND e.first_seen <= @to AND NOT e.baseline AND e.asset_id IS NULL AND NOT e.acknowledged
+               AND e.kind IS DISTINCT FROM 'private'
+            """),
         new("job.failed", """
             SELECT 'job.failed', 'medium', 'job.failed:' || j.id,
                    'Background job failed: ' || j.job_type,

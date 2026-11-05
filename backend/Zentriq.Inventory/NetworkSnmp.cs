@@ -22,6 +22,8 @@ public static class NetworkSnmp
     public const string Dot3Duplex = "1.3.6.1.2.1.10.7.2.1.19";
     // IP-MIB
     public const string IpAdEntIfIndex = "1.3.6.1.2.1.4.20.1.2";
+    /// <summary>ipAdEntNetMask: the subnet mask of each interface address (for the IP address management view).</summary>
+    public const string IpAdEntNetMask = "1.3.6.1.2.1.4.20.1.3";
     public const string IpNetToMediaPhys = "1.3.6.1.2.1.4.22.1.2";
     public const string IpCidrRouteNumber = "1.3.6.1.2.1.4.24.3.0";
     public const string InetCidrRouteNumber = "1.3.6.1.2.1.4.24.6.0";
@@ -102,7 +104,7 @@ public static class NetworkSnmp
     public static readonly IReadOnlyDictionary<string, int> WalkColumns = new Dictionary<string, int>
     {
         [IfMtu] = 1024, [IfAdminStatus] = 1024, [IfLastChange] = 1024, [IfInErrors] = 1024, [IfOutErrors] = 1024,
-        [IfName] = 1024, [IfHighSpeed] = 1024, [Dot3Duplex] = 1024, [IpAdEntIfIndex] = 512, [IpNetToMediaPhys] = 4096,
+        [IfName] = 1024, [IfHighSpeed] = 1024, [Dot3Duplex] = 1024, [IpAdEntIfIndex] = 512, [IpAdEntNetMask] = 512, [IpNetToMediaPhys] = 4096,
         [Dot1dBasePortIfIndex] = 1024, [Dot1dTpFdbPort] = 8192, [Dot1qTpFdbPort] = 8192, [Dot1qVlanStaticName] = 4094, [Dot1qPvid] = 1024,
         [LldpLocPortId] = 1024, [LldpLocPortDesc] = 1024, [LldpRemChassisIdSubtype] = 1024, [LldpRemChassisId] = 1024, [LldpRemPortId] = 1024, [LldpRemPortDesc] = 1024,
         [LldpRemSysName] = 1024, [LldpRemSysDesc] = 1024, [LldpRemSysCapEnabled] = 1024, [LldpRemManAddrIfSubtype] = 1024,
@@ -151,7 +153,11 @@ public static class NetworkSnmp
             n.Interfaces.Add(it);
         }
         foreach (var kv in Column(v, IpAdEntIfIndex))
-            if (int.TryParse(kv.Value, out var i) && byIndex.TryGetValue(i, out var it) && kv.Key != "127.0.0.1") it.Ipv4.Add(kv.Key);
+            if (int.TryParse(kv.Value, out var i) && byIndex.TryGetValue(i, out var it) && kv.Key != "127.0.0.1")
+            {
+                it.Ipv4.Add(kv.Key);
+                if (Subnet(kv.Key, Get(v, IpAdEntNetMask + "." + kv.Key)) is { } net && !it.Subnets.Contains(net)) it.Subnets.Add(net);
+            }
 
         // ---- bridge ports, VLANs, MAC address table ---------------------------------------------------------
         var portToIf = new Dictionary<int, int>();
@@ -436,6 +442,20 @@ public static class NetworkSnmp
         if (h.Length != 8) return null;
         var b = Enumerable.Range(0, 4).Select(i => Convert.ToInt32(h.Substring(i * 2, 2), 16));
         return string.Join(".", b);
+    }
+
+    /// <summary>The network of an interface address and its mask in CIDR notation ("10.1.20.5", "255.255.255.0" → "10.1.20.0/24"); null for host routes and bad masks.</summary>
+    public static string? Subnet(string address, string? mask)
+    {
+        if (mask is null || !System.Net.IPAddress.TryParse(address, out var ip) || !System.Net.IPAddress.TryParse(mask, out var m)) return null;
+        var a = ip.GetAddressBytes(); var b = m.GetAddressBytes();
+        if (a.Length != 4 || b.Length != 4) return null;
+        uint mv = (uint)(b[0] << 24 | b[1] << 16 | b[2] << 8 | b[3]);
+        var len = 0;
+        while (len < 32 && (mv & (1u << (31 - len))) != 0) len++;
+        if (mv != (len == 0 ? 0u : uint.MaxValue << (32 - len)) || len < 8 || len > 30) return null;   // not contiguous, too wide, or a point-to-point / host address
+        uint av = (uint)(a[0] << 24 | a[1] << 16 | a[2] << 8 | a[3]) & mv;
+        return $"{av >> 24}.{(av >> 16) & 255}.{(av >> 8) & 255}.{av & 255}/{len}";
     }
 
     private static string? MacFromIndex(string[] p, int start)

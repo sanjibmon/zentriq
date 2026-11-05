@@ -46,6 +46,10 @@ public static class Permissions
     public const string LifecycleManage = "lifecycle.manage";
     public const string CloudView = "cloud.view";
     public const string CloudManage = "cloud.manage";
+    public const string LicensesView = "licenses.view";
+    public const string LicensesManage = "licenses.manage";
+    public const string WebAppsView = "webapps.view";
+    public const string WebAppsManage = "webapps.manage";
 
     /// <summary>Policy: may see at least one asset area (departments and locations are shared by all of them).</summary>
     public const string AnyAssetView = "any:assets.view";
@@ -60,7 +64,8 @@ public static class Permissions
         DeployRun, RemoteStart, RemoteUnattended, ReportsDesign, ReportsExport, DashboardsShare, VulnExcept,
         JobsView, UsersManage, LicensingManage, BackupRun, SettingsManage, AuditView, AgentsManage, DirectoryManage, AssetsControl, SoftwareUninstall, VulnView, VulnManage,
         SecurityView, SecurityManage, IntegrationsManage, RemoteManage, DashboardView, ReportsView, ActivityView, NonItView, NonItManage,
-        AccessoriesView, AccessoriesManage, LifecycleView, LifecycleManage, CloudView, CloudManage, DeployView, DeployManage
+        AccessoriesView, AccessoriesManage, LifecycleView, LifecycleManage, CloudView, CloudManage, DeployView, DeployManage,
+        LicensesView, LicensesManage, WebAppsView, WebAppsManage
     ];
 }
 
@@ -79,11 +84,15 @@ public static class Modules
     public const string Cloud = "cloud";
     public const string Lifecycle = "lifecycle";
     public const string Integrations = "integrations";
+    /// <summary>Software License Management (software asset management).</summary>
+    public const string Licenses = "licenses";
+    /// <summary>Web Apps &amp; Accounts (SaaS applications, accounts and usage).</summary>
+    public const string WebApps = "webapps";
 
     public static readonly IReadOnlyList<string> All =
     [
         Inventory, Discovery, Dashboards, Reports, Patch, Vulnerability, Configuration, Deployment, Remote, Cloud,
-        Lifecycle, Integrations
+        Lifecycle, Integrations, Licenses, WebApps
     ];
 }
 
@@ -118,7 +127,7 @@ public static class ProductSections
         [Discover] = [Modules.Inventory, Modules.Discovery],
         [Remote] = [Modules.Remote],
         [Infrastructure] = [Modules.Cloud, Modules.Lifecycle],
-        [Secure] = [Modules.Patch, Modules.Vulnerability, Modules.Configuration, Modules.Deployment],
+        [Secure] = [Modules.Patch, Modules.Vulnerability, Modules.Configuration, Modules.Deployment, Modules.Licenses, Modules.WebApps],
         [Insight] = [Modules.Reports, Modules.Integrations],
     };
 

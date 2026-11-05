@@ -360,6 +360,8 @@ public sealed class Notification
     public string Title { get; set; } = "";
     public string Body { get; set; } = "";
     public string? Link { get; set; }
+    /// <summary>Broadcast notifications for one area: shown to users with this permission (and administrators).</summary>
+    public string? Permission { get; set; }
     public DateTimeOffset? ReadAt { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
 }

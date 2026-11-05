@@ -1,3 +1,4 @@
+import { titleCase } from './ui';
 import { useEffect, type ReactNode } from 'react';
 import { Icon } from './Icon';
 
@@ -11,7 +12,7 @@ export function Modal({ title, wide, onClose, children, footer }: { title: strin
   return (
     <div className="modal-scrim" role="dialog" aria-modal="true" aria-label={title} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className={`modal-card${wide ? ' wide' : ''}`}>
-        <header><h2>{title}</h2><button className="icon-btn" style={{ marginLeft: 'auto' }} onClick={onClose} aria-label="Close"><Icon name="x" /></button></header>
+        <header><h2>{titleCase(title)}</h2><button className="icon-btn" style={{ marginLeft: 'auto' }} onClick={onClose} aria-label="Close"><Icon name="x" /></button></header>
         <div className="body">{children}</div>
         {footer && <footer>{footer}</footer>}
       </div>

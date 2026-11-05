@@ -57,6 +57,7 @@ builder.Services.AddHostedService<Housekeeping>();
 builder.Services.AddHostedService<Zentriq.Worker.LicenseCheckin>();
 builder.Services.AddHostedService<Zentriq.Worker.DuplicateCleanup>();
 builder.Services.AddHostedService<Zentriq.Worker.LifecycleAutomation>();
+builder.Services.AddHostedService<Zentriq.Worker.LicenseService>();
 builder.Services.AddHostedService<Zentriq.Worker.Cloud.CloudScheduler>();
 builder.Services.AddHostedService<Zentriq.Worker.Integrations.IntegrationService>();
 builder.Services.AddHostedService<Zentriq.Worker.Remote.RemoteSupportSync>();

@@ -78,6 +78,13 @@ public static class NetworkEndpoints
                 'blockingPorts', (SELECT count(*) FROM ports WHERE stp_state = 'blocking'),
                 'portsWithDiscards', (SELECT count(*) FROM ports WHERE COALESCE(in_discards, 0) + COALESCE(out_discards, 0) > 0),
                 'transceivers', (SELECT count(*) FROM zentriq.network_modules m JOIN zentriq.assets a ON a.id = m.asset_id AND a.status = 'active' WHERE m.class = 'transceiver'),
+                'endpoints', (SELECT count(*) FROM zentriq.network_endpoints WHERE last_seen > now() - interval '30 days'),
+                'unknownDevices', (SELECT count(*) FROM zentriq.network_endpoints WHERE asset_id IS NULL AND NOT acknowledged AND last_seen > now() - interval '30 days'),
+                'newDevices7d', (SELECT count(*) FROM zentriq.network_endpoints WHERE NOT baseline AND first_seen > now() - interval '7 days'),
+                'movedDevices7d', (SELECT count(*) FROM zentriq.network_endpoints WHERE moved_at > now() - interval '7 days'),
+                'ipConflicts', (SELECT count(*) FROM ({{ConflictsSql}}) c),
+                'subnets', (SELECT count(DISTINCT n) FROM zentriq.network_interfaces i JOIN zentriq.assets a ON a.id = i.asset_id AND a.status = 'active', unnest(i.subnets) n),
+                'macVendors', (SELECT count(*) FROM zentriq.mac_vendors),
                 'speeds', (SELECT COALESCE(jsonb_object_agg(s, n), '{}') FROM (SELECT CASE WHEN speed_mbps >= 10000 THEN '10G+' WHEN speed_mbps >= 1000 THEN '1G'
                               WHEN speed_mbps >= 100 THEN '100M' WHEN speed_mbps > 0 THEN '10M' ELSE 'unknown' END s, count(*) n FROM ports WHERE oper = 'up' GROUP BY 1) x)
             )::text
@@ -182,6 +189,165 @@ public static class NetworkEndpoints
                 FROM ({DeviceSelect}) d GROUP BY 1, 2, 3) t
             """, null, ct)).RequireAuthorization(Permissions.AssetsView);
 
+        // ---- connected devices (every MAC address on an access port) ---------------------------------------------
+        g.MapGet("/endpoints", async (NpgsqlDataSource ds, string? filter, string? q, string? kind, Guid? switchId, CancellationToken ct) => await JsonAsync(ds, """
+            SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY t."unknown" DESC, t."lastSeen" DESC), '[]')::text FROM (
+              SELECT e.mac::text AS "mac", host(e.ip) AS "ip", e.vendor AS "vendor", e.kind AS "kind", e.asset_id AS "assetId",
+                     COALESCE(a.hostname, host(a.primary_ip)) AS "assetName", COALESCE(a.device_type, a.category) AS "deviceType",
+                     e.switch_id AS "switchId", COALESCE(sw.hostname, host(sw.primary_ip)) AS "switchName", e.port AS "port", e.if_index AS "ifIndex", e.vlan AS "vlan",
+                     e.behind_unmanaged AS "behindUnmanaged", e.first_seen AS "firstSeen", e.last_seen AS "lastSeen", e.baseline AS "baseline",
+                     e.moved_at AS "movedAt", COALESCE(ps.hostname, host(ps.primary_ip)) AS "prevSwitchName", e.prev_port AS "prevPort",
+                     host(e.prev_ip) AS "prevIp", e.ip_changed_at AS "ipChangedAt", e.acknowledged AS "acknowledged", e.note AS "note",
+                     e.ack_by AS "ackBy", (e.asset_id IS NULL AND NOT e.acknowledged) AS "unknown"
+                FROM zentriq.network_endpoints e
+                LEFT JOIN zentriq.assets a ON a.id = e.asset_id
+                LEFT JOIN zentriq.assets sw ON sw.id = e.switch_id
+                LEFT JOIN zentriq.assets ps ON ps.id = e.prev_switch_id
+               WHERE (@sw::uuid IS NULL OR e.switch_id = @sw)
+                 AND (@kind::text IS NULL OR e.kind = @kind)
+                 AND (@filter::text IS NULL
+                      OR (@filter = 'unknown' AND e.asset_id IS NULL AND NOT e.acknowledged)
+                      OR (@filter = 'known' AND (e.asset_id IS NOT NULL OR e.acknowledged))
+                      OR (@filter = 'new' AND NOT e.baseline AND e.first_seen > now() - interval '7 days')
+                      OR (@filter = 'moved' AND e.moved_at > now() - interval '7 days')
+                      OR (@filter = 'ipchanged' AND e.ip_changed_at > now() - interval '7 days')
+                      OR (@filter = 'unmanaged' AND e.behind_unmanaged)
+                      OR (@filter = 'private' AND e.kind = 'private')
+                      OR (@filter = 'stale' AND e.last_seen < now() - interval '7 days'))
+                 AND (@q::text IS NULL OR e.mac::text ILIKE '%' || @qmac || '%' OR host(e.ip) LIKE @q || '%' OR e.vendor ILIKE '%' || @q || '%'
+                      OR a.hostname ILIKE '%' || @q || '%' OR sw.hostname ILIKE '%' || @q || '%' OR e.port ILIKE '%' || @q || '%' OR e.note ILIKE '%' || @q || '%')
+               LIMIT 5000) t
+            """, c =>
+            {
+                var clean = Clean(q);
+                c.Parameters.Add(Text("filter", filter)); c.Parameters.Add(Text("kind", kind)); c.Parameters.Add(Text("q", clean)); c.Parameters.Add(Text("qmac", MacQuery(clean)));
+                c.Parameters.Add(new NpgsqlParameter("sw", NpgsqlDbType.Uuid) { Value = (object?)switchId ?? DBNull.Value });
+            }, ct)).RequireAuthorization(Permissions.AssetsView);
+
+        g.MapGet("/endpoints/vendors", async (NpgsqlDataSource ds, CancellationToken ct) => await JsonAsync(ds, """
+            SELECT COALESCE(jsonb_agg(jsonb_build_object('vendor', v, 'count', n, 'unknown', u) ORDER BY n DESC), '[]')::text FROM (
+              SELECT COALESCE(vendor, 'Not registered') v, count(*) n, count(*) FILTER (WHERE asset_id IS NULL AND NOT acknowledged) u
+                FROM zentriq.network_endpoints WHERE last_seen > now() - interval '30 days' GROUP BY 1 ORDER BY 2 DESC LIMIT 25) x
+            """, null, ct)).RequireAuthorization(Permissions.AssetsView);
+
+        g.MapPost("/endpoints/acknowledge", async (AckBody body, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
+        {
+            var macs = (body.Macs ?? []).Select(NetworkStore.Mac).Where(m => m is not null).Distinct().Take(1000).ToArray();
+            if (macs.Length == 0) return Validation.Problem("macs", "Choose at least one device.");
+            var note = string.IsNullOrWhiteSpace(body.Note) ? null : body.Note.Trim();
+            if (note is { Length: > 500 }) return Validation.Problem("note", "Keep the note under 500 characters.");
+            await using var cmd = ds.CreateCommand("""
+                UPDATE zentriq.network_endpoints SET acknowledged = @ack, note = COALESCE(@note, note),
+                       ack_by = CASE WHEN @ack THEN @by END, ack_at = CASE WHEN @ack THEN now() END
+                 WHERE mac = ANY (@m::macaddr[])
+                """);
+            cmd.Parameters.AddWithValue("ack", body.Acknowledged ?? true);
+            cmd.Parameters.Add(Text("note", note));
+            cmd.Parameters.Add(Text("by", rc.UserName));
+            cmd.Parameters.Add(new NpgsqlParameter("m", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = macs });
+            var n = await cmd.ExecuteNonQueryAsync(ct);
+            await rc.AuditAsync(body.Acknowledged ?? true ? "network.endpoint_ack" : "network.endpoint_unack", $"{n} device(s)", detail: new { macs, note });
+            return Results.Ok(new { updated = n });
+        }).RequireAuthorization(Permissions.AssetsManage);
+
+        // ---- IP address management --------------------------------------------------------------------------------
+        g.MapGet("/subnets", async (NpgsqlDataSource ds, CancellationToken ct) => await JsonAsync(ds, $$"""
+            WITH nets AS (
+                SELECT n, (array_agg(DISTINCT via) FILTER (WHERE via IS NOT NULL))[1:4] AS via, (array_agg(DISTINCT vlan) FILTER (WHERE vlan IS NOT NULL))[1:4] AS vlans,
+                       (array_agg(DISTINCT gw) FILTER (WHERE gw IS NOT NULL))[1:4] AS gateways, bool_or(src = 'interface') AS from_devices
+                  FROM (
+                    SELECT sn AS n, 'interface' AS src, COALESCE(a.hostname, host(a.primary_ip)) || COALESCE(' ' || i.name, '') AS via, i.vlan,
+                           (SELECT ip FROM unnest(i.ipv4) ip WHERE ip::inet << sn LIMIT 1) AS gw
+                      FROM zentriq.network_interfaces i JOIN zentriq.assets a ON a.id = i.asset_id AND a.status = 'active', unnest(i.subnets) sn
+                    UNION ALL
+                    SELECT x::cidr, 'scope', NULL, NULL, NULL
+                      FROM jsonb_array_elements_text(COALESCE((SELECT CASE WHEN jsonb_typeof(value) = 'array' THEN value END FROM zentriq.system_settings WHERE key = 'discovery.approved_scopes'), '[]')) x
+                     WHERE x ~ '^[0-9]{1,3}(\.[0-9]{1,3}){3}/[0-9]{1,2}$' AND split_part(x, '/', 2)::int BETWEEN 16 AND 30
+                  ) s GROUP BY n),
+            {{IpsCte}}
+            SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY t."cidr"), '[]')::text FROM (
+              SELECT n.n::text AS "cidr", masklen(n.n) AS "prefix", (2 ^ (32 - masklen(n.n)))::bigint - 2 AS "size", n.via AS "via", n.vlans AS "vlans",
+                     n.gateways AS "gateways", n.from_devices AS "fromDevices",
+                     (SELECT count(DISTINCT ip) FROM ips WHERE ips.ip << n.n) AS "used",
+                     (SELECT count(DISTINCT ip) FROM ips WHERE ips.ip << n.n AND ips.asset_id IS NOT NULL) AS "known",
+                     (SELECT count(DISTINCT ip) FROM ips WHERE ips.ip << n.n AND ips.asset_id IS NULL) AS "unknown",
+                     (SELECT count(*) FROM ({{ConflictsSql}}) c WHERE c.ip::inet << n.n) AS "conflicts",
+                     (SELECT max(seen) FROM ips WHERE ips.ip << n.n) AS "lastSeen"
+                FROM nets n WHERE family(n.n) = 4 AND masklen(n.n) BETWEEN 16 AND 30) t
+            """, null, ct)).RequireAuthorization(Permissions.AssetsView);
+
+        g.MapGet("/subnets/ips", async (NpgsqlDataSource ds, string cidr, bool? all, CancellationToken ct) =>
+        {
+            if (!System.Net.IPNetwork.TryParse(cidr ?? "", out var net) || net.BaseAddress.AddressFamily != System.Net.Sockets.AddressFamily.InterNetwork || net.PrefixLength is < 16 or > 30)
+                return Validation.Problem("cidr", "Enter an IPv4 network between /16 and /30, for example 10.1.20.0/24.");
+            return await JsonAsync(ds, $$"""
+                WITH n AS (SELECT @cidr::cidr AS n),
+                {{IpsCte}},
+                inside AS (SELECT * FROM ips, n WHERE ips.ip << n.n),
+                conflicts AS ({{ConflictsSql}}),
+                hosts AS (
+                    SELECT DISTINCT ip FROM inside
+                    UNION
+                    SELECT (host(network(n.n))::inet + g) FROM n, generate_series(1, CASE WHEN @all AND masklen(n.n) >= 22 THEN (2 ^ (32 - masklen(n.n)))::int - 2 ELSE 0 END) g)
+                SELECT jsonb_build_object('cidr', (SELECT n::text FROM n), 'rows', COALESCE((SELECT jsonb_agg(to_jsonb(t) ORDER BY t."sort") FROM (
+                  SELECT h.ip AS "sort", host(h.ip) AS "ip", EXISTS (SELECT 1 FROM inside i WHERE i.ip = h.ip) AS "used",
+                         (SELECT array_agg(DISTINCT i.mac::text) FROM inside i WHERE i.ip = h.ip AND i.mac IS NOT NULL) AS "macs",
+                         (SELECT array_agg(DISTINCT i.src) FROM inside i WHERE i.ip = h.ip) AS "sources",
+                         x.asset_id AS "assetId", COALESCE(a.hostname, host(a.primary_ip)) AS "assetName", COALESCE(a.device_type, a.category) AS "deviceType",
+                         ep.vendor AS "vendor", ep.kind AS "kind", COALESCE(sw.hostname, host(sw.primary_ip)) AS "switchName", ep.switch_id AS "switchId", ep.port AS "port", ep.vlan AS "vlan",
+                         (SELECT max(i.seen) FROM inside i WHERE i.ip = h.ip) AS "lastSeen",
+                         EXISTS (SELECT 1 FROM conflicts c WHERE c.ip = host(h.ip)) AS "conflict"
+                    FROM hosts h
+                    LEFT JOIN LATERAL (SELECT i.asset_id FROM inside i WHERE i.ip = h.ip AND i.asset_id IS NOT NULL LIMIT 1) x ON true
+                    LEFT JOIN zentriq.assets a ON a.id = x.asset_id
+                    LEFT JOIN LATERAL (SELECT e.* FROM zentriq.network_endpoints e WHERE host(e.ip) = host(h.ip) ORDER BY e.last_seen DESC LIMIT 1) ep ON true
+                    LEFT JOIN zentriq.assets sw ON sw.id = ep.switch_id
+                   LIMIT 4096) t), '[]'))::text
+                """, c => { c.Parameters.AddWithValue("cidr", net.ToString()); c.Parameters.AddWithValue("all", all ?? true); }, ct);
+        }).RequireAuthorization(Permissions.AssetsView);
+
+        g.MapGet("/conflicts", async (NpgsqlDataSource ds, CancellationToken ct) => await JsonAsync(ds, $$"""
+            SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY t.ip), '[]')::text FROM (
+              SELECT c.ip AS "ip", c.macs AS "macs",
+                     (SELECT jsonb_agg(jsonb_build_object('mac', m, 'vendor', zentriq.mac_vendor(m::macaddr),
+                             'assetId', (SELECT ai.asset_id FROM zentriq.asset_identifiers ai WHERE ai.kind = 'mac' AND lower(ai.value) = m LIMIT 1),
+                             'assetName', (SELECT a.hostname FROM zentriq.asset_identifiers ai JOIN zentriq.assets a ON a.id = ai.asset_id WHERE ai.kind = 'mac' AND lower(ai.value) = m LIMIT 1),
+                             'port', (SELECT COALESCE(sw.hostname, '') || ' ' || COALESCE(e.port, '') FROM zentriq.network_endpoints e LEFT JOIN zentriq.assets sw ON sw.id = e.switch_id WHERE e.mac = m::macaddr)))
+                        FROM unnest(c.macs) m) AS "devices",
+                     c.seen_by AS "seenBy"
+                FROM ({{ConflictsSql}}) c) t
+            """, null, ct)).RequireAuthorization(Permissions.AssetsView);
+
+        // ---- MAC address vendors (IEEE registry) ----------------------------------------------------------------------
+        g.MapGet("/vendors/status", async (NpgsqlDataSource ds, CancellationToken ct) => await JsonAsync(ds, $"""
+            SELECT jsonb_build_object('prefixes', (SELECT count(*) FROM zentriq.mac_vendors),
+                   'status', (SELECT value FROM zentriq.system_settings WHERE key = '{MacVendors.StatusKey}'))::text
+            """, null, ct)).RequireAuthorization(Permissions.AssetsView);
+
+        g.MapPost("/vendors/update", async (NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
+        {
+            try
+            {
+                var n = await MacVendors.DownloadAsync(ds, ct);
+                await rc.AuditAsync("network.vendors_update", $"{n} prefixes");
+                return Results.Ok(new { prefixes = n });
+            }
+            catch (InvalidOperationException ex)
+            {
+                await MacVendors.RecordErrorAsync(ds, ex.Message, ct);
+                return Results.Problem(statusCode: 502, title: ex.Message);
+            }
+        }).RequireAuthorization(Permissions.AssetsManage);
+
+        g.MapPost("/vendors/import", async (VendorImportBody body, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
+        {
+            var rows = MacVendors.Parse(body.Csv ?? "");
+            if (rows.Count == 0) return Validation.Problem("csv", "No MAC address prefixes found. Use oui.csv, mam.csv or oui36.csv from standards-oui.ieee.org.");
+            var n = await MacVendors.StoreAsync(ds, rows, "import", ct);
+            await rc.AuditAsync("network.vendors_import", $"{n} prefixes");
+            return Results.Ok(new { prefixes = n });
+        }).RequireAuthorization(Permissions.AssetsManage);
+
         // Network details of one device: ports, neighbours, VLANs, modules — and, for any device, the switch port it is connected to.
         api.MapGet("/assets/{id:guid}/network", async (Guid id, NpgsqlDataSource ds, CancellationToken ct) => await JsonAsync(ds, $$"""
             SELECT jsonb_build_object(
@@ -212,6 +378,38 @@ public static class NetworkEndpoints
             )::text
             """, c => c.Parameters.AddWithValue("id", id), ct)).RequireAuthorization(Permissions.AssetsView).RequireModule(Modules.Inventory).WithTags("Network inventory");
     }
+
+    public sealed record AckBody(string[]? Macs, string? Note, bool? Acknowledged);
+    public sealed record VendorImportBody(string? Csv);
+
+    /// <summary>Every IPv4 address in use: newest ARP entry per address (routers, layer-3 switches, firewalls), inventoried devices, connected devices.</summary>
+    private const string IpsCte = """
+        ips AS (
+            SELECT host(r.ip)::inet AS ip, r.mac, 'arp' AS src, (SELECT ai.asset_id FROM zentriq.asset_identifiers ai WHERE ai.kind = 'mac' AND lower(ai.value) = r.mac::text LIMIT 1) AS asset_id, d.collected_at AS seen
+              FROM zentriq.network_arp r JOIN zentriq.network_devices d ON d.asset_id = r.asset_id JOIN zentriq.assets x ON x.id = r.asset_id AND x.status = 'active'
+             WHERE family(r.ip) = 4
+            UNION ALL
+            SELECT host(a.primary_ip)::inet, a.mac_address, 'inventory', a.id, a.last_seen_at FROM zentriq.assets a
+             WHERE a.status = 'active' AND a.primary_ip IS NOT NULL AND family(a.primary_ip) = 4
+            UNION ALL
+            SELECT host(e.ip)::inet, e.mac, 'switch', e.asset_id, e.last_seen FROM zentriq.network_endpoints e
+             WHERE e.ip IS NOT NULL AND family(e.ip) = 4 AND e.last_seen > now() - interval '30 days')
+        """;
+
+    /// <summary>
+    /// IP addresses that ARP tables give to more than one device. Virtual router MAC addresses (VRRP, HSRP, GLBP) and
+    /// several MAC addresses of the same inventoried device (teaming, docking stations) are not conflicts.
+    /// </summary>
+    private const string ConflictsSql = """
+        SELECT host(r.ip) AS ip, array_agg(DISTINCT r.mac::text) AS macs,
+               array_agg(DISTINCT COALESCE(x.hostname, host(x.primary_ip))) AS seen_by
+          FROM zentriq.network_arp r JOIN zentriq.assets x ON x.id = r.asset_id AND x.status = 'active'
+         WHERE family(r.ip) = 4
+           AND left(r.mac::text, 14) NOT IN ('00:00:5e:00:01', '00:00:5e:00:02', '00:00:0c:07:ac') AND left(r.mac::text, 13) <> '00:00:0c:9f:f'
+           AND left(r.mac::text, 8) <> '00:07:b4'
+         GROUP BY host(r.ip)
+        HAVING count(DISTINCT COALESCE((SELECT ai.asset_id::text FROM zentriq.asset_identifiers ai WHERE ai.kind = 'mac' AND lower(ai.value) = r.mac::text LIMIT 1), r.mac::text)) > 1
+        """;
 
     private static async Task<IResult> JsonAsync(NpgsqlDataSource ds, string sql, Action<NpgsqlCommand>? bind, CancellationToken ct)
     {

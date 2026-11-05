@@ -26,6 +26,8 @@ export const AREAS: AreaDef[] = [
   { area: 'Security configuration', hint: 'Windows configuration checks and baselines', view: 'security.view', manage: 'security.manage' },
   { area: 'Software deployment', hint: 'Approved software, application control, requests, packages', view: 'deploy.view', manage: 'deploy.manage', manageLabel: 'Manage',
     extras: [['deploy.run', 'Deploy packages to devices']] },
+  { area: 'Software licenses', hint: 'Products, licences, compliance, Microsoft 365 licences, activation', view: 'licenses.view', manage: 'licenses.manage' },
+  { area: 'Web apps & accounts', hint: 'SaaS applications, their accounts and use', view: 'webapps.view', manage: 'webapps.manage' },
   { area: 'Patch management', hint: 'Coming module', extras: [['patch.approve', 'Approve patches'], ['patch.deploy', 'Deploy patches']] },
   { area: 'Reports & Analytics', hint: 'Reports run only on the areas the role can see', view: 'reports.view', manage: 'reports.design', manageLabel: 'Design',
     extras: [['reports.export', 'Export and e-mail'], ['dashboards.share', 'Share reports']] },

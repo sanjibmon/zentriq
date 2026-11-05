@@ -121,14 +121,15 @@ public static class NetworkStore
         {
             await using var cmd = new NpgsqlCommand("""
                 INSERT INTO zentriq.network_interfaces (asset_id, if_index, name, description, alias, type, mac, admin, oper, speed_mbps, duplex, mtu,
-                    vlan, trunk, poe, in_errors, out_errors, ipv4, last_change_sec,
+                    vlan, trunk, poe, in_errors, out_errors, ipv4, subnets, last_change_sec,
                     in_octets, out_octets, in_discards, out_discards, counters_at, in_bps, out_bps, util_percent, stp_state, lag_if_index)
                 SELECT @a, x.ix, x.nm, x.ds, x.al, x.ty, x.mc, x.ad, x.op, x.sp, x.dp, x.mt, x.vl, x.tr, x.pe, x.ie, x.oe,
-                       CASE WHEN x.ip IS NULL OR x.ip = '' THEN '{}'::text[] ELSE string_to_array(x.ip, ',') END, x.lc,
+                       CASE WHEN x.ip IS NULL OR x.ip = '' THEN '{}'::text[] ELSE string_to_array(x.ip, ',') END,
+                       CASE WHEN x.sn IS NULL OR x.sn = '' THEN '{}'::cidr[] ELSE string_to_array(x.sn, ',')::cidr[] END, x.lc,
                        x.io, x.oo, x.idc, x.odc, CASE WHEN x.io IS NULL AND x.oo IS NULL THEN NULL ELSE @now END, x.ib, x.ob, x.ut, x.st, x.lg
-                FROM unnest(@ix, @nm, @ds, @al, @ty, @mc, @ad, @op, @sp, @dp, @mt, @vl, @tr, @pe, @ie, @oe, @ip, @lc,
+                FROM unnest(@ix, @nm, @ds, @al, @ty, @mc, @ad, @op, @sp, @dp, @mt, @vl, @tr, @pe, @ie, @oe, @ip, @sn, @lc,
                             @io, @oo, @idc, @odc, @ib, @ob, @ut, @st, @lg)
-                     AS x(ix, nm, ds, al, ty, mc, ad, op, sp, dp, mt, vl, tr, pe, ie, oe, ip, lc, io, oo, idc, odc, ib, ob, ut, st, lg)
+                     AS x(ix, nm, ds, al, ty, mc, ad, op, sp, dp, mt, vl, tr, pe, ie, oe, ip, sn, lc, io, oo, idc, odc, ib, ob, ut, st, lg)
                 """, conn, tx);
             cmd.Parameters.AddWithValue("a", assetId);
             cmd.Parameters.AddWithValue("ix", ifs.Select(i => i.Index).ToArray());
@@ -148,6 +149,7 @@ public static class NetworkStore
             cmd.Parameters.Add(Array("ie", NpgsqlDbType.Bigint, ifs.Select(i => i.InErrors)));
             cmd.Parameters.Add(Array("oe", NpgsqlDbType.Bigint, ifs.Select(i => i.OutErrors)));
             cmd.Parameters.Add(TextArray("ip", ifs.Select(i => i.Ipv4.Count == 0 ? null : string.Join(",", i.Ipv4.Where(Ip).Take(16)))));
+            cmd.Parameters.Add(TextArray("sn", ifs.Select(i => i.Subnets.Count == 0 ? null : string.Join(",", i.Subnets.Where(Cidr).Take(16)))));
             cmd.Parameters.Add(Array("lc", NpgsqlDbType.Bigint, ifs.Select(i => i.LastChangeSeconds)));
             cmd.Parameters.Add(Array("io", NpgsqlDbType.Numeric, ifs.Select(i => i.InOctets is { } x ? (decimal?)x : null)));
             cmd.Parameters.Add(Array("oo", NpgsqlDbType.Numeric, ifs.Select(i => i.OutOctets is { } x ? (decimal?)x : null)));
@@ -256,8 +258,72 @@ public static class NetworkStore
         cmd.Parameters.Add(new NpgsqlParameter("virt", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = VirtualOuis });
         cmd.Parameters.Add(new NpgsqlParameter("asset", NpgsqlDbType.Uuid) { Value = (object?)assetId ?? DBNull.Value });
         await cmd.ExecuteNonQueryAsync(ct);
+        if (assetId is null)
+        {
+            // The connected devices register (every MAC address on an access port), after a full refresh only.
+            await using var ep = new NpgsqlCommand(EndpointsSql, conn, tx ?? own) { CommandTimeout = 120 };
+            await ep.ExecuteNonQueryAsync(ct);
+        }
         if (own is not null) { await own.CommitAsync(ct); await own.DisposeAsync(); }
     }
+
+    /// <summary>
+    /// Updates <c>network_endpoints</c>: for every MAC address learned on an access port (not an uplink, not network
+    /// equipment), the port, VLAN, IP address (newest ARP entry of any router), vendor and the inventoried device it
+    /// belongs to; a device that appears on another port is recorded as moved, a changed IP address is kept.
+    /// Needs <c>zq_mac_owner</c> from <see cref="RefreshSql"/> in the same transaction.
+    /// </summary>
+    public const string EndpointsSql = """
+        WITH first_build AS (SELECT NOT EXISTS (SELECT 1 FROM zentriq.network_endpoints) AS initial),
+        loc AS (
+            SELECT DISTINCT ON (m.mac) m.mac, m.asset_id AS switch_id, m.if_index, COALESCE(ni.name, ni.description) AS port,
+                   COALESCE(NULLIF(m.vlan, 0), ni.vlan) AS vlan, ni.unmanaged_suspect, nd.collected_at AS seen
+              FROM zentriq.network_mac_table m
+              JOIN zentriq.network_interfaces ni ON ni.asset_id = m.asset_id AND ni.if_index = m.if_index
+              JOIN zentriq.network_devices nd ON nd.asset_id = m.asset_id
+             WHERE NOT ni.uplink AND NOT COALESCE(ni.trunk, false) AND COALESCE(ni.type, 'ethernet') IN ('ethernet', 'wireless', 'other')
+               AND NOT EXISTS (SELECT 1 FROM zq_mac_owner o WHERE o.mac = m.mac AND o.infra)
+               AND m.mac <> '00:00:00:00:00:00'::macaddr
+             ORDER BY m.mac, ni.mac_count, nd.collected_at DESC
+        ),
+        src AS (
+            SELECT l.*, o.asset_id,
+                   (SELECT r.ip FROM zentriq.network_arp r JOIN zentriq.network_devices d ON d.asset_id = r.asset_id
+                     WHERE r.mac = l.mac AND family(r.ip) = 4 ORDER BY d.collected_at DESC LIMIT 1) AS arp_ip,
+                   zentriq.mac_vendor(l.mac) AS vendor,
+                   EXISTS (SELECT 1 FROM zentriq.network_neighbors nb WHERE nb.asset_id = l.switch_id AND nb.local_if_index = l.if_index AND 'phone' = ANY (nb.capabilities)) AS phone_port
+              FROM loc l LEFT JOIN zq_mac_owner o ON o.mac = l.mac
+        )
+        INSERT INTO zentriq.network_endpoints AS e (mac, ip, vendor, kind, asset_id, switch_id, if_index, port, vlan, behind_unmanaged, first_seen, last_seen, baseline)
+        SELECT s.mac, COALESCE(s.arp_ip, a.primary_ip), s.vendor,
+               CASE WHEN a.id IS NOT NULL THEN COALESCE(a.device_type, a.category)
+                    WHEN s.phone_port OR s.vendor ~* '(polycom|yealink|avaya|grandstream|mitel|snom|fanvil|poly\M)' THEN 'phone'
+                    WHEN s.vendor ~* '(hikvision|dahua|axis communications|hanwha|uniview|vivotek|mobotix|bosch security)' THEN 'camera'
+                    WHEN s.vendor ~* '(brother|kyocera|ricoh|xerox|konica|lexmark|canon|seiko epson|sharp|toshiba tec|zebra)' THEN 'printer'
+                    WHEN s.vendor ~* '(espressif|tuya|shelly|sonoff|raspberry pi|particle industries|texas instruments)' THEN 'iot'
+                    WHEN s.vendor ~* '(vmware|hyper-v|qemu|virtualbox|xensource)' THEN 'virtual'
+                    WHEN s.vendor ~* '(ubiquiti|aruba|ruckus|meraki|mist systems|cambium)' THEN 'network'
+                    WHEN s.vendor LIKE 'Private (%' THEN 'private'
+                    END,
+               s.asset_id, s.switch_id, s.if_index, s.port, s.vlan, COALESCE(s.unmanaged_suspect, false), s.seen, s.seen, f.initial
+          FROM src s CROSS JOIN first_build f LEFT JOIN zentriq.assets a ON a.id = s.asset_id
+        ON CONFLICT (mac) DO UPDATE SET
+            moved_at = CASE WHEN (e.switch_id, e.if_index) IS DISTINCT FROM (EXCLUDED.switch_id, EXCLUDED.if_index) AND e.switch_id IS NOT NULL THEN EXCLUDED.last_seen ELSE e.moved_at END,
+            prev_switch_id = CASE WHEN (e.switch_id, e.if_index) IS DISTINCT FROM (EXCLUDED.switch_id, EXCLUDED.if_index) AND e.switch_id IS NOT NULL THEN e.switch_id ELSE e.prev_switch_id END,
+            prev_port = CASE WHEN (e.switch_id, e.if_index) IS DISTINCT FROM (EXCLUDED.switch_id, EXCLUDED.if_index) AND e.switch_id IS NOT NULL THEN e.port ELSE e.prev_port END,
+            ip_changed_at = CASE WHEN EXCLUDED.ip IS NOT NULL AND e.ip IS NOT NULL AND EXCLUDED.ip <> e.ip THEN EXCLUDED.last_seen ELSE e.ip_changed_at END,
+            prev_ip = CASE WHEN EXCLUDED.ip IS NOT NULL AND e.ip IS NOT NULL AND EXCLUDED.ip <> e.ip THEN e.ip ELSE e.prev_ip END,
+            ip = COALESCE(EXCLUDED.ip, e.ip), vendor = COALESCE(EXCLUDED.vendor, e.vendor), kind = COALESCE(EXCLUDED.kind, e.kind),
+            asset_id = EXCLUDED.asset_id, switch_id = EXCLUDED.switch_id, if_index = EXCLUDED.if_index, port = EXCLUDED.port, vlan = EXCLUDED.vlan,
+            behind_unmanaged = EXCLUDED.behind_unmanaged, last_seen = GREATEST(e.last_seen, EXCLUDED.last_seen)
+        WHERE e.last_seen <= EXCLUDED.last_seen;
+        -- A MAC address that now belongs to an inventoried device or to network equipment is no longer an unknown device.
+        UPDATE zentriq.network_endpoints e SET asset_id = o.asset_id
+          FROM zq_mac_owner o WHERE o.mac = e.mac AND e.asset_id IS DISTINCT FROM o.asset_id AND NOT o.infra;
+        DELETE FROM zentriq.network_endpoints e USING zq_mac_owner o WHERE o.mac = e.mac AND o.infra;
+        -- Not seen for 90 days: gone.
+        DELETE FROM zentriq.network_endpoints WHERE last_seen < now() - interval '90 days';
+        """;
 
     public const string RefreshSql = """
         -- A full refresh runs one at a time.
@@ -339,6 +405,7 @@ public static class NetworkStore
     }
 
     private static bool Ip(string? s) => s is not null && IPAddress.TryParse(s, out _);
+    private static bool Cidr(string? s) => s is not null && s.Split('/') is [var ip, var len] && IPAddress.TryParse(ip, out _) && int.TryParse(len, out var l) && l is >= 8 and <= 30;
     private static string? Trunc(string? s, int max) => s is null ? null : s.Length <= max ? s : s[..max];
     private static NpgsqlParameter Text(string name, string? value) => new(name, NpgsqlDbType.Text) { Value = (object?)value ?? DBNull.Value };
     private static NpgsqlParameter Nullable<T>(string name, NpgsqlDbType type, T? value) where T : struct => new(name, type) { Value = value.HasValue ? value.Value : DBNull.Value };

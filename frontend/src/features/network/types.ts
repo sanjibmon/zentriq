@@ -10,6 +10,7 @@ export interface NetworkSummary {
   poeBudgetWatts: number; poeUsedWatts: number; vlans: number; links: number; firmwareVersions: number; staleDevices: number; highCpu: number;
   highMemory: number; hotDevices: number; componentsBad: number; peersDown: number; routingPeers: number; busyPorts: number; blockingPorts: number;
   portsWithDiscards: number; transceivers: number;
+  endpoints: number; unknownDevices: number; newDevices7d: number; movedDevices7d: number; ipConflicts: number; subnets: number; macVendors: number;
   speeds: Record<string, number>;
 }
 

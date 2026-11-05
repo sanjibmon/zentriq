@@ -33,6 +33,26 @@ public sealed class InventoryDocument
     [JsonPropertyName("ports")] public PortSummary? Ports { get; set; }
     /// <summary>Switches, routers, firewalls, access points: ports, neighbours, VLANs, MAC and ARP tables (SNMP).</summary>
     [JsonPropertyName("networkDevice")] public NetworkDeviceInfo? NetworkDevice { get; set; }
+    /// <summary>Windows and Office activation (product, channel, status, last five characters of the key).</summary>
+    [JsonPropertyName("licenses")] public List<LicenseItem>? Licenses { get; set; }
+    /// <summary>Host names from the DNS client cache (web applications in use). Not stored: the server keeps only known web applications.</summary>
+    [JsonPropertyName("webHosts")] public List<string>? WebHosts { get; set; }
+}
+
+/// <summary>A licensed product on the device (Windows / Office activation from SoftwareLicensingProduct).</summary>
+public sealed class LicenseItem
+{
+    [JsonPropertyName("product")] public string Product { get; set; } = "";
+    [JsonPropertyName("description")] public string? Description { get; set; }
+    /// <summary>windows | office | firmware | other</summary>
+    [JsonPropertyName("application")] public string? Application { get; set; }
+    [JsonPropertyName("family")] public string? Family { get; set; }
+    /// <summary>Retail | OEM:DM | OEM:NONSLP | Volume:MAK | Volume:GVLK | …</summary>
+    [JsonPropertyName("channel")] public string? Channel { get; set; }
+    /// <summary>licensed | unlicensed | oob_grace | oot_grace | non_genuine_grace | notification | extended_grace | embedded | unknown</summary>
+    [JsonPropertyName("status")] public string Status { get; set; } = "unknown";
+    [JsonPropertyName("partialKey")] public string? PartialKey { get; set; }
+    [JsonPropertyName("graceMinutes")] public long? GraceMinutes { get; set; }
 }
 
 public sealed class DeviceInfo

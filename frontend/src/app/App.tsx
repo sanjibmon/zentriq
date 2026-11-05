@@ -26,6 +26,10 @@ import { VulnerabilitiesPage } from '../features/vulnerabilities/Vulnerabilities
 import { SecurityPage } from '../features/security/SecurityPage';
 import { IntegrationsPage } from '../features/integrations/IntegrationsPage';
 import { RemotePage } from '../features/remote/RemotePage';
+import { LicensesPage } from '../features/licenses/LicensesPage';
+import { ProductPage } from '../features/licenses/ProductPage';
+import { WebAppPage } from '../features/webapps/WebAppPage';
+import { WebAppsPage } from '../features/webapps/WebAppsPage';
 import { DeploymentPage } from '../features/deployment/DeploymentPage';
 import { ActivityPage } from '../features/activity/ActivityPage';
 import { LoginPage } from '../features/login/LoginPage';
@@ -99,6 +103,12 @@ function Routes() {
   if (path === '/integrations' || path === '/modules/integrations') return <IntegrationsPage />;
   if (path === '/remote' || path === '/modules/remote') return <RemotePage />;
   if (path === '/deployment' || path === '/modules/deploy') return <DeploymentPage />;
+  const productMatch = /^\/modules\/licenses\/products\/([0-9a-f-]{36})$/i.exec(path);
+  if (productMatch) return <ProductPage key={productMatch[1]} id={productMatch[1]!} />;
+  if (path === '/licenses' || path === '/modules/licenses' || /^\/modules\/licenses\/licenses\/[0-9a-f-]{36}$/i.test(path)) return <LicensesPage />;
+  const webAppMatch = /^\/modules\/webapps\/([0-9a-f-]{36})$/i.exec(path);
+  if (webAppMatch) return <WebAppPage key={webAppMatch[1]} id={webAppMatch[1]!} />;
+  if (path === '/webapps' || path === '/modules/webapps') return <WebAppsPage />;
   if (path.startsWith('/modules/')) return <ModulePage id={path.slice('/modules/'.length)} />;
   return <ModulePage id="" />;
 }

@@ -6,15 +6,17 @@ import { CategoryChart, ChartKindPicker, useChartKind } from '../../components/c
 import { Callout, DataTable, ErrorBox, fmt, Kpis, Loading, PageHead, Panel, Pill } from '../../components/ui';
 import { ChoosableTable } from '../../components/columns';
 import { deviceTypeLabel } from '../assets/deviceTypes';
+import { EndpointsTab, IpamTab } from './Endpoints';
 import { TopologyMap } from './Topology';
 import {
   bpsLabel, MANAGEMENT, portState, speedLabel, type FirmwareRow, type Management, type NetworkDevice, type NetworkLink, type NetworkPort,
   type NetworkSummary, type NetworkVlan, type UnmanagedData,
 } from './types';
 
-type Tab = 'devices' | 'ports' | 'topology' | 'vlans' | 'unmanaged' | 'firmware';
+type Tab = 'devices' | 'endpoints' | 'ipam' | 'ports' | 'topology' | 'vlans' | 'unmanaged' | 'firmware';
 const TABS: [Tab, string][] = [
-  ['devices', 'Devices'], ['ports', 'Switch Ports'], ['topology', 'Topology'], ['vlans', 'VLANs'], ['unmanaged', 'Unmanaged Switches'], ['firmware', 'Firmware'],
+  ['devices', 'Devices'], ['endpoints', 'Connected Devices'], ['ipam', 'IP Addresses'], ['ports', 'Switch Ports'], ['topology', 'Topology'], ['vlans', 'VLANs'],
+  ['unmanaged', 'Unmanaged Switches'], ['firmware', 'Firmware'],
 ];
 const NET_TYPES = ['switch', 'router', 'firewall', 'access_point', 'wireless_controller', 'load_balancer', 'network'];
 const typeName = (t: string | null | undefined) => deviceTypeLabel(t) ?? fmt.label(t ?? 'network');
@@ -51,6 +53,8 @@ export function NetworkPage() {
           { label: 'Ports in use', value: `${pct(s.portsUp, s.portsTotal)}%`, sub: `${s.portsUp.toLocaleString()} of ${s.portsTotal.toLocaleString()} up · ${s.portsAdminDown} disabled`, to: '/network?tab=ports' },
           { label: 'PoE', value: s.poeBudgetWatts ? `${pct(s.poeUsedWatts, s.poeBudgetWatts)}%` : '—', sub: s.poeBudgetWatts ? `${s.poeUsedWatts} W of ${s.poeBudgetWatts} W · ${s.portsPoe} powered ports` : 'no PoE data', to: '/network?tab=ports' },
           { label: 'VLANs · links', value: `${s.vlans} · ${s.links}`, sub: 'VLANs · LLDP/CDP links', to: '/network?tab=topology' },
+          { label: 'Connected devices', value: (s.endpoints ?? 0).toLocaleString(), sub: `${s.unknownDevices ?? 0} not in inventory · ${s.newDevices7d ?? 0} new in 7 days`, to: (s.unknownDevices ?? 0) > 0 ? '/network?tab=endpoints&filter=unknown' : '/network?tab=endpoints' },
+          { label: 'IP addresses', value: (s.subnets ?? 0).toLocaleString(), sub: `subnets · ${s.ipConflicts ?? 0} conflict(s)`, to: '/network?tab=ipam' },
         ]} />
       )}
       {s && <Attention s={s} />}
@@ -58,10 +62,14 @@ export function NetworkPage() {
         {TABS.map(([t, label]) => (
           <button key={t} role="tab" aria-selected={tab === t} className={tab === t ? 'on' : ''} onClick={() => setTab(t)}>{label}
             {t === 'unmanaged' && s && s.unmanagedSuspected > 0 && <span className="cnt">{s.unmanagedSuspected}</span>}
+            {t === 'endpoints' && s && (s.unknownDevices ?? 0) > 0 && <span className="cnt">{s.unknownDevices}</span>}
+            {t === 'ipam' && s && (s.ipConflicts ?? 0) > 0 && <span className="cnt">{s.ipConflicts}</span>}
           </button>
         ))}
       </div>
       {tab === 'devices' && <DevicesTab summary={s} />}
+      {tab === 'endpoints' && <EndpointsTab key={query.get('filter') ?? ''} />}
+      {tab === 'ipam' && <IpamTab />}
       {tab === 'ports' && <PortsTab />}
       {tab === 'topology' && <TopologyTab />}
       {tab === 'vlans' && <VlansTab />}
@@ -84,6 +92,8 @@ function Attention({ s }: { s: NetworkSummary }) {
     [s.highMemory, 'device(s) with memory ≥ 85 %', '/network?tab=devices'],
     [s.hotDevices, 'device(s) at 60 °C or more', '/network?tab=devices'],
     [s.staleDevices, 'device(s) not seen for 7 days', '/network?tab=devices'],
+    [s.ipConflicts ?? 0, 'IP address conflict(s)', '/network?tab=ipam'],
+    [s.newDevices7d ?? 0, 'new device(s) on switch ports', '/network?tab=endpoints&filter=new'],
   ];
   const shown = items.filter(([n]) => n > 0);
   if (shown.length === 0) return null;

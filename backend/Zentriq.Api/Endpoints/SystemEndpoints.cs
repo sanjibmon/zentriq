@@ -98,7 +98,9 @@ public static class SystemEndpoints
         {
             var uid = rc.UserId;
             var isAdmin = rc.Has(Permissions.SettingsManage);
-            var rows = await db.Notifications.AsNoTracking().Where(n => n.UserId == uid || (n.UserId == null && isAdmin))
+            var areas = AreaPermissions.Where(rc.Has).ToList();
+            var rows = await db.Notifications.AsNoTracking()
+                .Where(n => n.UserId == uid || (n.UserId == null && (isAdmin || (n.Permission != null && areas.Contains(n.Permission)))))
                 .OrderByDescending(n => n.Id).Take(50).ToListAsync(ct);
             return Results.Ok(rows.Select(n => new { n.Id, n.Kind, n.Title, n.Body, n.Link, n.CreatedAt, read = n.ReadAt != null }));
         }).RequireAuthorization();
@@ -107,11 +109,15 @@ public static class SystemEndpoints
         {
             var uid = rc.UserId;
             var isAdmin = rc.Has(Permissions.SettingsManage);
-            await db.Notifications.Where(n => n.ReadAt == null && (n.UserId == uid || (n.UserId == null && isAdmin)))
+            var areas = AreaPermissions.Where(rc.Has).ToList();
+            await db.Notifications.Where(n => n.ReadAt == null && (n.UserId == uid || (n.UserId == null && (isAdmin || (n.Permission != null && areas.Contains(n.Permission))))))
                 .ExecuteUpdateAsync(s => s.SetProperty(n => n.ReadAt, DateTimeOffset.UtcNow), ct);
             return Results.NoContent();
         }).RequireAuthorization();
     }
+
+    /// <summary>Areas whose broadcast notifications reach every user who can see the area.</summary>
+    private static readonly string[] AreaPermissions = [Permissions.LicensesView, Permissions.WebAppsView];
 
     private static string? ValidateSetting(string key, JsonElement v)
     {

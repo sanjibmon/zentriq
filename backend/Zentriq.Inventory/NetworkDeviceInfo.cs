@@ -100,6 +100,8 @@ public sealed class NetInterface
     [JsonPropertyName("inErrors")] public long? InErrors { get; set; }
     [JsonPropertyName("outErrors")] public long? OutErrors { get; set; }
     [JsonPropertyName("ipv4")] public List<string> Ipv4 { get; set; } = new();
+    /// <summary>Networks of the interface addresses in CIDR notation (ipAdEntNetMask), e.g. 10.1.20.0/24.</summary>
+    [JsonPropertyName("subnets")] public List<string> Subnets { get; set; } = new();
     /// <summary>Seconds since boot when the port last changed state (ifLastChange).</summary>
     [JsonPropertyName("lastChangeSec")] public long? LastChangeSeconds { get; set; }
     /// <summary>64-bit octet counters (IF-MIB ifHCIn/OutOctets); traffic rates come from two collections.</summary>

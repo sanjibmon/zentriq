@@ -119,7 +119,7 @@ Remove-Item $answer -Force   # contains the administrator password
 
 if (-not $installed) {
     foreach ($t in 'T02 PostgreSQL provisioning', 'T03 Database migration', 'T04 Administrator sign-in', 'T05 API and worker services', 'T06 Trial initialization',
-                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection', 'T68 Live agent connection', 'T69 Locations and IT accessories', 'T70 Manual hardware details', 'T71 Standard and Advanced installation', 'T72 Asset lifecycle', 'T73 Cloud and infrastructure', 'T74 Own asset tags, people and bulk upload', 'T75 Backup and restore', 'T76 Roles and groups', 'T77 Log retention and export', 'T78 Agent stop and disable protection', 'T79 Automatic agent update', 'T80 Agent check-in and diagnosis commands', 'T81 Licensing plans and online activation', 'T82 Software Deployment policy', 'T83 Application control on Windows', 'T84 Push deployment', 'T85 Remote support agent tamper protection') {
+                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection', 'T68 Live agent connection', 'T69 Locations and IT accessories', 'T70 Manual hardware details', 'T71 Standard and Advanced installation', 'T72 Asset lifecycle', 'T73 Cloud and infrastructure', 'T74 Own asset tags, people and bulk upload', 'T75 Backup and restore', 'T76 Roles and groups', 'T77 Log retention and export', 'T78 Agent stop and disable protection', 'T79 Automatic agent update', 'T80 Agent check-in and diagnosis commands', 'T81 Licensing plans and online activation', 'T82 Software Deployment policy', 'T83 Application control on Windows', 'T84 Push deployment', 'T85 Remote support agent tamper protection', 'T86 Software licenses', 'T87 Web apps and accounts', 'T88 Network connected devices') {
         Record $t.Substring(0, 3) $t.Substring(4) 'BLOCKED' 'installation failed'
     }
 } else {
@@ -890,6 +890,79 @@ if (-not $installed) {
                 if ($script:ciGroup) { Api DELETE "/deployment/groups/$($script:ciGroup)" -Session $s | Out-Null }
             } catch { Write-Host "Could not reset application control: $_" }
         } else { Record 'T84' 'Push deployment' 'BLOCKED' 'T82 failed' }
+
+        # ---- T86: Software License Management ----
+        Check 'T86' 'Software licenses: a product found in the inventory, a subscription with too few licences ending soon raises shortfall and expiry alerts, renewal resolves them; Windows activation reported by the agent' {
+            $s = Login
+            Api POST '/assets/collect' @{ assetIds = @($script:agentAsset) } -Session $s | Out-Null
+            $deadline = (Get-Date).AddMinutes(6); $act = $null
+            do { Start-Sleep 10; $act = Api GET '/sam/activation?filter=windows' -Session $s } while (@($act.rows | Where-Object assetId -eq $script:agentAsset).Count -eq 0 -and (Get-Date) -lt $deadline)
+            $win = @($act.rows | Where-Object assetId -eq $script:agentAsset) | Select-Object -First 1
+            Assert ($null -ne $win) 'the agent reported no Windows activation'
+            $disc = Api GET '/sam/discover' -Session $s
+            $title = @($disc.uncovered)[0]
+            Assert ($null -ne $title) 'no installed software to track'
+            $p = Api POST '/sam/products' @{ name = "CI $($title.name)"; namePatterns = @($title.name); metric = 'device' } -Session $s
+            $l = Api POST '/sam/licenses' @{ productId = $p.id; name = 'CI subscription'; licenseType = 'subscription'; quantity = 0; endDate = (Get-Date).AddDays(5).ToString('yyyy-MM-dd'); unitCost = 10; currency = 'USD' } -Session $s
+            Api POST '/sam/evaluate' -Session $s | Out-Null
+            $d = Api GET "/sam/products/$($p.id)" -Session $s
+            Assert ($d.compliance.status -eq 'shortfall') "position: $($d.compliance.status)"
+            Assert ($d.compliance.devices -ge 1) 'no installations counted'
+            $alerts = @(Api GET '/sam/alerts' -Session $s | ForEach-Object { $_ })
+            Assert (@($alerts | Where-Object { $_.productId -eq $p.id -and $_.kind -eq 'shortfall' }).Count -eq 1) 'no shortfall alert'
+            $exp = @($alerts | Where-Object { $_.licenseId -eq $l.id -and $_.kind -eq 'expiring' }) | Select-Object -First 1
+            Assert ($exp -and $exp.severity -eq 'high') "expiry alert: $($exp | ConvertTo-Json -Compress)"
+            $sum = Api GET '/sam/summary' -Session $s
+            Assert ($sum.shortfall -ge 1 -and $sum.detail.expiring30 -ge 1) "summary: shortfall $($sum.shortfall), expiring $($sum.detail.expiring30)"
+            $h = Api GET '/sam/highlights' -Session $s
+            Assert ($h.licenses.shortfall -ge 1) 'dashboard highlights do not show the shortfall'
+            Api POST "/sam/licenses/$($l.id)/renew" @{ endDate = (Get-Date).AddDays(365).ToString('yyyy-MM-dd'); quantity = 50 } -Session $s | Out-Null
+            $open = @(Api GET '/sam/alerts' -Session $s | ForEach-Object { $_ } | Where-Object { $_.productId -eq $p.id -and $_.kind -in 'shortfall', 'expiring' })
+            Assert ($open.Count -eq 0) "alerts still open after the renewal: $($open.kind -join ', ')"
+            Assert ((Api GET "/sam/products/$($p.id)" -Session $s).compliance.status -in 'compliant', 'over_licensed') 'not compliant after the renewal'
+            $inst = @(Api GET "/sam/products/$($p.id)/installations" -Session $s | ForEach-Object { $_ })
+            Assert (@($inst | Where-Object assetId -eq $script:agentAsset).Count -eq 1) 'the runner is not listed among the installations'
+            Api DELETE "/sam/products/$($p.id)" -Session $s | Out-Null
+            "activation: $($win.product) $($win.status) ($($win.channel)); '$($title.name)' on $($d.compliance.devices) device(s): shortfall and expiry alerts, resolved by the renewal"
+        } | Out-Null
+
+        # ---- T87: Web Apps & Accounts ----
+        Check 'T87' 'Web apps and accounts: add from the catalogue, import the user list, an account of a person who left is orphaned, unsanctioned use is reported' {
+            $s = Login
+            $cat = Api GET '/webapps/catalog' -Session $s
+            Assert (@($cat.apps).Count -ge 60) "catalogue: $(@($cat.apps).Count) apps"
+            $existing = @(Api GET '/webapps?q=Miro' -Session $s | ForEach-Object { $_ }) | Where-Object catalogKey -eq 'miro'
+            if (-not $existing) { Api POST '/webapps/from-catalog' @{ keys = @('miro'); status = 'sanctioned' } -Session $s | Out-Null }
+            $app = @(Api GET '/webapps?q=Miro' -Session $s | ForEach-Object { $_ }) | Where-Object catalogKey -eq 'miro' | Select-Object -First 1
+            Assert ($null -ne $app) 'Miro not added'
+            Api POST '/lifecycle/people' @{ name = 'CI Leaver'; email = 'ci.leaver@example.com'; status = 'left' } -Session $s | Out-Null
+            $csv = "Email,Name,Role,Last Login`nci.leaver@example.com,CI Leaver,Admin,2026-01-05`nci.user@example.com,CI User,Member,$((Get-Date).ToString('yyyy-MM-dd'))"
+            $imp = Api POST "/webapps/$($app.id)/accounts/import" @{ csv = $csv } -Session $s
+            Assert ($imp.imported -eq 2) "imported $($imp.imported)"
+            $orph = @(Api GET "/webapps/accounts?appId=$($app.id)&filter=orphaned" -Session $s | ForEach-Object { $_ })
+            Assert ($orph.Count -eq 1 -and $orph[0].userName -eq 'ci.leaver@example.com') "orphaned: $($orph.userName -join ', ')"
+            $alerts = @(Api GET '/webapps/alerts' -Session $s | ForEach-Object { $_ } | Where-Object { $_.appId -eq $app.id -and $_.kind -eq 'webapp_orphaned' })
+            Assert ($alerts.Count -eq 1 -and $alerts[0].severity -eq 'high') 'no orphaned-account alert'
+            $sum = Api GET '/webapps/summary' -Session $s
+            Assert ($sum.orphaned -ge 1) "summary orphaned $($sum.orphaned)"
+            # Web apps seen on the runner from its DNS cache (GitHub, Microsoft 365 …) after the inventory.
+            $seen = @(Api GET '/webapps?filter=inuse' -Session $s | ForEach-Object { $_ })
+            Api POST '/webapps/status' @{ ids = @($app.id); status = 'unsanctioned' } -Session $s | Out-Null
+            Api DELETE "/webapps/$($app.id)" -Session $s | Out-Null
+            "catalogue $(@($cat.apps).Count) apps; 2 accounts imported, the leaver's admin account orphaned with a high alert; in use on the runner: $(@($seen.name) -join ', ')"
+        } | Out-Null
+
+        # ---- T88: network connected devices and IP address management ----
+        Check 'T88' 'Network: connected devices register, IP address management, MAC vendor status and notifications respond' {
+            $s = Login
+            $sum = Api GET '/network/summary' -Session $s
+            Assert ($null -ne $sum.endpoints -and $null -ne $sum.ipConflicts) 'summary lacks the connected devices'
+            $ep = @(Api GET '/network/endpoints?filter=unknown' -Session $s | ForEach-Object { $_ })
+            $subnets = @(Api GET '/network/subnets' -Session $s | ForEach-Object { $_ })
+            $vs = Api GET '/network/vendors/status' -Session $s
+            $notes = @(Api GET '/system/notifications' -Session $s | ForEach-Object { $_ })
+            "connected devices $($sum.endpoints) ($($ep.Count) unknown); $($subnets.Count) subnet(s); $($vs.prefixes) MAC vendor prefixes; $($notes.Count) notification(s)"
+        } | Out-Null
     }
 
 

@@ -199,6 +199,27 @@ public static class WindowsCollector
                     doc.Services.Add(new ServiceItem { Name = Str(s, "Name") ?? "", DisplayName = Str(s, "DisplayName"), State = Str(s, "State"), StartMode = Str(s, "StartMode") });
             });
 
+        // Windows and Office activation (Software License Management: genuine / licensed check). Only the last five
+        // characters of a product key are ever read (PartialProductKey); a full key is never collected.
+        if (doc.Os.Family == "windows")
+            Section(doc, "activation", () => doc.Licenses = Activation(wmi), optional: true);
+
+        // Web applications in use (Web Apps & Accounts): host names in the DNS client cache. The server keeps only the
+        // names that belong to a known web application and discards the rest.
+        if (includeServices && doc.Os.Family == "windows")
+            Section(doc, "web applications", () =>
+            {
+                var hosts = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var r in wmi.Query(@"root\StandardCimv2", "SELECT Entry, Type FROM MSFT_DNSClientCache"))
+                {
+                    var t = Long(r, "Type");
+                    if (t is not (1 or 5 or 28)) continue;   // A, CNAME, AAAA
+                    if (WebHost(Str(r, "Entry")) is { } h) hosts.Add(h);
+                    if (hosts.Count >= 1000) break;
+                }
+                doc.WebHosts = hosts.OrderBy(h => h, StringComparer.Ordinal).ToList();
+            }, optional: true);
+
         Section(doc, "antivirus", () =>
         {
             if (productType == 1)
@@ -388,6 +409,77 @@ public static class WindowsCollector
             if (t is 3 or 4 or 5 or 6 or 7 or 13 or 15 or 16 or 24 or 33 or 34 or 35 or 36) return "desktop";
         }
         return types.Length == 0 ? null : "other";
+    }
+
+    // ---- activation (SoftwareLicensingProduct) ---------------------------------------------------------
+
+    private const string WindowsAppId = "55c92734-d682-4d71-983e-d6ec3f16059f";
+    private const string OfficeAppId = "0ff1ce15-a989-479d-af46-f275c6370663";
+
+    /// <summary>Activation of Windows and Office products that have a product key installed.</summary>
+    internal static List<LicenseItem> Activation(IWmiSource wmi)
+    {
+        IReadOnlyList<IReadOnlyDictionary<string, object?>> rows;
+        try { rows = wmi.Query(Cimv2, "SELECT Name, Description, LicenseStatus, PartialProductKey, ProductKeyChannel, GracePeriodRemaining, LicenseFamily, ApplicationID FROM SoftwareLicensingProduct WHERE PartialProductKey IS NOT NULL"); }
+        catch (Exception) { rows = wmi.Query(Cimv2, "SELECT Name, Description, LicenseStatus, PartialProductKey, GracePeriodRemaining, LicenseFamily, ApplicationID FROM SoftwareLicensingProduct WHERE PartialProductKey IS NOT NULL"); }
+        var list = new List<LicenseItem>();
+        foreach (var r in rows)
+        {
+            var app = (Str(r, "ApplicationID") ?? "").ToLowerInvariant();
+            var description = Str(r, "Description");
+            list.Add(new LicenseItem
+            {
+                Product = Clean(Str(r, "Name")) ?? "Unknown product",
+                Description = Clean(description),
+                Application = app == WindowsAppId ? "windows" : app == OfficeAppId ? "office" : "other",
+                Family = Clean(Str(r, "LicenseFamily")),
+                Channel = Clean(Str(r, "ProductKeyChannel")) ?? ChannelFromDescription(description),
+                Status = LicenseStatusName(Long(r, "LicenseStatus")),
+                PartialKey = Clean(Str(r, "PartialProductKey")),
+                GraceMinutes = Long(r, "GracePeriodRemaining"),
+            });
+        }
+        // The licence embedded in the firmware by the manufacturer (OEM activation 3.0): its description only.
+        try
+        {
+            var svc = First(wmi, Cimv2, "SELECT OA3xOriginalProductKeyDescription FROM SoftwareLicensingService");
+            if (Clean(svc is null ? null : Str(svc, "OA3xOriginalProductKeyDescription")) is { } oem)
+                list.Add(new LicenseItem { Product = "Firmware (OEM) licence", Description = oem, Application = "firmware", Channel = ChannelFromDescription(oem) ?? "OEM", Status = "embedded" });
+        }
+        catch (Exception) { /* older Windows */ }
+        return list;
+    }
+
+    /// <summary>SoftwareLicensingProduct.LicenseStatus as a name.</summary>
+    public static string LicenseStatusName(long? status) => status switch
+    {
+        0 => "unlicensed", 1 => "licensed", 2 => "oob_grace", 3 => "oot_grace", 4 => "non_genuine_grace", 5 => "notification", 6 => "extended_grace",
+        _ => "unknown",
+    };
+
+    /// <summary>"Windows(R) Operating System, RETAIL channel" → "Retail"; "VOLUME_KMSCLIENT channel" → "Volume:GVLK".</summary>
+    public static string? ChannelFromDescription(string? description)
+    {
+        if (string.IsNullOrEmpty(description)) return null;
+        var d = description!.ToUpperInvariant();
+        if (d.Contains("KMSCLIENT")) return "Volume:GVLK";
+        if (d.Contains("MAK")) return "Volume:MAK";
+        if (d.Contains("OEM")) return "OEM";
+        if (d.Contains("RETAIL")) return "Retail";
+        if (d.Contains("TIMEBASED_SUB") || d.Contains("SUBSCRIPTION")) return "Subscription";
+        if (d.Contains("VOLUME")) return "Volume";
+        return null;
+    }
+
+    /// <summary>A DNS name that can belong to a web application: lower case, at least two labels, not an address or a reverse / local name.</summary>
+    public static string? WebHost(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return null;
+        var h = name!.Trim().TrimEnd('.').ToLowerInvariant();
+        if (h.Length > 253 || h.IndexOf('.') <= 0 || h.EndsWith(".arpa") || h.EndsWith(".local") || h.EndsWith(".lan") || h.EndsWith(".internal") || h.EndsWith(".localdomain")) return null;
+        if (System.Net.IPAddress.TryParse(h, out _)) return null;
+        foreach (var c in h) if (!(c is >= 'a' and <= 'z' || c is >= '0' and <= '9' || c is '-' or '.' or '_')) return null;
+        return h;
     }
 
     // ---- value helpers (System.Management and MMI return slightly different CLR types) --------

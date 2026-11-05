@@ -1,0 +1,929 @@
+{
+ "version": "2026.11.1",
+ "apps": [
+  {
+   "key": "microsoft-365",
+   "name": "Microsoft 365",
+   "vendor": "Microsoft",
+   "category": "Productivity",
+   "url": "https://www.office.com",
+   "domains": [
+    "office.com",
+    "office365.com",
+    "officeapps.live.com",
+    "microsoft365.com",
+    "sharepoint.com",
+    "onedrive.live.com",
+    "outlook.office.com",
+    "outlook.office365.com"
+   ]
+  },
+  {
+   "key": "microsoft-teams",
+   "name": "Microsoft Teams",
+   "vendor": "Microsoft",
+   "category": "Communication",
+   "url": "https://teams.microsoft.com",
+   "domains": [
+    "teams.microsoft.com",
+    "teams.live.com",
+    "teams.cloud.microsoft"
+   ]
+  },
+  {
+   "key": "microsoft-copilot",
+   "name": "Microsoft Copilot",
+   "vendor": "Microsoft",
+   "category": "AI assistants",
+   "url": "https://copilot.microsoft.com",
+   "domains": [
+    "copilot.microsoft.com",
+    "copilot.cloud.microsoft"
+   ]
+  },
+  {
+   "key": "power-bi",
+   "name": "Power BI",
+   "vendor": "Microsoft",
+   "category": "Analytics",
+   "url": "https://app.powerbi.com",
+   "domains": [
+    "powerbi.com"
+   ]
+  },
+  {
+   "key": "dynamics-365",
+   "name": "Dynamics 365",
+   "vendor": "Microsoft",
+   "category": "CRM",
+   "url": "https://dynamics.microsoft.com",
+   "domains": [
+    "dynamics.com"
+   ]
+  },
+  {
+   "key": "azure-portal",
+   "name": "Microsoft Azure portal",
+   "vendor": "Microsoft",
+   "category": "Cloud platforms",
+   "url": "https://portal.azure.com",
+   "domains": [
+    "portal.azure.com"
+   ]
+  },
+  {
+   "key": "google-workspace",
+   "name": "Google Workspace",
+   "vendor": "Google",
+   "category": "Productivity",
+   "url": "https://workspace.google.com",
+   "domains": [
+    "mail.google.com",
+    "docs.google.com",
+    "drive.google.com",
+    "sheets.google.com",
+    "slides.google.com",
+    "calendar.google.com",
+    "meet.google.com",
+    "chat.google.com"
+   ]
+  },
+  {
+   "key": "google-cloud-console",
+   "name": "Google Cloud console",
+   "vendor": "Google",
+   "category": "Cloud platforms",
+   "url": "https://console.cloud.google.com",
+   "domains": [
+    "console.cloud.google.com"
+   ]
+  },
+  {
+   "key": "gemini",
+   "name": "Google Gemini",
+   "vendor": "Google",
+   "category": "AI assistants",
+   "url": "https://gemini.google.com",
+   "domains": [
+    "gemini.google.com"
+   ]
+  },
+  {
+   "key": "aws-console",
+   "name": "AWS Management Console",
+   "vendor": "Amazon Web Services",
+   "category": "Cloud platforms",
+   "url": "https://console.aws.amazon.com",
+   "domains": [
+    "console.aws.amazon.com",
+    "signin.aws.amazon.com",
+    "awsapps.com"
+   ]
+  },
+  {
+   "key": "chatgpt",
+   "name": "ChatGPT",
+   "vendor": "OpenAI",
+   "category": "AI assistants",
+   "url": "https://chatgpt.com",
+   "domains": [
+    "chatgpt.com",
+    "chat.openai.com"
+   ]
+  },
+  {
+   "key": "claude",
+   "name": "Claude",
+   "vendor": "Anthropic",
+   "category": "AI assistants",
+   "url": "https://claude.ai",
+   "domains": [
+    "claude.ai"
+   ]
+  },
+  {
+   "key": "perplexity",
+   "name": "Perplexity",
+   "vendor": "Perplexity AI",
+   "category": "AI assistants",
+   "url": "https://www.perplexity.ai",
+   "domains": [
+    "perplexity.ai"
+   ]
+  },
+  {
+   "key": "github-copilot",
+   "name": "GitHub Copilot",
+   "vendor": "GitHub",
+   "category": "AI assistants",
+   "url": "https://github.com/features/copilot",
+   "domains": [
+    "githubcopilot.com"
+   ]
+  },
+  {
+   "key": "slack",
+   "name": "Slack",
+   "vendor": "Salesforce",
+   "category": "Communication",
+   "url": "https://slack.com",
+   "domains": [
+    "slack.com",
+    "slack-edge.com"
+   ]
+  },
+  {
+   "key": "zoom",
+   "name": "Zoom",
+   "vendor": "Zoom Communications",
+   "category": "Communication",
+   "url": "https://zoom.us",
+   "domains": [
+    "zoom.us",
+    "zoom.com"
+   ]
+  },
+  {
+   "key": "webex",
+   "name": "Webex",
+   "vendor": "Cisco",
+   "category": "Communication",
+   "url": "https://www.webex.com",
+   "domains": [
+    "webex.com"
+   ]
+  },
+  {
+   "key": "goto",
+   "name": "GoTo Meeting",
+   "vendor": "GoTo",
+   "category": "Communication",
+   "url": "https://www.goto.com",
+   "domains": [
+    "gotomeeting.com",
+    "goto.com"
+   ]
+  },
+  {
+   "key": "whatsapp-web",
+   "name": "WhatsApp",
+   "vendor": "Meta",
+   "category": "Communication",
+   "url": "https://web.whatsapp.com",
+   "domains": [
+    "web.whatsapp.com"
+   ]
+  },
+  {
+   "key": "telegram",
+   "name": "Telegram",
+   "vendor": "Telegram",
+   "category": "Communication",
+   "url": "https://web.telegram.org",
+   "domains": [
+    "web.telegram.org"
+   ]
+  },
+  {
+   "key": "discord",
+   "name": "Discord",
+   "vendor": "Discord",
+   "category": "Communication",
+   "url": "https://discord.com",
+   "domains": [
+    "discord.com",
+    "discord.gg"
+   ]
+  },
+  {
+   "key": "ringcentral",
+   "name": "RingCentral",
+   "vendor": "RingCentral",
+   "category": "Communication",
+   "url": "https://www.ringcentral.com",
+   "domains": [
+    "ringcentral.com"
+   ]
+  },
+  {
+   "key": "salesforce",
+   "name": "Salesforce",
+   "vendor": "Salesforce",
+   "category": "CRM",
+   "url": "https://www.salesforce.com",
+   "domains": [
+    "salesforce.com",
+    "force.com",
+    "lightning.force.com"
+   ]
+  },
+  {
+   "key": "hubspot",
+   "name": "HubSpot",
+   "vendor": "HubSpot",
+   "category": "CRM",
+   "url": "https://www.hubspot.com",
+   "domains": [
+    "app.hubspot.com",
+    "hubspot.com"
+   ]
+  },
+  {
+   "key": "zoho",
+   "name": "Zoho",
+   "vendor": "Zoho",
+   "category": "CRM",
+   "url": "https://www.zoho.com",
+   "domains": [
+    "zoho.com",
+    "zoho.in",
+    "zoho.eu"
+   ]
+  },
+  {
+   "key": "pipedrive",
+   "name": "Pipedrive",
+   "vendor": "Pipedrive",
+   "category": "CRM",
+   "url": "https://www.pipedrive.com",
+   "domains": [
+    "pipedrive.com"
+   ]
+  },
+  {
+   "key": "freshworks",
+   "name": "Freshworks (Freshdesk, Freshservice)",
+   "vendor": "Freshworks",
+   "category": "Service desk",
+   "url": "https://www.freshworks.com",
+   "domains": [
+    "freshdesk.com",
+    "freshservice.com",
+    "freshworks.com"
+   ]
+  },
+  {
+   "key": "zendesk",
+   "name": "Zendesk",
+   "vendor": "Zendesk",
+   "category": "Service desk",
+   "url": "https://www.zendesk.com",
+   "domains": [
+    "zendesk.com"
+   ]
+  },
+  {
+   "key": "servicenow",
+   "name": "ServiceNow",
+   "vendor": "ServiceNow",
+   "category": "Service desk",
+   "url": "https://www.servicenow.com",
+   "domains": [
+    "service-now.com",
+    "servicenow.com"
+   ]
+  },
+  {
+   "key": "jira",
+   "name": "Jira",
+   "vendor": "Atlassian",
+   "category": "Project management",
+   "url": "https://www.atlassian.com/software/jira",
+   "domains": [
+    "atlassian.net",
+    "jira.com"
+   ]
+  },
+  {
+   "key": "confluence",
+   "name": "Confluence",
+   "vendor": "Atlassian",
+   "category": "Collaboration",
+   "url": "https://www.atlassian.com/software/confluence",
+   "domains": []
+  },
+  {
+   "key": "trello",
+   "name": "Trello",
+   "vendor": "Atlassian",
+   "category": "Project management",
+   "url": "https://trello.com",
+   "domains": [
+    "trello.com"
+   ]
+  },
+  {
+   "key": "asana",
+   "name": "Asana",
+   "vendor": "Asana",
+   "category": "Project management",
+   "url": "https://asana.com",
+   "domains": [
+    "asana.com"
+   ]
+  },
+  {
+   "key": "monday",
+   "name": "monday.com",
+   "vendor": "monday.com",
+   "category": "Project management",
+   "url": "https://monday.com",
+   "domains": [
+    "monday.com"
+   ]
+  },
+  {
+   "key": "clickup",
+   "name": "ClickUp",
+   "vendor": "ClickUp",
+   "category": "Project management",
+   "url": "https://clickup.com",
+   "domains": [
+    "clickup.com"
+   ]
+  },
+  {
+   "key": "smartsheet",
+   "name": "Smartsheet",
+   "vendor": "Smartsheet",
+   "category": "Project management",
+   "url": "https://www.smartsheet.com",
+   "domains": [
+    "smartsheet.com"
+   ]
+  },
+  {
+   "key": "wrike",
+   "name": "Wrike",
+   "vendor": "Wrike",
+   "category": "Project management",
+   "url": "https://www.wrike.com",
+   "domains": [
+    "wrike.com"
+   ]
+  },
+  {
+   "key": "notion",
+   "name": "Notion",
+   "vendor": "Notion Labs",
+   "category": "Collaboration",
+   "url": "https://www.notion.so",
+   "domains": [
+    "notion.so",
+    "notion.com"
+   ]
+  },
+  {
+   "key": "miro",
+   "name": "Miro",
+   "vendor": "Miro",
+   "category": "Collaboration",
+   "url": "https://miro.com",
+   "domains": [
+    "miro.com"
+   ]
+  },
+  {
+   "key": "airtable",
+   "name": "Airtable",
+   "vendor": "Airtable",
+   "category": "Collaboration",
+   "url": "https://airtable.com",
+   "domains": [
+    "airtable.com"
+   ]
+  },
+  {
+   "key": "coda",
+   "name": "Coda",
+   "vendor": "Coda",
+   "category": "Collaboration",
+   "url": "https://coda.io",
+   "domains": [
+    "coda.io"
+   ]
+  },
+  {
+   "key": "github",
+   "name": "GitHub",
+   "vendor": "GitHub",
+   "category": "Developer tools",
+   "url": "https://github.com",
+   "domains": [
+    "github.com"
+   ]
+  },
+  {
+   "key": "gitlab",
+   "name": "GitLab",
+   "vendor": "GitLab",
+   "category": "Developer tools",
+   "url": "https://gitlab.com",
+   "domains": [
+    "gitlab.com"
+   ]
+  },
+  {
+   "key": "bitbucket",
+   "name": "Bitbucket",
+   "vendor": "Atlassian",
+   "category": "Developer tools",
+   "url": "https://bitbucket.org",
+   "domains": [
+    "bitbucket.org"
+   ]
+  },
+  {
+   "key": "postman",
+   "name": "Postman",
+   "vendor": "Postman",
+   "category": "Developer tools",
+   "url": "https://www.postman.com",
+   "domains": [
+    "postman.com",
+    "getpostman.com"
+   ]
+  },
+  {
+   "key": "vercel",
+   "name": "Vercel",
+   "vendor": "Vercel",
+   "category": "Developer tools",
+   "url": "https://vercel.com",
+   "domains": [
+    "vercel.com"
+   ]
+  },
+  {
+   "key": "docker-hub",
+   "name": "Docker Hub",
+   "vendor": "Docker",
+   "category": "Developer tools",
+   "url": "https://hub.docker.com",
+   "domains": [
+    "hub.docker.com"
+   ]
+  },
+  {
+   "key": "datadog",
+   "name": "Datadog",
+   "vendor": "Datadog",
+   "category": "Developer tools",
+   "url": "https://www.datadoghq.com",
+   "domains": [
+    "datadoghq.com",
+    "datadoghq.eu"
+   ]
+  },
+  {
+   "key": "dropbox",
+   "name": "Dropbox",
+   "vendor": "Dropbox",
+   "category": "File sharing",
+   "url": "https://www.dropbox.com",
+   "domains": [
+    "dropbox.com",
+    "dropboxapi.com"
+   ]
+  },
+  {
+   "key": "box",
+   "name": "Box",
+   "vendor": "Box",
+   "category": "File sharing",
+   "url": "https://www.box.com",
+   "domains": [
+    "box.com",
+    "app.box.com"
+   ]
+  },
+  {
+   "key": "wetransfer",
+   "name": "WeTransfer",
+   "vendor": "WeTransfer",
+   "category": "File sharing",
+   "url": "https://wetransfer.com",
+   "domains": [
+    "wetransfer.com"
+   ]
+  },
+  {
+   "key": "icloud",
+   "name": "iCloud",
+   "vendor": "Apple",
+   "category": "File sharing",
+   "url": "https://www.icloud.com",
+   "domains": [
+    "icloud.com"
+   ]
+  },
+  {
+   "key": "mega",
+   "name": "MEGA",
+   "vendor": "Mega Limited",
+   "category": "File sharing",
+   "url": "https://mega.io",
+   "domains": [
+    "mega.nz",
+    "mega.io"
+   ]
+  },
+  {
+   "key": "adobe-creative-cloud",
+   "name": "Adobe Creative Cloud",
+   "vendor": "Adobe",
+   "category": "Design",
+   "url": "https://www.adobe.com/creativecloud.html",
+   "domains": [
+    "creativecloud.adobe.com",
+    "adobe.io",
+    "express.adobe.com"
+   ]
+  },
+  {
+   "key": "adobe-acrobat-sign",
+   "name": "Adobe Acrobat Sign",
+   "vendor": "Adobe",
+   "category": "Documents & e-signature",
+   "url": "https://www.adobe.com/sign.html",
+   "domains": [
+    "echosign.com",
+    "adobesign.com"
+   ]
+  },
+  {
+   "key": "canva",
+   "name": "Canva",
+   "vendor": "Canva",
+   "category": "Design",
+   "url": "https://www.canva.com",
+   "domains": [
+    "canva.com"
+   ]
+  },
+  {
+   "key": "figma",
+   "name": "Figma",
+   "vendor": "Figma",
+   "category": "Design",
+   "url": "https://www.figma.com",
+   "domains": [
+    "figma.com"
+   ]
+  },
+  {
+   "key": "docusign",
+   "name": "Docusign",
+   "vendor": "Docusign",
+   "category": "Documents & e-signature",
+   "url": "https://www.docusign.com",
+   "domains": [
+    "docusign.com",
+    "docusign.net"
+   ]
+  },
+  {
+   "key": "grammarly",
+   "name": "Grammarly",
+   "vendor": "Grammarly",
+   "category": "Productivity",
+   "url": "https://www.grammarly.com",
+   "domains": [
+    "grammarly.com",
+    "grammarly.io"
+   ]
+  },
+  {
+   "key": "calendly",
+   "name": "Calendly",
+   "vendor": "Calendly",
+   "category": "Productivity",
+   "url": "https://calendly.com",
+   "domains": [
+    "calendly.com"
+   ]
+  },
+  {
+   "key": "evernote",
+   "name": "Evernote",
+   "vendor": "Bending Spoons",
+   "category": "Productivity",
+   "url": "https://evernote.com",
+   "domains": [
+    "evernote.com"
+   ]
+  },
+  {
+   "key": "mailchimp",
+   "name": "Mailchimp",
+   "vendor": "Intuit",
+   "category": "Marketing",
+   "url": "https://mailchimp.com",
+   "domains": [
+    "mailchimp.com",
+    "admin.mailchimp.com"
+   ]
+  },
+  {
+   "key": "linkedin",
+   "name": "LinkedIn",
+   "vendor": "Microsoft",
+   "category": "Marketing",
+   "url": "https://www.linkedin.com",
+   "domains": [
+    "linkedin.com"
+   ]
+  },
+  {
+   "key": "semrush",
+   "name": "Semrush",
+   "vendor": "Semrush",
+   "category": "Marketing",
+   "url": "https://www.semrush.com",
+   "domains": [
+    "semrush.com"
+   ]
+  },
+  {
+   "key": "surveymonkey",
+   "name": "SurveyMonkey",
+   "vendor": "SurveyMonkey",
+   "category": "Marketing",
+   "url": "https://www.surveymonkey.com",
+   "domains": [
+    "surveymonkey.com"
+   ]
+  },
+  {
+   "key": "typeform",
+   "name": "Typeform",
+   "vendor": "Typeform",
+   "category": "Marketing",
+   "url": "https://www.typeform.com",
+   "domains": [
+    "typeform.com"
+   ]
+  },
+  {
+   "key": "workday",
+   "name": "Workday",
+   "vendor": "Workday",
+   "category": "HR & finance",
+   "url": "https://www.workday.com",
+   "domains": [
+    "myworkday.com",
+    "workday.com"
+   ]
+  },
+  {
+   "key": "bamboohr",
+   "name": "BambooHR",
+   "vendor": "BambooHR",
+   "category": "HR & finance",
+   "url": "https://www.bamboohr.com",
+   "domains": [
+    "bamboohr.com"
+   ]
+  },
+  {
+   "key": "sap-successfactors",
+   "name": "SAP SuccessFactors",
+   "vendor": "SAP",
+   "category": "HR & finance",
+   "url": "https://www.sap.com/products/hcm.html",
+   "domains": [
+    "successfactors.com",
+    "successfactors.eu"
+   ]
+  },
+  {
+   "key": "darwinbox",
+   "name": "Darwinbox",
+   "vendor": "Darwinbox",
+   "category": "HR & finance",
+   "url": "https://darwinbox.com",
+   "domains": [
+    "darwinbox.in",
+    "darwinbox.com"
+   ]
+  },
+  {
+   "key": "keka",
+   "name": "Keka",
+   "vendor": "Keka",
+   "category": "HR & finance",
+   "url": "https://www.keka.com",
+   "domains": [
+    "keka.com"
+   ]
+  },
+  {
+   "key": "quickbooks",
+   "name": "QuickBooks Online",
+   "vendor": "Intuit",
+   "category": "HR & finance",
+   "url": "https://quickbooks.intuit.com",
+   "domains": [
+    "qbo.intuit.com",
+    "quickbooks.intuit.com"
+   ]
+  },
+  {
+   "key": "xero",
+   "name": "Xero",
+   "vendor": "Xero",
+   "category": "HR & finance",
+   "url": "https://www.xero.com",
+   "domains": [
+    "xero.com"
+   ]
+  },
+  {
+   "key": "netsuite",
+   "name": "Oracle NetSuite",
+   "vendor": "Oracle",
+   "category": "HR & finance",
+   "url": "https://www.netsuite.com",
+   "domains": [
+    "netsuite.com"
+   ]
+  },
+  {
+   "key": "expensify",
+   "name": "Expensify",
+   "vendor": "Expensify",
+   "category": "HR & finance",
+   "url": "https://www.expensify.com",
+   "domains": [
+    "expensify.com"
+   ]
+  },
+  {
+   "key": "okta",
+   "name": "Okta",
+   "vendor": "Okta",
+   "category": "Identity & security",
+   "url": "https://www.okta.com",
+   "domains": [
+    "okta.com",
+    "oktapreview.com"
+   ]
+  },
+  {
+   "key": "lastpass",
+   "name": "LastPass",
+   "vendor": "LastPass",
+   "category": "Identity & security",
+   "url": "https://www.lastpass.com",
+   "domains": [
+    "lastpass.com"
+   ]
+  },
+  {
+   "key": "1password",
+   "name": "1Password",
+   "vendor": "AgileBits",
+   "category": "Identity & security",
+   "url": "https://1password.com",
+   "domains": [
+    "1password.com",
+    "1password.eu"
+   ]
+  },
+  {
+   "key": "bitwarden",
+   "name": "Bitwarden",
+   "vendor": "Bitwarden",
+   "category": "Identity & security",
+   "url": "https://bitwarden.com",
+   "domains": [
+    "bitwarden.com",
+    "bitwarden.eu"
+   ]
+  },
+  {
+   "key": "duo",
+   "name": "Duo Security",
+   "vendor": "Cisco",
+   "category": "Identity & security",
+   "url": "https://duo.com",
+   "domains": [
+    "duosecurity.com"
+   ]
+  },
+  {
+   "key": "teamviewer",
+   "name": "TeamViewer (web)",
+   "vendor": "TeamViewer",
+   "category": "Remote access",
+   "url": "https://login.teamviewer.com",
+   "domains": [
+    "login.teamviewer.com",
+    "web.teamviewer.com"
+   ]
+  },
+  {
+   "key": "anydesk",
+   "name": "AnyDesk (my.anydesk)",
+   "vendor": "AnyDesk",
+   "category": "Remote access",
+   "url": "https://my.anydesk.com",
+   "domains": [
+    "my.anydesk.com"
+   ]
+  },
+  {
+   "key": "shopify",
+   "name": "Shopify",
+   "vendor": "Shopify",
+   "category": "E-commerce",
+   "url": "https://www.shopify.com",
+   "domains": [
+    "myshopify.com",
+    "admin.shopify.com"
+   ]
+  },
+  {
+   "key": "tableau",
+   "name": "Tableau Cloud",
+   "vendor": "Salesforce",
+   "category": "Analytics",
+   "url": "https://www.tableau.com",
+   "domains": [
+    "online.tableau.com"
+   ]
+  },
+  {
+   "key": "looker-studio",
+   "name": "Looker Studio",
+   "vendor": "Google",
+   "category": "Analytics",
+   "url": "https://lookerstudio.google.com",
+   "domains": [
+    "lookerstudio.google.com",
+    "datastudio.google.com"
+   ]
+  },
+  {
+   "key": "intercom",
+   "name": "Intercom",
+   "vendor": "Intercom",
+   "category": "Service desk",
+   "url": "https://www.intercom.com",
+   "domains": [
+    "intercom.com",
+    "intercom.io"
+   ]
+  },
+  {
+   "key": "loom",
+   "name": "Loom",
+   "vendor": "Atlassian",
+   "category": "Communication",
+   "url": "https://www.loom.com",
+   "domains": [
+    "loom.com"
+   ]
+  }
+ ]
+}

@@ -6,6 +6,7 @@ import { useApi } from '../../app/useApi';
 import { Link, useRouter } from '../../app/router';
 import { Callout, DataTable, ErrorBox, fmt, Loading, PageHead, Panel, Pill, statusTone, titleCase } from '../../components/ui';
 import { useConfirm } from '../../components/Confirm';
+import { Icon } from '../../components/Icon';
 import { CategoryChart, CHART_KINDS, HBars, PostureBars, TrendArea, type ChartKind, type Slice } from '../../components/charts';
 import { ReportWidget } from './ReportWidget';
 import { deviceTypeLabel } from '../assets/deviceTypes';
@@ -149,6 +150,42 @@ export async function pinReportToDashboard(reportId: string, name: string, wide:
   return 'added';
 }
 const isKind = (k: unknown): k is ChartKind => CHART_KINDS.some(([c]) => c === k);
+
+interface HighlightData {
+  licenses: { products: number; shortfall: number; unlicensed: number; compliancePercent: number;
+    detail: { expiring: number; expired: number; cloudIssues: number; notActivated: number; next: { name: string; endDate: string; days: number } | null } } | null;
+  webapps: { apps: number; review: number; unsanctionedInUse: number; accounts: number; orphaned: number; inactive: number } | null;
+}
+
+/** Licence and web app problems at the top of the dashboard (only for users who can see those areas). */
+function Highlights({ tick }: { tick: number }) {
+  const h = useApi(() => api.get<HighlightData>('/sam/highlights').catch(() => null), [tick]);
+  const l = h.data?.licenses; const w = h.data?.webapps;
+  const items: [number, string, string, 'crit' | 'warn'][] = [];
+  if (l) {
+    if (l.shortfall + l.unlicensed > 0) items.push([l.shortfall + l.unlicensed, 'software product(s) under-licensed or unlicensed', '/modules/licenses?tab=products&status=issues', 'crit']);
+    if (l.detail.expired > 0) items.push([l.detail.expired, 'licence(s) expired', '/modules/licenses?tab=licenses&filter=expired', 'crit']);
+    if (l.detail.expiring > 0) items.push([l.detail.expiring, 'licence(s) ending soon', '/modules/licenses?tab=licenses&filter=expiring', 'warn']);
+    if (l.detail.cloudIssues > 0) items.push([l.detail.cloudIssues, 'Microsoft 365 licence problem(s)', '/modules/licenses?tab=cloud', 'crit']);
+    if (l.detail.notActivated > 0) items.push([l.detail.notActivated, 'Windows / Office not activated', '/modules/licenses?tab=activation&filter=problems', 'warn']);
+  }
+  if (w) {
+    if (w.orphaned > 0) items.push([w.orphaned, 'web app account(s) of people who left', '/modules/webapps?tab=accounts&filter=orphaned', 'crit']);
+    if (w.unsanctionedInUse > 0) items.push([w.unsanctionedInUse, 'unsanctioned web app(s) in use', '/modules/webapps?tab=apps&filter=shadow', 'warn']);
+    if (w.review > 0) items.push([w.review, 'new web app(s) to review', '/modules/webapps?tab=apps&status=review', 'warn']);
+  }
+  if (items.length === 0) return null;
+  const crit = items.some((i) => i[3] === 'crit');
+  return (
+    <div className={`highlights ${crit ? 'crit' : 'warn'}`} role="status">
+      <Icon name="alert" size={16} />
+      <div className="hl-items">
+        {items.map(([n, label, to, tone]) => <Link key={label} to={to} className={`hl ${tone}`}><b>{n.toLocaleString()}</b> {label}</Link>)}
+        {l?.detail.next && l.detail.next.days <= 60 && <span className="hl-next">Next renewal: <b>{l.detail.next.name}</b> in {l.detail.next.days} d</span>}
+      </div>
+    </div>
+  );
+}
 
 export function DashboardPage() {
   const { me, can } = useAuth();
@@ -482,6 +519,7 @@ export function DashboardPage() {
           {can('scans.run') && <Link to="/discovery?new=1" className="btn primary">New scan</Link>}
         </>} />
       {msg && <Callout icon="info">{msg}</Callout>}
+      <Highlights tick={tick} />
       <ErrorBox error={ov.error} />
       {itAssets && (!o || !k) ? <Loading /> : layout.length === 0 ? <Callout icon="info">Nothing to show for your role yet. <b>Customize</b> to add widgets or saved reports.</Callout> : (
         <>

@@ -5,6 +5,7 @@ import { Link, useRouter } from '../app/router';
 import { Icon } from './Icon';
 import { LogoMark, PRODUCT } from './Logo';
 import { CompanyLogo } from './CompanyLogo';
+import { api } from '../api/client';
 
 function initials(name: string) {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((x) => x[0]!.toUpperCase()).join('') || 'U';
@@ -72,6 +73,7 @@ export function Shell({ children }: { children: ReactNode }) {
           <CompanyLogo className="top-logo" height={30} />
           <span className="top-spacer" />
           <LicenseBadge mode={lic.mode} days={lic.daysRemaining} onClick={() => navigate('/licensing')} />
+          <Bell onOpen={(link) => link && navigate(link)} />
           <div className="user-menu" ref={menuRef}>
             <button className="avatar" onClick={() => setMenu((m) => !m)} title={me.displayName} aria-haspopup="menu" aria-expanded={menu}>
               {initials(me.displayName)}
@@ -124,5 +126,50 @@ function LicenseBadge({ mode, days, onClick }: { mode: string; days: number | nu
       <i />
       <span>{text}</span>
     </button>
+  );
+}
+
+interface Note { id: number; kind: 'info' | 'ok' | 'warn' | 'crit'; title: string; body: string; link: string | null; createdAt: string; read: boolean }
+
+/** Notifications (licence, web app, backup and agent alerts) with the unread count. */
+function Bell({ onOpen }: { onOpen: (link: string | null) => void }) {
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    let alive = true;
+    const load = () => { api.get<Note[]>('/system/notifications').then((n) => { if (alive) setNotes(n); }).catch(() => { /* not signed in or offline */ }); };
+    load();
+    const t = setInterval(load, 60000);
+    const close = (e: MouseEvent) => ref.current && !ref.current.contains(e.target as Node) && setOpen(false);
+    document.addEventListener('mousedown', close);
+    return () => { alive = false; clearInterval(t); document.removeEventListener('mousedown', close); };
+  }, []);
+  const unread = notes.filter((n) => !n.read).length;
+  async function markRead() {
+    try { await api.post('/system/notifications/read'); setNotes((n) => n.map((x) => ({ ...x, read: true }))); } catch { /* ignore */ }
+  }
+  return (
+    <div className="user-menu" ref={ref}>
+      <button className="icon-btn bell" onClick={() => setOpen((o) => !o)} title="Notifications" aria-label={`Notifications${unread ? ` (${unread} unread)` : ''}`} aria-haspopup="menu" aria-expanded={open}>
+        <Icon name="bell" />
+        {unread > 0 && <span className="bell-count">{unread > 99 ? '99+' : unread}</span>}
+      </button>
+      {open && (
+        <div className="popover notes" role="menu" style={{ right: 0 }}>
+          <div className="notes-h"><b>Notifications</b>{unread > 0 && <button className="link-btn" onClick={() => void markRead()}>Mark All as Read</button>}</div>
+          {notes.length === 0 ? <div className="faint" style={{ padding: '10px 12px' }}>Nothing new.</div> : (
+            <div className="notes-list">
+              {notes.map((n) => (
+                <button key={n.id} className={`note ${n.kind}${n.read ? '' : ' unread'}`} role="menuitem" onClick={() => { setOpen(false); onOpen(n.link); }}>
+                  <i />
+                  <span><b>{n.title}</b>{n.body && <span className="faint">{n.body}</span>}<small className="faint">{new Date(n.createdAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</small></span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

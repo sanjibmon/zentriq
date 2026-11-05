@@ -93,6 +93,46 @@ On a **device page**, the **Network** tab shows:
 - for every device, **Connected to**: the switch and port where its MAC address was learned, with the VLAN, and whether it is behind an unmanaged switch;
 - for network devices, a summary (CPU, memory, temperature, up time), the ports with traffic and connected devices, neighbours, health (sensors, fans, power supplies), routing neighbours, optical levels, VLANs, and modules and transceivers.
 
+## Connected devices (build 111)
+
+*Network Inventory › Connected Devices* lists every device (MAC address) learned on an access port of a managed
+switch — also devices Zentriq does not know yet — with:
+
+* its **IP address** (newest ARP entry of any router, layer-3 switch or firewall), previous address when it changed;
+* its **vendor** from the IEEE registration authority (MA-L, MA-M and MA-S registries) — randomised MAC addresses of
+  phones and laptops are shown as *Private (randomised address)*;
+* a **type** guessed from the vendor and the port (IP phone, camera, printer, IoT device, virtual machine, network
+  equipment) when it is not in the inventory;
+* the **switch, port and VLAN**, whether it is behind an unmanaged switch, and where it was before when it **moved**;
+* first and last seen.
+
+Filters: unknown (not in the inventory), new in 7 days, moved, IP changed, behind an unmanaged switch, randomised MAC,
+not seen for 7 days. Select unknown devices and *Mark as Known* (with a note such as "badge reader") so they are not
+reported again. A device not in the inventory that appears for the first time raises the integration event
+*network.unknown_device* (devices present when the register was first built are not reported).
+
+The vendor registry is downloaded by the worker every week when the server can reach `standards-oui.ieee.org`
+(*Vendor List › Download Now*); an offline server imports `oui.csv`, `mam.csv` and `oui36.csv` from the same dialog.
+
+## IP address management (build 111)
+
+*Network Inventory › IP Addresses* lists the subnets — from the interface addresses and masks of routers and layer-3
+switches (`ipAdEntNetMask`) and from the approved discovery scopes — with the gateway, VLAN, the addresses in use
+(ARP tables, inventoried devices, connected devices), how many are not in the inventory, and the use against the size.
+Click a subnet to see every address (free and in use, up to /22) with its device, MAC address, vendor, switch port and
+where it was seen.
+
+**IP address conflicts**: one address that the ARP tables give to more than one device. Virtual router addresses
+(VRRP, HSRP, GLBP) and several MAC addresses of the same inventoried device are not conflicts.
+
+| Endpoint | Returns |
+|---|---|
+| `GET /api/v1/network/endpoints?filter=&q=` | Connected devices |
+| `POST /api/v1/network/endpoints/acknowledge` | Mark devices as known (*assets.manage*) |
+| `GET /api/v1/network/subnets` · `GET /api/v1/network/subnets/ips?cidr=` | Subnets, addresses of one subnet |
+| `GET /api/v1/network/conflicts` | IP address conflicts |
+| `GET /api/v1/network/vendors/status` · `POST …/vendors/update` · `POST …/vendors/import` | MAC vendor registry |
+
 ## Dashboard and reports
 
 **Dashboard widgets.** Customize → Network devices, Switch management, Switch port usage, Network attention. The first three are added to existing dashboards automatically.
