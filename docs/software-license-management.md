@@ -99,4 +99,4 @@ Unit tests (licence position per metric, wildcards and the licence catalogue, ac
 (position, alerts opened, resolved by a renewal and re-opened when a licence ends, activation, in-app notification,
 Microsoft 365 sync with licences, renewal dates, users and products, more assigned than bought) and the Windows
 acceptance test T86 (activation reported by the agent, shortfall and expiry alerts, renewal). First released in
-build 1.1.1.111. Results: [test report](test-report.md).
+build 1.1.1.112. Results: [test report](test-report.md).

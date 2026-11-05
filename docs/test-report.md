@@ -1,11 +1,45 @@
 # Test report
 
-Latest: GitHub Actions run 41966535331, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
-10.0.20348** VM plus an Ubuntu job for the Linux agent. Release: `v1.1.1-build.110` (pre-release, **unsigned**), package
-version **1.1.1.110**, commit `b1c1df3`. Results: unit + PostgreSQL integration tests **390 PASS** (392, 2 skipped);
-installer acceptance **76 passed, 0 failed** (10 not run: need hardware, a domain, a reboot or old Windows); upgrade
-suites **14/14** (from build 109, same version in place, half-updated server); Linux agent on 11 distributions
-**11/11**; Linux application control passed in ci-quick run 41965386435.
+Latest: GitHub Actions run 42094367710, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
+10.0.20348** VM plus an Ubuntu job for the Linux agent. Release: `v1.1.1-build.112` (pre-release, **unsigned**), package
+version **1.1.1.112**, commit `4d6c8cb`. Results: unit + PostgreSQL integration tests **400 PASS** (402, 2 skipped);
+installer acceptance **79 passed, 0 failed** (10 not run: need hardware, a domain, a reboot or old Windows); upgrade
+suites **14/14** (from build 110, same version in place, half-updated server); Linux agent on 11 distributions **11/11**.
+
+New in build 112 (build 111 failed two new acceptance tests and was not released):
+
+* **Software License Management** — products and how their installations are found, licences (perpetual, subscription,
+  volume, OEM, enterprise, trial, freeware), allocations, the licence position per metric, Microsoft 365 cloud licences,
+  Windows and Office activation reported by the agent, expiry tracking, alerts (bell, e-mail digest, integration events)
+  and dashboard highlights.
+* **Web Apps & Accounts** — catalogue of 87 SaaS apps, use seen on devices (DNS cache; only known apps are kept),
+  Microsoft Entra single sign-on apps and their accounts, CSV import of user lists, orphaned and inactive accounts,
+  shadow IT.
+* **Network inventory** — connected devices register (every MAC address on an access port with IP address, IEEE
+  vendor, type, switch port, VLAN and moves), subnets and IP address use, IP conflicts, unknown device events.
+* Every word on buttons, tabs and menus starts with a capital letter; Title Case for tiles, panels, dialogs and column headers.
+
+| ID | Test | Result |
+|---|---|---|
+| T86 | Software licenses: Windows activation reported by the agent (ServerDatacenter, Volume:GVLK, licensed); a product found in the inventory with a subscription of 0 licences ending in 5 days raises a shortfall and a high expiry alert; renewal resolves both | **PASS** |
+| T87 | Web apps: catalogue (87 apps), CSV import of 2 accounts, the leaver's admin account orphaned with a high alert | **PASS** |
+| T88 | Network: connected devices, subnets, MAC vendor status and notifications respond | **PASS** |
+
+| File | SHA256 |
+|---|---|
+| Zentriq-Setup-x64.exe | `99ffc629f96be4544cf6fc74c773fd168599d820cac63bda8a9dac31b6cafcc0` |
+| Zentriq.msi | `6c6ef461ea212f8d964547d1aa2a97d3e5afd1ee45be051fbbcf1d0cc3336d71` |
+| ZentriqAgent-x64.msi | `75cfab8754f4b3a6a7430aafd51acadceffdc274dcb71b608e3dba802edaf266` |
+| zentriq-agent-linux-x64.deb | `d9508077092cb25e9c06144a7ed378f2af68deddbd0b481902bc5ca2ee80f691` |
+| zentriq-agent-linux-x64.rpm | `890b6e6f3d039c911290c239c03b2d0b760115df26d1a3dcae634da997d45e7f` |
+| zentriq-agent-linux-x64.tar.gz | `ffc2a67b67788e7c540af60d315ea0c55a9db1bf558a672c78caf0ea5c70c176` |
+| zentriq-agent-linux-arm64.deb | `68c35b7b5f5acbbcd30852595ebce027d844ccba3bf57eec5f8a473c57f27cb6` |
+| zentriq-agent-linux-arm64.rpm | `7cb3db5e19077d384da9fd170e275ddb02596581cc85680a94ef59b2f5e10a2b` |
+| zentriq-agent-linux-arm64.tar.gz | `6e286a71d2a9b3e27fae47f390ae99719dc50a779dca7ff96a9b3ba1ad54bbe2` |
+| Zentriq-1.1.1-msi-offline-kit.zip | `df779f3bbdd780e2446c1b8124dc2c3f5b16845c8b44a00454723955bcf9df6a` |
+| Zentriq-1.1.1-docs.zip | `b2d7c72dbedd5af81ecf5d8c5622d2e231c8521f315be1c999df01f52f78580a` |
+
+## Build 110 (run 41966535331, commit `b1c1df3`)
 
 New in build 110: console polish and Software Deployment refinements.
 

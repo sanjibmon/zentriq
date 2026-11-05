@@ -93,7 +93,7 @@ On a **device page**, the **Network** tab shows:
 - for every device, **Connected to**: the switch and port where its MAC address was learned, with the VLAN, and whether it is behind an unmanaged switch;
 - for network devices, a summary (CPU, memory, temperature, up time), the ports with traffic and connected devices, neighbours, health (sensors, fans, power supplies), routing neighbours, optical levels, VLANs, and modules and transceivers.
 
-## Connected devices (build 111)
+## Connected devices (build 112)
 
 *Network Inventory › Connected Devices* lists every device (MAC address) learned on an access port of a managed
 switch — also devices Zentriq does not know yet — with:
@@ -114,7 +114,7 @@ reported again. A device not in the inventory that appears for the first time ra
 The vendor registry is downloaded by the worker every week when the server can reach `standards-oui.ieee.org`
 (*Vendor List › Download Now*); an offline server imports `oui.csv`, `mam.csv` and `oui36.csv` from the same dialog.
 
-## IP address management (build 111)
+## IP address management (build 112)
 
 *Network Inventory › IP Addresses* lists the subnets — from the interface addresses and masks of routers and layer-3
 switches (`ipAdEntNetMask`) and from the approved discovery scopes — with the gateway, VLAN, the addresses in use
