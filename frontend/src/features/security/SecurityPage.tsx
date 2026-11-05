@@ -73,7 +73,7 @@ function Overview({ baselineId, onRule }: { baselineId: string | null; onRule: (
       {c.windowsDevices > 0 && !o.data.lastEvaluation && <Callout tone="info" icon="info">Devices have not been evaluated yet. The first evaluation runs within 30 minutes, or click <b>Evaluate now</b>.</Callout>}
       <Kpis items={[
         { label: 'Average score', value: <span style={{ color: SCORE_COLOR(k.avgScore) }}>{k.avgScore ?? '—'}</span>, sub: `${k.devices.toLocaleString()} device(s) assessed`, to: '/security?tab=devices' },
-        { label: 'Compliant devices', value: `${k.compliant.toLocaleString()} / ${k.devices.toLocaleString()}`, sub: 'no failed high-severity check' },
+        { label: 'Compliant devices', value: `${k.compliant.toLocaleString()} / ${k.devices.toLocaleString()}`, sub: 'no failed high-severity check', to: '/security?tab=devices' },
         { label: 'Failed checks', value: k.failedChecks.toLocaleString(), sub: `${k.failedHigh.toLocaleString()} high severity`, to: '/security?tab=checks' },
         { label: 'Score below 70', value: <span style={{ color: k.poor ? 'var(--crit)' : undefined }}>{k.poor.toLocaleString()}</span>, sub: `${k.good.toLocaleString()} device(s) at 90 or more`, to: '/security?tab=devices' },
         { label: 'Unknown results', value: k.unknown.toLocaleString(), sub: 'settings not reported' },
@@ -320,7 +320,7 @@ function Baselines({ onChanged }: { onChanged: () => void }) {
   }
   return (
     <>
-      <Callout tone="info" icon="info">A baseline is a set of checks with your severities and thresholds, for all Windows and Linux devices or only servers or workstations / desktops. Every enabled baseline is evaluated; each device gets a score per baseline.</Callout>
+      <Callout tone="info" icon="info">A baseline is a set of checks with your severities and thresholds, for all devices, servers or workstations. Each device is scored per enabled baseline.</Callout>
       <Panel flush title="Baselines" right={manage && <button className="btn sm primary" onClick={() => setEdit({ id: null, copyFrom: list.data?.find((b) => b.builtIn)?.id })}><Icon name="plus" size={12} /> New baseline</button>}>
         <ErrorBox error={list.error} />
         <DataTable rows={list.data ?? []} empty="No baselines." columns={[

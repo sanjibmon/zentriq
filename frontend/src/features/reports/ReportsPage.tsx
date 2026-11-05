@@ -19,7 +19,7 @@ export function ReportsPage() {
         actions={<Link className="btn primary" to="/reports/new"><Icon name="plus" size={14} /> New report</Link>} />
       <div className="tabs" role="tablist">
         <button role="tab" aria-selected={tab === 'library'} className={tab === 'library' ? 'on' : ''} onClick={() => navigate('/reports', true)}>Reports</button>
-        <button role="tab" aria-selected={tab === 'history'} className={tab === 'history' ? 'on' : ''} onClick={() => navigate('/reports?tab=history', true)}>Run history</button>
+        <button role="tab" aria-selected={tab === 'history'} className={tab === 'history' ? 'on' : ''} onClick={() => navigate('/reports?tab=history', true)}>Run History</button>
       </div>
       {tab === 'library' ? <Library /> : <History />}
     </>

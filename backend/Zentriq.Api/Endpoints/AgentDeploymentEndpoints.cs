@@ -18,9 +18,22 @@ namespace Zentriq.Api.Endpoints;
 /// </summary>
 public static partial class AgentEndpoints
 {
-    public sealed record AppEvent(string? Kind, DateTimeOffset? At, string? Name, string? Publisher, string? Version, string? Sha256, string? Path, string? User, string? Detail);
+    public sealed record AppEvent(string? Kind, DateTimeOffset? At, string? Name, string? Publisher, string? Version, string? Sha256, string? Path, string? User, string? Detail, Dictionary<string, string>? Details = null);
     public sealed record AppEventsBody(List<AppEvent>? Events);
-    public sealed record AppRequestBody(string? Name, string? Publisher, string? Version, string? Sha256, string? Path, string? User, string? Reason);
+    public sealed record AppRequestBody(string? Name, string? Publisher, string? Version, string? Sha256, string? Path, string? User, string? Reason, Dictionary<string, string>? Details = null);
+
+    /// <summary>The installer details from the device (at most 40 entries, bounded keys and values).</summary>
+    internal static NpgsqlParameter DetailsParameter(Dictionary<string, string>? details)
+    {
+        var clean = new Dictionary<string, string>();
+        foreach (var (k, v) in details ?? [])
+        {
+            if (clean.Count >= 40 || string.IsNullOrWhiteSpace(k) || string.IsNullOrWhiteSpace(v)) continue;
+            var key = k.Trim(); var value = v.Trim();
+            clean.TryAdd(key.Length > 60 ? key[..60] : key, value.Length > 1000 ? value[..1000] : value);
+        }
+        return new NpgsqlParameter("x", NpgsqlDbType.Jsonb) { Value = clean.Count == 0 ? DBNull.Value : System.Text.Json.JsonSerializer.Serialize(clean) };
+    }
 
     private static void MapAgentDeploymentEndpoints(RouteGroupBuilder g)
     {
@@ -50,8 +63,8 @@ public static partial class AgentEndpoints
                 var name = Trunc(e.Name, 300);
                 if (kind is null || name is null) continue;
                 await using var cmd = ds.CreateCommand("""
-                    INSERT INTO zentriq.app_control_events (asset_id, agent_id, occurred_at, kind, name, publisher, version, sha256, path, user_name, platform, detail)
-                    VALUES (@a, @ag, @at, @k, @n, @p, @v, @h, @f, @u, @pf, @d)
+                    INSERT INTO zentriq.app_control_events (asset_id, agent_id, occurred_at, kind, name, publisher, version, sha256, path, user_name, platform, detail, details)
+                    VALUES (@a, @ag, @at, @k, @n, @p, @v, @h, @f, @u, @pf, @d, @x)
                     """);
                 cmd.Parameters.Add(new NpgsqlParameter("a", NpgsqlDbType.Uuid) { Value = (object?)agent.AssetId ?? DBNull.Value });
                 cmd.Parameters.AddWithValue("ag", agent.Id);
@@ -65,6 +78,7 @@ public static partial class AgentEndpoints
                 cmd.Parameters.Add(Text("u", Trunc(e.User, 200)));
                 cmd.Parameters.AddWithValue("pf", platform);
                 cmd.Parameters.Add(Text("d", Trunc(e.Detail, 2000)));
+                cmd.Parameters.Add(DetailsParameter(e.Details));
                 stored += await cmd.ExecuteNonQueryAsync(ct);
             }
             return Results.Ok(new { stored });
@@ -82,11 +96,12 @@ public static partial class AgentEndpoints
             // One open request per device and software (asking again updates the reason).
             await using var cmd = ds.CreateCommand("""
                 WITH open AS (
-                    UPDATE zentriq.app_control_requests SET reason = COALESCE(@r, reason), user_name = COALESCE(@u, user_name), created_at = now()
+                    UPDATE zentriq.app_control_requests SET reason = COALESCE(@r, reason), user_name = COALESCE(@u, user_name), details = COALESCE(@x, details),
+                           sha256 = COALESCE(@h, sha256), path = COALESCE(@f, path), publisher = COALESCE(@p, publisher), created_at = now()
                      WHERE agent_id = @ag AND status = 'pending' AND lower(name) = lower(@n) AND COALESCE(version, '') = COALESCE(@v, '')
                     RETURNING id)
-                INSERT INTO zentriq.app_control_requests (asset_id, agent_id, user_name, name, publisher, version, sha256, path, platform, reason)
-                SELECT @a, @ag, @u, @n, @p, @v, @h, @f, @pf, @r WHERE NOT EXISTS (SELECT 1 FROM open)
+                INSERT INTO zentriq.app_control_requests (asset_id, agent_id, user_name, name, publisher, version, sha256, path, platform, reason, details)
+                SELECT @a, @ag, @u, @n, @p, @v, @h, @f, @pf, @r, @x WHERE NOT EXISTS (SELECT 1 FROM open)
                 RETURNING id
                 """);
             cmd.Parameters.Add(new NpgsqlParameter("a", NpgsqlDbType.Uuid) { Value = (object?)agent.AssetId ?? DBNull.Value });
@@ -99,6 +114,7 @@ public static partial class AgentEndpoints
             cmd.Parameters.Add(Text("f", Trunc(body.Path, 1000)));
             cmd.Parameters.AddWithValue("pf", platform);
             cmd.Parameters.Add(Text("r", Trunc(body.Reason, 1000)));
+            cmd.Parameters.Add(DetailsParameter(body.Details));
             var id = await cmd.ExecuteScalarAsync(ct);
             return Results.Ok(new { id, message = "Your request was sent to your administrator." });
         }).AllowAnonymous();

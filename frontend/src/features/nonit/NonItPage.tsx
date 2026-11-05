@@ -26,8 +26,8 @@ export function NonItPage() {
   const { can } = useAuth();
   const { query, navigate } = useRouter();
   const canEdit = can('nonit.manage');
-  const [tab, setTabState] = useState<Tab>((['assets', 'categories', 'departments', 'fields'] as Tab[]).find((t) => t === query.get('tab')) ?? 'assets');
-  const setTab = (t: Tab) => { setTabState(t); navigate(`/non-it?tab=${t}`); };
+  const tab: Tab = (['assets', 'categories', 'departments', 'fields'] as Tab[]).find((t) => t === query.get('tab')) ?? 'assets';   // follows the address
+  const setTab = (t: Tab) => navigate(`/non-it?tab=${t}`);
   const [tick, setTick] = useState(0);
   const reload = () => setTick((x) => x + 1);
   const summary = useApi(() => api.get<NonItSummary>('/nonit/summary'), [tick]);
@@ -52,7 +52,7 @@ export function NonItPage() {
       <ErrorBox error={summary.error} />
       {s && (
         <Kpis items={[
-          { label: 'Assets', value: s.total.toLocaleString(), sub: `${s.items.toLocaleString()} items · ${s.addedLast30} added in 30 days` },
+          { label: 'Assets', value: s.total.toLocaleString(), sub: `${s.items.toLocaleString()} items · ${s.addedLast30} added in 30 days`, to: '/non-it?tab=assets' },
           { label: 'Purchase value', value: total(s.purchaseValue), sub: `Current value ${total(s.currentValue)}` },
           { label: 'Cover ending in 90 days', value: (s.warranty90 + s.amc90 + s.insurance90).toLocaleString(), sub: `${s.warranty90} warranty · ${s.amc90} AMC · ${s.insurance90} insurance`, to: '/non-it?tab=assets&due=warranty' },
           { label: 'Maintenance due', value: s.maintenance30.toLocaleString(), sub: s.maintenanceOverdue ? `${s.maintenanceOverdue} overdue` : 'next 30 days', to: '/non-it?tab=assets&due=maintenance' },
@@ -61,15 +61,15 @@ export function NonItPage() {
       )}
       <div className="tabs" role="tablist">
         <button role="tab" aria-selected={tab === 'assets'} className={tab === 'assets' ? 'on' : ''} onClick={() => setTab('assets')}>Assets</button>
-        <button role="tab" aria-selected={tab === 'categories'} className={tab === 'categories' ? 'on' : ''} onClick={() => setTab('categories')}>Groups &amp; categories<span className="cnt">{cats.data?.length ?? 0}</span></button>
+        <button role="tab" aria-selected={tab === 'categories'} className={tab === 'categories' ? 'on' : ''} onClick={() => setTab('categories')}>Groups &amp; Categories<span className="cnt">{cats.data?.length ?? 0}</span></button>
         <button role="tab" aria-selected={tab === 'departments'} className={tab === 'departments' ? 'on' : ''} onClick={() => setTab('departments')}>Departments<span className="cnt">{deps.data?.items.length ?? 0}</span></button>
-        <button role="tab" aria-selected={tab === 'fields'} className={tab === 'fields' ? 'on' : ''} onClick={() => setTab('fields')}>Custom fields<span className="cnt">{fields.data?.length ?? 0}</span></button>
+        <button role="tab" aria-selected={tab === 'fields'} className={tab === 'fields' ? 'on' : ''} onClick={() => setTab('fields')}>Custom Fields<span className="cnt">{fields.data?.length ?? 0}</span></button>
       </div>
       {tab === 'assets' && <AssetsTab tick={tick} summary={s} categories={cats.data ?? []} departments={deps.data?.items ?? []} canEdit={canEdit}
         onOpen={setDetails} onReload={reload} onAdd={() => setForm({ asset: null })} onUpload={() => setUpload(true)} />}
       {tab === 'categories' && <CategoriesTab list={cats.data ?? []} groups={groups.data ?? []} canEdit={canEdit} onChanged={reload} />}
       {tab === 'departments' && <DepartmentsTab list={deps.data?.items ?? []} canEdit={canEdit} onChanged={() => { deps.reload(); reload(); }}
-        onOpen={(id) => { navigate(`/non-it?tab=assets&department=${id}`); setTabState('assets'); }} />}
+        onOpen={(id) => { navigate(`/non-it?tab=assets&department=${id}`); }} />}
       {tab === 'fields' && <FieldsTab list={fields.data ?? []} canEdit={canEdit} onChanged={reload} />}
 
       {form && <AssetForm asset={form.asset} initial={form.initial} categories={cats.data ?? []} groups={(groups.data ?? []).map((g) => g.name)} departments={deps.data?.items ?? []} fields={fields.data ?? []}

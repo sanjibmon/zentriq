@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { MouseEvent as ReactMouseEvent, ReactNode } from 'react';
 import { ApiError } from '../api/client';
 import { NAV, type NavItem } from '../app/nav';
 import { Link, useRouter } from '../app/router';
@@ -13,6 +13,21 @@ function navFor(path: string): { group: string; item: NavItem } | null {
       if ((item.path === '/' ? path === '/' : path === item.path || path.startsWith(item.path + '/')) && (!best || item.path.length > best.item.path.length)) best = { group, item };
   return best;
 }
+
+const SMALL_WORDS = new Set(['a', 'an', 'and', 'as', 'at', 'by', 'for', 'from', 'in', 'into', 'of', 'on', 'or', 'per', 'the', 'to', 'via', 'vs', 'with', 'without']);
+
+/** Title Case for labels in tiles, tabs and panel headers ("Approved software" → "Approved Software"); acronyms, units and small words stay as they are. */
+export function titleCase(text: string): string {
+  return text.replace(/[A-Za-z][A-Za-z'’]*/g, (w, at: number) => {
+    if (/[A-Z]/.test(w.slice(1))) return w;                       // WDAC, IPv4, macOS
+    if (w.length === 1 && w !== 'a') return w;                       // units: 24 h, 7 d
+    const prev = text.slice(0, at);
+    if (/[-.@/]$/.test(prev) || /\d$/.test(prev)) return w;           // up-to-date, e.g., file.exe, 10x
+    if (at > 0 && SMALL_WORDS.has(w.toLowerCase()) && !/[:(—–·]\s*$/.test(prev)) return w.toLowerCase();
+    return w[0].toUpperCase() + w.slice(1);
+  });
+}
+const tc = (x: ReactNode) => (typeof x === 'string' ? titleCase(x) : x);
 
 export function PageHead({ title, desc, actions, crumbs = true, icon }: { title: string; desc?: ReactNode; actions?: ReactNode; crumbs?: boolean; icon?: IconName }) {
   const { path } = useRouter();
@@ -72,7 +87,7 @@ export function Panel({ title, sub, right, children, flush }: { title?: ReactNod
     <section className="panel">
       {title && (
         <div className="panel-h">
-          <h3>{title}</h3>
+          <h3>{tc(title)}</h3>
           {sub && <span className="sub">{sub}</span>}
           {right && <div className="right">{right}</div>}
         </div>
@@ -88,7 +103,7 @@ export function Kpis({ items }: { items: { label: string; value: ReactNode; sub?
       {items.map((k) => {
         const body = (
           <>
-            <div className="l">{k.label}</div>
+            <div className="l">{titleCase(k.label)}</div>
             <div className="v">{k.value}</div>
             {k.sub && <div className="s">{k.sub}</div>}
           </>
@@ -148,7 +163,17 @@ export interface Column<T> {
   title?: string;
 }
 
-export function DataTable<T extends { id: string | number }>({ columns, rows, empty = 'No records.' }: { columns: Column<T>[]; rows: T[]; empty?: string }) {
+/** A click on the row itself (not on a link, button or box inside it). */
+const rowClick = <T,>(onRow: ((row: T) => void) | undefined, row: T) => onRow && ((e: ReactMouseEvent) => {
+  if ((e.target as HTMLElement).closest('a, button, input, select, textarea, label')) return;
+  onRow(row);
+});
+
+export function DataTable<T extends { id: string | number }>({ columns, rows, empty = 'No records.', onRow, rowTitle }: {
+  columns: Column<T>[]; rows: T[]; empty?: string;
+  /** Makes rows clickable (e.g. to open the details). */
+  onRow?: (row: T) => void; rowTitle?: string;
+}) {
   return (
     <div className="tbl-wrap">
       <table className="t">
@@ -168,7 +193,8 @@ export function DataTable<T extends { id: string | number }>({ columns, rows, em
             </tr>
           ) : (
             rows.map((r) => (
-              <tr key={r.id}>
+              <tr key={r.id} className={onRow ? 'clickable' : undefined} title={onRow ? rowTitle : undefined} onClick={rowClick(onRow, r)}
+                tabIndex={onRow ? 0 : undefined} onKeyDown={onRow ? (e) => { if (e.key === 'Enter' && e.target === e.currentTarget) onRow(r); } : undefined}>
                 {columns.map((c) => (
                   <td key={c.key} className={c.className}>
                     {c.render(r)}

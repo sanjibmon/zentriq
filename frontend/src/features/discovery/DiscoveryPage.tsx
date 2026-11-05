@@ -134,9 +134,7 @@ function ScanDetail({ scan, onClose }: { scan: Scan; onClose: () => void }) {
           {s.error && <Callout tone="crit" icon="alert">{s.error}</Callout>}
           {noCreds && (
             <Callout tone="warn" icon="alert">
-              Some devices responded but no hardware/software inventory was collected. Inventory needs a credential that can log in to them (Windows: WinRM on TCP 5985 or DCOM/WMI; Linux: SSH; network devices: SNMP),
-              or the Zentriq Agent installed on the device. Open each row below for the exact reason. Windows hosts with the firewall on usually need WinRM enabled
-              (Group Policy: <i>Allow remote server management through WinRM</i> and a firewall rule for TCP 5985 from this server) — or deploy the agent with Intune, Configuration Manager or Group Policy.
+              Some devices answered but sent no inventory. Add a credential (Windows: WinRM 5985 or WMI; Linux: SSH; network: SNMP) or install the Zentriq Agent. Open a row for the exact reason.
             </Callout>
           )}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>

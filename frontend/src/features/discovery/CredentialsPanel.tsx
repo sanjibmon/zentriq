@@ -37,7 +37,7 @@ export function CredentialsPanel() {
 
   return (
     <>
-      <Callout icon="lock">Credentials let scans log in to devices and collect full hardware and software inventory without an agent. Secrets are encrypted on the server (AES-256-GCM) and are never shown again or returned by the API. Use dedicated, least-privilege accounts and limit each credential to the networks it is meant for.</Callout>
+      <Callout icon="lock">Scans use these to collect full inventory without an agent. Encrypted (AES-256-GCM), never shown again. Use least-privilege accounts limited to their networks.</Callout>
       <ErrorBox error={creds.error} />
       <Panel title="Scan credentials" right={manage && <button className="btn primary sm" onClick={() => setEdit('new')}>Add credential</button>} flush>
         <DataTable rows={creds.data ?? []} empty={creds.loading ? 'Loading…' : 'No credentials. Without credentials, scans only find devices (ping, open ports, names).'} columns={[

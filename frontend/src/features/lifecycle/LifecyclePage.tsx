@@ -18,7 +18,7 @@ import {
 } from './types';
 
 type Tab = 'overview' | 'assets' | 'people' | 'contracts' | 'refresh' | 'history' | 'settings';
-const TABS: [Tab, string][] = [['overview', 'Overview'], ['assets', 'IT assets'], ['people', 'People'], ['contracts', 'Contracts'], ['refresh', 'Refresh planning'], ['history', 'History'], ['settings', 'Policies']];
+const TABS: [Tab, string][] = [['overview', 'Overview'], ['assets', 'IT Assets'], ['people', 'People'], ['contracts', 'Contracts'], ['refresh', 'Refresh Planning'], ['history', 'History'], ['settings', 'Policies']];
 
 export function LifecyclePage() {
   const { query, navigate } = useRouter();

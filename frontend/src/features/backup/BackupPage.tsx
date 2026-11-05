@@ -47,7 +47,7 @@ export function BackupPage() {
           <button className="btn primary" onClick={() => void backupNow()} disabled={!!running}><Icon name="archive" size={14} /> Back up now</button>
         </>} />
       <div className="tabs" role="tablist">
-        <button role="tab" aria-selected={tab === 'overview'} className={tab === 'overview' ? 'on' : ''} onClick={() => navigate('/backup', true)}>Backup settings</button>
+        <button role="tab" aria-selected={tab === 'overview'} className={tab === 'overview' ? 'on' : ''} onClick={() => navigate('/backup', true)}>Backup Settings</button>
         <button role="tab" aria-selected={tab === 'history'} className={tab === 'history' ? 'on' : ''} onClick={() => navigate('/backup?tab=history', true)}>History</button>
       </div>
       {msg && <Callout tone={msg.tone} icon={msg.tone === 'crit' ? 'alert' : 'info'}>{msg.text}</Callout>}

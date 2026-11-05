@@ -109,7 +109,7 @@ export function LicensingPage() {
 
   return (
     <>
-      <PageHead title="Licensing" desc="Your plan, what it covers and how much of it is in use. Import the license file from Zentriq: it is validated by the Zentriq license server, then activated." />
+      <PageHead title="Licensing" />
       {msg && <Callout tone={msg.tone} icon={msg.tone === 'ok' ? 'info' : 'alert'}>{msg.text}</Callout>}
       <ErrorBox error={st.error} />
       {!d ? <Loading /> : (

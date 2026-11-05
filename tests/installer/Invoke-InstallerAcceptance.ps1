@@ -806,9 +806,27 @@ if (-not $installed) {
                 $w = New-Object System.IO.StreamWriter($pipe); $w.AutoFlush = $true; $rd = New-Object System.IO.StreamReader($pipe)
                 $w.WriteLine('{"reason":"CI test: needed for the network check"}'); $ack = $rd.ReadLine(); $pipe.Dispose()
                 Assert ($ack -match '"ok":true') "request not accepted by the agent: $ack"
+                # One message per attempt: running it again while the message is open stops it without a second message.
+                $p2 = Run-Setup
+                $deadline = (Get-Date).AddSeconds(15)
+                while (-not $p2.HasExited -and (Get-Date) -lt $deadline) { Start-Sleep 1 }
+                Assert ($p2.HasExited) 'block mode did not stop the second attempt'
+                Start-Sleep 3
+                $open = @(Get-CimInstance Win32_Process -Filter "Name='ZentriqAgent.exe'" | Where-Object CommandLine -match '--app-notice')
+                Assert ($open.Count -eq 1) "expected one message while it is open, found $($open.Count)"
                 Stop-Process -Id $notice.ProcessId -Force -ErrorAction SilentlyContinue
+                Start-Sleep 2
+                Assert (-not (Get-CimInstance Win32_Process -Filter "Name='ZentriqAgent.exe'" | Where-Object CommandLine -match '--app-notice')) 'the message came back after it was closed'
+                # Closed: a new attempt shows the message again.
+                $p3 = Run-Setup
+                $again = Dep-Wait { Get-CimInstance Win32_Process -Filter "Name='ZentriqAgent.exe'" | Where-Object CommandLine -match '--app-notice' | Select-Object -First 1 } 20 'the message for a new attempt'
+                Stop-Process -Id $again.ProcessId -Force -ErrorAction SilentlyContinue
                 $req = Dep-Wait { @(Api GET '/deployment/requests?status=pending' -Session $s | ForEach-Object { $_ }) | Where-Object { $_.sha256 -eq $sha } | Select-Object -First 1 } 90 'the request in Requests'
                 Assert ($req.reason -like 'CI test*' -and $req.user) "request: $($req | ConvertTo-Json -Compress)"
+                # The request carries everything the device knows about the installer.
+                $dt = $req.details
+                Assert ($dt -and $dt.'SHA-256' -eq $sha -and $dt.'Installer type' -and $dt.'File name' -eq 'ZqDemoSetup.exe' -and $dt.'File size' -and $dt.'Signature' -and $dt.'Started by' -and $req.deviceOs) `
+                    "request details: $($req | ConvertTo-Json -Compress -Depth 4)"
                 # Approve exactly this file for this device: it runs.
                 $ap = Api POST "/deployment/requests/$($req.id)/approve" @{ scope = 'device'; match = 'hash' } -Session $s
                 Assert $ap.ruleId 'no rule from the approval'
@@ -819,7 +837,7 @@ if (-not $installed) {
                 Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
                 $rq = @(Api GET '/deployment/requests?status=approved' -Session $s | ForEach-Object { $_ }) | Where-Object id -eq $req.id
                 Assert ($rq.ruleId -eq $ap.ruleId) 'request not marked approved'
-                "audit: ran and reported ($($ev.name)); block: stopped within $stopSec s, reported, message '$($details.message)' shown to the user; request '$($req.reason)' by $($req.user); approved for this device by SHA-256: runs"
+                "audit: ran and reported ($($ev.name)); block: stopped within $stopSec s, reported, message '$($details.message)' shown to the user, once per attempt; request '$($req.reason)' by $($req.user) with $(@($dt.PSObject.Properties).Count) details; approved for this device by SHA-256: runs"
             } | Out-Null
         } else { Record 'T83' 'Application control on Windows' 'NOT RUN' "the tests run in session $sessionId (services are not checked)" }
 

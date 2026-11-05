@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
 using System.IO;
+using System.Linq;
 using System.IO.Pipes;
 using System.Runtime.InteropServices;
 using System.Security.AccessControl;
@@ -25,6 +26,27 @@ internal static class Notice
 {
     // ---- service side ------------------------------------------------------------------------------------------
 
+    private sealed class Shown { public IntPtr Process; public DateTime At; }
+    private static readonly Dictionary<string, Shown> Open = new Dictionary<string, Shown>();
+    private static readonly object Gate = new object();
+
+    private static string Key(int session, SoftwareCandidate c) => session + "|" + (c.Sha256 ?? (c.Name + "|" + c.Version));
+
+    /// <summary>Whether the message for this software is still open on that desktop.</summary>
+    public static bool IsOpen(int session, SoftwareCandidate c)
+    {
+        lock (Gate)
+        {
+            if (!Open.TryGetValue(Key(session, c), out var s) || s.Process == IntPtr.Zero) return false;
+            return WaitForSingleObject(s.Process, 0) == 0x102 /* WAIT_TIMEOUT: still running */;
+        }
+    }
+
+    public static bool ShownRecently(int session, SoftwareCandidate c, TimeSpan within)
+    {
+        lock (Gate) return Open.TryGetValue(Key(session, c), out var s) && DateTime.UtcNow - s.At < within;
+    }
+
     public static void Show(int session, SoftwareCandidate c, AppControlPolicy policy, string? user)
     {
         var pipeName = "ZentriqAgentNotice-" + Guid.NewGuid().ToString("N");
@@ -35,7 +57,19 @@ internal static class Notice
         };
         if (policy.AllowRequests) new Thread(() => Listen(pipeName, c, user)) { IsBackground = true, Name = "notice" }.Start();
         var arg = Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(details)));
-        if (!StartInSession(session, "--app-notice " + arg)) Log.Warn($"Application control: could not show the message in session {session}.");
+        var process = StartInSession(session, "--app-notice " + arg);
+        if (process == IntPtr.Zero) { Log.Warn($"Application control: could not show the message in session {session}."); return; }
+        lock (Gate)
+        {
+            foreach (var old in Open.Where(kv => DateTime.UtcNow - kv.Value.At > TimeSpan.FromHours(2)).Select(kv => kv.Key).ToList())
+            {
+                if (Open[old].Process != IntPtr.Zero) CloseHandle(Open[old].Process);
+                Open.Remove(old);
+            }
+            var key = Key(session, c);
+            if (Open.TryGetValue(key, out var prev) && prev.Process != IntPtr.Zero) CloseHandle(prev.Process);
+            Open[key] = new Shown { Process = process, At = DateTime.UtcNow };
+        }
     }
 
     /// <summary>Waits (up to 15 minutes) for the notice to send a request.</summary>
@@ -62,12 +96,13 @@ internal static class Notice
         catch (Exception ex) { Log.Warn("Application control: the approval request could not be received: " + ex.Message); }
     }
 
-    private static bool StartInSession(int session, string arguments)
+    /// <summary>Starts the notice on the user's desktop; returns its process handle (or zero).</summary>
+    private static IntPtr StartInSession(int session, string arguments)
     {
         IntPtr token = IntPtr.Zero, env = IntPtr.Zero;
         try
         {
-            if (!WTSQueryUserToken(session, out token)) return false;
+            if (!WTSQueryUserToken(session, out token)) return IntPtr.Zero;
             if (!CreateEnvironmentBlock(out env, token, false)) env = IntPtr.Zero;
             var exe = Path.Combine(TamperGuard.InstallFolder, "ZentriqAgent.exe");
             var si = new StartupInfo { cb = Marshal.SizeOf(typeof(StartupInfo)), lpDesktop = @"winsta0\default" };
@@ -75,11 +110,10 @@ internal static class Notice
                     TamperGuard.InstallFolder, ref si, out var pi))
             {
                 Log.Warn("Application control: " + new Win32Exception(Marshal.GetLastWin32Error()).Message);
-                return false;
+                return IntPtr.Zero;
             }
             CloseHandle(pi.hThread);
-            CloseHandle(pi.hProcess);
-            return true;
+            return pi.hProcess;
         }
         finally
         {
@@ -164,8 +198,12 @@ internal static class Notice
                 writer.WriteLine(JsonSerializer.Serialize(new Dictionary<string, string?> { ["reason"] = _reason.Text.Trim() }));
                 reader.ReadLine();
                 _status.ForeColor = Color.DarkGreen;
-                _status.Text = "Your request was sent to your administrator. You can install the software once it is approved.";
+                _status.Text = "Your request was sent to your administrator. Run the installer again once it is approved.";
                 _reason.Enabled = false;
+                // Done: the message closes by itself; the installer has to be run again (once approved).
+                var timer = new System.Windows.Forms.Timer { Interval = 5000 };
+                timer.Tick += (_, _) => { timer.Stop(); Close(); };
+                timer.Start();
             }
             catch (Exception ex)
             {
@@ -202,4 +240,6 @@ internal static class Notice
         bool inheritHandles, uint creationFlags, IntPtr environment, string? currentDirectory, ref StartupInfo startupInfo, out ProcessInformation processInformation);
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool CloseHandle(IntPtr handle);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern uint WaitForSingleObject(IntPtr handle, uint milliseconds);
 }

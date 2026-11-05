@@ -164,7 +164,10 @@ internal static class AppControlAgent
                             r["user"] = Owner(f);
                             if (!string.IsNullOrWhiteSpace(r.GetValueOrDefault("name")))
                             {
-                                client.PostAppControlRequestAsync(r.ToDictionary(kv => kv.Key, kv => (object?)kv.Value), ct).GetAwaiter().GetResult();
+                                var body = r.ToDictionary(kv => kv.Key, kv => (object?)kv.Value);
+                                var details = PackageDetails(r["name"]!, r.GetValueOrDefault("version"));
+                                if (details.Count > 0) body["details"] = details;
+                                client.PostAppControlRequestAsync(body, ct).GetAwaiter().GetResult();
                                 Log.Info($"Application control: {r["user"]} asked for approval of {r.GetValueOrDefault("name")}.");
                             }
                         }
@@ -175,6 +178,66 @@ internal static class AppControlAgent
                 }
         }
         catch (Exception ex) when (ex is not OperationCanceledException) { Log.Warn("Application control: could not send events or requests: " + AgentWorker.Describe(ex)); }
+    }
+
+    /// <summary>What the repositories say about a package (apt, dnf / yum or zypper), for the approval request.</summary>
+    internal static Dictionary<string, string> PackageDetails(string name, string? version)
+    {
+        var d = new Dictionary<string, string>();
+        void Add(string k, string? v) { if (!string.IsNullOrWhiteSpace(v) && !d.ContainsKey(k)) d[k] = v.Trim().Length > 1000 ? v.Trim()[..1000] : v.Trim(); }
+        if (!System.Text.RegularExpressions.Regex.IsMatch(name, @"^[A-Za-z0-9][A-Za-z0-9+._:-]{0,200}$")) { Add("Requested name", name); return d; }
+        Add("Package", name);
+        Add("Requested version", version);
+        Shell.Result r;
+        if (File.Exists("/usr/bin/apt-cache") && (r = Shell.Run("apt-cache", ["show", "--no-all-versions", name], TimeSpan.FromSeconds(20))).Ok)
+        {
+            foreach (var line in r.Output.Split('\n'))
+            {
+                var i = line.IndexOf(':');
+                if (i <= 0 || line.StartsWith(" ")) continue;
+                var k = line[..i]; var v = line[(i + 1)..];
+                switch (k)
+                {
+                    case "Version": Add("Version", v); break;
+                    case "Maintainer": Add("Maintainer", v); break;
+                    case "Section": Add("Section", v); break;
+                    case "Homepage": Add("Homepage", v); break;
+                    case "Installed-Size": Add("Installed size", v.Trim() + " KB"); break;
+                    case "Size": Add("Download size", v.Trim() + " bytes"); break;
+                    case "Description": case "Description-en": Add("Description", v); break;
+                    case "SHA256": Add("SHA-256", v); break;
+                    case "Filename": Add("Repository file", v); break;
+                }
+            }
+            var policy = Shell.Run("apt-cache", ["policy", name], TimeSpan.FromSeconds(20));
+            if (policy.Ok) foreach (var line in policy.Output.Split('\n')) if (line.Contains("http") || line.Contains("file:")) { Add("Repository", line.Trim().TrimStart('0','1','2','3','4','5','6','7','8','9',' ')); break; }
+        }
+        else if ((File.Exists("/usr/bin/dnf") && (r = Shell.Run("dnf", ["-q", "info", name], TimeSpan.FromSeconds(60))).Ok)
+              || (File.Exists("/usr/bin/zypper") && (r = Shell.Run("zypper", ["--non-interactive", "--quiet", "info", name], TimeSpan.FromSeconds(60))).Ok)
+              || (File.Exists("/usr/bin/yum") && (r = Shell.Run("yum", ["-q", "info", name], TimeSpan.FromSeconds(60))).Ok))
+        {
+            foreach (var line in r.Output.Split('\n'))
+            {
+                var i = line.IndexOf(':');
+                if (i <= 0) continue;
+                var k = line[..i].Trim(); var v = line[(i + 1)..];
+                switch (k)
+                {
+                    case "Version": Add("Version", v); break;
+                    case "Release": Add("Release", v); break;
+                    case "Architecture": case "Arch": Add("Architecture", v); break;
+                    case "Size": case "Installed Size": Add("Size", v); break;
+                    case "Repository": case "Repo": Add("Repository", v); break;
+                    case "Summary": Add("Description", v); break;
+                    case "URL": Add("Homepage", v); break;
+                    case "License": Add("License", v); break;
+                    case "Vendor": Add("Vendor", v); break;
+                }
+            }
+        }
+        Add("Requested with", "zentriq-agent --request");
+        Add("Requested at", DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss") + " UTC");
+        return d;
     }
 
     private static string? Owner(string file)

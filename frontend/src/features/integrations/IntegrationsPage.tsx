@@ -48,7 +48,7 @@ const cap = (s: string) => (s ? s[0]!.toUpperCase() + s.slice(1) : s);
 const err = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 type Tab = 'overview' | 'channels' | 'rules' | 'log' | 'api';
-const TABS: [Tab, string][] = [['overview', 'Overview'], ['channels', 'Channels'], ['rules', 'Alert rules'], ['log', 'Delivery log'], ['api', 'API access']];
+const TABS: [Tab, string][] = [['overview', 'Overview'], ['channels', 'Channels'], ['rules', 'Alert Rules'], ['log', 'Delivery Log'], ['api', 'API Access']];
 
 export function IntegrationsPage() {
   const { query, navigate } = useRouter();
@@ -94,7 +94,7 @@ function Overview({ catalog }: { catalog: Catalog }) {
         { label: 'Alert rules', value: `${k.rulesEnabled} / ${k.rules}`, sub: 'on / total', to: '/integrations?tab=rules' },
         { label: 'Sent (24 h)', value: k.sent24h.toLocaleString(), sub: `${k.queued} waiting`, to: '/integrations?tab=log' },
         { label: 'Failed (24 h)', value: <span style={{ color: k.failed24h ? 'var(--crit)' : undefined }}>{k.failed24h.toLocaleString()}</span>, sub: 'after retries', to: '/integrations?tab=log' },
-        { label: 'Events (24 h)', value: k.events24h.toLocaleString(), sub: 'found by the detectors' },
+        { label: 'Events (24 h)', value: k.events24h.toLocaleString(), sub: 'found by the detectors', to: '/integrations?tab=log' },
         { label: 'API tokens', value: k.tokens.toLocaleString(), sub: 'active, read-only', to: '/integrations?tab=api' },
       ]} />}
       <div className="grid-2">

@@ -13,7 +13,7 @@ import {
 import { CveDialog, ExceptionDialog, FindingDrawer, WorkflowDialog } from './VulnDialogs';
 
 type Tab = 'overview' | 'findings' | 'remediation' | 'products' | 'feeds';
-const TABS: [Tab, string][] = [['overview', 'Overview'], ['findings', 'Findings'], ['remediation', 'Remediation plan'], ['products', 'Software mapping'], ['feeds', 'Feeds & settings']];
+const TABS: [Tab, string][] = [['overview', 'Overview'], ['findings', 'Findings'], ['remediation', 'Remediation Plan'], ['products', 'Software Mapping'], ['feeds', 'Feeds & Settings']];
 
 export function VulnerabilitiesPage() {
   const { query, navigate } = useRouter();
@@ -55,8 +55,8 @@ function Overview({ onCve, go }: { onCve: (c: string) => void; go: (t: Tab, extr
         { label: 'Critical', value: <span style={{ color: k.critical ? SEVERITY_COLOR.critical : undefined }}>{k.critical.toLocaleString()}</span>, sub: `${k.high.toLocaleString()} high`, to: '/vulnerabilities?tab=findings&severity=critical' },
         { label: 'Known exploited', value: <span style={{ color: k.exploited ? SEVERITY_COLOR.critical : undefined }}>{k.exploited.toLocaleString()}</span>, sub: 'CISA KEV or Microsoft', to: '/vulnerabilities?tab=findings&kev=true' },
         { label: 'Overdue', value: k.overdue.toLocaleString(), sub: 'past SLA due date', to: '/vulnerabilities?tab=findings&overdue=true' },
-        { label: 'Affected devices', value: `${k.affectedAssets.toLocaleString()} / ${k.assets.toLocaleString()}`, sub: k.assets ? `${Math.round((100 * k.affectedAssets) / k.assets)}% of active devices` : '' },
-        { label: 'Remediation (90 d)', value: `${k.mttrDays} d`, sub: `mean time to fix · ${k.slaMet}% within SLA` },
+        { label: 'Affected devices', value: `${k.affectedAssets.toLocaleString()} / ${k.assets.toLocaleString()}`, sub: k.assets ? `${Math.round((100 * k.affectedAssets) / k.assets)}% of active devices` : '', to: '/vulnerabilities?tab=findings' },
+        { label: 'Remediation (90 d)', value: `${k.mttrDays} d`, sub: `mean time to fix · ${k.slaMet}% within SLA`, to: '/vulnerabilities?tab=remediation' },
       ]} />
       <Kpis items={[
         { label: 'Windows (OS)', value: k.osOpen.toLocaleString(), sub: `open · ${k.windowsCves.toLocaleString()} Windows CVEs known`, to: '/vulnerabilities?tab=findings&source=os' },
@@ -365,7 +365,7 @@ function Products() {
   const manage = can('vuln.manage');
   return (
     <>
-      <Callout tone="info" icon="info">Each installed application is matched to its NVD product name (CPE vendor:product). Well-known products are mapped automatically; map the rest here so their vulnerabilities are found, or ignore internal software that has no CVEs.</Callout>
+      <Callout tone="info" icon="info">Map software to its NVD product (CPE vendor:product) so its vulnerabilities are found; well-known products are mapped automatically. Ignore internal software.</Callout>
       <form className="toolbar-row" onSubmit={(e) => { e.preventDefault(); setPage(1); setSearch(q); }}>
         <input className="in grow" placeholder="Search software, vendor or product…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search software mappings" />
         <select className="in" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} aria-label="Mapping status">

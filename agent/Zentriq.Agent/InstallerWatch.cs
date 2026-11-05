@@ -32,6 +32,23 @@ internal static class InstallerWatch
     /// <summary>Processes allowed recently (and their children): an installer's own helper processes are not checked again.</summary>
     private static readonly Dictionary<int, DateTime> Allowed = new Dictionary<int, DateTime>();
     private static readonly int Self = Process.GetCurrentProcess().Id;
+    /// <summary>
+    /// Processes of a blocked installation: the installer, what it started, and the program that launched it when that
+    /// is not the user's shell (a downloader or bootstrapper that tries again). Installers they start are stopped
+    /// without a new message: the user sees one message per attempt.
+    /// </summary>
+    private static readonly Dictionary<int, DateTime> Blocked = new Dictionary<int, DateTime>();
+    /// <summary>Programs through which a user starts an installer: a start from these is a new attempt.</summary>
+    private static readonly HashSet<string> UserShells = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "explorer.exe", "cmd.exe", "powershell.exe", "pwsh.exe", "WindowsTerminal.exe", "OpenConsole.exe", "msedge.exe", "chrome.exe", "firefox.exe",
+        "brave.exe", "opera.exe", "vivaldi.exe", "iexplore.exe", "outlook.exe", "7zFM.exe", "WinRAR.exe", "TOTALCMD64.EXE", "TOTALCMD.EXE", "Everything.exe",
+    };
+    /// <summary>Programs that start installers on their own (scheduled tasks, run-once entries, services).</summary>
+    private static readonly HashSet<string> AutoStarters = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "svchost.exe", "taskhostw.exe", "taskeng.exe", "services.exe", "WmiPrvSE.exe", "runonce.exe", "rundll32.exe", "userinit.exe", "sihost.exe",
+    };
 
     public static bool Running { get { lock (Gate) return _watcher is not null; } }
 
@@ -133,16 +150,31 @@ internal static class InstallerWatch
             if (policy.Mode == "audit")
             {
                 lock (Gate) Allowed[pid] = DateTime.UtcNow;
+                Describe(candidate, isMsiexec, pid, ParentImage(ppid));
                 Log.Warn($"Application control (audit): {user ?? "a user"} installs {candidate}, which is not approved ({d.Reason}).");
                 AppControlAgent.AddEvent("audited", candidate, user, d.Reason + " Audit mode: the installation was allowed.");
                 return;
             }
-            // Block: stop the installer (and what it already started), report it and tell the user.
-            KillTree(pid, h);
+            // Block: stop the installer (and what it already started), report it and tell the user - once per attempt.
+            var parent = ParentImage(ppid);
+            Describe(candidate, isMsiexec, pid, parent);
+            bool again;
+            lock (Gate)
+            {
+                foreach (var old in Blocked.Where(kv => DateTime.UtcNow - kv.Value > TimeSpan.FromMinutes(30)).Select(kv => kv.Key).ToList()) Blocked.Remove(old);
+                again = Blocked.ContainsKey(ppid);
+                Blocked[pid] = DateTime.UtcNow;
+                var parentName = parent is null ? null : Path.GetFileName(parent);
+                // A launcher that is not the user's shell (a downloader, a bootstrapper, an updater) belongs to this attempt.
+                if (!again && ppid > 4 && (parentName is null || !UserShells.Contains(parentName)) && !AutoStarters.Contains(parentName ?? "")) Blocked[ppid] = DateTime.UtcNow;
+                if (!again && parentName is not null && AutoStarters.Contains(parentName) && Notice.ShownRecently(session, candidate, TimeSpan.FromMinutes(60))) again = true;
+                if (!again && Notice.IsOpen(session, candidate)) again = true;   // the message for this software is still on the screen
+            }
+            KillTree(pid, h, Blocked);
             suspended = false;
-            Log.Warn($"Application control: blocked {candidate} started by {user ?? "a user"} ({d.Reason}).");
+            Log.Warn($"Application control: blocked {candidate} started by {user ?? "a user"} ({d.Reason})" + (again ? "; the same attempt, no new message." : "."));
             AppControlAgent.AddEvent("blocked", candidate, user, d.Reason);
-            Notice.Show(session, candidate, policy, user);
+            if (!again) Notice.Show(session, candidate, policy, user);
         }
         catch (Exception ex) { Log.Warn($"Installer watch ({name}, {pid}): {ex.Message}"); }
         finally
@@ -215,7 +247,16 @@ internal static class InstallerWatch
 
     private static string? Clean(string? s) => string.IsNullOrWhiteSpace(s) ? null : s!.Trim().Trim('\0').Trim();
 
-    private static bool HasInstallerMarker(string path)
+    private static bool HasInstallerMarker(string path) => MarkerOf(path) is not null;
+
+    private static readonly Dictionary<string, string> MarkerNames = new Dictionary<string, string>
+    {
+        ["Nullsoft.NSIS"] = "NSIS", ["NullsoftInst"] = "NSIS", ["Inno Setup"] = "Inno Setup", [".wixburn"] = "WiX bundle", ["InstallShield"] = "InstallShield",
+        ["Squirrel"] = "Squirrel", ["Advanced Installer"] = "Advanced Installer", ["Setup Factory"] = "Setup Factory", ["WiseMain"] = "Wise", ["7zSfx"] = "7-Zip self-extracting",
+        ["InstallAware"] = "InstallAware",
+    };
+
+    private static string? MarkerOf(string path)
     {
         try
         {
@@ -225,9 +266,110 @@ internal static class InstallerWatch
             var read = 0;
             while (read < len) { var n = f.Read(buf, read, len - read); if (n <= 0) break; read += n; }
             var text = Encoding.ASCII.GetString(buf, 0, read);
-            return Markers.Any(m => text.IndexOf(m, StringComparison.Ordinal) >= 0);
+            var m = Markers.FirstOrDefault(x => text.IndexOf(x, StringComparison.Ordinal) >= 0);
+            return m is null ? null : MarkerNames[m];
         }
-        catch (Exception) { return false; }
+        catch (Exception) { return null; }
+    }
+
+    private static string? ParentImage(int ppid)
+    {
+        var h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, ppid);
+        if (h == IntPtr.Zero) return null;
+        try { return ImagePath(h); } finally { CloseHandle(h); }
+    }
+
+    /// <summary>Collects everything about the installer for the console (events and approval requests).</summary>
+    private static void Describe(SoftwareCandidate c, bool isMsi, int pid, string? parent)
+    {
+        var d = c.Details;
+        void Add(string key, string? value) { if (!string.IsNullOrWhiteSpace(value) && !d.ContainsKey(key)) d[key] = value!.Trim().Trim('\0'); }
+        try
+        {
+            var file = c.Path;
+            var exists = file is not null && Path.IsPathRooted(file) && File.Exists(file);
+            Add("Product", c.Name);
+            Add("Version", c.Version);
+            Add("Publisher", c.Publisher);
+            if (exists)
+            {
+                var fi = new FileInfo(file!);
+                Add("File name", fi.Name);
+                Add("Folder", fi.DirectoryName);
+                Add("File size", fi.Length >= 1048576 ? $"{fi.Length / 1048576.0:0.0} MB ({fi.Length:N0} bytes)" : $"{fi.Length / 1024.0:0.0} KB ({fi.Length:N0} bytes)");
+                Add("File date", fi.LastWriteTimeUtc.ToString("yyyy-MM-dd HH:mm") + " UTC");
+            }
+            Add("SHA-256", c.Sha256);
+            if (isMsi && exists)
+            {
+                Add("Installer type", "Windows Installer package (.msi)");
+                Add("Product code", MsiProperty(file!, "ProductCode"));
+                Add("Upgrade code", MsiProperty(file!, "UpgradeCode"));
+                Add("Manufacturer", MsiProperty(file!, "Manufacturer"));
+            }
+            else if (exists)
+            {
+                Add("Installer type", MarkerOf(file!) is { } m ? m + " setup program" : "Setup program (.exe)");
+                try
+                {
+                    var vi = FileVersionInfo.GetVersionInfo(file!);
+                    Add("Product name", vi.ProductName);
+                    Add("File description", vi.FileDescription);
+                    Add("Company", vi.CompanyName);
+                    Add("Product version", vi.ProductVersion);
+                    Add("File version", vi.FileVersion);
+                    Add("Original file name", vi.OriginalFilename);
+                    Add("Copyright", vi.LegalCopyright);
+                }
+                catch (Exception) { }
+            }
+            if (exists)
+            {
+                var valid = false;
+                try { valid = Authenticode.Valid(file!); } catch (Exception) { }
+                try
+                {
+                    using var cert = new X509Certificate2(X509Certificate.CreateFromSignedFile(file!));
+                    Add("Signature", valid ? "Valid" : "Present but not valid");
+                    Add("Signed by", AppControl.SubjectName(cert.Subject));
+                    Add("Certificate issuer", AppControl.SubjectName(cert.Issuer));
+                    Add("Certificate valid until", cert.NotAfter.ToUniversalTime().ToString("yyyy-MM-dd"));
+                    Add("Certificate thumbprint", cert.Thumbprint);
+                }
+                catch (Exception) { Add("Signature", "Not signed"); }
+                foreach (var kv in ZoneIdentifier(file!)) Add(kv.Key, kv.Value);
+            }
+            Add("Started by", parent);
+            var cmd = CommandLine(pid);
+            if (cmd is not null) Add("Command line", cmd.Length > 600 ? cmd.Substring(0, 600) + "…" : cmd);
+            Add("Detected at", DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss") + " UTC");
+        }
+        catch (Exception ex) { Log.Warn("Application control: details: " + ex.Message); }
+    }
+
+    /// <summary>Where a downloaded file came from (the Mark of the Web: Zone.Identifier stream).</summary>
+    private static Dictionary<string, string> ZoneIdentifier(string file)
+    {
+        var r = new Dictionary<string, string>();
+        var h = CreateFile(file + ":Zone.Identifier", 0x80000000 /* GENERIC_READ */, 7, IntPtr.Zero, 3 /* OPEN_EXISTING */, 0, IntPtr.Zero);
+        if (h.IsInvalid) { h.Dispose(); return r; }
+        try
+        {
+            using var fs = new FileStream(h, FileAccess.Read);
+            using var reader = new StreamReader(fs);
+            var text = reader.ReadToEnd();
+            foreach (var line in text.Split('\n'))
+            {
+                var i = line.IndexOf('=');
+                if (i <= 0) continue;
+                var k = line.Substring(0, i).Trim(); var v = line.Substring(i + 1).Trim();
+                if (k == "HostUrl") r["Downloaded from"] = v;
+                else if (k == "ReferrerUrl") r["Download page"] = v;
+                else if (k == "ZoneId") r["Zone"] = v switch { "3" => "Internet", "2" => "Trusted sites", "1" => "Local intranet", "4" => "Restricted sites", _ => v };
+            }
+        }
+        catch (Exception) { }
+        return r;
     }
 
     /// <summary>Adds the code-signing certificate (when the signature is valid) and the SHA-256 of the file.</summary>
@@ -303,8 +445,9 @@ internal static class InstallerWatch
     }
 
     /// <summary>Ends the installer and every process it started.</summary>
-    private static void KillTree(int pid, IntPtr handle)
+    private static void KillTree(int pid, IntPtr handle, Dictionary<int, DateTime>? mark = null)
     {
+        if (mark is not null) lock (Gate) mark[pid] = DateTime.UtcNow;
         try
         {
             using var s = new ManagementObjectSearcher(@"root\cimv2", "SELECT ProcessId FROM Win32_Process WHERE ParentProcessId = " + pid);
@@ -313,7 +456,7 @@ internal static class InstallerWatch
                 {
                     var child = Convert.ToInt32(o["ProcessId"]);
                     var ch = OpenProcess(PROCESS_TERMINATE | PROCESS_SUSPEND_RESUME, false, child);
-                    if (ch != IntPtr.Zero) { KillTree(child, ch); CloseHandle(ch); }
+                    if (ch != IntPtr.Zero) { KillTree(child, ch, mark); CloseHandle(ch); }
                 }
         }
         catch (Exception) { }
@@ -328,6 +471,8 @@ internal static class InstallerWatch
     [DllImport("kernel32.dll", SetLastError = true)] private static extern bool TerminateProcess(IntPtr h, uint code);
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)] private static extern bool QueryFullProcessImageName(IntPtr h, int flags, StringBuilder name, ref int size);
     [DllImport("ntdll.dll")] private static extern int NtSuspendProcess(IntPtr h);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern Microsoft.Win32.SafeHandles.SafeFileHandle CreateFile(string name, uint access, uint share, IntPtr security, uint disposition, uint flags, IntPtr template);
     [DllImport("ntdll.dll")] private static extern int NtResumeProcess(IntPtr h);
     [DllImport("wtsapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)] private static extern bool WTSQuerySessionInformation(IntPtr server, int session, int infoClass, out IntPtr buffer, out int bytes);
     [DllImport("wtsapi32.dll")] private static extern void WTSFreeMemory(IntPtr p);

@@ -42,12 +42,19 @@ export interface Group {
 export interface AppEvent {
   id: number; at: string; kind: 'blocked' | 'audited' | 'detected' | 'removed' | 'remove-failed' | 'wdac'; name: string; publisher: string | null; version: string | null;
   sha256: string | null; path: string | null; user: string | null; platform: string | null; detail: string | null; assetId: string | null; device: string | null;
+  details: Record<string, string> | null;
 }
 
 export interface AppRequest {
   id: string; createdAt: string; status: 'pending' | 'approved' | 'rejected'; name: string; publisher: string | null; version: string | null; sha256: string | null;
   path: string | null; platform: string | null; user: string | null; reason: string | null; assetId: string | null; device: string | null;
   decidedAt: string | null; decidedBy: string | null; decisionNote: string | null; ruleId: string | null;
+  details: Record<string, string> | null; deviceOs: string | null; deviceIp: string | null; department: string | null; agentVersion: string | null; lastCheckin: string | null;
+}
+
+export interface InventoryDevice {
+  assetId: string; hostname: string | null; osName: string | null; version: string | null; installedOn: string | null; department: string | null; location: string | null;
+  owner: string | null; ip: string | null; agent: boolean; online: boolean; lastCheckin: string | null; approved: boolean; outcome: string; reason: string;
 }
 
 export interface Package {
@@ -72,9 +79,9 @@ export interface DeviceRow {
   department: string | null; location: string | null;
 }
 
-export const MODE_LABEL: Record<string, string> = { off: 'Off', audit: 'Audit (report only)', block: 'Block' };
+export const MODE_LABEL: Record<string, string> = { off: 'Off', audit: 'Audit', block: 'Block' };
 export const KIND_LABEL: Record<string, string> = {
-  blocked: 'Blocked', audited: 'Installed (audit)', detected: 'Found installed', removed: 'Removed', 'remove-failed': 'Removal failed', wdac: 'WDAC',
+  blocked: 'Blocked', audited: 'Installed (Audit)', detected: 'Found Installed', removed: 'Removed', 'remove-failed': 'Removal Failed', wdac: 'WDAC',
 };
 export const platformLabel = (p: string | null | undefined) => (p === 'linux' ? 'Linux' : p === 'windows' ? 'Windows' : 'Windows & Linux');
 
@@ -82,3 +89,14 @@ export const errText = (e: unknown) => {
   const b = (e as { body?: { errors?: Record<string, string[]>; title?: string } }).body;
   return b?.errors ? Object.values(b.errors).flat().join(' ') : b?.title ?? (e instanceof Error ? e.message : String(e));
 };
+
+/** The order in which installer details are shown (the device sends them in any order). */
+export const DETAIL_SECTIONS: [string, string[]][] = [
+  ['Software', ['Product', 'Product name', 'Version', 'Product version', 'File version', 'Publisher', 'Company', 'Manufacturer', 'File description', 'Description', 'Copyright',
+    'Package', 'Requested version', 'Requested name', 'Release', 'Architecture', 'Section', 'Maintainer', 'Vendor', 'License', 'Homepage']],
+  ['Installer', ['Installer type', 'File name', 'Original file name', 'Folder', 'File size', 'Size', 'Installed size', 'Download size', 'File date', 'SHA-256', 'Product code', 'Upgrade code',
+    'Repository', 'Repository file']],
+  ['Signature', ['Signature', 'Signed by', 'Certificate issuer', 'Certificate valid until', 'Certificate thumbprint']],
+  ['Origin', ['Downloaded from', 'Download page', 'Zone', 'Started by', 'Command line', 'Requested with', 'Detected at', 'Requested at']],
+];
+export const MONO_DETAILS = new Set(['SHA-256', 'Product code', 'Upgrade code', 'Certificate thumbprint', 'Command line', 'Folder', 'Started by', 'Repository file']);

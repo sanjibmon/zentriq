@@ -14,7 +14,7 @@ import {
 
 type Tab = 'devices' | 'ports' | 'topology' | 'vlans' | 'unmanaged' | 'firmware';
 const TABS: [Tab, string][] = [
-  ['devices', 'Devices'], ['ports', 'Switch ports'], ['topology', 'Topology'], ['vlans', 'VLANs'], ['unmanaged', 'Unmanaged switches'], ['firmware', 'Firmware'],
+  ['devices', 'Devices'], ['ports', 'Switch Ports'], ['topology', 'Topology'], ['vlans', 'VLANs'], ['unmanaged', 'Unmanaged Switches'], ['firmware', 'Firmware'],
 ];
 const NET_TYPES = ['switch', 'router', 'firewall', 'access_point', 'wireless_controller', 'load_balancer', 'network'];
 const typeName = (t: string | null | undefined) => deviceTypeLabel(t) ?? fmt.label(t ?? 'network');
@@ -23,8 +23,8 @@ const pct = (a: number, b: number) => (b ? Math.round((a / b) * 100) : 0);
 export function NetworkPage() {
   const { query, navigate } = useRouter();
   const initial = (TABS.map(([t]) => t).find((t) => t === query.get('tab')) ?? 'devices') as Tab;
-  const [tab, setTabState] = useState<Tab>(initial);
-  const setTab = (t: Tab) => { setTabState(t); navigate(`/network?tab=${t}`); };
+  const tab = initial;   // the tab follows the address
+  const setTab = (t: Tab) => navigate(`/network?tab=${t}`);
   const summary = useApi(() => api.get<NetworkSummary>('/network/summary'), []);
   const s = summary.data;
 
@@ -46,10 +46,10 @@ export function NetworkPage() {
       {s && (
         <Kpis items={[
           { label: 'Network devices', value: s.devices.toLocaleString(), sub: Object.entries(s.byType).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([t, n]) => `${n} ${typeName(t).toLowerCase()}`).join(' · ') || '—', to: '/network?tab=devices' },
-          { label: 'Managed switches', value: s.switchesManaged.toLocaleString(), sub: `${s.switchesWebOnly} web interface only · ${s.switchesNoManagement} no management` },
+          { label: 'Managed switches', value: s.switchesManaged.toLocaleString(), sub: `${s.switchesWebOnly} web interface only · ${s.switchesNoManagement} no management`, to: '/network?tab=devices' },
           { label: 'Unmanaged switches (suspected)', value: s.unmanagedSuspected.toLocaleString(), sub: 'several devices behind one access port', to: '/network?tab=unmanaged' },
           { label: 'Ports in use', value: `${pct(s.portsUp, s.portsTotal)}%`, sub: `${s.portsUp.toLocaleString()} of ${s.portsTotal.toLocaleString()} up · ${s.portsAdminDown} disabled`, to: '/network?tab=ports' },
-          { label: 'PoE', value: s.poeBudgetWatts ? `${pct(s.poeUsedWatts, s.poeBudgetWatts)}%` : '—', sub: s.poeBudgetWatts ? `${s.poeUsedWatts} W of ${s.poeBudgetWatts} W · ${s.portsPoe} powered ports` : 'no PoE data' },
+          { label: 'PoE', value: s.poeBudgetWatts ? `${pct(s.poeUsedWatts, s.poeBudgetWatts)}%` : '—', sub: s.poeBudgetWatts ? `${s.poeUsedWatts} W of ${s.poeBudgetWatts} W · ${s.portsPoe} powered ports` : 'no PoE data', to: '/network?tab=ports' },
           { label: 'VLANs · links', value: `${s.vlans} · ${s.links}`, sub: 'VLANs · LLDP/CDP links', to: '/network?tab=topology' },
         ]} />
       )}

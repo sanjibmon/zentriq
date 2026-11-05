@@ -20,8 +20,8 @@ export function AuditPage() {
     <>
       <PageHead title="Audit Logs" actions={tab === 'log' ? <button className="btn" onClick={() => setCsv(true)}><Icon name="down" size={14} /> Download CSV</button> : undefined} />
       <div className="tabs" role="tablist">
-        <button role="tab" aria-selected={tab === 'log'} className={tab === 'log' ? 'on' : ''} onClick={() => navigate('/audit', true)}>Audit log</button>
-        <button role="tab" aria-selected={tab === 'retention'} className={tab === 'retention' ? 'on' : ''} onClick={() => navigate('/audit?tab=retention', true)}>Retention &amp; export</button>
+        <button role="tab" aria-selected={tab === 'log'} className={tab === 'log' ? 'on' : ''} onClick={() => navigate('/audit', true)}>Audit Log</button>
+        <button role="tab" aria-selected={tab === 'retention'} className={tab === 'retention' ? 'on' : ''} onClick={() => navigate('/audit?tab=retention', true)}>Retention &amp; Export</button>
       </div>
       {csv && <CsvExportDialog what="audit log" path="/audit/export" onClose={() => setCsv(false)} />}
       {tab === 'retention' ? <LogRetention /> : <>

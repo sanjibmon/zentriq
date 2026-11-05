@@ -26,7 +26,7 @@ public static class DeploymentEndpoints
         string? Platform, Guid? GroupId, Guid? AssetId, string? Note, DateTimeOffset? ExpiresAt);
     public sealed record TestBody(string? Name, string? Publisher, string? Signer, string? Version, string? Sha256, string? Platform, Guid? AssetId);
     public sealed record InventoryItem(string Name, string? Publisher, string Platform);
-    public sealed record FromInventoryBody(InventoryItem[]? Items, Guid? GroupId, bool? WithPublisher);
+    public sealed record FromInventoryBody(InventoryItem[]? Items, Guid? GroupId, bool? WithPublisher, Guid? AssetId = null);
     public sealed record GroupBody(string? Name, string? Description, Guid[]? DepartmentIds, Guid[]? LocationIds, Guid[]? AssetIds, string? Platform, string? AppMode, string? WdacMode);
     public sealed record DecideBody(string? Scope, Guid? GroupId, string? Match, string? Note);
     public sealed record PackageBody(string? UploadId, string? Name, string? Version, string? Publisher, string? Platform, string? Format, string? InstallArgs,
@@ -312,6 +312,45 @@ public static class DeploymentEndpoints
             return Results.Ok(list);
         });
 
+        // The devices a piece of software was found on, with what application control decides for each of them.
+        g.MapGet("/inventory/devices", async (NpgsqlDataSource ds, string name, string? publisher, string? platform, CancellationToken ct) =>
+        {
+            var pf = platform == "linux" ? "linux" : "windows";
+            await using var cmd = ds.CreateCommand("""
+                SELECT a.id, a.hostname, a.os_name, s.version, s.installed_on, d.name, l.name, a.owner_name, host(a.primary_ip),
+                       r.platform, r.last_checkin_at, COALESCE(r.online_until > now(), false)
+                  FROM zentriq.software_inventory s JOIN zentriq.assets a ON a.id = s.asset_id
+                  LEFT JOIN zentriq.departments d ON d.id = a.department_id LEFT JOIN zentriq.locations l ON l.id = a.location_id
+                  LEFT JOIN LATERAL (SELECT x.platform, x.last_checkin_at, x.online_until FROM zentriq.agent_registrations x
+                                      WHERE x.asset_id = a.id AND x.status = 'active' ORDER BY x.last_checkin_at DESC NULLS LAST LIMIT 1) r ON true
+                 WHERE a.status = 'active' AND s.name = @n AND s.publisher IS NOT DISTINCT FROM @p
+                   AND (CASE WHEN a.os_family = 'linux' THEN 'linux' ELSE 'windows' END) = @pf
+                 ORDER BY lower(a.hostname) LIMIT 2000
+                """);
+            cmd.Parameters.AddWithValue("n", name);
+            cmd.Parameters.Add(Text("p", string.IsNullOrEmpty(publisher) ? null : publisher));
+            cmd.Parameters.AddWithValue("pf", pf);
+            var rows = new List<(Guid Id, string? Host, string? Os, string? Version, DateOnly? On, string? Dept, string? Loc, string? Owner, string? Ip, string? AgentPf, DateTimeOffset? Seen, bool Online)>();
+            await using (var r = await cmd.ExecuteReaderAsync(ct))
+                while (await r.ReadAsync(ct))
+                    rows.Add((r.GetGuid(0), S(r, 1), S(r, 2), S(r, 3), r.IsDBNull(4) ? null : r.GetFieldValue<DateOnly>(4), S(r, 5), S(r, 6), S(r, 7), S(r, 8), S(r, 9), T(r, 10), r.GetBoolean(11)));
+            var fallback = pf == "linux" ? "linux-x64" : "windows-x64";
+            var orgPolicy = await AppControlStore.PolicyForAsync(ds, null, fallback, ct);
+            var list = new List<object>();
+            foreach (var x in rows)
+            {
+                // Each device's own policy (its groups and its own rules); for very long lists the organisation's.
+                var policy = list.Count < 300 ? await AppControlStore.PolicyForAsync(ds, x.Id, x.AgentPf ?? fallback, ct) : orgPolicy;
+                var d = AppControl.Evaluate(policy, new SoftwareCandidate { Name = name, Publisher = string.IsNullOrEmpty(publisher) ? null : publisher, Version = x.Version, Platform = pf });
+                list.Add(new
+                {
+                    assetId = x.Id, hostname = x.Host, osName = x.Os, version = x.Version, installedOn = x.On, department = x.Dept, location = x.Loc, owner = x.Owner, ip = x.Ip,
+                    agent = x.AgentPf is not null, online = x.Online, lastCheckin = x.Seen, approved = d.Approved, outcome = d.Outcome, reason = d.Reason,
+                });
+            }
+            return Results.Ok(list);
+        });
+
         g.MapPost("/rules/from-inventory", async (FromInventoryBody body, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
         {
             var items = (body.Items ?? []).Where(i => !string.IsNullOrWhiteSpace(i.Name)).Take(5000).ToList();
@@ -321,24 +360,25 @@ public static class DeploymentEndpoints
             {
                 var pf = i.Platform == "linux" ? "linux" : "windows";
                 var rule = new Rule("allow", i.Name.Trim(), Escape(i.Name.Trim()), body.WithPublisher == true && pf == "windows" && !string.IsNullOrWhiteSpace(i.Publisher) ? Escape(i.Publisher!.Trim()) : null,
-                    null, null, null, pf, body.GroupId, null, "From inventory", null);
+                    null, null, null, pf, body.AssetId is null ? body.GroupId : null, body.AssetId, "From inventory", null);
                 await using var cmd = ds.CreateCommand("""
-                    INSERT INTO zentriq.app_control_rules (action, label, name_pattern, publisher_pattern, platform, group_id, source, note, created_by)
-                    SELECT 'allow', @l, @n, @p, @pf, @g, 'inventory', @no, @by
+                    INSERT INTO zentriq.app_control_rules (action, label, name_pattern, publisher_pattern, platform, group_id, asset_id, source, note, created_by)
+                    SELECT 'allow', @l, @n, @p, @pf, @g, @as, 'inventory', @no, @by
                      WHERE NOT EXISTS (SELECT 1 FROM zentriq.app_control_rules WHERE action = 'allow' AND lower(name_pattern) = lower(@n) AND platform = @pf
-                                         AND group_id IS NOT DISTINCT FROM @g AND asset_id IS NULL AND publisher_pattern IS NOT DISTINCT FROM @p)
+                                         AND group_id IS NOT DISTINCT FROM @g AND asset_id IS NOT DISTINCT FROM @as AND publisher_pattern IS NOT DISTINCT FROM @p)
                     """);
                 cmd.Parameters.AddWithValue("l", rule.Label);
                 cmd.Parameters.AddWithValue("n", rule.Name!);
                 cmd.Parameters.Add(Text("p", rule.Publisher));
                 cmd.Parameters.AddWithValue("pf", pf);
-                cmd.Parameters.Add(Uuid("g", body.GroupId));
+                cmd.Parameters.Add(Uuid("g", rule.GroupId));
+                cmd.Parameters.Add(Uuid("as", body.AssetId));
                 cmd.Parameters.AddWithValue("no", rule.Note!);
                 cmd.Parameters.Add(Uuid("by", rc.UserId));
                 created += await cmd.ExecuteNonQueryAsync(ct);
             }
             if (created > 0) await ChangedAsync(ds, ct);
-            await rc.AuditAsync("appcontrol.approve_inventory", $"{created} item(s)", detail: new { created, body.GroupId });
+            await rc.AuditAsync("appcontrol.approve_inventory", $"{created} item(s)", detail: new { created, body.GroupId, body.AssetId });
             return Results.Ok(new { created });
         }).RequireAuthorization(Permissions.DeployManage);
 
@@ -459,7 +499,8 @@ public static class DeploymentEndpoints
         g.MapGet("/events", async (NpgsqlDataSource ds, string? kind, string? q, Guid? assetId, int? days, CancellationToken ct) =>
         {
             await using var cmd = ds.CreateCommand("""
-                SELECT e.id, e.occurred_at, e.kind, e.name, e.publisher, e.version, e.sha256, e.path, e.user_name, e.platform, e.detail, e.asset_id, a.hostname
+                SELECT e.id, e.occurred_at, e.kind, e.name, e.publisher, e.version, e.sha256, e.path, e.user_name, e.platform, e.detail, e.asset_id, a.hostname,
+                       e.details::text
                   FROM zentriq.app_control_events e LEFT JOIN zentriq.assets a ON a.id = e.asset_id
                  WHERE e.occurred_at > now() - make_interval(days => @days) AND (@k::text IS NULL OR e.kind = @k) AND (@a::uuid IS NULL OR e.asset_id = @a)
                    AND (@q::text IS NULL OR e.name ILIKE @q OR e.publisher ILIKE @q OR e.user_name ILIKE @q OR a.hostname ILIKE @q OR e.path ILIKE @q)
@@ -476,6 +517,7 @@ public static class DeploymentEndpoints
                 {
                     id = r.GetInt64(0), at = r.GetFieldValue<DateTimeOffset>(1), kind = r.GetString(2), name = r.GetString(3), publisher = S(r, 4), version = S(r, 5),
                     sha256 = S(r, 6), path = S(r, 7), user = S(r, 8), platform = S(r, 9), detail = S(r, 10), assetId = G(r, 11), device = S(r, 12),
+                    details = Details(r, 13),
                 });
             return Results.Ok(list);
         });
@@ -502,8 +544,10 @@ public static class DeploymentEndpoints
         {
             await using var cmd = ds.CreateCommand("""
                 SELECT q.id, q.created_at, q.status, q.name, q.publisher, q.version, q.sha256, q.path, q.platform, q.user_name, q.reason,
-                       q.asset_id, a.hostname, q.decided_at, u.email, q.decision_note, q.rule_id
+                       q.asset_id, a.hostname, q.decided_at, u.email, q.decision_note, q.rule_id, q.details::text,
+                       a.os_name, host(a.primary_ip), dp.name, ag.agent_version, ag.last_checkin_at
                   FROM zentriq.app_control_requests q LEFT JOIN zentriq.assets a ON a.id = q.asset_id LEFT JOIN zentriq.users u ON u.id = q.decided_by
+                  LEFT JOIN zentriq.departments dp ON dp.id = a.department_id LEFT JOIN zentriq.agent_registrations ag ON ag.id = q.agent_id
                  WHERE (@s::text IS NULL OR q.status = @s)
                  ORDER BY q.status = 'pending' DESC, q.created_at DESC LIMIT 2000
                 """);
@@ -515,7 +559,8 @@ public static class DeploymentEndpoints
                 {
                     id = r.GetGuid(0), createdAt = r.GetFieldValue<DateTimeOffset>(1), status = r.GetString(2), name = r.GetString(3), publisher = S(r, 4), version = S(r, 5),
                     sha256 = S(r, 6), path = S(r, 7), platform = S(r, 8), user = S(r, 9), reason = S(r, 10), assetId = G(r, 11), device = S(r, 12),
-                    decidedAt = T(r, 13), decidedBy = S(r, 14), decisionNote = S(r, 15), ruleId = G(r, 16),
+                    decidedAt = T(r, 13), decidedBy = S(r, 14), decisionNote = S(r, 15), ruleId = G(r, 16), details = Details(r, 17),
+                    deviceOs = S(r, 18), deviceIp = S(r, 19), department = S(r, 20), agentVersion = S(r, 21), lastCheckin = T(r, 22),
                 });
             return Results.Ok(list);
         });
@@ -1100,4 +1145,9 @@ public static class DeploymentEndpoints
     private static string? S(NpgsqlDataReader r, int i) => r.IsDBNull(i) ? null : r.GetString(i);
     private static Guid? G(NpgsqlDataReader r, int i) => r.IsDBNull(i) ? null : r.GetGuid(i);
     private static DateTimeOffset? T(NpgsqlDataReader r, int i) => r.IsDBNull(i) ? null : r.GetFieldValue<DateTimeOffset>(i);
+    private static Dictionary<string, string>? Details(NpgsqlDataReader r, int i)
+    {
+        if (r.IsDBNull(i)) return null;
+        try { return System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(r.GetString(i)); } catch (System.Text.Json.JsonException) { return null; }
+    }
 }

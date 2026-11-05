@@ -4,7 +4,7 @@ import type { KC, LicensingStatus, Overview, Paged, Scan } from '../../api/types
 import { useAuth } from '../../app/auth';
 import { useApi } from '../../app/useApi';
 import { Link, useRouter } from '../../app/router';
-import { Callout, DataTable, ErrorBox, fmt, Loading, PageHead, Panel, Pill, statusTone } from '../../components/ui';
+import { Callout, DataTable, ErrorBox, fmt, Loading, PageHead, Panel, Pill, statusTone, titleCase } from '../../components/ui';
 import { useConfirm } from '../../components/Confirm';
 import { CategoryChart, CHART_KINDS, HBars, PostureBars, TrendArea, type ChartKind, type Slice } from '../../components/charts';
 import { ReportWidget } from './ReportWidget';
@@ -48,7 +48,7 @@ function size(k: string) { const n = parseFloat(k); return Number.isNaN(n) ? Num
 function Hero({ label, value, sub, to, meter, tone }: { label: string; value: string; sub?: string; to?: string; meter?: number; tone?: 'crit' }) {
   const body = (
     <>
-      <span className="k">{label}</span>
+      <span className="k">{titleCase(label)}</span>
       <span className="v" style={tone === 'crit' ? { color: 'var(--crit)' } : undefined}>{value}</span>
       <span className="meter" aria-hidden="true" style={meter == null ? { visibility: 'hidden' } : undefined}><i style={{ width: `${Math.min(100, Math.max(0, meter ?? 0))}%` }} /></span>
       <span className="s">{sub ?? ''}</span>

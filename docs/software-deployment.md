@@ -22,14 +22,19 @@ Licensed with the *Secure* section.
 
 ## Rolling it out
 
-1. **Build the approved list.** *Software catalogue*: select what your organisation allows and *Approve* (for all
-   devices or a device group). *Found on devices*: everything installed on your devices that is not approved yet —
-   select and approve what you use. Add your own line-of-business software with *Your own software*.
+1. **Build the approved list.** *Software Catalogue*: select what your organisation allows and *Approve* (for all
+   devices or a device group). *Found on Devices*: everything installed on your devices that is not approved yet —
+   select and approve what you use, or click a row to see **which devices** have it and approve it **for one device**
+   (*Approve on This Device*), for a device group or for all devices. Add your own line-of-business software with
+   *Add Your Own*.
 2. **Audit mode** (*Overview › Mode: Audit*). Installations of software that is not approved continue and are listed
    under *Events*. Approve what you see (*Events › Approve…*). Nothing changes for users.
-3. **Block mode** — first for a device group (*Device groups › Application control: Block*), then for everyone. Users
+3. **Block mode** — first for a device group (*Device Groups › Application Control: Block*), then for everyone. Users
    see the message and can request approval; requests appear under *Requests* (and as the integration event
-   *appcontrol.request*).
+   *appcontrol.request*). Click a request to see everything about it (below) before you approve or reject it.
+
+The tiles at the top of the page open the matching tab (*Blocked* and *Found Installed* open *Events* filtered to
+those events).
 
 Changes reach online agents within seconds (live connection) and the agent reports the applied policy at once, so
 *Devices* shows it as current; devices that are offline get them when they connect.
@@ -74,7 +79,22 @@ A new installer is **held** while it is checked (product name, publisher, code-s
 * approved → it continues;
 * audit mode → it continues and is reported;
 * block mode → it and what it started are stopped, it is reported, and the user sees the message with *Request
-  approval* (and a box for the reason). The request goes to the console through the agent.
+  approval* (and a box for the reason). The request goes to the console through the agent; the message then closes
+  by itself.
+
+The user sees **one message per attempt**. Once it is closed (or the request is sent) it does not come back by itself:
+programs that retry on their own — a downloader or bootstrapper that starts the installer again, a scheduled task —
+are stopped silently, and starting the installer again while the message is still open does not open a second one.
+When the user runs the installer again after closing the message, the message appears again.
+
+**What a request and an event show.** Everything the device knows about the installer: product name, version,
+publisher and company, file description and copyright; the installer type (Windows Installer package, NSIS, Inno
+Setup, WiX bundle, InstallShield and others), file name, folder, size, date and SHA-256; for .msi packages the product
+and upgrade codes; the code-signing signature (valid or not, signer, issuer, expiry, thumbprint); where it was
+downloaded from (the Mark of the Web: download address and page, zone); what started it and its command line; the
+user, and the device (operating system, IP address, department, agent version, last seen). On Linux a request lists
+what the repositories say about the package (version, description, maintainer or vendor, homepage, size, repository,
+licence).
 
 Not checked: installations started by services (Windows Update, Configuration Manager, Intune, Zentriq deployments),
 uninstallers, programs an allowed installer starts, and Windows components. Software that is installed in another way

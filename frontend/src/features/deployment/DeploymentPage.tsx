@@ -9,14 +9,14 @@ import { Modal } from '../../components/Modal';
 import { Callout, DataTable, ErrorBox, fmt, Kpis, PageHead, Panel, Pill, type Column } from '../../components/ui';
 import { DecideDialog, DeployDialog, GroupDialog, PackageDialog, RuleDialog } from './DeploymentDialogs';
 import {
-  errText, KIND_LABEL, MODE_LABEL, platformLabel, type AppEvent, type AppRequest, type Catalog, type CatalogEntry, type DeviceRow, type Group, type InventoryRow,
-  type Job, type JobDevice, type Mode, type Package, type Rule, type Settings, type Summary,
+  DETAIL_SECTIONS, errText, KIND_LABEL, MODE_LABEL, MONO_DETAILS, platformLabel, type AppEvent, type AppRequest, type Catalog, type CatalogEntry, type DeviceRow, type Group,
+  type InventoryDevice, type InventoryRow, type Job, type JobDevice, type Mode, type Package, type Rule, type Settings, type Summary,
 } from './types';
 
 type Tab = 'overview' | 'approved' | 'catalog' | 'inventory' | 'requests' | 'events' | 'groups' | 'packages' | 'deployments' | 'devices';
 const TABS: [Tab, string][] = [
-  ['overview', 'Overview'], ['approved', 'Approved software'], ['catalog', 'Software catalogue'], ['inventory', 'Found on devices'], ['requests', 'Requests'],
-  ['events', 'Events'], ['groups', 'Device groups'], ['packages', 'Packages'], ['deployments', 'Deployments'], ['devices', 'Devices'],
+  ['overview', 'Overview'], ['approved', 'Approved Software'], ['catalog', 'Software Catalogue'], ['inventory', 'Found on Devices'], ['requests', 'Requests'],
+  ['events', 'Events'], ['groups', 'Device Groups'], ['packages', 'Packages'], ['deployments', 'Deployments'], ['devices', 'Devices'],
 ];
 
 export function DeploymentPage() {
@@ -24,8 +24,9 @@ export function DeploymentPage() {
   const { query, navigate } = useRouter();
   const canManage = can('deploy.manage');
   const canRun = can('deploy.run');
-  const [tab, setTabState] = useState<Tab>(TABS.find(([t]) => t === query.get('tab'))?.[0] ?? 'overview');
-  const setTab = (t: Tab) => { setTabState(t); navigate(`/modules/deploy?tab=${t}`, true); };
+  const tab: Tab = TABS.find(([t]) => t === query.get('tab'))?.[0] ?? 'overview';
+  const kindFilter = query.get('kind') ?? '';
+  const setTab = (t: Tab) => navigate(`/modules/deploy?tab=${t}`, true);
   const [tick, setTick] = useState(0);
   const summary = useApi(() => api.get<Summary>('/deployment/summary'), [tick]);
   const groups = useApi(() => api.get<Group[]>('/deployment/groups'), [tick]);
@@ -37,15 +38,14 @@ export function DeploymentPage() {
 
   return (
     <>
-      <PageHead title="Software Deployment" icon="package"
-        desc="The software your organisation allows, enforced on every device with the Zentriq Agent; and installing software on devices from here." />
+      <PageHead title="Software Deployment" icon="package" />
       {s && <Kpis items={[
-        { label: 'Application control', value: MODE_LABEL[s.settings.mode], sub: `${s.blocking} blocking · ${s.auditing} auditing of ${s.agents} agent(s)` },
-        { label: 'Approved software', value: s.approvedRules.toLocaleString(), sub: `${s.blockedRules} blocked · catalogue of ${s.catalog.entries}`, to: '/modules/deploy?tab=approved' },
-        { label: 'Requests', value: s.pendingRequests.toLocaleString(), sub: 'waiting for a decision', to: '/modules/deploy?tab=requests' },
-        { label: 'Blocked (24 h)', value: s.blocked24h.toLocaleString(), sub: `${s.audited24h} reported in audit mode`, to: '/modules/deploy?tab=events' },
-        { label: 'Found installed (7 d)', value: s.detected7d.toLocaleString(), sub: 'not approved, installed anyway', to: '/modules/deploy?tab=events' },
-        { label: 'Deployments', value: s.deploymentsOpen.toLocaleString(), sub: `in progress · ${s.deploymentsFailed7d} failed (7 d)`, to: '/modules/deploy?tab=deployments' },
+        { label: 'Application Control', value: MODE_LABEL[s.settings.mode], sub: `${s.blocking} blocking · ${s.auditing} auditing`, to: '/modules/deploy?tab=devices' },
+        { label: 'Approved Software', value: s.approvedRules.toLocaleString(), sub: `${s.blockedRules} blocked`, to: '/modules/deploy?tab=approved' },
+        { label: 'Requests', value: s.pendingRequests.toLocaleString(), sub: 'Waiting for a decision', to: '/modules/deploy?tab=requests' },
+        { label: 'Blocked (24 h)', value: s.blocked24h.toLocaleString(), sub: `${s.audited24h} reported in audit`, to: '/modules/deploy?tab=events&kind=blocked' },
+        { label: 'Found Installed (7 d)', value: s.detected7d.toLocaleString(), sub: 'Not approved', to: '/modules/deploy?tab=events&kind=detected' },
+        { label: 'Deployments', value: s.deploymentsOpen.toLocaleString(), sub: `${s.deploymentsFailed7d} failed (7 d)`, to: '/modules/deploy?tab=deployments' },
       ]} />}
       {msg && <Callout tone={msg.tone} icon={msg.tone === 'crit' ? 'alert' : 'info'}>{msg.text}</Callout>}
       <div className="tabs" role="tablist">
@@ -61,7 +61,7 @@ export function DeploymentPage() {
       {tab === 'catalog' && <CatalogTab {...ctx} />}
       {tab === 'inventory' && <InventoryTab {...ctx} />}
       {tab === 'requests' && <RequestsTab {...ctx} />}
-      {tab === 'events' && <EventsTab {...ctx} />}
+      {tab === 'events' && <EventsTab key={kindFilter} {...ctx} initialKind={kindFilter} />}
       {tab === 'groups' && <GroupsTab {...ctx} reloadGroups={groups.reload} />}
       {tab === 'packages' && <PackagesTab {...ctx} />}
       {tab === 'deployments' && <DeploymentsTab {...ctx} />}
@@ -93,47 +93,46 @@ function OverviewTab({ summary, canManage, changed, failed, onTab }: Ctx & { sum
     catch (e) { failed(e); } finally { setBusy(false); }
   }
   const steps: [string, string, Tab][] = [
-    ['Build the approved list', 'Approve software from the standard catalogue, or what is installed on your devices today.', 'catalog'],
-    ['Turn on audit mode', 'Installations of software that is not approved are reported, not stopped. Approve what you see.', 'events'],
-    ['Turn on blocking', 'For all devices, or first for a device group. Users see your message and can request approval.', 'groups'],
+    ['Approve Software', 'From the catalogue or from what is installed.', 'catalog'],
+    ['Audit', 'Report, do not stop. Approve what you see.', 'events'],
+    ['Block', 'For a device group first, then for everyone.', 'groups'],
   ];
   return (
     <div className="grid-2">
-      <Panel title="Application control" sub="Applies to every device with the Zentriq Agent (Windows and Linux); device groups can set their own mode.">
+      <Panel title="Application Control" sub="All devices with the Zentriq Agent; device groups can override">
         <div className="form-v">
           <label>Mode
             <select className="in" value={f.mode} disabled={!canManage} onChange={(e) => setF({ ...f, mode: e.target.value as Mode })}>
-              <option value="off">Off — installations are not checked</option>
-              <option value="audit">Audit — report installations of software that is not approved</option>
-              <option value="block">Block — stop them and show the message</option>
+              <option value="off">Off — not checked</option>
+              <option value="audit">Audit — report software that is not approved</option>
+              <option value="block">Block — stop it and show the message</option>
             </select>
           </label>
           <label>Message users see
             <textarea className="in" rows={3} value={f.message} disabled={!canManage} onChange={(e) => setF({ ...f, message: e.target.value })} maxLength={500} />
-            <small className="muted">Default: “{summary.settings.defaultMessage}” {f.message !== summary.settings.defaultMessage && canManage && <button type="button" className="btn sm" onClick={() => setF({ ...f, message: summary.settings.defaultMessage })}>Use the default</button>}</small>
+            {f.message !== summary.settings.defaultMessage && canManage && <small><button type="button" className="link-btn" onClick={() => setF({ ...f, message: summary.settings.defaultMessage })}>Use the default message</button></small>}
           </label>
-          <label className="row-check"><input type="checkbox" checked={f.allowRequests} disabled={!canManage} onChange={(e) => setF({ ...f, allowRequests: e.target.checked })} /> Users can request approval from the message</label>
-          <label className="row-check"><input type="checkbox" checked={f.autoRemove} disabled={!canManage} onChange={(e) => setF({ ...f, autoRemove: e.target.checked })} />
-            Remove software that is not approved and was installed anyway (block mode; software installed before application control was turned on is not removed)</label>
-          <label className="row-check"><input type="checkbox" checked={f.protectRemoteAgent} disabled={!canManage} onChange={(e) => setF({ ...f, protectRemoteAgent: e.target.checked })} />
-            Protect the remote support agent like the Zentriq Agent (stopping, disabling or removing it on the device needs a code; reinstalled when removed)</label>
+          <label className="row-check"><input type="checkbox" checked={f.allowRequests} disabled={!canManage} onChange={(e) => setF({ ...f, allowRequests: e.target.checked })} /> Users can request approval</label>
+          <label className="row-check" title="Block mode only. Software installed before application control was turned on is never removed."><input type="checkbox" checked={f.autoRemove} disabled={!canManage} onChange={(e) => setF({ ...f, autoRemove: e.target.checked })} />
+            Remove unapproved software installed anyway</label>
+          <label className="row-check" title="Stopping, disabling or removing it on the device needs a code; it is reinstalled if removed."><input type="checkbox" checked={f.protectRemoteAgent} disabled={!canManage} onChange={(e) => setF({ ...f, protectRemoteAgent: e.target.checked })} />
+            Tamper-protect the remote support agent</label>
           {canManage && <div><button className="btn primary" disabled={!dirty || busy} onClick={() => void save()}>{busy ? 'Saving…' : 'Save'}</button></div>}
-          {summary.settings.enabledAt && <small className="muted">On since {fmt.date(summary.settings.enabledAt)} · policy revision {summary.settings.revision}</small>}
+          {summary.settings.enabledAt && <small className="faint">On since {fmt.date(summary.settings.enabledAt)} · revision {summary.settings.revision}</small>}
         </div>
       </Panel>
-      <Panel title="Rolling it out" sub="Without surprises for your users.">
-        <ol className="steps">
-          {steps.map(([t, d, to]) => <li key={t}><b>{t}</b><div className="muted">{d} <button className="btn sm" onClick={() => onTab(to)}>Open</button></div></li>)}
+      <Panel title="Rolling It Out">
+        <ol className="mini-steps">
+          {steps.map(([t, d, to], i) => <li key={t}><span className="n">{i + 1}</span><div><b>{t}</b><span className="muted" style={{ fontSize: 12.5 }}>{d}</span><div><button className="link-btn" onClick={() => onTab(to)}>Open</button></div></div></li>)}
         </ol>
-        <Callout tone="info" icon="shield">
-          Always allowed: Windows components and updates, drivers, Microsoft runtimes, the Zentriq Agent and the remote support agent; on Linux also updates of
-          installed packages, kernels, firmware and libraries. Installations by services (Windows Update, Configuration Manager, Intune, Zentriq deployments) are
-          not stopped; the inventory check reports anything installed that is not approved. Because the Zentriq Agent is tamper-protected, local administrators
-          cannot turn this off without a code.
-        </Callout>
-        <div className="muted" style={{ fontSize: 12.5 }}>
-          {summary.capableAgents} of {summary.agents} agents support application control{summary.capableAgents < summary.agents && <> — <Link to="/agents">update the others</Link></>} ·
-          WDAC on {summary.wdac} · remote support agent protected on {summary.remoteProtected}
+        <p className="faint" style={{ fontSize: 12.5, margin: '12px 0 0' }} title="Installations by services (Windows Update, Configuration Manager, Intune, Zentriq deployments) are not stopped; the inventory check reports anything installed that is not approved.">
+          Always allowed: Windows components and updates, drivers, Microsoft runtimes, Zentriq; on Linux, package updates, kernels and libraries.
+        </p>
+        <div className="stat-line">
+          <span><b>{summary.capableAgents}</b> of {summary.agents} agents ready{summary.capableAgents < summary.agents && <> · <Link to="/agents">Update the Others</Link></>}</span>
+          <span>WDAC <b>{summary.wdac}</b></span>
+          <span>Remote agent protected <b>{summary.remoteProtected}</b></span>
+          <span>Catalogue <b>{summary.catalog.entries}</b></span>
         </div>
       </Panel>
     </div>
@@ -166,7 +165,7 @@ function RulesTab({ tick, canManage, groups, changed, failed }: Ctx) {
       {r.sha256 && <div>SHA-256: <span className="mono">{r.sha256.slice(0, 16)}…</span></div>}
     </span> },
     { key: 'p', label: 'Platform', render: (r) => platformLabel(r.platform) },
-    { key: 's', label: 'Applies to', render: (r) => r.device ? <>Device {r.device}</> : r.group ? <>Group {r.group}</> : 'All devices' },
+    { key: 's', label: 'Applies To', render: (r) => r.device ? <>Device {r.device}</> : r.group ? <>Group {r.group}</> : 'All devices' },
     { key: 'src', label: 'Added', render: (r) => <span title={`${fmt.date(r.createdAt)}${r.createdBy ? ' by ' + r.createdBy : ''}`}>{fmt.label(r.source)} · {fmt.ago(r.createdAt)}</span> },
     { key: 'x', label: '', render: (r) => canManage ? <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
       <button className="btn sm" onClick={() => setEditing(r)}>Edit</button>
@@ -250,9 +249,9 @@ function CatalogTab({ tick, canManage, groups, changed, failed }: Ctx) {
     { key: 'n', label: 'Software', className: 'wrap', render: (e) => <><b>{e.name}</b>{!e.builtIn && <> <Pill tone="info">Your entry</Pill></>}<div className="faint" style={{ fontSize: 11.5 }}>{e.publisher ?? '—'}</div></> },
     { key: 'cat', label: 'Category', render: (e) => e.category },
     { key: 'p', label: 'Platforms', render: (e) => e.platforms.map((p) => platformLabel(p)).join(', ') },
-    { key: 'd', label: 'On devices', render: (e) => e.devices ? e.devices.toLocaleString() : <span className="muted">—</span> },
+    { key: 'd', label: 'On Devices', render: (e) => e.devices ? e.devices.toLocaleString() : <span className="muted">—</span> },
     { key: 's', label: 'Status', render: (e) => e.blocked ? <Pill tone="crit">Blocked</Pill> : e.approved ? <Pill tone="ok">Approved</Pill> : <span className="muted">Not approved</span> },
-    { key: 'i', label: 'Silent install', optional: true, className: 'wrap', render: (e) => <span className="mono" style={{ fontSize: 11.5 }}>{[e.windowsSilentArgs, e.debPackage && `apt: ${e.debPackage}`, e.rpmPackage && `dnf: ${e.rpmPackage}`].filter(Boolean).join(' · ') || '—'}</span> },
+    { key: 'i', label: 'Silent Install', optional: true, className: 'wrap', render: (e) => <span className="mono" style={{ fontSize: 11.5 }}>{[e.windowsSilentArgs, e.debPackage && `apt: ${e.debPackage}`, e.rpmPackage && `dnf: ${e.rpmPackage}`].filter(Boolean).join(' · ') || '—'}</span> },
     { key: 'w', label: '', render: (e) => <span style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
       {e.website && <a className="btn sm" href={e.website} target="_blank" rel="noreferrer">Website</a>}
       {!e.builtIn && canManage && <button className="btn sm" aria-label={`Remove ${e.name}`} onClick={() => void removeOwn(e)}><Icon name="trash" size={13} /></button>}
@@ -260,12 +259,12 @@ function CatalogTab({ tick, canManage, groups, changed, failed }: Ctx) {
   ];
   return (
     <>
-      <Callout tone="info" icon="package">The standard catalogue ({cat.data?.version ?? '…'}) lists {cat.data?.entries.length ?? '…'} well-known applications with the names and publishers they install under on Windows, their Linux package names and silent installation switches. Select what your organisation allows and approve it — for all devices or for a device group.</Callout>
       <div className="toolbar-row">
         <input className="in grow" placeholder="Search the catalogue…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search the catalogue" />
         <select className="in" value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Category"><option value="">All categories</option>{(cat.data?.categories ?? []).map((c) => <option key={c}>{c}</option>)}</select>
         <select className="in" value={platform} onChange={(e) => setPlatform(e.target.value)} aria-label="Platform"><option value="">Windows and Linux</option><option value="windows">Windows</option><option value="linux">Linux</option></select>
-        {canManage && <button className="btn" onClick={() => setAdding(true)}><Icon name="plus" size={13} /> Your own software</button>}
+        <span className="hint">{entries.length} of {cat.data?.entries.length ?? '…'}</span>
+        {canManage && <button className="btn" onClick={() => setAdding(true)}><Icon name="plus" size={13} /> Add Your Own</button>}
       </div>
       {canManage && sel.length > 0 && <div className="toolbar-row">
         <b>{sel.length} selected</b>
@@ -327,6 +326,7 @@ function InventoryTab({ tick, canManage, groups, changed, failed }: Ctx) {
   const [sel, setSel] = useState<string[]>([]);
   const [groupId, setGroupId] = useState('');
   const [withPublisher, setWithPublisher] = useState(true);
+  const [open, setOpen] = useState<InventoryRow | null>(null);
   const list = (rows.data ?? []).map((r) => ({ ...r, id: `${r.platform}|${r.name}|${r.publisher ?? ''}` }));
   async function approve() {
     const items = list.filter((r) => sel.includes(r.id)).map((r) => ({ name: r.name, publisher: r.publisher, platform: r.platform }));
@@ -341,13 +341,12 @@ function InventoryTab({ tick, canManage, groups, changed, failed }: Ctx) {
       render: (r) => canManage && !r.approved ? <input type="checkbox" aria-label={`Select ${r.name}`} checked={sel.includes(r.id)} onChange={(e) => setSel(e.target.checked ? [...sel, r.id] : sel.filter((x) => x !== r.id))} /> : null },
     { key: 'n', label: 'Software', className: 'wrap', render: (r) => <><b>{r.name}</b><div className="faint" style={{ fontSize: 11.5 }}>{r.publisher ?? '—'}</div></> },
     { key: 'p', label: 'Platform', render: (r) => platformLabel(r.platform) },
-    { key: 'd', label: 'Devices', render: (r) => r.devices.toLocaleString() },
+    { key: 'd', label: 'Devices', render: (r) => <button className="link-btn" onClick={() => setOpen(r)}>{r.devices.toLocaleString()}</button> },
     { key: 'v', label: 'Versions', className: 'wrap', render: (r) => <span style={{ fontSize: 12 }}>{r.versions.join(', ') || '—'}</span> },
     { key: 's', label: 'Status', className: 'wrap', render: (r) => r.approved ? <Pill tone="ok">{r.outcome === 'built-in' ? 'Always allowed' : 'Approved'}</Pill> : <span title={r.reason}><Pill tone={r.outcome === 'blocked' ? 'crit' : 'warn'}>{r.outcome === 'blocked' ? 'Blocked' : 'Not approved'}</Pill></span> },
   ];
   return (
     <>
-      <Callout tone="info" icon="info">Software installed on your devices now, checked against the approved list for all devices. Approve what your organisation uses before you turn on blocking.</Callout>
       <form className="toolbar-row" onSubmit={(e) => { e.preventDefault(); setSearch(q); }}>
         <input className="in grow" placeholder="Search software or publisher…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search software" />
         <select className="in" value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Status"><option value="unapproved">Not approved</option><option value="approved">Approved</option><option value="">All</option></select>
@@ -361,8 +360,65 @@ function InventoryTab({ tick, canManage, groups, changed, failed }: Ctx) {
         <button className="btn primary" onClick={() => void approve()}>Approve</button>
       </div>}
       <ErrorBox error={rows.error} />
-      <DataTable columns={cols} rows={list} empty={rows.loading ? 'Loading…' : status === 'unapproved' ? 'All software found on devices is approved.' : 'No software found.'} />
+      <DataTable columns={cols} rows={list} onRow={setOpen} rowTitle="Show the devices"
+        empty={rows.loading ? 'Loading…' : status === 'unapproved' ? 'All software found on devices is approved.' : 'No software found.'} />
+      {open && <InventoryDevicesDialog item={open} canManage={canManage} groups={groups} onClose={() => setOpen(null)}
+        onChanged={(m) => { setLocal((x) => x + 1); changed(m); }} failed={failed} />}
     </>
+  );
+}
+
+/** The devices a piece of software was found on; approve it for one device, a group or all devices. */
+function InventoryDevicesDialog({ item, canManage, groups, onClose, onChanged, failed }: {
+  item: InventoryRow; canManage: boolean; groups: Group[]; onClose: () => void; onChanged: (m: string) => void; failed: (e: unknown) => void;
+}) {
+  const [local, setLocal] = useState(0);
+  const devices = useApi(() => api.get<InventoryDevice[]>('/deployment/inventory/devices', { name: item.name, publisher: item.publisher ?? '', platform: item.platform }), [item.name, item.publisher, item.platform, local]);
+  const [withPublisher, setWithPublisher] = useState(item.platform === 'windows' && !!item.publisher);
+  const [groupId, setGroupId] = useState('');
+  const [busy, setBusy] = useState<string | null>(null);
+  const [q, setQ] = useState('');
+  async function approve(assetId: string | null, label: string) {
+    setBusy(assetId ?? 'all');
+    try {
+      const r = await api.post<{ created: number }>('/deployment/rules/from-inventory', {
+        items: [{ name: item.name, publisher: item.publisher, platform: item.platform }], withPublisher, assetId, groupId: assetId ? null : groupId || null,
+      });
+      setLocal((x) => x + 1);
+      onChanged(r.created ? `${item.name} approved for ${label}.` : `${item.name} was already approved for ${label}.`);
+    } catch (e) { failed(e); } finally { setBusy(null); }
+  }
+  const rows = (devices.data ?? []).filter((d) => !q.trim() || `${d.hostname} ${d.department} ${d.location} ${d.owner} ${d.ip}`.toLowerCase().includes(q.trim().toLowerCase()))
+    .map((d) => ({ ...d, id: d.assetId }));
+  const pending = rows.filter((d) => !d.approved).length;
+  return (
+    <Modal title={item.name} wide onClose={onClose} footer={<button className="btn" onClick={onClose}>Close</button>}>
+      <div className="form-v">
+        <div className="stat-line" style={{ marginTop: 0 }}>
+          <span>{item.publisher ?? 'Unknown publisher'}</span><span>{platformLabel(item.platform)}</span>
+          <span><b>{devices.data?.length ?? item.devices}</b> device(s)</span><span><b>{pending}</b> not approved</span>
+          {item.versions.length > 0 && <span>Versions {item.versions.join(', ')}</span>}
+        </div>
+        {canManage && <div className="toolbar-row">
+          <select className="in" value={groupId} onChange={(e) => setGroupId(e.target.value)} aria-label="Approve for"><option value="">All devices</option>{groups.map((g) => <option key={g.id} value={g.id}>Group {g.name}</option>)}</select>
+          <button className="btn primary" disabled={busy !== null} onClick={() => void approve(null, groupId ? `the group ${groups.find((g) => g.id === groupId)?.name}` : 'all devices')}>
+            {busy === 'all' ? 'Approving…' : groupId ? 'Approve for the Group' : 'Approve for All Devices'}</button>
+          {item.platform === 'windows' && item.publisher && <label className="row-check"><input type="checkbox" checked={withPublisher} onChange={(e) => setWithPublisher(e.target.checked)} /> Only from {item.publisher}</label>}
+          <input className="in grow" placeholder="Filter devices…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Filter devices" />
+        </div>}
+        <ErrorBox error={devices.error} />
+        <DataTable rows={rows} empty={devices.loading ? 'Loading…' : 'No devices.'} columns={[
+          { key: 'h', label: 'Device', className: 'wrap', render: (d) => <><Link to={`/assets/${d.assetId}`}>{d.hostname ?? d.assetId}</Link><div className="faint">{[d.osName, d.ip].filter(Boolean).join(' · ')}</div></> },
+          { key: 'g', label: 'Department / Location', className: 'wrap', render: (d) => [d.department, d.location].filter(Boolean).join(' · ') || <span className="faint">—</span> },
+          { key: 'u', label: 'User', render: (d) => d.owner ?? <span className="faint">—</span> },
+          { key: 'v', label: 'Version', render: (d) => d.version ?? '—' },
+          { key: 'o', label: 'Agent', render: (d) => !d.agent ? <span className="faint">No agent</span> : d.online ? <Pill tone="ok">Online</Pill> : <span className="faint" title={fmt.date(d.lastCheckin)}>{fmt.ago(d.lastCheckin)}</span> },
+          { key: 's', label: 'Status', render: (d) => d.approved ? <Pill tone="ok">{d.outcome === 'built-in' ? 'Always Allowed' : 'Approved'}</Pill> : <span title={d.reason}><Pill tone={d.outcome === 'blocked' ? 'crit' : 'warn'}>{d.outcome === 'blocked' ? 'Blocked' : 'Not Approved'}</Pill></span> },
+          { key: 'x', label: '', render: (d) => canManage && !d.approved && d.outcome !== 'blocked'
+            ? <button className="btn sm" disabled={busy !== null} onClick={() => void approve(d.assetId, d.hostname ?? 'this device')}>{busy === d.assetId ? 'Approving…' : 'Approve on This Device'}</button> : null },
+        ]} />
+      </div>
+    </Modal>
   );
 }
 
@@ -373,6 +429,7 @@ function RequestsTab({ tick, canManage, groups, changed, failed }: Ctx) {
   const [local, setLocal] = useState(0);
   const reqs = useApi(() => api.get<AppRequest[]>('/deployment/requests', { status }), [status, tick, local]);
   const [deciding, setDeciding] = useState<AppRequest | null>(null);
+  const [showing, setShowing] = useState<AppRequest | null>(null);
   const confirm = useConfirm();
   async function reject(r: AppRequest) {
     const note = await confirm({ title: `Reject ${r.name}?`, message: 'The software stays blocked on the device.', confirmLabel: 'Reject', input: { label: 'Note (optional)', type: 'text' } });
@@ -386,10 +443,11 @@ function RequestsTab({ tick, canManage, groups, changed, failed }: Ctx) {
     { key: 'r', label: 'Reason', className: 'wrap', render: (r) => r.reason ?? <span className="muted">—</span> },
     { key: 's', label: 'Status', className: 'wrap', render: (r) => r.status === 'pending' ? <Pill tone="warn">Waiting</Pill> : <><Pill tone={r.status === 'approved' ? 'ok' : 'crit'}>{r.status === 'approved' ? 'Approved' : 'Rejected'}</Pill>
       <div className="faint" style={{ fontSize: 11.5 }}>{r.decidedBy} · {fmt.ago(r.decidedAt)}{r.decisionNote && ` · ${r.decisionNote}`}</div></> },
-    { key: 'x', label: '', render: (r) => canManage && r.status === 'pending' ? <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-      <button className="btn sm primary" onClick={() => setDeciding(r)}>Approve…</button>
-      <button className="btn sm" onClick={() => void reject(r)}>Reject</button>
-    </div> : null },
+    { key: 'x', label: '', render: (r) => <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+      <button className="btn sm" onClick={() => setShowing(r)}>Details</button>
+      {canManage && r.status === 'pending' && <><button className="btn sm primary" onClick={() => setDeciding(r)}>Approve…</button>
+      <button className="btn sm" onClick={() => void reject(r)}>Reject</button></>}
+    </div> },
   ];
   return (
     <>
@@ -397,15 +455,18 @@ function RequestsTab({ tick, canManage, groups, changed, failed }: Ctx) {
         <select className="in" value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Status"><option value="pending">Waiting for a decision</option><option value="approved">Approved</option><option value="rejected">Rejected</option><option value="">All</option></select>
       </div>
       <ErrorBox error={reqs.error} />
-      <DataTable columns={cols} rows={reqs.data ?? []} empty={reqs.loading ? 'Loading…' : status === 'pending' ? 'No requests waiting.' : 'No requests.'} />
+      <DataTable columns={cols} rows={reqs.data ?? []} onRow={setShowing} rowTitle="Show the details" empty={reqs.loading ? 'Loading…' : status === 'pending' ? 'No requests waiting.' : 'No requests.'} />
+      {showing && <RequestDetailsDialog r={showing} canManage={canManage} onClose={() => setShowing(null)}
+        onApprove={() => { setDeciding(showing); setShowing(null); }} onReject={() => { const r = showing; setShowing(null); void reject(r); }} />}
       {deciding && <DecideDialog title={`Approve ${deciding.name}`} item={deciding} groups={groups} endpoint={`/deployment/requests/${deciding.id}/approve`}
         onClose={() => setDeciding(null)} onDone={(m) => { setDeciding(null); setLocal((x) => x + 1); changed(m); }} />}
     </>
   );
 }
 
-function EventsTab({ tick, canManage, groups, changed }: Ctx) {
-  const [kind, setKind] = useState('');
+function EventsTab({ tick, canManage, groups, changed, initialKind }: Ctx & { initialKind: string }) {
+  const [kind, setKind] = useState(initialKind);
+  const [showing, setShowing] = useState<AppEvent | null>(null);
   const [q, setQ] = useState('');
   const [search, setSearch] = useState('');
   const [days, setDays] = useState(7);
@@ -417,8 +478,11 @@ function EventsTab({ tick, canManage, groups, changed }: Ctx) {
     { key: 'k', label: 'What', render: (e) => <Pill tone={tone(e.kind)}>{KIND_LABEL[e.kind] ?? e.kind}</Pill> },
     { key: 'n', label: 'Software', className: 'wrap', render: (e) => <><b>{e.name}</b>{e.version && ` ${e.version}`}<div className="faint" style={{ fontSize: 11.5 }}>{e.publisher ?? '—'}</div></> },
     { key: 'd', label: 'Device', render: (e) => <>{e.assetId ? <Link to={`/assets/${e.assetId}`}>{e.device}</Link> : e.device ?? '—'}<div className="faint" style={{ fontSize: 11.5 }}>{e.user ?? ''}</div></> },
-    { key: 'x', label: 'Detail', className: 'wrap', render: (e) => <span style={{ fontSize: 12 }}>{e.detail}{e.path && <div className="mono faint">{e.path}</div>}</span> },
-    { key: 'a', label: '', render: (e) => canManage && ['blocked', 'audited', 'detected'].includes(e.kind) ? <button className="btn sm" onClick={() => setApproving(e)}>Approve…</button> : null },
+    { key: 'x', label: 'Detail', className: 'wrap', render: (e) => <span style={{ fontSize: 12.5 }}>{e.detail}</span> },
+    { key: 'a', label: '', render: (e) => <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+      <button className="btn sm" onClick={() => setShowing(e)}>Details</button>
+      {canManage && ['blocked', 'audited', 'detected'].includes(e.kind) && <button className="btn sm" onClick={() => setApproving(e)}>Approve…</button>}
+    </div> },
   ];
   return (
     <>
@@ -429,7 +493,18 @@ function EventsTab({ tick, canManage, groups, changed }: Ctx) {
         <button className="btn" type="submit">Search</button>
       </form>
       <ErrorBox error={events.error} />
-      <DataTable columns={cols} rows={events.data ?? []} empty={events.loading ? 'Loading…' : 'Nothing in this period.'} />
+      <DataTable columns={cols} rows={events.data ?? []} onRow={setShowing} rowTitle="Show the details" empty={events.loading ? 'Loading…' : 'Nothing in this period.'} />
+      {showing && <Modal title={`${KIND_LABEL[showing.kind] ?? showing.kind}: ${showing.name}`} wide onClose={() => setShowing(null)}
+        footer={<>{canManage && ['blocked', 'audited', 'detected'].includes(showing.kind) && <button className="btn primary" onClick={() => { setApproving(showing); setShowing(null); }}>Approve…</button>}
+          <button className="btn" onClick={() => setShowing(null)}>Close</button></>}>
+        <dl className="kv">
+          <dt>When</dt><dd>{fmt.date(showing.at)}</dd>
+          <dt>Device</dt><dd>{showing.assetId ? <Link to={`/assets/${showing.assetId}`}>{showing.device}</Link> : showing.device ?? '—'}</dd>
+          {showing.user && <><dt>User</dt><dd>{showing.user}</dd></>}
+          {showing.detail && <><dt>Result</dt><dd>{showing.detail}</dd></>}
+        </dl>
+        <SoftwareDetails item={showing} />
+      </Modal>}
       {approving && <DecideDialog title={`Approve ${approving.name}`} item={approving} groups={groups} endpoint={`/deployment/events/${approving.id}/approve`}
         onClose={() => setApproving(null)} onDone={(m) => { setApproving(null); changed(m); }} />}
     </>
@@ -450,9 +525,9 @@ function GroupsTab({ canManage, groups, changed, failed, reloadGroups }: Ctx & {
     { key: 'n', label: 'Group', className: 'wrap', render: (g) => <><b>{g.name}</b>{g.description && <div className="faint" style={{ fontSize: 11.5 }}>{g.description}</div>}</> },
     { key: 'm', label: 'Members', className: 'wrap', render: (g) => <span style={{ fontSize: 12 }}>{[g.departments.length ? `Departments: ${g.departments.join(', ')}` : '', g.locations.length ? `Locations: ${g.locations.join(', ')}` : '', g.assetIds.length ? `${g.assetIds.length} device(s)` : ''].filter(Boolean).join(' · ')}{g.platform && ` (${platformLabel(g.platform)} only)`}</span> },
     { key: 'd', label: 'Devices', render: (g) => <button className="btn sm" onClick={() => setShowing(g)}>{g.devices}</button> },
-    { key: 'a', label: 'Application control', render: (g) => g.appMode ? MODE_LABEL[g.appMode] : <span className="muted">Organisation's</span> },
+    { key: 'a', label: 'Application Control', render: (g) => g.appMode ? MODE_LABEL[g.appMode] : <span className="muted">Organisation's</span> },
     { key: 'w', label: 'WDAC (Windows)', render: (g) => g.wdacMode === 'off' ? <span className="muted">Off</span> : <Pill tone={g.wdacMode === 'enforce' ? 'crit' : 'warn'}>{g.wdacMode === 'enforce' ? 'Enforced' : 'Audit'}</Pill> },
-    { key: 'r', label: 'Own rules', render: (g) => g.rules },
+    { key: 'r', label: 'Own Rules', render: (g) => g.rules },
     { key: 'x', label: '', render: (g) => canManage ? <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
       <button className="btn sm" onClick={() => setEditing(g)}>Edit</button>
       <button className="btn sm" aria-label={`Delete ${g.name}`} onClick={() => void remove(g)}><Icon name="trash" size={13} /></button>
@@ -461,7 +536,7 @@ function GroupsTab({ canManage, groups, changed, failed, reloadGroups }: Ctx & {
   return (
     <>
       <div className="toolbar-row">
-        <span className="muted grow">A group gathers devices by department, location or by name. It can have its own approved software, its own mode (e.g. block for one department first) and WDAC on Windows (start in audit).</span>
+        <span className="hint grow">Devices by department, location or name, with their own rules, mode and WDAC.</span>
         {canManage && <button className="btn primary" onClick={() => setEditing('new')}><Icon name="plus" size={13} /> New group</button>}
       </div>
       <DataTable columns={cols} rows={groups} empty="No device groups." />
@@ -479,7 +554,7 @@ function GroupDevices({ group, onClose }: { group: Group; onClose: () => void })
           <DataTable rows={list.data ?? []} empty={list.loading ? 'Loading…' : 'No devices.'} columns={[
             { key: 'h', label: 'Device', render: (d) => <Link to={`/assets/${d.id}`}>{d.hostname ?? d.id}</Link> },
             { key: 'o', label: 'System', render: (d) => d.osName ?? '—' },
-            { key: 'g', label: 'Department / location', render: (d) => [d.department, d.location].filter(Boolean).join(' · ') || '—' },
+            { key: 'g', label: 'Department / Location', render: (d) => [d.department, d.location].filter(Boolean).join(' · ') || '—' },
             { key: 'a', label: 'Agent', render: (d) => d.agent ? <>{MODE_LABEL[d.appControl ?? 'off'] ?? d.appControl}{d.wdac && d.wdac !== 'off' && ` · WDAC ${d.wdac}`}</> : <span className="muted">No agent</span> },
           ]} />
         </div>
@@ -502,9 +577,9 @@ function PackagesTab({ tick, canManage, canRun, groups, changed, failed }: Ctx) 
   const cols: Column<Package>[] = [
     { key: 'n', label: 'Package', className: 'wrap', render: (p) => <><b>{p.name}</b>{p.version && ` ${p.version}`}{!p.active && <> <Pill>Retired</Pill></>}<div className="faint" style={{ fontSize: 11.5 }}>{p.publisher ?? ''}{p.notes && ` · ${p.notes}`}</div></> },
     { key: 'f', label: 'File', className: 'wrap', render: (p) => <span style={{ fontSize: 12 }}><span className="mono">{p.fileName}</span><div className="faint">{p.format.toUpperCase()} · {fmt.bytes(p.size)} · {platformLabel(p.platform)}</div></span> },
-    { key: 'a', label: 'Silent install', className: 'wrap', render: (p) => <span className="mono" style={{ fontSize: 11.5 }}>{p.format === 'deb' ? 'apt install' : p.format === 'rpm' ? 'dnf / zypper install' : p.installArgs ?? '—'}</span> },
+    { key: 'a', label: 'Silent Install', className: 'wrap', render: (p) => <span className="mono" style={{ fontSize: 11.5 }}>{p.format === 'deb' ? 'apt install' : p.format === 'rpm' ? 'dnf / zypper install' : p.installArgs ?? '—'}</span> },
     { key: 'h', label: 'SHA-256', optional: true, render: (p) => <span className="mono" style={{ fontSize: 11 }} title={p.sha256}>{p.sha256.slice(0, 16)}…</span> },
-    { key: 'i', label: 'Installed by deployments', render: (p) => `${p.installed} device(s) · ${p.jobs} deployment(s)` },
+    { key: 'i', label: 'Installed by Deployments', render: (p) => `${p.installed} device(s) · ${p.jobs} deployment(s)` },
     { key: 'x', label: '', render: (p) => <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
       {canRun && p.active && <button className="btn sm primary" onClick={() => setDeploying(p)}>Deploy…</button>}
       {canManage && <button className="btn sm" onClick={() => setAdding(p)}>Edit</button>}
@@ -514,7 +589,7 @@ function PackagesTab({ tick, canManage, canRun, groups, changed, failed }: Ctx) 
   return (
     <>
       <div className="toolbar-row">
-        <span className="muted grow">Upload Windows Installer (.msi) packages, setup programs (.exe, with their silent switches), Debian (.deb) and RPM (.rpm) packages. The agents download them from this server over their own connection and check the SHA-256 before installing.</span>
+        <span className="hint grow">.msi, .exe (with silent switches), .deb and .rpm. Agents verify the SHA-256 before installing.</span>
         {canManage && <button className="btn primary" onClick={() => setAdding('new')}><Icon name="upload" size={13} /> Upload package</button>}
       </div>
       <ErrorBox error={pkgs.error} />
@@ -528,7 +603,7 @@ function PackagesTab({ tick, canManage, canRun, groups, changed, failed }: Ctx) 
 function DeploymentsTab({ tick, canRun, changed, failed }: Ctx) {
   const [local, setLocal] = useState(0);
   const jobs = useApi(() => api.get<Job[]>('/deployment/jobs'), [tick, local]);
-  const { query } = useRouter();
+  const { query, navigate } = useRouter();
   const [open, setOpen] = useState<string | null>(query.get('job'));
   async function act(j: Job, what: 'retry' | 'cancel') {
     try {
@@ -553,7 +628,7 @@ function DeploymentsTab({ tick, canRun, changed, failed }: Ctx) {
   ];
   return (
     <>
-      <div className="toolbar-row"><span className="muted grow">Devices receive a deployment at once when they are online, otherwise when they next connect (up to 7 days). Start a deployment from <b>Packages</b>.</span>
+      <div className="toolbar-row"><span className="hint grow">Online devices start at once; others when they connect (up to 7 days). Start from <button className="link-btn" onClick={() => navigate('/modules/deploy?tab=packages', true)}>Packages</button>.</span>
         <button className="btn" onClick={() => setLocal((x) => x + 1)}><Icon name="retry" size={13} /> Refresh</button></div>
       <ErrorBox error={jobs.error} />
       <DataTable columns={cols} rows={jobs.data ?? []} empty={jobs.loading ? 'Loading…' : 'No deployments yet.'} />
@@ -590,11 +665,67 @@ function DevicesTab({ tick }: Ctx) {
       <DataTable rows={rows} empty={list.loading ? 'Loading…' : 'No agents.'} columns={[
         { key: 'h', label: 'Device', render: (d) => <>{d.assetId ? <Link to={`/assets/${d.assetId}`}>{d.hostname}</Link> : d.hostname}<div className="faint" style={{ fontSize: 11.5 }}>{[d.department, d.location].filter(Boolean).join(' · ')}</div></> },
         { key: 'p', label: 'Platform', render: (d) => <>{d.platform.startsWith('linux') ? 'Linux' : 'Windows'} · {d.agentVersion ?? '—'}</> },
-        { key: 'a', label: 'Application control', render: (d) => !d.appControlCapable ? <span className="muted">Agent too old</span> : <>{d.appControl === 'error' ? <Pill tone="crit">Not working</Pill> : MODE_LABEL[d.appControl ?? 'off'] ?? d.appControl}{!d.policyCurrent && <span className="faint" title="The device has not received the latest policy yet (offline)."> · pending</span>}</> },
+        { key: 'a', label: 'Application Control', render: (d) => !d.appControlCapable ? <span className="muted">Agent too old</span> : <>{d.appControl === 'error' ? <Pill tone="crit">Not working</Pill> : MODE_LABEL[d.appControl ?? 'off'] ?? d.appControl}{!d.policyCurrent && <span className="faint" title="The device has not received the latest policy yet (offline)."> · pending</span>}</> },
         { key: 'w', label: 'WDAC', render: (d) => d.platform.startsWith('linux') ? <span className="muted">—</span> : d.wdac === 'unsupported' ? <span className="muted" title="This edition of Windows has no ConfigCI module">Not available</span> : fmt.label(d.wdac ?? 'off') },
-        { key: 'r', label: 'Remote support agent', render: (d) => remote(d.remoteProtection) },
+        { key: 'r', label: 'Remote Support Agent', render: (d) => remote(d.remoteProtection) },
         { key: 'o', label: 'Online', render: (d) => d.online ? <Pill tone="ok">Online</Pill> : <span className="muted" title={fmt.date(d.lastCheckin)}>{fmt.ago(d.lastCheckin)}</span> },
       ]} />
     </>
+  );
+}
+
+// ---- installer details -------------------------------------------------------------------------------------------
+
+/** Everything the device reported about the software (file, version, signature, origin), grouped and in a fixed order. */
+function SoftwareDetails({ item }: { item: { name: string; publisher: string | null; version: string | null; sha256: string | null; path: string | null; details: Record<string, string> | null } }) {
+  const d: Record<string, string> = { ...(item.details ?? {}) };
+  if (!d['Product'] && !d['Package'] && !d['Requested name']) d['Product'] = item.name;
+  if (!d['Version'] && item.version) d['Version'] = item.version;
+  if (!d['Publisher'] && item.publisher) d['Publisher'] = item.publisher;
+  if (!d['SHA-256'] && item.sha256) d['SHA-256'] = item.sha256;
+  if (!d['Folder'] && !d['File name'] && item.path) d['File'] = item.path;
+  const known = new Set(DETAIL_SECTIONS.flatMap(([, keys]) => keys));
+  const other = Object.keys(d).filter((k) => !known.has(k));
+  const sections: [string, string[]][] = [...DETAIL_SECTIONS.map(([t, keys]) => [t, keys.filter((k) => d[k])] as [string, string[]]), ['Other', other]];
+  return (
+    <>
+      {sections.filter(([, keys]) => keys.length > 0).map(([title, keys]) => (
+        <div key={title}>
+          <div className="kv-section">{title}</div>
+          <dl className="kv">
+            {keys.map((k) => <div key={k} style={{ display: 'contents' }}><dt>{k}</dt><dd className={MONO_DETAILS.has(k) ? 'mono' : undefined}>
+              {/^https?:\/\//.test(d[k]) ? <a href={d[k]} target="_blank" rel="noreferrer noopener">{d[k]}</a> : d[k]}</dd></div>)}
+          </dl>
+        </div>
+      ))}
+      {!item.details && <p className="faint" style={{ fontSize: 12.5, marginTop: 12 }}>The device sent only the basic details (its agent is older than build 110).</p>}
+    </>
+  );
+}
+
+function RequestDetailsDialog({ r, canManage, onClose, onApprove, onReject }: { r: AppRequest; canManage: boolean; onClose: () => void; onApprove: () => void; onReject: () => void }) {
+  return (
+    <Modal title={`Request: ${r.name}${r.version ? ' ' + r.version : ''}`} wide onClose={onClose}
+      footer={<>{canManage && r.status === 'pending' && <><button className="btn" onClick={onReject}>Reject</button><button className="btn primary" onClick={onApprove}>Approve…</button></>}
+        <button className="btn" onClick={onClose}>Close</button></>}>
+      <div className="kv-section" style={{ marginTop: 0 }}>Request</div>
+      <dl className="kv">
+        <dt>Status</dt><dd>{r.status === 'pending' ? <Pill tone="warn">Waiting</Pill> : <Pill tone={r.status === 'approved' ? 'ok' : 'crit'}>{r.status === 'approved' ? 'Approved' : 'Rejected'}</Pill>}
+          {r.decidedBy && <span className="faint"> · {r.decidedBy} · {fmt.date(r.decidedAt)}{r.decisionNote && ` · ${r.decisionNote}`}</span>}</dd>
+        <dt>Asked</dt><dd>{fmt.date(r.createdAt)}</dd>
+        <dt>User</dt><dd>{r.user ?? '—'}</dd>
+        <dt>Reason</dt><dd>{r.reason ?? <span className="faint">No reason given</span>}</dd>
+      </dl>
+      <div className="kv-section">Device</div>
+      <dl className="kv">
+        <dt>Device</dt><dd>{r.assetId ? <Link to={`/assets/${r.assetId}`}>{r.device}</Link> : r.device ?? '—'}</dd>
+        {r.deviceOs && <><dt>Operating system</dt><dd>{r.deviceOs}</dd></>}
+        {r.deviceIp && <><dt>IP address</dt><dd className="mono">{r.deviceIp}</dd></>}
+        {r.department && <><dt>Department</dt><dd>{r.department}</dd></>}
+        <dt>Platform</dt><dd>{platformLabel(r.platform)}{r.agentVersion && <span className="faint"> · agent {r.agentVersion}</span>}</dd>
+        {r.lastCheckin && <><dt>Last seen</dt><dd>{fmt.ago(r.lastCheckin)}</dd></>}
+      </dl>
+      <SoftwareDetails item={r} />
+    </Modal>
   );
 }

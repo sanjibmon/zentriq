@@ -17,7 +17,7 @@ import {
 } from './remote';
 
 type Tab = 'quick' | 'devices' | 'sessions' | 'setup';
-const TABS: [Tab, string][] = [['quick', 'Quick support'], ['devices', 'Unattended devices'], ['sessions', 'History'], ['setup', 'Settings']];
+const TABS: [Tab, string][] = [['quick', 'Quick Support'], ['devices', 'Unattended Devices'], ['sessions', 'History'], ['setup', 'Settings']];
 const err = (e: unknown) => {
   const b = (e as { body?: { errors?: Record<string, string[]>; title?: string } }).body;
   return b?.errors ? Object.values(b.errors).flat().join(' ') : e instanceof Error ? e.message : String(e);
@@ -116,12 +116,12 @@ function Quick({ status, allowTerminal, creating, setCreating, onMsg, onChanged 
   return (
     <>
       <Kpis items={[
-        { label: 'Active sessions', value: active.length.toLocaleString(), sub: `${active.filter((q) => q.status === 'waiting').length} waiting for the user` },
-        { label: 'Sessions (30 days)', value: status.quick30d.toLocaleString(), sub: 'on-demand help' },
+        { label: 'Active sessions', value: active.length.toLocaleString(), sub: `${active.filter((q) => q.status === 'waiting').length} waiting for the user`, to: '/remote?tab=sessions' },
+        { label: 'Sessions (30 days)', value: status.quick30d.toLocaleString(), sub: 'on-demand help', to: '/remote?tab=sessions' },
         { label: 'Unattended devices', value: status.devices.toLocaleString(), sub: `${status.online.toLocaleString()} online now`, to: '/remote?tab=devices' },
         { label: 'Internet access', value: status.internet?.usable ? (status.internet.applied ? 'On' : 'Starting') : 'Not set up', sub: status.internet ? `${status.internet.host}:${status.internet.port}${status.internet.verified ? ' · verified' : status.internet.confirmed ? ' · confirmed' : ''}` : 'public address needed', to: can('remote.manage') ? '/remote?tab=setup' : undefined },
       ]} />
-      {!status.internet?.usable && <Callout tone="info" icon="globe">To help people at home or on the road, remote support needs a public address (domain name or public IP) that reaches this server over HTTPS. Zentriq checks it before creating internet links — set it under <Link to="/remote?tab=setup">Settings › Internet access</Link> or when you create a session. People on the office network can be helped now.</Callout>}
+      {!status.internet?.usable && <Callout tone="info" icon="globe">Office network: ready. For people outside, set a public HTTPS address under <Link to="/remote?tab=setup">Settings › Internet Access</Link>.</Callout>}
       {list.data?.warning && <Callout tone="warn" icon="alert">{list.data.warning}</Callout>}
       <ErrorBox error={list.error} />
 
@@ -289,8 +289,8 @@ function Devices({ status, allowTerminal, onMsg, onChanged }: { status: RemoteSt
   return (
     <>
       <Kpis items={[
-        { label: 'With remote support', value: status.devices.toLocaleString(), sub: `${status.online.toLocaleString()} online now` },
-        { label: 'Ready to install', value: status.readyToInstall.toLocaleString(), sub: 'Zentriq Agent can install it' },
+        { label: 'With remote support', value: status.devices.toLocaleString(), sub: `${status.online.toLocaleString()} online now`, to: '/remote?tab=devices' },
+        { label: 'Ready to install', value: status.readyToInstall.toLocaleString(), sub: 'Zentriq Agent can install it', to: '/remote?tab=devices' },
         { label: 'Sessions (24 h)', value: status.sessions24h.toLocaleString(), sub: status.lastSync ? `synced ${fmt.ago(status.lastSync)}` : 'not synced yet', to: '/remote?tab=sessions' },
       ]} />
       <Panel flush title="Unattended devices" sub="Installed agent — connect any time, signed out or in, standard or admin users, UAC prompts included" right={<div className="rs-toolbar">

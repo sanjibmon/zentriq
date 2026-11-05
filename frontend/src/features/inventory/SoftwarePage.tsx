@@ -69,7 +69,7 @@ export function SoftwarePage() {
     <>
       <PageHead title="Software Inventory" />
       <div className="tabs" role="tablist">
-        <button role="tab" aria-selected={tab === 'all'} className={tab === 'all' ? 'on' : ''} onClick={() => setTab('all')}>Installed software</button>
+        <button role="tab" aria-selected={tab === 'all'} className={tab === 'all' ? 'on' : ''} onClick={() => setTab('all')}>Installed Software</button>
         <button role="tab" aria-selected={tab === 'changes'} className={tab === 'changes' ? 'on' : ''} onClick={() => setTab('changes')}>Changes</button>
       </div>
       {tab === 'changes' ? <ChangesTab kind="software" /> : <>

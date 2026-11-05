@@ -60,8 +60,7 @@ function Overview({ tick, onAdd }: { tick: number; onAdd?: () => void }) {
       <div className="cl-empty">
         <div className="cl-empty-icons">{PROVIDERS.map((p) => <ProviderBadge key={p.id} provider={p.id} full />)}</div>
         <h3>Connect your cloud and virtualization platforms</h3>
-        <p className="muted">Zentriq reads virtual machines, hosts, disks, networks, storage and databases with a read-only account, links each machine to its inventoried device,
-          and points out what costs money for nothing (unattached disks, idle IPs, machines switched off for months) and what is exposed (RDP/SSH open to the internet, public storage).</p>
+        <p className="muted">Read-only: virtual machines, hosts, disks, networks, storage and databases, linked to your devices, with waste and exposure flagged.</p>
         <ul className="cl-howto">
           <li><b>Azure</b> — an app registration with the <i>Reader</i> role on the subscriptions.</li>
           <li><b>AWS</b> — an IAM user access key with the <i>ReadOnlyAccess</i> policy.</li>

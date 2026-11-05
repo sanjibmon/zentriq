@@ -20,8 +20,9 @@ export function AccessoriesPage() {
   const { can } = useAuth();
   const { query, navigate } = useRouter();
   const canEdit = can('accessories.manage');
-  const [tab, setTabState] = useState<Tab>((['stock', 'issued', 'movements', 'catalogue'] as Tab[]).find((t) => t === query.get('tab')) ?? 'stock');
-  const setTab = (t: Tab) => { setTabState(t); navigate(`/accessories?tab=${t}`, true); };
+  // The tab follows the address, so links and tiles that lead to a tab of this page open it.
+  const tab: Tab = (['stock', 'issued', 'movements', 'catalogue'] as Tab[]).find((t) => t === query.get('tab')) ?? 'stock';
+  const setTab = (t: Tab) => navigate(`/accessories?tab=${t}`, true);
   const [tick, setTick] = useState(0);
   const summary = useApi(() => api.get<AccessorySummary>('/accessories/summary'), [tick]);
   const items = useApi(() => api.get<AccessoryItem[]>('/accessories/items', { all: true }), [tick]);
@@ -47,11 +48,11 @@ export function AccessoriesPage() {
         {canEdit && <button className="btn primary" disabled={!!noItems || !!noLocations} onClick={() => setMove({ kind: 'issue' })}>Issue</button>}
       </>} />
       {s && <Kpis items={[
-        { label: 'Accessories', value: s.items.toLocaleString(), sub: `${s.locations} location(s)` },
-        { label: 'In stock', value: s.inStock.toLocaleString(), sub: s.faulty ? `${s.faulty} faulty kept apart` : 'usable units' },
-        { label: 'Stock value', value: money(s.stockValue), sub: 'quantity × unit cost' },
+        { label: 'Accessories', value: s.items.toLocaleString(), sub: `${s.locations} location(s)`, to: '/accessories?tab=catalogue' },
+        { label: 'In stock', value: s.inStock.toLocaleString(), sub: s.faulty ? `${s.faulty} faulty kept apart` : 'usable units', to: '/accessories?tab=stock' },
+        { label: 'Stock value', value: money(s.stockValue), sub: 'quantity × unit cost', to: '/accessories?tab=stock' },
         { label: 'To reorder', value: s.lowStock.toLocaleString(), sub: 'at or below the reorder level', to: '/accessories?tab=stock&low=1' },
-        { label: 'Issued (30 days)', value: s.issued30d.toLocaleString(), sub: 'units given to people' },
+        { label: 'Issued (30 days)', value: s.issued30d.toLocaleString(), sub: 'units given to people', to: '/accessories?tab=movements' },
         { label: 'With people', value: s.outstanding.toLocaleString(), sub: 'returnable units issued', to: '/accessories?tab=issued' },
       ]} />}
       {msg && <Callout tone={msg.tone} icon={msg.tone === 'crit' ? 'alert' : 'info'}>{msg.text}</Callout>}
@@ -61,7 +62,7 @@ export function AccessoriesPage() {
       </Callout>}
       {!noLocations && noItems && <Callout tone="info" icon="info">Add the accessories you stock (mouse, keyboard, headset…), then receive the quantities you bought.</Callout>}
       <div className="tabs" role="tablist">
-        {([['stock', 'Stock'], ['issued', 'Issued to people'], ['movements', 'Movements'], ['catalogue', 'Catalogue']] as [Tab, string][]).map(([t, l]) => (
+        {([['stock', 'Stock'], ['issued', 'Issued to People'], ['movements', 'Movements'], ['catalogue', 'Catalogue']] as [Tab, string][]).map(([t, l]) => (
           <button key={t} role="tab" aria-selected={tab === t} className={tab === t ? 'on' : ''} onClick={() => setTab(t)}>{l}
             {t === 'catalogue' && items.data && <span className="cnt">{items.data.filter((i) => i.active).length}</span>}
             {t === 'issued' && s && s.outstanding > 0 && <span className="cnt">{s.outstanding}</span>}

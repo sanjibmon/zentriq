@@ -134,7 +134,7 @@ internal static class AppControlAgent
             Events.Add(new Dictionary<string, object?>
             {
                 ["key"] = key, ["kind"] = kind, ["at"] = DateTime.UtcNow.ToString("o"), ["name"] = c.Name, ["publisher"] = c.Publisher ?? c.Signer, ["version"] = c.Version,
-                ["sha256"] = c.Sha256, ["path"] = c.Path, ["user"] = user, ["detail"] = detail,
+                ["sha256"] = c.Sha256, ["path"] = c.Path, ["user"] = user, ["detail"] = detail, ["details"] = c.Details.Count > 0 ? c.Details : null,
             });
             if (Events.Count > 500) Events.RemoveRange(0, Events.Count - 500);
             SaveQueue();
@@ -150,6 +150,7 @@ internal static class AppControlAgent
             Requests.Add(new Dictionary<string, object?>
             {
                 ["name"] = c.Name, ["publisher"] = c.Publisher ?? c.Signer, ["version"] = c.Version, ["sha256"] = c.Sha256, ["path"] = c.Path, ["user"] = user, ["reason"] = reason,
+                ["details"] = c.Details.Count > 0 ? c.Details : null,
             });
             if (Requests.Count > 50) Requests.RemoveRange(0, Requests.Count - 50);
             SaveQueue();

@@ -65,6 +65,9 @@ namespace Zentriq.Inventory
         /// <summary>Linux: the package's section (libs, kernel, …) when known.</summary>
         public string? Section { get; set; }
         public string? Path { get; set; }
+        /// <summary>Everything the device knows about the installer (file, version resource, signature, MSI codes,
+        /// where it was downloaded from, what started it), shown with events and approval requests.</summary>
+        public Dictionary<string, string> Details { get; set; } = new Dictionary<string, string>();
 
         public override string ToString() =>
             Name + (string.IsNullOrEmpty(Version) ? "" : " " + Version) + (string.IsNullOrEmpty(Publisher ?? Signer) ? "" : " (" + (Publisher ?? Signer) + ")");

@@ -182,7 +182,7 @@ export function AgentsPage() {
       ]} />
       <div className="tabs" role="tablist">
         <button className={tab === 'agents' ? 'on' : ''} onClick={() => setTab('agents')}>Agents<span className="cnt">{current.length}</span></button>
-        {manage && <button className={tab === 'codes' ? 'on' : ''} onClick={() => setTab('codes')}>Enrollment codes<span className="cnt">{tokens.data?.length ?? 0}</span></button>}
+        {manage && <button className={tab === 'codes' ? 'on' : ''} onClick={() => setTab('codes')}>Enrollment Codes<span className="cnt">{tokens.data?.length ?? 0}</span></button>}
         {manage && <button className={tab === 'settings' ? 'on' : ''} onClick={() => setTab('settings')}>Settings</button>}
       </div>
       {tab === 'agents' && hidden > 0 && (
@@ -472,7 +472,7 @@ function SettingsTab({ onSaved, onAll }: { onSaved: (msg: string) => void; onAll
           <label className="row-check"><input type="checkbox" checked={f.autoUpdate} onChange={(e) => setF({ ...f, autoUpdate: e.target.checked })} /> Update agents automatically when this server has a newer agent</label>
           <label>At most this many agents update at the same time
             <input className="in" type="number" min={1} max={1000} value={f.autoUpdateMax} disabled={!f.autoUpdate} onChange={(e) => setF({ ...f, autoUpdateMax: Number(e.target.value) || 1 })} style={{ maxWidth: 140 }} /></label>
-          <p className="muted" style={{ margin: 0, fontSize: 13 }}>After Zentriq on this server is updated, each older agent updates itself at its next check-in: it downloads the package from this server over its secure connection, checks the checksum and installs it silently (the service restarts for a few seconds; enrollment and history are kept). A failed update is retried after 24 hours. Agents installed before self-update existed need the new MSI once. Off: update agents with the Update button.</p>
+          <p className="muted" style={{ margin: 0, fontSize: 13 }}>Older agents update themselves at their next check-in (verified download, silent install, enrollment kept). Failed updates retry after 24 hours. Off: use the Update button.</p>
           <div><button className="btn primary" disabled={busy} onClick={() => void save()}>Save</button></div>
         </div>
       </Panel>

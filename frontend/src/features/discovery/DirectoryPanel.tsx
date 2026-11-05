@@ -63,7 +63,7 @@ export function DirectoryPanel({ onScan }: { onScan: (connectionId: string) => v
 
   return (
     <>
-      <Callout icon="lock">Zentriq reads Active Directory with a read-only LDAP connection: organizational units, users, groups and computers. Nothing is changed in the directory. The password is encrypted on this server and never shown again. A normal domain user account is enough to read these objects.</Callout>
+      <Callout icon="lock">Read-only LDAP: OUs, users, groups and computers; nothing is changed. A normal domain user is enough; the password is encrypted and never shown again.</Callout>
       {msg && <Callout tone={msg.tone} icon={msg.tone === 'crit' ? 'alert' : 'info'}>{msg.text}</Callout>}
       <ErrorBox error={conns.error} />
       <Panel title="Active Directory connections" right={manage && <button className="btn primary sm" onClick={() => setEdit('new')}>Add connection</button>} flush>
