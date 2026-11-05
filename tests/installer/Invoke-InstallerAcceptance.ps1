@@ -918,7 +918,7 @@ if (-not $installed) {
             Assert ($h.licenses.shortfall -ge 1) 'dashboard highlights do not show the shortfall'
             Api POST "/sam/licenses/$($l.id)/renew" @{ endDate = (Get-Date).AddDays(365).ToString('yyyy-MM-dd'); quantity = 50 } -Session $s | Out-Null
             $open = @(Api GET '/sam/alerts' -Session $s | ForEach-Object { $_ } | Where-Object { $_.productId -eq $p.id -and $_.kind -in 'shortfall', 'expiring' })
-            Assert ($open.Count -eq 0) "alerts still open after the renewal: $($open.kind -join ', ')"
+            Assert ($open.Count -eq 0) "alerts still open after the renewal: $(($open | ForEach-Object { $_.kind }) -join ', ')"
             Assert ((Api GET "/sam/products/$($p.id)" -Session $s).compliance.status -in 'compliant', 'over_licensed') 'not compliant after the renewal'
             $inst = @(Api GET "/sam/products/$($p.id)/installations" -Session $s | ForEach-Object { $_ })
             Assert (@($inst | Where-Object assetId -eq $script:agentAsset).Count -eq 1) 'the runner is not listed among the installations'
@@ -940,7 +940,7 @@ if (-not $installed) {
             $imp = Api POST "/webapps/$($app.id)/accounts/import" @{ csv = $csv } -Session $s
             Assert ($imp.imported -eq 2) "imported $($imp.imported)"
             $orph = @(Api GET "/webapps/accounts?appId=$($app.id)&filter=orphaned" -Session $s | ForEach-Object { $_ })
-            Assert ($orph.Count -eq 1 -and $orph[0].userName -eq 'ci.leaver@example.com') "orphaned: $($orph.userName -join ', ')"
+            Assert ($orph.Count -eq 1 -and $orph[0].userName -eq 'ci.leaver@example.com') "orphaned: $(($orph | ForEach-Object { $_.userName }) -join ', ')"
             $alerts = @(Api GET '/webapps/alerts' -Session $s | ForEach-Object { $_ } | Where-Object { $_.appId -eq $app.id -and $_.kind -eq 'webapp_orphaned' })
             Assert ($alerts.Count -eq 1 -and $alerts[0].severity -eq 'high') 'no orphaned-account alert'
             $sum = Api GET '/webapps/summary' -Session $s
@@ -949,7 +949,7 @@ if (-not $installed) {
             $seen = @(Api GET '/webapps?filter=inuse' -Session $s | ForEach-Object { $_ })
             Api POST '/webapps/status' @{ ids = @($app.id); status = 'unsanctioned' } -Session $s | Out-Null
             Api DELETE "/webapps/$($app.id)" -Session $s | Out-Null
-            "catalogue $(@($cat.apps).Count) apps; 2 accounts imported, the leaver's admin account orphaned with a high alert; in use on the runner: $(@($seen.name) -join ', ')"
+            "catalogue $(@($cat.apps).Count) apps; 2 accounts imported, the leaver's admin account orphaned with a high alert; in use on the runner: $(($seen | ForEach-Object { $_.name }) -join ', ')"
         } | Out-Null
 
         # ---- T88: network connected devices and IP address management ----

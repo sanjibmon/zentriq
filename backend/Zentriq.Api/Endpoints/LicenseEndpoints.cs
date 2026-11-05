@@ -161,7 +161,7 @@ public static class LicenseEndpoints
                         'enabled', k.enabled_units, 'warning', k.warning, 'suspended', k.suspended, 'consumed', k.consumed, 'status', k.status, 'nextLifecycle', k.next_lifecycle,
                         'isTrial', k.is_trial, 'syncedAt', k.synced_at)), '[]')
                         FROM zentriq.sam_cloud_skus k JOIN zentriq.sam_cloud_connections c ON c.id = k.connection_id
-                       WHERE k.sku_part = ANY ((SELECT cloud_skus FROM zentriq.sam_products WHERE id = @id))),
+                       WHERE k.sku_part IN (SELECT unnest(cloud_skus) FROM zentriq.sam_products WHERE id = @id)),
                   'alerts', (SELECT COALESCE(jsonb_agg(jsonb_build_object('id', s.id, 'kind', s.kind, 'severity', s.severity, 'title', s.title, 'detail', s.detail, 'firstAt', s.first_at)
                         ORDER BY s.first_at DESC), '[]') FROM zentriq.sam_alerts s WHERE s.product_id = @id AND s.resolved_at IS NULL AND NOT s.dismissed)
                 )::text
