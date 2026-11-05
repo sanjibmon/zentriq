@@ -1,9 +1,51 @@
 # Test report
 
-Latest: GitHub Actions run 41283941378, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
-10.0.20348** VM plus an Ubuntu job for the Linux agent. Release: `v1.1.1-build.103` (pre-release, **unsigned**), package
-version **1.1.1.103**. Results: unit + PostgreSQL integration tests **369 PASS, 2 skipped**; installer acceptance
-**72 passed, 0 failed**; Linux agent on 11 distributions **11/11**.
+Latest: GitHub Actions run 41934323520, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
+10.0.20348** VM plus an Ubuntu job for the Linux agent. Release: `v1.1.1-build.109` (pre-release, **unsigned**), package
+version **1.1.1.109**, commit `968c267`. Results: unit + PostgreSQL integration tests **390 PASS**; installer acceptance
+**76 passed, 0 failed** (10 not run: need hardware, a domain, a reboot or old Windows); upgrade suites **14/14** (from
+the last release, same version in place, half-updated server); Linux agent on 11 distributions **11/11**; Linux
+application control **5/5**.
+
+New in build 109: **Software Deployment** (Secure module) and **remote support agent tamper protection** (builds 104-108
+failed only in the CI test harness or on test timing and were not released).
+
+* Standard software catalogue (201 well-known applications for Windows and Linux) from which administrators build the
+  organisation's approved software list; own catalogue entries; approve from the catalogue, from the installed
+  inventory or from a user's request; block rules for all devices, a device group or one device, with expiry.
+* Application control per organisation or device group: off, audit (report) or block. Windows: installers are stopped
+  before they run, the user sees the message and can request approval; optional WDAC (opt-in, audit first). Linux:
+  dpkg/apt and dnf refused through package-manager hooks, zypper reported. Unapproved software found in inventory is
+  reported and can be removed automatically.
+* Push deployment of MSI/EXE/DEB/RPM packages with per-device status, retry and uninstall.
+* Policy changes reach online agents within seconds and the agent reports them at once; the agent's hooks and WDAC
+  policy go only with the agent, which needs the uninstall code.
+* Remote support agent (ZentriqRemoteSupport) protected like the Zentriq Agent: stop, disable, delete and reconfigure
+  refused for local administrators; reinstalled automatically if removed; released from the console.
+
+| ID | Test | Result |
+|---|---|---|
+| T82 | Catalogue (201 entries), approve from catalogue and inventory, block rule, test, settings; audit mode reaches the agent within seconds | **PASS** |
+| T83 | Windows application control: audit reports, block stops the installer within 1 s with the message, approval request from the message, approved installer runs | **PASS** |
+| T84 | Push deployment: upload, install with per-device status, failing package reported and retried, uninstall; WDAC audit for a device group | **PASS** |
+| T85 | Remote support agent tamper protection: stop refused (exit 5), disable and delete refused, console shows protected, lifted when protection is off | **PASS** |
+| A01-A05 | Linux application control: Ubuntu 24.04 (apt), Debian 12 (dpkg -i), Rocky 9 and Amazon Linux 2023 (dnf) block; openSUSE 15.6 (zypper) reports | **PASS** |
+
+| File | SHA256 |
+|---|---|
+| Zentriq-Setup-x64.exe | `5453bd0d8af76206473563c1fd5217131470586da3b4bf9bea513bd5a171df18` |
+| Zentriq.msi | `3abba4f425bc03a3707c848027d8b97ac081355c641471bcf82d93e340aeb452` |
+| ZentriqAgent-x64.msi | `353180652fb1e80bbe0ffd8ecc5c322a1b012ef99ae30bfb76e4df0fec4e6bc0` |
+| zentriq-agent-linux-x64.deb | `5c9273be44bfa2e7e2b16761f790551a1fa6aecf41bd6cad73be83930c7cdeb4` |
+| zentriq-agent-linux-x64.rpm | `0ad3841a0e1e9e2bf0bfcbe8c53efc8f028d220ec354741e2b0682ad16749d35` |
+| zentriq-agent-linux-x64.tar.gz | `759882744c91f174631e6430c1fa7661cca3a4b17d9d52a37685e6ebe4d9cd9f` |
+| zentriq-agent-linux-arm64.deb | `73e713d1064073c104554769b0b6e496d20da702049580790ac85ccdea8f899b` |
+| zentriq-agent-linux-arm64.rpm | `1c4855906dfba0fc95277dfe164170ed6e228846d26fddc61580349793ed3057` |
+| zentriq-agent-linux-arm64.tar.gz | `8527c06775a7a80c0a796c63038ede201c2cd662c9b678a0ed29958932bd3eb0` |
+| Zentriq-1.1.1-msi-offline-kit.zip | `909b8a048538a694af4781cbee0fbdc1b8d900653e5b450bd46c5cbe2c1306b5` |
+| Zentriq-1.1.1-docs.zip | `403f4e2d0a3095a3173958e42a275f9d8668608343222a6c3de6b291b416efe6` |
+
+Previous: build 103 (run 41283941378): 369 PASS, 2 skipped; acceptance 72 passed; Linux 11/11.
 
 New in build 103: Zentriq trusts the **production license signing key** `zentriq-prod-2026-11` (fingerprint
 `SHA256:56:39:37:29:89:E5:08:18:1F:DC:2A:CB:94:7D:64:1A:8B:C4:93:A6:E6:A6:3D:44:21:11:67:BB:32:F8:94:81`, confirmed by
