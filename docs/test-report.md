@@ -1,11 +1,45 @@
 # Test report
 
-Latest: GitHub Actions run 41934323520, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
-10.0.20348** VM plus an Ubuntu job for the Linux agent. Release: `v1.1.1-build.109` (pre-release, **unsigned**), package
-version **1.1.1.109**, commit `968c267`. Results: unit + PostgreSQL integration tests **390 PASS**; installer acceptance
-**76 passed, 0 failed** (10 not run: need hardware, a domain, a reboot or old Windows); upgrade suites **14/14** (from
-the last release, same version in place, half-updated server); Linux agent on 11 distributions **11/11**; Linux
-application control **5/5**.
+Latest: GitHub Actions run 41966535331, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
+10.0.20348** VM plus an Ubuntu job for the Linux agent. Release: `v1.1.1-build.110` (pre-release, **unsigned**), package
+version **1.1.1.110**, commit `b1c1df3`. Results: unit + PostgreSQL integration tests **390 PASS** (392, 2 skipped);
+installer acceptance **76 passed, 0 failed** (10 not run: need hardware, a domain, a reboot or old Windows); upgrade
+suites **14/14** (from build 109, same version in place, half-updated server); Linux agent on 11 distributions
+**11/11**; Linux application control passed in ci-quick run 41965386435.
+
+New in build 110: console polish and Software Deployment refinements.
+
+* Software Deployment: no tagline; Title Case tabs and tiles (also on the other modules); every tile opens its tab
+  (Blocked / Found Installed open *Events* filtered); shorter, compact text across the console; darker text colours
+  for readability.
+* *Found on Devices*: click a row to see which devices have the software and approve it for one device, a device
+  group or all devices.
+* The blocking message on Windows appears once per attempt: closed means closed; retries by downloaders,
+  bootstrappers or scheduled tasks are stopped silently; running the installer again shows it again.
+* Requests and events carry the full installer details (product, version, publisher, installer type, file, size,
+  SHA-256, MSI codes, signature, download origin, parent process and command line) and the device (OS, IP,
+  department, agent version, last seen); Linux requests carry the repository's package information.
+
+| ID | Test | Result |
+|---|---|---|
+| T83 | Windows application control: audit reports; block stops the installer within 2 s with the message, **once per attempt** (second start while open: no second message; closed: does not return; run again: shown again); request with **20 installer details** and the device's OS; approved for this device by SHA-256: runs | **PASS** |
+| T82, T84, T85 | Catalogue and inventory approval, push deployment, remote support agent protection | **PASS** |
+
+| File | SHA256 |
+|---|---|
+| Zentriq-Setup-x64.exe | `7f677b4195d6230e9ed071b29b07f3125d8545f07c9620e1979d109a84c8c92f` |
+| Zentriq.msi | `5097fbc5ed121521e70b0ce9a48043d80a43a9fddb107e398592f262cde2d1a6` |
+| ZentriqAgent-x64.msi | `e9d8b9da03ff66e27b482af7abdd7342da36c1fb33aa4962842ca033b5f2834d` |
+| zentriq-agent-linux-x64.deb | `428455c83f4fbc7bd24bf7f2a5a88a1524e6f34646fa95e6563b8211e9099c67` |
+| zentriq-agent-linux-x64.rpm | `2c510a7e20ad2218c69cfd1468e37d9ebbb6c137b25a567e7718badc64889cab` |
+| zentriq-agent-linux-x64.tar.gz | `52084b4ffce1f2a2aaca86509d4f93e0eccb544d681cfff3b71571d9a5a36282` |
+| zentriq-agent-linux-arm64.deb | `64439dac491b9ed9f2573804fb5cd4cffa373479e8f1079a10424d4defed09cd` |
+| zentriq-agent-linux-arm64.rpm | `183565aae75dcfde0a15e6588761c23b64ee84544aa23dce096bf29380d6ac5c` |
+| zentriq-agent-linux-arm64.tar.gz | `90d85a462838fecb1a57a8fc7215916f385cd234aadd058642b6acf77b73b8d3` |
+| Zentriq-1.1.1-msi-offline-kit.zip | `cdd9bcdd92b109cb28433c250ed956f6aee21a0f07523866aabb1ba23e04a18c` |
+| Zentriq-1.1.1-docs.zip | `5b11ae878ca021d94b7b58c53b2c1c7b369b8ef28ed32d4ca12bcc21c49b0837` |
+
+## Build 109 (run 41934323520, commit `968c267`)
 
 New in build 109: **Software Deployment** (Secure module) and **remote support agent tamper protection** (builds 104-108
 failed only in the CI test harness or on test timing and were not released).

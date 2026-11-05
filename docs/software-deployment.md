@@ -183,5 +183,5 @@ with apt and with `dpkg -i`, dnf on Rocky Linux and Amazon Linux: approved packa
 with the message, event recorded, request by a normal user, audit mode, hooks removed with the agent; zypper on openSUSE: reported) and the Windows
 acceptance tests T82–T85 (catalogue and inventory approval, audit → block for a device group with the message and a
 request from the desktop, approval by SHA-256, push installation with status, retry and uninstall, WDAC audit, remote
-support agent protection). First released in **build 1.1.1.109**: T82–T85 and Linux A01–A05 all pass. Results:
+support agent protection). First released in **build 1.1.1.109**: T82–T85 and Linux A01–A05 all pass. Build **1.1.1.110** adds the once-per-attempt message and installer details to T83 (pass). Results:
 [test report](test-report.md).
