@@ -43,6 +43,8 @@ public sealed class Release2Tests
         // A package name the package manager could take as an option is refused.
         Assert.Null(PatchStore.IdOf(new ScanUpdate(null, null, null, null, null, null, "--allow-downgrades", "1", null, null, null, null, null), "linux"));
         Assert.Null(PatchStore.IdOf(new ScanUpdate(null, null, null, null, null, null, "a b", "1", null, null, null, null, null), "linux"));
+        Assert.Equal("linux:NetworkManager:1:1.46.0-8.el9", PatchStore.NormId(" linux:NetworkManager:1:1.46.0-8.el9 "));
+        Assert.Equal("1a2b", PatchStore.NormId("1A2B"));
         Assert.Equal("5034441", PatchStore.CleanKb("KB5034441"));
         Assert.Null(PatchStore.CleanKb("KB50x"));
     }

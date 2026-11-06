@@ -127,7 +127,7 @@ public static class PatchEndpoints
 
         g.MapPost("/approval", async (ApprovalBody body, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
         {
-            var ids = (body.Ids ?? []).Select(x => x.Trim().ToLowerInvariant()).Where(x => x.Length > 0).Distinct().Take(2000).ToArray();
+            var ids = (body.Ids ?? []).Select(PatchStore.NormId).Where(x => x.Length > 0).Distinct().Take(2000).ToArray();
             if (ids.Length == 0) return Validation.Problem("ids", "Choose the updates.");
             if (body.Approval is not ("approved" or "declined" or "none")) return Validation.Problem("approval", "Approve, decline or reset.");
             var n = await PatchStore.SetApprovalAsync(ds, ids, body.Approval, rc.UserId, ct);
@@ -249,7 +249,7 @@ public static class PatchEndpoints
             if (platform is null && ids.Length > 0)
             {
                 await using var pf = ds.CreateCommand("SELECT DISTINCT platform FROM zentriq.patches WHERE id = ANY(@ids)");
-                pf.Parameters.AddWithValue("ids", ids.Select(x => x.ToLowerInvariant()).ToArray());
+                pf.Parameters.AddWithValue("ids", ids.Select(PatchStore.NormId).ToArray());
                 var pfs = new List<string>();
                 await using (var r = await pf.ExecuteReaderAsync(ct)) while (await r.ReadAsync(ct)) pfs.Add(r.GetString(0));
                 if (pfs.Count > 1) return Validation.Problem("patchIds", "Choose Windows or Linux updates, not both, for one deployment.");

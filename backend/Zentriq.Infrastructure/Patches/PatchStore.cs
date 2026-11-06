@@ -159,6 +159,13 @@ public static partial class PatchStore
         return id is not null && SafeId().IsMatch(id) ? id : null;
     }
 
+    /// <summary>Stored ids: Windows update ids in lower case; Linux ids keep the package's case (NetworkManager).</summary>
+    public static string NormId(string id)
+    {
+        var s = id.Trim();
+        return s.StartsWith("linux:", StringComparison.Ordinal) ? s : s.ToLowerInvariant();
+    }
+
     private static string? T(string? s, int max) => string.IsNullOrWhiteSpace(s) ? null : s.Trim().Length > max ? s.Trim()[..max] : s.Trim();
 
     // ---- scans ------------------------------------------------------------------------------------------------------
@@ -173,7 +180,7 @@ public static partial class PatchStore
         await using var tx = await conn.BeginTransactionAsync(ct);
         var results = new Dictionary<string, InstallResult>(StringComparer.OrdinalIgnoreCase);
         foreach (var r in report.Results ?? [])
-            if (r.Id is { } rid) results[rid.Trim().ToLowerInvariant()] = r;
+            if (r.Id is { } rid) results[NormId(rid)] = r;
         var rebootPending = report.RebootPending == true;
         int missing = 0, installed = 0, failed = 0;
 
@@ -384,7 +391,7 @@ public static partial class PatchStore
         var settings = await SettingsAsync(ds, ct);
         var targets = await DeviceTargets.ResolveAsync(ds, req.Targets, Capability, ct);
         if (targets.Count > 10000) throw new InvalidOperationException("Deploy to at most 10 000 devices at a time.");
-        var ids = (req.PatchIds ?? []).Select(x => x.Trim().ToLowerInvariant()).Where(x => x.Length > 0).Distinct().ToArray();
+        var ids = (req.PatchIds ?? []).Select(NormId).Where(x => x.Length > 0).Distinct().ToArray();
         var f = req.Filter ?? new PatchFilter(null, null, false, 0);
         var jobId = Guid.NewGuid();
         int sent = 0, skipped = 0, nothing = 0;
