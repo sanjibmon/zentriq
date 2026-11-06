@@ -1,10 +1,50 @@
 # Test report
 
-Latest: GitHub Actions run 42094367710, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
-10.0.20348** VM plus an Ubuntu job for the Linux agent. Release: `v1.1.1-build.112` (pre-release, **unsigned**), package
-version **1.1.1.112**, commit `4d6c8cb`. Results: unit + PostgreSQL integration tests **400 PASS** (402, 2 skipped);
-installer acceptance **79 passed, 0 failed** (10 not run: need hardware, a domain, a reboot or old Windows); upgrade
-suites **14/14** (from build 110, same version in place, half-updated server); Linux agent on 11 distributions **11/11**.
+Latest: GitHub Actions run 42253237747, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
+10.0.20348** VM plus an Ubuntu job for the Linux agent. Release: `v1.1.1-build.113` (pre-release, **unsigned**), package
+version **1.1.1.113**, commit `23fed34`. Results: unit + PostgreSQL integration tests **408 PASS** (410, 2 skipped);
+installer acceptance **82 passed, 0 failed** (10 not run: need hardware, a domain, a reboot or old Windows); upgrade
+suites **14/14** (from 1.0.2, same version in place, half-updated server); Linux agent on 11 distributions **11/11**.
+
+New in build 113 (Release 1 of the Endpoint Central comparison):
+
+* **Online warranty lookup** — Dell, Lenovo and HP API keys under *Asset Lifecycle › Settings* (stored encrypted),
+  *Look Up Warranty* in *Warranty & Contracts*, for selected IT assets and on the device's Lifecycle tab; automatic
+  lookup every 30 minutes for new and due devices; manual and imported dates are kept unless overwriting is turned on;
+  dashboard widget *Warranty Expiry* and highlights. The agent now reports the system SKU (HP product number).
+* **Remote session recording** — *Remote Support › Settings*: on/off, all devices or device groups, retention (90 days
+  by default); the consent prompt and privacy bar show "(session recorded)"; *History* has *Play* (desktop and
+  terminal player) and *Download*; every playback is audited (permission *remote.recordings*).
+* **Console sign-in with Active Directory (LDAP/LDAPS) and Microsoft Entra ID (OpenID Connect)** — *Users, Roles &
+  Groups › Sign-in*; directory groups mapped to roles; *Directory Account* and *Sign In With Microsoft* on the sign-in
+  page; local accounts and two-step verification unchanged.
+
+| ID | Test | Result |
+|---|---|---|
+| T89 | Warranty lookup: keys stored encrypted, a made-up Dell key is explained (HTTP 401), devices of other makers are skipped, expiry overview | **PASS** |
+| T90 | Session recording: settings validated, the engine is configured to record, recordings list and playback protected, turned off again | **PASS** |
+| T91 | Directory sign-in: *Sign In With Microsoft* redirects with PKCE, a forged callback is refused, an unreachable domain controller is explained, group mapping added and removed, local sign-in keeps working | **PASS** |
+
+Also: the live remote engine test now starts MeshCentral with recording on and checks the recorded technician account.
+Not testable on the build VM: a real vendor warranty answer (no real keys), a recorded desktop session (no device with
+a screen), sign-in against a real domain controller or Entra tenant.
+
+| File | SHA256 |
+|---|---|
+| Zentriq-Setup-x64.exe | `35932adf439513d1da8428840f99d45191f1b7a1a90be8d0b3c1ca629159cc79` |
+| Zentriq.msi | `2fee7403108e5a47deca87362f7db3df1ed31b17349251c498eedb5a9a1ddda4` |
+| ZentriqAgent-x64.msi | `db00a58fc4a8a440811db9a2eea7449990fc3630b244d2bff2392c5e33607570` |
+| zentriq-agent-linux-x64.deb | `c66e29cbb5d39b47ff49e5087c8d957ee3c360f15cd9e94c84d7aeb54edb8c6e` |
+| zentriq-agent-linux-x64.rpm | `5767a14036eed5f42a6a8ebef4f34b1f438cc5cd207d4686f9ced849e30ad38a` |
+| zentriq-agent-linux-x64.tar.gz | `2685ab9d6ceb6117d01c9ab553b43ce0d41ad8ffaa77bdb211ee7c5514afc2cd` |
+| zentriq-agent-linux-arm64.deb | `c9bf9a13d5178ebbea7835dc83d2c80ec0b98555fa2a04ad08570d8a02ff861a` |
+| zentriq-agent-linux-arm64.rpm | `ea5032333c49014f0b5c6bb692b2e67c79ebf464cadfb82e3775fa5668d01b53` |
+| zentriq-agent-linux-arm64.tar.gz | `a6968ee37268d9a9265d09b1b3f259318c79081959e1dfc60e10b6c499558329` |
+| Zentriq-1.1.1-msi-offline-kit.zip | `0cecf31a83cc180de98d74a5bbc6d25f5dcf929a91f0e95a303fb5381dbd0d53` |
+| Zentriq-1.1.1-docs.zip | `f2889c164de75cd418d501e93c82320224fd20d2e4480d6c095bd174281ae4c9` |
+
+
+## Build 112 (run 42094367710, commit `4d6c8cb`)
 
 New in build 112 (build 111 failed two new acceptance tests and was not released):
 
