@@ -274,17 +274,17 @@ public sealed class Release1DbTests : IAsyncLifetime
         var r = await svc.LookupAsync([a1, a2, a3], "test", default);
         Assert.Equal(2, r.Found);
         Assert.Equal(1, r.NoKey);                     // Lenovo has no key
-        Assert.Equal(new DateTime(2026, 2, 2), await Scalar(ds, "SELECT warranty_end FROM zentriq.asset_lifecycle WHERE asset_id = @a", ("a", a1)));
+        Assert.Equal(new DateOnly(2026, 2, 2), await Scalar(ds, "SELECT warranty_end FROM zentriq.asset_lifecycle WHERE asset_id = @a", ("a", a1)));
         Assert.Equal("Dell", await Scalar(ds, "SELECT warranty_provider FROM zentriq.asset_lifecycle WHERE asset_id = @a", ("a", a1)));
         Assert.Equal("vendor", await Scalar(ds, "SELECT warranty_source FROM zentriq.asset_lifecycle WHERE asset_id = @a", ("a", a1)));
         // Entered by hand: kept, the answer is shown on the device.
-        Assert.Equal(new DateTime(2024, 1, 1), await Scalar(ds, "SELECT warranty_end FROM zentriq.asset_lifecycle WHERE asset_id = @a", ("a", a2)));
+        Assert.Equal(new DateOnly(2024, 1, 1), await Scalar(ds, "SELECT warranty_end FROM zentriq.asset_lifecycle WHERE asset_id = @a", ("a", a2)));
         Assert.Equal(false, await Scalar(ds, "SELECT applied FROM zentriq.warranty_lookups WHERE asset_id = @a", ("a", a2)));
-        Assert.Equal(new DateTime(2027, 1, 11), await Scalar(ds, "SELECT warranty_end FROM zentriq.warranty_lookups WHERE asset_id = @a", ("a", a2)));
+        Assert.Equal(new DateOnly(2027, 1, 11), await Scalar(ds, "SELECT warranty_end FROM zentriq.warranty_lookups WHERE asset_id = @a", ("a", a2)));
 
         await svc.SaveSettingsAsync(new WarrantySettings { Auto = true, RefreshDays = 30, OverwriteManual = true }, "test", default);
         await svc.LookupAsync([a2], "test", default);
-        Assert.Equal(new DateTime(2027, 1, 11), await Scalar(ds, "SELECT warranty_end FROM zentriq.asset_lifecycle WHERE asset_id = @a", ("a", a2)));
+        Assert.Equal(new DateOnly(2027, 1, 11), await Scalar(ds, "SELECT warranty_end FROM zentriq.asset_lifecycle WHERE asset_id = @a", ("a", a2)));
 
         // Background: the Dell devices were just checked; only the Lenovo one is due (and still has no key, so it is
         // skipped without an answer being saved).
