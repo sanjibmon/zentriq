@@ -408,8 +408,8 @@ internal sealed class AgentWorker
                     "uninstall" => PackageActions.Uninstall(a.Target, a.Argument, TimeSpan.FromMinutes(20)),
                     "remote-support" => RemoteSupportActions.Run(client, a.Operation, a.Argument, ct),
                     "deploy" => Deployer.Run(client, a, ct),
-                    "patch" => Patches.Run(client, a, ct),
-                    "script" => Scripts.Run(client, a, ct),
+                    "patch" => LongActions.Start(a, (c, x) => Patches.Run(c, x, CancellationToken.None)),
+                    "script" => LongActions.Start(a, (c, x) => Scripts.Run(c, x, CancellationToken.None)),
                     _ => ServiceActions.Run(a.Kind, a.Target, a.Operation, TimeSpan.FromSeconds(90)),
                 };
             }

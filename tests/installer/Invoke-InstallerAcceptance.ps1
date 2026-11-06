@@ -119,7 +119,7 @@ Remove-Item $answer -Force   # contains the administrator password
 
 if (-not $installed) {
     foreach ($t in 'T02 PostgreSQL provisioning', 'T03 Database migration', 'T04 Administrator sign-in', 'T05 API and worker services', 'T06 Trial initialization',
-                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection', 'T68 Live agent connection', 'T69 Locations and IT accessories', 'T70 Manual hardware details', 'T71 Standard and Advanced installation', 'T72 Asset lifecycle', 'T73 Cloud and infrastructure', 'T74 Own asset tags, people and bulk upload', 'T75 Backup and restore', 'T76 Roles and groups', 'T77 Log retention and export', 'T78 Agent stop and disable protection', 'T79 Automatic agent update', 'T80 Agent check-in and diagnosis commands', 'T81 Licensing plans and online activation', 'T82 Software Deployment policy', 'T83 Application control on Windows', 'T84 Push deployment', 'T85 Remote support agent tamper protection', 'T86 Software licenses', 'T87 Web apps and accounts', 'T88 Network connected devices', 'T89 Warranty lookup', 'T90 Session recording', 'T91 Directory sign-in') {
+                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection', 'T68 Live agent connection', 'T69 Locations and IT accessories', 'T70 Manual hardware details', 'T71 Standard and Advanced installation', 'T72 Asset lifecycle', 'T73 Cloud and infrastructure', 'T74 Own asset tags, people and bulk upload', 'T75 Backup and restore', 'T76 Roles and groups', 'T77 Log retention and export', 'T78 Agent stop and disable protection', 'T79 Automatic agent update', 'T80 Agent check-in and diagnosis commands', 'T81 Licensing plans and online activation', 'T82 Software Deployment policy', 'T83 Application control on Windows', 'T84 Push deployment', 'T85 Remote support agent tamper protection', 'T86 Software licenses', 'T87 Web apps and accounts', 'T88 Network connected devices', 'T89 Warranty lookup', 'T90 Session recording', 'T91 Directory sign-in', 'T92 Patch management', 'T93 Scripts and remediation') {
         Record $t.Substring(0, 3) $t.Substring(4) 'BLOCKED' 'installation failed'
     }
 } else {
@@ -1064,6 +1064,97 @@ if (-not $installed) {
             $me = Api GET '/auth/me' -Session $again
             Assert ($me.email -eq $adminEmail) 'local sign-in after the directory settings'
             "authorize redirect to tenant $tenant with PKCE; forged callback refused; AD: $(((Body $dir) | ConvertFrom-Json).title); mapping added and removed; local admin signs in"
+        } | Out-Null
+
+        # ---- T92: patch management ----
+        Check 'T92' 'Patch management: the agent scans with the Windows Update Agent (or says why it cannot), device patch state, policies, a deployment of updates the device does not miss, settings' {
+            $s = Login
+            $sum = Api GET '/patches/summary' -Session $s
+            Assert ($sum.devices -ge 1) "devices with a capable agent: $($sum.devices), older agents: $($sum.olderAgents)"
+            $req = Api POST '/patches/scan' @{ assetIds = @($script:agentAsset) } -Session $s
+            # An automatic scan may already be running: wait for a finished one (the scan runs beside the check-in).
+            $dev = Dep-Wait {
+                $x = Api GET "/patches/devices/$($script:agentAsset)" -Session $s
+                $last = @($x.actions | Where-Object operation -eq 'scan') | Select-Object -First 1
+                if ($x.scan -and $last -and $last.status -in 'succeeded', 'failed') { $x }
+            } 1500 'the patch scan on the runner'
+            $scanText = if ($dev.scan.ok) { "$($dev.scan.missing) missing update(s) from $($dev.scan.source)$(if ($dev.scan.rebootPending) { ', restart pending' })" }
+                else { Assert ($dev.scan.message -match 'Windows Update') "scan error: $($dev.scan.message)"; "scan not possible here: $($dev.scan.message)" }
+            $devices = @(Api GET '/patches/devices' -Session $s | ForEach-Object { $_ })
+            $me = $devices | Where-Object id -eq $script:agentAsset
+            Assert ($me -and $me.capable -and $me.scannedAt) "device list: $($me | ConvertTo-Json -Compress)"
+            # A policy: validated, listed, deleted.
+            $bad = Invoke-WebRequest "$base/api/v1/patches/policies" -Method Post -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } -ContentType 'application/json' `
+                -Body (@{ name = 'CI'; platform = 'windows'; classifications = @(); days = @(3); startTime = '22:00'; windowHours = 4; assetIds = @($script:agentAsset) } | ConvertTo-Json) -SkipHttpErrorCheck
+            Assert ($bad.StatusCode -eq 400 -and (Body $bad) -match 'classification') "policy without classifications: $($bad.StatusCode)"
+            $pol = Api POST '/patches/policies' @{ name = 'CI security updates'; platform = 'windows'; classifications = @('critical', 'security'); days = @(0, 6); startTime = '03:00'; windowHours = 2; reboot = 'never'; enabled = $false; assetIds = @($script:agentAsset) } -Session $s
+            $pols = @(Api GET '/patches/policies' -Session $s | ForEach-Object { $_ })
+            $p = $pols | Where-Object id -eq $pol.id
+            Assert ($p -and $p.startTime -eq '03:00' -and -not $p.enabled -and @($p.targets.assetIds) -contains $script:agentAsset) "policy: $($p | ConvertTo-Json -Compress -Depth 4)"
+            Api DELETE "/patches/policies/$($pol.id)" -Session $s | Out-Null
+            # A deployment of an update the device does not miss: nothing is sent, and the reason is given.
+            $job = Api POST '/patches/jobs' @{ patchIds = @('00000000-0000-0000-0000-00000000c1c1'); assetIds = @($script:agentAsset); reboot = 'never' } -Session $s
+            Assert ($job.sent -eq 0 -and $job.skipped -eq 1 -and $job.nothing -eq 1) "job: $($job | ConvertTo-Json -Compress)"
+            $jd = @(Api GET "/patches/jobs/$($job.id)" -Session $s | ForEach-Object { $_ }) | Select-Object -First 1
+            Assert ($jd.status -eq 'skipped' -and $jd.detail -match 'Nothing to install') "job device: $($jd | ConvertTo-Json -Compress)"
+            # Settings are validated.
+            $set = Invoke-WebRequest "$base/api/v1/patches/settings" -Method Put -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } -ContentType 'application/json' -Body '{"autoScan":true,"scanHours":0,"rebootDelayMinutes":10,"rebootMessage":"x"}' -SkipHttpErrorCheck
+            Assert ($set.StatusCode -eq 400) "scan every 0 hours: $($set.StatusCode)"
+            $act = Api GET '/activity?kind=patch' -Session $s
+            Assert ($act.total -ge 1 -and $null -eq @($act.items)[0].argument) "activity log: $($act.total) patch action(s)"
+            "$scanText; policy saved and deleted; deployment of an update the runner does not miss skipped; $($act.total) patch action(s) in the activity log"
+        } | Out-Null
+
+        # ---- T93: scripts and remediation ----
+        Check 'T93' 'Scripts: a PowerShell script runs as SYSTEM with its parameters, output and exit code; a remediation fixes and then reports compliant; a time limit stops a script; scripts can be turned off' {
+            $s = Login
+            $lib = @(Api GET '/scripts' -Session $s | ForEach-Object { $_ })
+            Assert (@($lib | Where-Object builtIn).Count -ge 10) "ready-made scripts: $(@($lib | Where-Object builtIn).Count)"
+            $marker = Join-Path $env:ProgramData 'zq-ci-script.txt'
+            $fixed = Join-Path $env:ProgramData 'zq-ci-fixed.txt'
+            Remove-Item $marker, $fixed -ErrorAction SilentlyContinue
+            function Wait-Run([string] $Id, [string] $What) {
+                Dep-Wait { $x = @(Api GET "/scripts/runs/$Id" -Session $s | ForEach-Object { $_ }) | Select-Object -First 1; if ($x.status -in 'succeeded', 'failed', 'expired') { $x } } 240 $What
+            }
+            $hello = Api POST '/scripts' @{ name = 'CI Hello'; platform = 'windows'; language = 'powershell'; parameters = '-Name ci'; timeoutSeconds = 120
+                content = "param([string]`$Name)`n`"hello `$Name from `$([Security.Principal.WindowsIdentity]::GetCurrent().Name)`"`nSet-Content -LiteralPath '$marker' -Value 'ran'`nWrite-Error 'a warning on stderr'`nexit 3" } -Session $s
+            $run = Api POST '/scripts/runs' @{ scriptId = $hello.id; assetIds = @($script:agentAsset) } -Session $s
+            Assert ($run.sent -eq 1) "run: $($run | ConvertTo-Json -Compress)"
+            $d = Wait-Run $run.id 'the script on the runner'
+            Assert ($d.status -eq 'failed' -and $d.exitCode -eq 3 -and $d.outcome -eq 'failed') "result: $($d.status) exit $($d.exitCode) $($d.detail)"
+            Assert ($d.stdout -match 'hello ci from NT AUTHORITY\\SYSTEM') "stdout: $($d.stdout)"
+            Assert ($d.stderr -match 'a warning on stderr') "stderr: $($d.stderr)"
+            Assert ((Test-Path $marker) -and (Get-Content $marker -Raw) -match 'ran') 'the script did not run on the device'
+            # A ready-made script.
+            $disk = $lib | Where-Object name -eq 'Disk Space Report'
+            $r2 = Api POST '/scripts/runs' @{ scriptId = $disk.id; assetIds = @($script:agentAsset) } -Session $s
+            $d2 = Wait-Run $r2.id 'the ready-made script'
+            Assert ($d2.status -eq 'succeeded' -and $d2.exitCode -eq 0 -and $d2.stdout -match 'GB free') "disk space: $($d2.status) $($d2.stdout)"
+            # A remediation: the detection finds the problem, the fix runs, the check after it passes; the next run is compliant.
+            $det = Api POST '/scripts' @{ name = 'CI Detect'; platform = 'windows'; language = 'powershell'; timeoutSeconds = 60; content = "if (Test-Path -LiteralPath '$fixed') { 'fine'; exit 0 }`n'missing'; exit 1" } -Session $s
+            $fix = Api POST '/scripts' @{ name = 'CI Fix'; platform = 'windows'; language = 'cmd'; timeoutSeconds = 60; content = "@echo off`r`necho fixed> `"$fixed`"`r`necho done" } -Session $s
+            $rem = Api POST '/scripts/runs' @{ scriptId = $fix.id; detectScriptId = $det.id; assetIds = @($script:agentAsset) } -Session $s
+            $d3 = Wait-Run $rem.id 'the remediation'
+            Assert ($d3.status -eq 'succeeded' -and $d3.outcome -eq 'remediated' -and (Test-Path $fixed)) "remediation: $($d3.outcome) $($d3.detail) $($d3.stdout)"
+            $rem2 = Api POST '/scripts/runs' @{ scriptId = $fix.id; detectScriptId = $det.id; assetIds = @($script:agentAsset) } -Session $s
+            $d4 = Wait-Run $rem2.id 'the second remediation'
+            Assert ($d4.outcome -eq 'compliant') "second remediation: $($d4.outcome) $($d4.detail)"
+            # A time limit.
+            $slow = Api POST '/scripts' @{ name = 'CI Slow'; platform = 'windows'; language = 'powershell'; timeoutSeconds = 10; content = 'Start-Sleep -Seconds 120' } -Session $s
+            $r5 = Api POST '/scripts/runs' @{ scriptId = $slow.id; assetIds = @($script:agentAsset) } -Session $s
+            $d5 = Wait-Run $r5.id 'the script with a time limit'
+            Assert ($d5.status -eq 'failed' -and $d5.outcome -eq 'timeout' -and $d5.detail -match 'did not finish') "time limit: $($d5.outcome) $($d5.detail)"
+            # Turned off for the organisation: nothing can be started.
+            Api PUT '/scripts/settings' @{ enabled = $false; keepOutputDays = 90 } -Session $s | Out-Null
+            $off = Invoke-WebRequest "$base/api/v1/scripts/runs" -Method Post -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } -ContentType 'application/json' -Body (@{ scriptId = $hello.id; assetIds = @($script:agentAsset) } | ConvertTo-Json) -SkipHttpErrorCheck
+            Assert ($off.StatusCode -eq 400 -and (Body $off) -match 'turned off') "run while turned off: $($off.StatusCode)"
+            Api PUT '/scripts/settings' @{ enabled = $true; keepOutputDays = 90 } -Session $s | Out-Null
+            # Ready-made scripts cannot be changed or deleted.
+            $ro = Invoke-WebRequest "$base/api/v1/scripts/$($disk.id)" -Method Delete -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } -SkipHttpErrorCheck
+            Assert ($ro.StatusCode -eq 404) "delete a ready-made script: $($ro.StatusCode)"
+            foreach ($x in $hello, $det, $fix, $slow) { Api DELETE "/scripts/$($x.id)" -Session $s | Out-Null }
+            Remove-Item $marker, $fixed -ErrorAction SilentlyContinue
+            "ran as $((($d.stdout -split "`n") | Where-Object { $_ -match 'hello' } | Select-Object -First 1).Trim()) (exit 3, stderr kept); disk report: $(($d2.stdout -split "`n")[0].Trim()); remediation: remediated then compliant; time limit stopped the script after $([math]::Round($d5.durationMs / 1000)) s"
         } | Out-Null
     }
 

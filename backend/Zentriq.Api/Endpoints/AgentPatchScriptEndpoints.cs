@@ -1,4 +1,5 @@
 using Npgsql;
+using Zentriq.Api.Infrastructure;
 using Zentriq.Infrastructure.Agents;
 using Zentriq.Infrastructure.Deployment;
 using Zentriq.Infrastructure.Patches;

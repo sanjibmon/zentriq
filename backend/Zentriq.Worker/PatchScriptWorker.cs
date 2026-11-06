@@ -35,6 +35,13 @@ public sealed class PatchScriptWorker(NpgsqlDataSource ds, ILogger<PatchScriptWo
                 }
                 foreach (var (policy, res) in await PatchStore.RunDuePoliciesAsync(ds, DateTime.Now, stoppingToken))
                     logger.LogInformation("Patch policy {Policy}: updates sent to {Sent} device(s), {Skipped} skipped ({Nothing} up to date).", policy.Name, res.Sent, res.Skipped, res.Nothing);
+                // Started on a device that restarted (or whose agent stopped) before the end: no result will come.
+                await using (var stale = ds.CreateCommand("""
+                    UPDATE zentriq.asset_actions SET status = 'failed', completed_at = now(),
+                           detail = 'No result from the device: it restarted or the agent stopped while this was running.'
+                     WHERE kind IN ('patch','script') AND status = 'running' AND COALESCE(sent_at, requested_at) < now() - interval '6 hours'
+                    """))
+                    await stale.ExecuteNonQueryAsync(stoppingToken);
                 var ran = await ScriptStore.RunDueSchedulesAsync(ds, stoppingToken);
                 if (ran > 0) logger.LogInformation("Scripts: {Count} scheduled run(s) started.", ran);
                 if (DateTimeOffset.UtcNow >= nextPurge)

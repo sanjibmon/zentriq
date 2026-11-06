@@ -321,7 +321,7 @@ public static class AssetActionEndpoints
         await using var cmd = ds.CreateCommand("""
             UPDATE zentriq.asset_actions SET status = @st, result_state = @rs, detail = @d, completed_at = CASE WHEN @st = 'running' THEN NULL ELSE now() END, secret_protected = NULL
              WHERE id = @id AND (@ag::uuid IS NULL OR agent_id = @ag) AND status IN ('queued','sent','running')
-            RETURNING asset_id, target
+            RETURNING asset_id, target, kind
             """);
         cmd.Parameters.AddWithValue("id", actionId);
         cmd.Parameters.Add(new NpgsqlParameter("ag", NpgsqlDbType.Uuid) { Value = (object?)agentId ?? DBNull.Value });
@@ -329,11 +329,11 @@ public static class AssetActionEndpoints
         cmd.Parameters.AddWithValue("st", !ok ? "failed" : state == "started" ? "running" : "succeeded");
         cmd.Parameters.Add(new NpgsqlParameter("rs", NpgsqlDbType.Text) { Value = (object?)state ?? DBNull.Value });
         cmd.Parameters.Add(new NpgsqlParameter("d", NpgsqlDbType.Text) { Value = (object?)Zentriq.Application.Security.Redactor.Redact(message ?? (ok ? "Done." : "Failed.")) });
-        Guid assetId; string target;
+        Guid assetId; string target, kind;
         await using (var r = await cmd.ExecuteReaderAsync(ct))
         {
             if (!await r.ReadAsync(ct)) return false;
-            assetId = r.GetGuid(0); target = r.GetString(1);
+            assetId = r.GetGuid(0); target = r.GetString(1); kind = r.GetString(2);
         }
         if (ok && state == "uninstalled")
         {
@@ -342,7 +342,7 @@ public static class AssetActionEndpoints
             del.Parameters.AddWithValue("n", target);
             await del.ExecuteNonQueryAsync(ct);
         }
-        else if (state is not null && state is not ("started" or "current" or "updated"))
+        else if (kind == "service" && state is not null && state is not ("started" or "current" or "updated"))
         {
             await using var doc = ds.CreateCommand("""
                 UPDATE zentriq.asset_inventory_documents
