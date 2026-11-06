@@ -20,11 +20,18 @@ export function LoginPage() {
   const [forgot, setForgot] = useState(false);
   const [resetByEmail, setResetByEmail] = useState<boolean | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [directory, setDirectory] = useState(false);
+  const [providers, setProviders] = useState<{ directory: { domain: string | null } | null; microsoft: boolean }>({ directory: null, microsoft: false });
   const mfaRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     api.get<SetupStatus>('/setup/status').then(setStatus).catch(() => setStatus(null));
-    api.get<{ passwordResetByEmail: boolean }>('/auth/options').then((o) => setResetByEmail(o.passwordResetByEmail)).catch(() => setResetByEmail(false));
+    api.get<{ passwordResetByEmail: boolean; directory: { domain: string | null } | null; microsoft: boolean }>('/auth/options')
+      .then((o) => { setResetByEmail(o.passwordResetByEmail); setProviders({ directory: o.directory ?? null, microsoft: !!o.microsoft }); })
+      .catch(() => setResetByEmail(false));
+    // Sign In With Microsoft comes back here with a message when it did not work.
+    const sso = new URLSearchParams(window.location.search).get('ssoError');
+    if (sso) { setError(sso); window.history.replaceState(null, '', window.location.pathname); }
   }, []);
   useEffect(() => {
     if (mfaStep) mfaRef.current?.focus();
@@ -53,12 +60,12 @@ export function LoginPage() {
     setError(null);
     setNotice(null);
     if (!email.trim() || !password) {
-      setError('Enter your e-mail address and password.');
+      setError(directory ? 'Enter your user name and password.' : 'Enter your e-mail address and password.');
       return;
     }
     setBusy(true);
     try {
-      await api.post<LoginResult>('/auth/login', { email: email.trim(), password, mfaCode: mfaStep ? mfaCode.trim() : null }, true);
+      await api.post<LoginResult>('/auth/login', { email: email.trim(), password, mfaCode: mfaStep ? mfaCode.trim() : null, directory: directory || null }, true);
       await refresh();
     } catch (err) {
       if (err instanceof ApiError && err.status === 401 && (err.body as LoginResult | null)?.mfaRequired) {
@@ -67,7 +74,7 @@ export function LoginPage() {
       } else if (err instanceof ApiError && err.status === 429) {
         setError('Too many sign-in attempts. Wait a minute and try again.');
       } else if (err instanceof ApiError && err.status === 401) {
-        setError('The e-mail address or password is incorrect, or the account is locked.');
+        setError(err.message && !/^HTTP \d+/.test(err.message) ? err.message : 'The e-mail address or password is incorrect, or the account is locked.');
       } else {
         setError('Zentriq could not be reached. Check that the Zentriq services are running, then try again.');
       }
@@ -133,10 +140,16 @@ export function LoginPage() {
 
           {!mfaStep ? (
             <>
+              {providers.directory && (
+                <div className="seg login-kind" role="radiogroup" aria-label="Account type">
+                  <button type="button" role="radio" aria-checked={!directory} className={!directory ? 'on' : ''} onClick={() => setDirectory(false)}>Zentriq Account</button>
+                  <button type="button" role="radio" aria-checked={directory} className={directory ? 'on' : ''} onClick={() => setDirectory(true)}>Directory Account</button>
+                </div>
+              )}
               <label className="login-field">
-                <span>Username</span>
-                <input className="in" type="email" name="username" autoComplete="username" autoFocus value={email}
-                  onChange={(e) => setEmail(e.target.value)} placeholder="name@company.com" disabled={busy} required />
+                <span>{directory ? 'User name' : 'Username'}</span>
+                <input className="in" type={directory ? 'text' : 'email'} name="username" autoComplete="username" autoFocus value={email}
+                  onChange={(e) => setEmail(e.target.value)} placeholder={directory ? (providers.directory?.domain ? `${providers.directory.domain}\\name or name` : 'DOMAIN\\name or name@domain') : 'name@company.com'} disabled={busy} required />
               </label>
               <label className="login-field">
                 <span>Password</span>
@@ -167,7 +180,16 @@ export function LoginPage() {
             </button>
           )}
 
-          {!mfaStep && (
+          {!mfaStep && providers.microsoft && (
+            <div className="login-sso">
+              <div className="login-or">or</div>
+              <a className="btn big ms" href={`/api/v1/auth/oidc/start${email.includes('@') ? `?hint=${encodeURIComponent(email.trim())}` : ''}`}>
+                <span className="ms-logo" aria-hidden="true"><i style={{ background: '#f25022' }} /><i style={{ background: '#7fba00' }} /><i style={{ background: '#00a4ef' }} /><i style={{ background: '#ffb900' }} /></span>
+                Sign In With Microsoft
+              </a>
+            </div>
+          )}
+          {!mfaStep && !directory && (
             <button type="button" className="btn ghost sm" onClick={() => { setForgot(true); setError(null); setNotice(null); }}>Forgot password?</button>
           )}
           {status && !status.initialized && <p className="login-help muted">Setup has not been completed on this server; run the Zentriq installer.</p>}

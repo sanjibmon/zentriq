@@ -35,6 +35,8 @@ public static class Permissions
     public const string SecurityManage = "security.manage";
     public const string IntegrationsManage = "integrations.manage";
     public const string RemoteManage = "remote.manage";
+    /// <summary>Play back recorded remote sessions (every playback is audited).</summary>
+    public const string RemoteRecordings = "remote.recordings";
     public const string DashboardView = "dashboard.view";
     public const string ReportsView = "reports.view";
     public const string ActivityView = "activity.view";
@@ -65,7 +67,7 @@ public static class Permissions
         JobsView, UsersManage, LicensingManage, BackupRun, SettingsManage, AuditView, AgentsManage, DirectoryManage, AssetsControl, SoftwareUninstall, VulnView, VulnManage,
         SecurityView, SecurityManage, IntegrationsManage, RemoteManage, DashboardView, ReportsView, ActivityView, NonItView, NonItManage,
         AccessoriesView, AccessoriesManage, LifecycleView, LifecycleManage, CloudView, CloudManage, DeployView, DeployManage,
-        LicensesView, LicensesManage, WebAppsView, WebAppsManage
+        LicensesView, LicensesManage, WebAppsView, WebAppsManage, RemoteRecordings
     ];
 }
 

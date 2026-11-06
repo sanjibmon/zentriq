@@ -53,6 +53,15 @@ public static class WindowsCollector
             if (Int(cs, "PCSystemType") == 2) doc.Device.Chassis = "laptop";
         });
 
+        // Product number (SKU) of the computer, needed for HP warranty lookups. Separate query: older Windows versions do
+        // not have the property and would fail the whole computer system query.
+        Section(doc, "system sku", () =>
+        {
+            var sku = Clean(Str(First(wmi, Cimv2, "SELECT SystemSKUNumber FROM Win32_ComputerSystem") ?? new Dictionary<string, object?>(), "SystemSKUNumber"));
+            if (sku is not null && sku.Length <= 64 && !sku.Equals("System SKUNumber", StringComparison.OrdinalIgnoreCase) && !sku.Equals("To be filled by O.E.M.", StringComparison.OrdinalIgnoreCase))
+                doc.Device.Sku = sku;
+        }, optional: true);
+
         // Win32_ComputerSystem.UserName is only the console session. Servers are used over Remote Desktop, so when it
         // is empty take the most recent interactive / Remote Desktop logon session instead.
         if (doc.Users.LoggedOn is null)

@@ -7,6 +7,7 @@ import { Icon } from '../../components/Icon';
 import { Callout, DataTable, ErrorBox, fmt, Loading, Panel, Pill } from '../../components/ui';
 import { DetailsDialog, StageDialog, useLcMeta, type StageMode } from './LifecycleDialogs';
 import { customText } from './LifecycleExtras';
+import { WarrantyCard } from './Warranty';
 import { CONTRACT_KIND, KIND_LABEL, money, STAGE_ORDER, STAGE_TONE, stageLabel, statusLabel, type LcDetail, type LcMeta } from './types';
 
 function KV({ items }: { items: [string, ReactNode][] }) {
@@ -102,6 +103,7 @@ export function LifecyclePanel({ assetId, onMessage }: { assetId: string; onMess
           ['Data removed by', [a.sanitizedBy, a.sanitizedOn ? fmt.day(a.sanitizedOn) : null].filter(Boolean).join(' · ') || null], ['Certificate', a.certificateRef],
         ]} /></div>}
       </Panel>
+      <WarrantyCard assetId={assetId} onChanged={(m2) => { setMsg(m2); onMessage?.(m2); setTick((x) => x + 1); }} />
       {d.schedule && d.schedule.length > 0 && <Panel title="Depreciation schedule" sub={`${m.depreciationMethods.find((x) => x.id === a.depreciationMethod)?.label ?? ''} · value at the end of each year`} flush>
         <DataTable rows={d.schedule.map((r) => ({ ...r, id: r.year }))} columns={[
           { key: 'y', label: 'Year', render: (r) => r.year },

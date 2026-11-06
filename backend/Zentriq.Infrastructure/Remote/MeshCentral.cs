@@ -202,6 +202,34 @@ public sealed class MeshControlClient : IAsyncDisposable
         throw new MeshException($"Could not create the remote support account {username}: {res}");
     }
 
+    /// <summary>
+    /// Flags an account for session recording (engine user flag 2; the engine records the sessions of flagged accounts
+    /// when its sessionRecording setting has onlySelectedUsers) and keeps its display name.
+    /// </summary>
+    public async Task SetUserRecordingAsync(string userId, string username, string realName, CancellationToken ct)
+    {
+        try
+        {
+            var r = await SendAsync(new JsonObject { ["action"] = "edituser", ["id"] = userId, ["name"] = username, ["realname"] = realName, ["flags"] = 2 }, ct, TimeSpan.FromSeconds(10));
+            if (!Ok(r)) throw new MeshException("Could not set up session recording for the account: " + Result(r));
+        }
+        catch (MeshException ex) when (ex.Message.StartsWith("No answer", StringComparison.Ordinal))
+        {
+            // Some engine versions do not answer edituser; the change is applied all the same.
+        }
+    }
+
+    /// <summary>Accounts of the engine: id → flags.</summary>
+    public async Task<Dictionary<string, int>> UserFlagsAsync(CancellationToken ct)
+    {
+        var r = await SendAsync(new JsonObject { ["action"] = "users" }, ct);
+        var d = new Dictionary<string, int>(StringComparer.Ordinal);
+        if (r["users"] is JsonArray a)
+            foreach (var u in a.OfType<JsonObject>())
+                if (u["_id"]?.ToString() is { } id) d[id] = u["flags"] is JsonValue f && f.TryGetValue<int>(out var fl) ? fl : 0;
+        return d;
+    }
+
     public async Task GrantGroupAsync(string meshId, string userId, uint rights, CancellationToken ct)
     {
         var r = await SendAsync(new JsonObject { ["action"] = "addmeshuser", ["meshid"] = meshId, ["userids"] = new JsonArray(userId), ["meshadmin"] = rights }, ct);

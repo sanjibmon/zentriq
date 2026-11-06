@@ -269,6 +269,7 @@ public static class LifecycleEndpoints
                        depreciation_method = @dm, useful_life_months = @life, salvage_value = @salv,
                        lessor = @lessor, lease_start = @lst, lease_end = @lend, lease_monthly_cost = @lmc,
                        warranty_provider = @wp, warranty_type = @wt, warranty_start = @wst, warranty_end = @wend, notes = @notes,
+                       warranty_source = CASE WHEN warranty_end IS DISTINCT FROM @wend OR warranty_start IS DISTINCT FROM @wst OR warranty_provider IS DISTINCT FROM @wp THEN 'manual' ELSE warranty_source END,
                        custom = CASE WHEN @hasCustom THEN @custom ELSE custom END,
                        updated_at = now(), updated_by = @by, row_version = row_version + 1
                  WHERE asset_id = @id AND (@rv::int IS NULL OR row_version = @rv)
@@ -411,7 +412,8 @@ public static class LifecycleEndpoints
                 await using (var upd = new NpgsqlCommand("""
                     UPDATE zentriq.asset_lifecycle SET stage = @stage, status = @status, auto_deploy = true, in_service_date = NULL, stage_reason = 'Added to the register',
                            purchase_date = @pd, purchase_cost = @cost, currency = @cur, vendor = @vendor, invoice_number = @inv, po_number = @po,
-                           warranty_provider = @wp, warranty_end = @wend, warranty_start = CASE WHEN @wend::date IS NOT NULL THEN @pd END, notes = @notes, updated_by = @by
+                           warranty_provider = @wp, warranty_end = @wend, warranty_start = CASE WHEN @wend::date IS NOT NULL THEN @pd END, notes = @notes, updated_by = @by,
+                           warranty_source = CASE WHEN @wend::date IS NOT NULL THEN 'manual' ELSE warranty_source END
                      WHERE asset_id = @id
                     """, conn, tx))
                 {

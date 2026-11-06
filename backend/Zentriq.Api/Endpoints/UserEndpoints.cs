@@ -31,9 +31,24 @@ public static class UserEndpoints
                     var uid = r.GetGuid(0);
                     (groups.TryGetValue(uid, out var gl) ? gl : groups[uid] = []).Add(new { id = r.GetGuid(1), name = r.GetString(2), roles = r.GetFieldValue<string[]>(3) });
                 }
+            // Sign-in method and the roles directory users get from their directory groups.
+            var source = new Dictionary<Guid, string>();
+            var dirRoles = new Dictionary<Guid, List<string>>();
+            await using (var cmd = ds.CreateCommand("SELECT id, auth_source FROM zentriq.users WHERE auth_source <> 'local'"))
+            await using (var r = await cmd.ExecuteReaderAsync(ct))
+                while (await r.ReadAsync(ct)) source[r.GetGuid(0)] = r.GetString(1);
+            await using (var cmd = ds.CreateCommand("SELECT d.user_id, r.name FROM zentriq.user_directory_roles d JOIN zentriq.roles r ON r.id = d.role_id ORDER BY r.name"))
+            await using (var r = await cmd.ExecuteReaderAsync(ct))
+                while (await r.ReadAsync(ct))
+                {
+                    var uid = r.GetGuid(0);
+                    (dirRoles.TryGetValue(uid, out var dl) ? dl : dirRoles[uid] = []).Add(r.GetString(1));
+                }
             return Results.Ok(users.Select(u => new
             {
                 u.Id, u.Email, u.DisplayName, u.Status, u.MfaEnabled, u.LastLoginAt, u.CreatedAt,
+                authSource = source.TryGetValue(u.Id, out var src) ? src : "local",
+                directoryRoles = dirRoles.TryGetValue(u.Id, out var dr) ? dr : [],
                 locked = u.LockedUntil > DateTimeOffset.UtcNow,
                 roles = u.Roles.Select(r => new { id = r.RoleId, name = r.Role!.Name }),
                 groups = groups.TryGetValue(u.Id, out var gs) ? gs : [],

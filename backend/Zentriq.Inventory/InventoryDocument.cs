@@ -63,6 +63,8 @@ public sealed class DeviceInfo
     [JsonPropertyName("manufacturer")] public string? Manufacturer { get; set; }
     [JsonPropertyName("model")] public string? Model { get; set; }
     [JsonPropertyName("serialNumber")] public string? SerialNumber { get; set; }
+    /// <summary>Product number / SKU (Win32_ComputerSystem.SystemSKUNumber), for example "2Z6A6EA#ABU" on HP.</summary>
+    [JsonPropertyName("sku")] public string? Sku { get; set; }
     [JsonPropertyName("smbiosUuid")] public string? SmbiosUuid { get; set; }
     /// <summary>desktop | laptop | server | virtual | network | printer | other</summary>
     [JsonPropertyName("chassis")] public string? Chassis { get; set; }

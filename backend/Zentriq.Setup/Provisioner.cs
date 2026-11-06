@@ -363,6 +363,10 @@ public sealed class Provisioner(ProvisionInput input, ZentriqPaths paths, Report
             // Shared with the API: it writes the console certificate and host names technicians use; the remote support
             // service picks them up and reports which host names it accepts.
             WindowsHost.SecureDirectory(paths.RemoteCertificateDir, (WindowsHost.ServiceSid(input.ApiService), FileSystemRights.Modify), (sid, FileSystemRights.Modify));
+            // Recorded sessions: written by the engine, played back by the API, indexed and deleted after the retention
+            // period by the worker.
+            WindowsHost.SecureDirectory(paths.RemoteRecordings, (WindowsHost.ServiceSid(input.ApiService), FileSystemRights.ReadAndExecute),
+                (WindowsHost.ServiceSid(input.WorkerService), FileSystemRights.Modify), (sid, FileSystemRights.Modify));
 
             var host = string.IsNullOrWhiteSpace(_options.Remote.PublicHost) ? _options.Https.HostName : _options.Remote.PublicHost!;
             var sessionKey = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));

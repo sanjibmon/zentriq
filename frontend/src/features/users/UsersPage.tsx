@@ -10,13 +10,14 @@ import { Icon } from '../../components/Icon';
 import { UserDialog } from './UserDialogs';
 import { GroupDialog, RoleDialog, type GroupRow, type RoleRow } from './RoleDialogs';
 import { describe } from './access';
+import { SignInTab } from './SignInTab';
 import { errorText } from '../discovery/DirectoryPanel';
 
-type Tab = 'users' | 'roles' | 'groups';
+type Tab = 'users' | 'roles' | 'groups' | 'signin';
 
 export function UsersPage() {
   const { query, navigate } = useRouter();
-  const tab: Tab = query.get('tab') === 'roles' ? 'roles' : query.get('tab') === 'groups' ? 'groups' : 'users';
+  const tab: Tab = query.get('tab') === 'roles' ? 'roles' : query.get('tab') === 'groups' ? 'groups' : query.get('tab') === 'signin' ? 'signin' : 'users';
   const users = useApi(() => api.get<UserRow[]>('/users'), []);
   const roles = useApi(() => api.get<RoleRow[]>('/roles'), []);
   const groups = useApi(() => api.get<GroupRow[]>('/groups'), []);
@@ -46,21 +47,24 @@ export function UsersPage() {
       <PageHead title="Users, Roles & Groups"
         actions={tab === 'users' ? <button className="btn primary" onClick={() => setEdit('new')}><Icon name="plus" size={14} /> Add user</button>
           : tab === 'roles' ? <button className="btn primary" onClick={() => setRoleEdit({ role: null })}><Icon name="plus" size={14} /> New role</button>
-          : <button className="btn primary" onClick={() => setGroupEdit('new')}><Icon name="plus" size={14} /> New group</button>} />
+          : tab === 'groups' ? <button className="btn primary" onClick={() => setGroupEdit('new')}><Icon name="plus" size={14} /> New group</button> : undefined} />
       {msg && <Callout tone={msg.tone} icon={msg.tone === 'crit' ? 'alert' : 'info'}>{msg.text}</Callout>}
       <div className="tabs" role="tablist">
-        {([['users', 'Users'], ['roles', 'Roles'], ['groups', 'Groups']] as [Tab, string][]).map(([k, l]) => (
+        {([['users', 'Users'], ['roles', 'Roles'], ['groups', 'Groups'], ['signin', 'Sign-in']] as [Tab, string][]).map(([k, l]) => (
           <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => navigate(k === 'users' ? '/users' : `/users?tab=${k}`, true)}>{l}</button>
         ))}
       </div>
+      {tab === 'signin' && <SignInTab roles={roles.data ?? []} />}
       {tab === 'users' && <>
         <ErrorBox error={users.error} />
         <Panel flush>
           <DataTable rows={users.data ?? []} empty={users.loading ? 'Loading…' : 'No users.'} columns={[
             { key: 'n', label: 'Name', render: (u) => <><b>{u.displayName}</b><div className="faint" style={{ fontSize: 11.5 }}>{u.email}</div></> },
+            { key: 'src', label: 'Sign-in', render: (u) => u.authSource === 'ldap' ? <Pill tone="info">Active Directory</Pill> : u.authSource === 'entra' ? <Pill tone="info">Microsoft</Pill> : <span className="faint">Local</span> },
             { key: 'r', label: 'Roles', className: 'wrap', render: (u) => <>
               {u.roles.map((r) => r.name).join(', ') || <span className="muted">—</span>}
               {(u.groups ?? []).length > 0 && <div className="faint" style={{ fontSize: 11.5 }}>via {(u.groups ?? []).map((g) => `${g.name}${g.roles.length ? ` (${g.roles.join(', ')})` : ''}`).join('; ')}</div>}
+              {(u.directoryRoles ?? []).length > 0 && <div className="faint" style={{ fontSize: 11.5 }}>from directory groups: {(u.directoryRoles ?? []).join(', ')}</div>}
             </> },
             { key: 'm', label: 'MFA', render: (u) => <Pill tone={u.mfaEnabled ? 'ok' : 'warn'}>{u.mfaEnabled ? 'Enrolled' : 'Not enrolled'}</Pill> },
             { key: 's', label: 'Status', render: (u) => <Pill tone={u.locked ? 'crit' : u.status === 'active' ? 'ok' : ''}>{u.locked ? 'Locked' : fmt.label(u.status)}</Pill> },

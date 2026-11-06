@@ -144,19 +144,22 @@ public static class RemoteEndpoints
 
             var name = rc.Principal.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value ?? rc.UserName;
             string url;
+            var recorded = false;
             try
             {
                 await remote.EnsureOriginAsync(paths.RemoteCertificateDir, http.Request.Host.Host, ct);
-                url = await remote.SessionUrlAsync(uid, name, rc.Has(Permissions.RemoteUnattended), viewOnly: false, nodeId, body.View, ct, http.Request.Host.Host);
+                recorded = await remote.IsRecordedAsync(assetId, ct);
+                url = await remote.SessionUrlAsync(uid, name, rc.Has(Permissions.RemoteUnattended), viewOnly: false, nodeId, body.View, ct, http.Request.Host.Host, recorded: recorded);
             }
             catch (Exception ex) when (ex is MeshException or WebSocketException or HttpRequestException or TaskCanceledException)
             {
                 return Results.Problem(statusCode: 503, title: "Remote support is not available: " + ex.Message);
             }
             await using (var log = ds.CreateCommand("""
-                INSERT INTO zentriq.remote_sessions (user_id, user_name, asset_id, node_id, device_name, view, source_ip) VALUES (@u, @n, @a, @node, @d, @v, @ip)
+                INSERT INTO zentriq.remote_sessions (user_id, user_name, asset_id, node_id, device_name, view, source_ip, recorded) VALUES (@u, @n, @a, @node, @d, @v, @ip, @rec)
                 """))
             {
+                log.Parameters.AddWithValue("rec", recorded);
                 log.Parameters.AddWithValue("u", uid);
                 log.Parameters.AddWithValue("n", name);
                 log.Parameters.Add(new NpgsqlParameter("a", NpgsqlDbType.Uuid) { Value = (object?)assetId ?? DBNull.Value });
@@ -166,8 +169,8 @@ public static class RemoteEndpoints
                 log.Parameters.Add(new NpgsqlParameter("ip", NpgsqlDbType.Text) { Value = (object?)http.Connection.RemoteIpAddress?.ToString() ?? DBNull.Value });
                 await log.ExecuteNonQueryAsync(ct);
             }
-            await rc.AuditAsync("remote.session", device ?? "remote console", detail: new { body.View, assetId, nodeId });
-            return Results.Ok(new { url, expiresInSeconds = 120 });
+            await rc.AuditAsync("remote.session", device ?? "remote console", detail: new { body.View, assetId, nodeId, recorded });
+            return Results.Ok(new { url, expiresInSeconds = 120, recorded });
         });
 
         // ---- quick support (on demand, anywhere) ----------------------------------------------------------------
@@ -219,16 +222,20 @@ public static class RemoteEndpoints
             if (!q.Online) return Results.Problem(statusCode: 409, title: "The person's support app is not connected (closed or offline).");
             var name = rc.Principal.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value ?? rc.UserName;
             string url;
+            var recorded = false;
             try
             {
                 await remote.EnsureOriginAsync(paths.RemoteCertificateDir, http.Request.Host.Host, ct);
-                url = await remote.SessionUrlAsync(uid, name, fullRights: false, viewOnly: false, q.NodeId, body.View, ct, http.Request.Host.Host, groupId: q.MeshId);
+                // Quick support sessions have no device group: they are recorded when every device is.
+                recorded = await remote.IsRecordedAsync(null, ct);
+                url = await remote.SessionUrlAsync(uid, name, fullRights: false, viewOnly: false, q.NodeId, body.View, ct, http.Request.Host.Host, groupId: q.MeshId, recorded: recorded);
             }
             catch (Exception ex) when (Unavailable(ex)) { return Results.Problem(statusCode: 503, title: "Remote support is not available: " + ex.Message); }
             await using (var log = ds.CreateCommand("""
-                INSERT INTO zentriq.remote_sessions (user_id, user_name, node_id, device_name, view, source_ip, quick_session_id) VALUES (@u, @n, @node, @d, @v, @ip, @q)
+                INSERT INTO zentriq.remote_sessions (user_id, user_name, node_id, device_name, view, source_ip, quick_session_id, recorded) VALUES (@u, @n, @node, @d, @v, @ip, @q, @rec)
                 """))
             {
+                log.Parameters.AddWithValue("rec", recorded);
                 log.Parameters.AddWithValue("u", uid);
                 log.Parameters.AddWithValue("n", name);
                 log.Parameters.AddWithValue("node", q.NodeId);
@@ -238,8 +245,8 @@ public static class RemoteEndpoints
                 log.Parameters.AddWithValue("q", id);
                 await log.ExecuteNonQueryAsync(ct);
             }
-            await rc.AuditAsync("remote.session", $"quick support {RemoteSupportService.FormatCode(q.Code)}", detail: new { body.View, quickSessionId = id, q.NodeId });
-            return Results.Ok(new { url, expiresInSeconds = 120 });
+            await rc.AuditAsync("remote.session", $"quick support {RemoteSupportService.FormatCode(q.Code)}", detail: new { body.View, quickSessionId = id, q.NodeId, recorded });
+            return Results.Ok(new { url, expiresInSeconds = 120, recorded });
         });
 
         g.MapPost("/quick/{id:long}/end", async (long id, RemoteSupportService remote, RequestContext rc, CancellationToken ct) =>
@@ -258,7 +265,9 @@ public static class RemoteEndpoints
         {
             var (p, ps) = Paging.Normalize(page, pageSize);
             await using var cmd = ds.CreateCommand("""
-                SELECT s.id, s.created_at, s.user_name, s.view, s.device_name, s.asset_id, s.source_ip, count(*) OVER ()
+                SELECT s.id, s.created_at, s.user_name, s.view, s.device_name, s.asset_id, s.source_ip, count(*) OVER (), s.recorded,
+                       (SELECT r.id FROM zentriq.remote_recordings r WHERE r.session_id = s.id AND r.deleted_at IS NULL ORDER BY r.started_at LIMIT 1),
+                       (SELECT count(*) FROM zentriq.remote_recordings r WHERE r.session_id = s.id AND r.deleted_at IS NULL)
                   FROM zentriq.remote_sessions s WHERE (@a::uuid IS NULL OR s.asset_id = @a)
                  ORDER BY s.id DESC LIMIT @l OFFSET @o
                 """);
@@ -275,6 +284,7 @@ public static class RemoteEndpoints
                 {
                     id = r.GetInt64(0), at = r.GetFieldValue<DateTimeOffset>(1), user = r.GetString(2), view = r.GetString(3), device = r.IsDBNull(4) ? null : r.GetString(4),
                     assetId = r.IsDBNull(5) ? (Guid?)null : r.GetGuid(5), ip = r.IsDBNull(6) ? null : r.GetString(6),
+                    recorded = r.GetBoolean(8), recordingId = r.IsDBNull(9) ? (long?)null : r.GetInt64(9), recordings = r.GetInt64(10),
                 });
             }
             return Results.Ok(new { items, total, page = p, pageSize = ps });
@@ -402,6 +412,66 @@ public static class RemoteEndpoints
             return Results.NoContent();
         }).RequireAuthorization(Permissions.RemoteManage);
 
+        // ---- recorded sessions ------------------------------------------------------------------------------------
+
+        // Device groups (Software Deployment) to choose the devices whose sessions are recorded.
+        g.MapGet("/device-groups", async (NpgsqlDataSource ds, CancellationToken ct) =>
+        {
+            var list = new List<object>();
+            await using var cmd = ds.CreateCommand("SELECT id, name FROM zentriq.device_groups ORDER BY lower(name)");
+            await using var r = await cmd.ExecuteReaderAsync(ct);
+            while (await r.ReadAsync(ct)) list.Add(new { id = r.GetGuid(0), name = r.GetString(1) });
+            return Results.Ok(list);
+        }).RequireAuthorization(Permissions.RemoteManage);
+
+        g.MapGet("/recordings", async (Guid? assetId, long? sessionId, int? page, int? pageSize, NpgsqlDataSource ds, CancellationToken ct) =>
+        {
+            var (p, ps) = Paging.Normalize(page, pageSize);
+            await using var cmd = ds.CreateCommand("""
+                SELECT r.id, r.session_id, r.user_name, r.device_name, r.asset_id, r.protocol, r.started_at, r.ended_at, r.size_bytes, count(*) OVER ()
+                  FROM zentriq.remote_recordings r
+                 WHERE r.deleted_at IS NULL AND (@a::uuid IS NULL OR r.asset_id = @a) AND (@s::bigint IS NULL OR r.session_id = @s)
+                 ORDER BY r.started_at DESC NULLS LAST, r.id DESC LIMIT @l OFFSET @o
+                """);
+            cmd.Parameters.Add(new NpgsqlParameter("a", NpgsqlDbType.Uuid) { Value = (object?)assetId ?? DBNull.Value });
+            cmd.Parameters.Add(new NpgsqlParameter("s", NpgsqlDbType.Bigint) { Value = (object?)sessionId ?? DBNull.Value });
+            cmd.Parameters.AddWithValue("l", ps);
+            cmd.Parameters.AddWithValue("o", (p - 1) * ps);
+            var items = new List<object>();
+            long total = 0;
+            await using var r = await cmd.ExecuteReaderAsync(ct);
+            while (await r.ReadAsync(ct))
+            {
+                total = r.GetInt64(9);
+                items.Add(new
+                {
+                    id = r.GetInt64(0), sessionId = r.IsDBNull(1) ? (long?)null : r.GetInt64(1), user = r.IsDBNull(2) ? null : r.GetString(2), device = r.IsDBNull(3) ? null : r.GetString(3),
+                    assetId = r.IsDBNull(4) ? (Guid?)null : r.GetGuid(4), kind = RemoteRecordings.Kind(r.IsDBNull(5) ? null : r.GetInt32(5)),
+                    startedAt = r.IsDBNull(6) ? (DateTimeOffset?)null : r.GetFieldValue<DateTimeOffset>(6), endedAt = r.IsDBNull(7) ? (DateTimeOffset?)null : r.GetFieldValue<DateTimeOffset>(7),
+                    size = r.GetInt64(8),
+                });
+            }
+            return Results.Ok(new { items, total, page = p, pageSize = ps });
+        }).RequireAuthorization(Permissions.RemoteRecordings);
+
+        // The recording file, for the player in the console (every playback is audited).
+        g.MapGet("/recordings/{id:long}/file", async (long id, bool? download, NpgsqlDataSource ds, ZentriqPaths paths, RequestContext rc, CancellationToken ct) =>
+        {
+            string file; string? device, user; DateTimeOffset? at;
+            await using (var cmd = ds.CreateCommand("SELECT file_name, device_name, user_name, started_at FROM zentriq.remote_recordings WHERE id = @id AND deleted_at IS NULL"))
+            {
+                cmd.Parameters.AddWithValue("id", id);
+                await using var r = await cmd.ExecuteReaderAsync(ct);
+                if (!await r.ReadAsync(ct)) return Results.NotFound();
+                file = r.GetString(0); device = r.IsDBNull(1) ? null : r.GetString(1); user = r.IsDBNull(2) ? null : r.GetString(2);
+                at = r.IsDBNull(3) ? null : r.GetFieldValue<DateTimeOffset>(3);
+            }
+            var path = RemoteRecordings.PathOf(paths.RemoteRecordings, file);
+            if (path is null || !File.Exists(path)) return Results.Problem(statusCode: 410, title: "The recording file is no longer on the server.");
+            await rc.AuditAsync(download == true ? "remote.recording.download" : "remote.recording.play", device ?? file, detail: new { recordingId = id, technician = user, startedAt = at });
+            return Results.File(File.OpenRead(path), "application/octet-stream", download == true ? Path.GetFileName(path) : null, enableRangeProcessing: false);
+        }).RequireAuthorization(Permissions.RemoteRecordings);
+
         g.MapGet("/settings", async (RemoteSupportService remote, CancellationToken ct) => Results.Ok(await remote.SettingsAsync(ct)));
 
         // Internet access: checks that a public name/address reaches this server over HTTPS before it is used for links.
@@ -437,6 +507,11 @@ public static class RemoteEndpoints
             var current = await remote.SettingsAsync(ct);
             body.InternetHost = current.InternetHost;
             body.InternetPort = current.InternetPort;
+            if (body.RecordingRetentionDays is < 1 or > 3650) return Validation.Problem("recordingRetentionDays", "Keep recordings between 1 and 3650 days.");
+            body.RecordGroupIds = (body.RecordGroupIds ?? []).Distinct().Take(200).ToList();
+            if (body.RecordSessions && !body.RecordAllDevices && body.RecordGroupIds.Count == 0) return Validation.Problem("recordGroupIds", "Choose the device groups whose sessions are recorded, or record all devices.");
+            try { RemoteServerConfig.WriteRecording(paths.RemoteCertificateDir, body.RecordSessions); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return Results.Problem(statusCode: 500, title: "Could not save the recording setting for the remote support service: " + ex.Message); }
             try { await remote.SaveSettingsAsync(body, ct); }
             catch (Exception ex) when (ex is MeshException or WebSocketException or HttpRequestException or TaskCanceledException)
             {

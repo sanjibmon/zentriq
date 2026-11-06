@@ -21,7 +21,7 @@ export const AREAS: AreaDef[] = [
   { area: 'Asset lifecycle', hint: 'Stages, assignment, people, contracts, depreciation', view: 'lifecycle.view', manage: 'lifecycle.manage' },
   { area: 'Cloud & infrastructure', hint: 'Azure, AWS, GCP, VMware, Hyper-V and other platforms', view: 'cloud.view', manage: 'cloud.manage' },
   { area: 'Remote support', hint: 'Remote sessions on devices', view: 'remote.start', viewLabel: 'Start sessions', manage: 'remote.manage', manageLabel: 'Configure',
-    extras: [['remote.unattended', 'Full remote rights']] },
+    extras: [['remote.unattended', 'Full remote rights'], ['remote.recordings', 'Play recorded sessions']] },
   { area: 'Vulnerabilities', hint: 'Findings, feeds and remediation', view: 'vuln.view', manage: 'vuln.manage', extras: [['vuln.except', 'Approve exceptions']] },
   { area: 'Security configuration', hint: 'Windows configuration checks and baselines', view: 'security.view', manage: 'security.manage' },
   { area: 'Software deployment', hint: 'Approved software, application control, requests, packages', view: 'deploy.view', manage: 'deploy.manage', manageLabel: 'Manage',

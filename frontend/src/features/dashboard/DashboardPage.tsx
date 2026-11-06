@@ -83,6 +83,7 @@ const WIDGETS: WidgetDef[] = [
   { id: 'network.attention', title: 'Network attention', defaultOn: false, description: 'Alarms, neighbours down, busy ports, unmanaged switches, port errors, high CPU' },
   { id: 'nonit.groups', chart: 'bar', title: 'Non-IT assets', defaultOn: true, description: 'Furniture, appliances, vehicles and other items by category group', perm: 'nonit.view' },
   { id: 'nonit.value', title: 'Non-IT asset value', defaultOn: true, description: 'Purchase and current value, status of the items', perm: 'nonit.view' },
+  { id: 'lifecycle.warranty', chart: 'bar', title: 'Warranty Expiry', defaultOn: true, description: 'IT assets in use or in stock by warranty end, and the next to end', perm: 'lifecycle.view' },
   { id: 'nonit.due', title: 'Non-IT: coming up', defaultOn: true, description: 'Warranty, AMC, insurance and maintenance due', perm: 'nonit.view' },
   { id: 'assets.seen', chart: 'bar', title: 'Last contact / offline', defaultOn: true, description: 'Online now … offline more than 30 days' },
   { id: 'assets.os', chart: 'bar', title: 'Operating systems', wide: true, defaultOn: true, description: 'Top operating systems' },
@@ -121,7 +122,7 @@ const toBody = (layout: Layout) => layout.map((w) => ({
   settings: { ...(w.chart ? { chart: w.chart } : {}), ...(w.reportId ? { reportId: w.reportId } : {}) },
 }));
 /** Widgets added in later releases: shown once on a saved dashboard until the user saves their layout. */
-const NEW_WIDGETS = ['assets.department', 'changes.hardware', 'changes.software', 'network.types', 'network.management', 'network.ports', 'nonit.groups', 'nonit.value', 'nonit.due', 'assets.location', 'accessories.stock', 'accessories.low'];
+const NEW_WIDGETS = ['assets.department', 'changes.hardware', 'changes.software', 'network.types', 'network.management', 'network.ports', 'nonit.groups', 'nonit.value', 'nonit.due', 'assets.location', 'accessories.stock', 'accessories.low', 'lifecycle.warranty'];
 const withNew = (layout: Layout, d: DashboardDto | null): Layout => {
   const seen = d?.filters?.seenWidgets ?? [];
   const add = NEW_WIDGETS.filter((id) => !seen.includes(id) && !layout.some((w) => w.id === id));
@@ -151,6 +152,9 @@ export async function pinReportToDashboard(reportId: string, name: string, wide:
 }
 const isKind = (k: unknown): k is ChartKind => CHART_KINDS.some(([c]) => c === k);
 
+interface WarrantyExpiry { expired: number; d30: number; d90: number; d365: number; later: number; unknown: number; total: number;
+  next: { id: string; name: string; warrantyEnd: string; days: number; provider: string | null; assignedTo: string | null }[] }
+
 interface HighlightData {
   licenses: { products: number; shortfall: number; unlicensed: number; compliancePercent: number;
     detail: { expiring: number; expired: number; cloudIssues: number; notActivated: number; next: { name: string; endDate: string; days: number } | null } } | null;
@@ -159,9 +163,15 @@ interface HighlightData {
 
 /** Licence and web app problems at the top of the dashboard (only for users who can see those areas). */
 function Highlights({ tick }: { tick: number }) {
+  const { can } = useAuth();
   const h = useApi(() => api.get<HighlightData>('/sam/highlights').catch(() => null), [tick]);
+  const wx = useApi(() => (can('lifecycle.view') ? api.get<WarrantyExpiry>('/lifecycle/warranty/expiry').catch(() => null) : Promise.resolve(null)), [tick]);
   const l = h.data?.licenses; const w = h.data?.webapps;
   const items: [number, string, string, 'crit' | 'warn'][] = [];
+  if (wx.data) {
+    if (wx.data.expired > 0) items.push([wx.data.expired, 'device(s) in use or in stock out of warranty', '/lifecycle?tab=assets&warranty=expired', 'crit']);
+    if (wx.data.d30 > 0) items.push([wx.data.d30, 'warranty(ies) ending within 30 days', '/lifecycle?tab=assets&warranty=expiring', 'warn']);
+  }
   if (l) {
     if (l.shortfall + l.unlicensed > 0) items.push([l.shortfall + l.unlicensed, 'software product(s) under-licensed or unlicensed', '/modules/licenses?tab=products&status=issues', 'crit']);
     if (l.detail.expired > 0) items.push([l.detail.expired, 'licence(s) expired', '/modules/licenses?tab=licenses&filter=expired', 'crit']);
@@ -222,6 +232,8 @@ export function DashboardPage() {
   const wantsAcc = layout.some((w) => w.id.startsWith('accessories.'));
   const acc = useApi(() => (wantsAcc ? Promise.all([api.get<AccSummary>('/accessories/summary'), api.get<AccStockRow[]>('/accessories/stock')]) : Promise.resolve(null)), [tick, wantsAcc]);
   const nonit = useApi(() => (wantsNonIt ? api.get<NonItSummary>('/nonit/summary') : Promise.resolve(null)), [tick, wantsNonIt]);
+  const wantsWarranty = layout.some((w) => w.id === 'lifecycle.warranty') && can('lifecycle.view');
+  const warranty = useApi(() => (wantsWarranty ? api.get<WarrantyExpiry>('/lifecycle/warranty/expiry') : Promise.resolve(null)), [tick, wantsWarranty]);
   const wantsSecurity = layout.some((w) => w.id.startsWith('security.') && w.id !== 'security.posture') && can('security.view');
   const sec = useApi(() => (wantsSecurity ? api.get<SecuritySummary>('/security/overview') : Promise.resolve(null)), [tick, wantsSecurity]);
 
@@ -352,6 +364,31 @@ export function DashboardPage() {
                 <span className="r"><span className={`stock-qty ${r.quantity === 0 ? 'out' : 'low'}`}>{r.quantity}</span> <span className="faint">/ {r.reorderLevel}</span></span>
               </div>
             ))}
+          </div>
+        );
+      }
+      case 'lifecycle.warranty': {
+        const v = warranty.data;
+        if (!v) return <div className="chart-empty">{warranty.error ? warranty.error.message : 'Loading…'}</div>;
+        if (v.total === 0) return <div className="chart-empty">No IT assets in use or in stock.</div>;
+        return (
+          <div className="stack-v">
+            {C([
+              { key: 'expired', label: 'Expired', value: v.expired, color: 'var(--crit)' },
+              { key: 'expiring', label: 'Within 30 days', value: v.d30, color: '#e8590c' },
+              { key: 'expiring90', label: '31–90 days', value: v.d90, color: 'var(--warn)' },
+              { key: 'active', label: '3–12 months', value: v.d365, color: 'var(--ok)' },
+              { key: 'later', label: 'More than a year', value: v.later, color: '#2b8a3e' },
+              { key: 'none', label: 'Unknown', value: v.unknown, color: 'var(--faint)' },
+            ], (sl) => navigate(`/lifecycle?tab=assets&warranty=${sl.key === 'expiring90' ? 'expiring' : sl.key === 'later' ? 'active' : sl.key}`), { centerLabel: 'devices' })}
+            {v.next.length > 0 && <div className="mini-list">
+              {v.next.slice(0, 5).map((u) => (
+                <div key={u.id} className="mi" onClick={() => navigate(`/lifecycle/assets/${u.id}`)}>
+                  <span><b>{u.name}</b> <span className="faint">{[u.provider, u.assignedTo].filter(Boolean).join(' · ')}</span></span>
+                  <span className="r faint">{u.days} d</span>
+                </div>
+              ))}
+            </div>}
           </div>
         );
       }
@@ -505,7 +542,7 @@ export function DashboardPage() {
     'scans.results': <Link to="/discovery" className="btn sm">Scans</Link>, 'license.usage': <Link to="/licensing" className="btn sm">Details</Link>,
     'scans.recent': <Link to="/discovery" className="btn sm">All scans</Link>,
     'accessories.stock': <Link to="/accessories" className="btn sm">Open</Link>, 'accessories.low': <Link to="/accessories?tab=stock&low=1" className="btn sm">All</Link>,
-    'nonit.groups': <Link to="/non-it" className="btn sm">Open</Link>, 'nonit.due': <Link to="/non-it?tab=assets&due=maintenance" className="btn sm">All</Link>,
+    'lifecycle.warranty': <Link to="/lifecycle?tab=contracts" className="btn sm">Warranty</Link>, 'nonit.groups': <Link to="/non-it" className="btn sm">Open</Link>, 'nonit.due': <Link to="/non-it?tab=assets&due=maintenance" className="btn sm">All</Link>,
     'network.types': <Link to="/network" className="btn sm">Network Inventory</Link>, 'network.ports': <Link to="/network?tab=ports" className="btn sm">Port map</Link>,
     'network.management': <Link to="/network?tab=unmanaged" className="btn sm">Unmanaged</Link>, 'network.attention': <Link to="/network" className="btn sm">Open</Link>,
   };

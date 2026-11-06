@@ -10,6 +10,7 @@ import { Icon } from '../../components/Icon';
 import { Modal } from '../../components/Modal';
 import { Callout, DataTable, ErrorBox, fmt, Kpis, PageHead, Pager, Panel, Pill } from '../../components/ui';
 import { InternetSetup } from './InternetSetup';
+import { RecordingPlayer } from './RecordingPlayer';
 import { TrustPanel } from './TrustPanel';
 import {
   formatCode, openQuick, openRemote, VIEW_LABEL,
@@ -334,19 +335,54 @@ function Devices({ status, allowTerminal, onMsg, onChanged }: { status: RemoteSt
 // ---- History ------------------------------------------------------------------------------------------------------
 
 function Sessions() {
+  const { can } = useAuth();
   const [page, setPage] = useState(1);
+  const [playing, setPlaying] = useState<RemoteSession | null>(null);
   const d = useApi(() => api.get<Paged<RemoteSession>>('/remote/sessions', { page, pageSize: 50 }), [page]);
+  const canPlay = can('remote.recordings');
   return (
-    <Panel flush title="Session history" sub="Every remote session opened from Zentriq (also in the activity log)">
+    <Panel flush title="Session history" sub="Every remote session opened from Zentriq (also in the activity log). Recorded sessions can be played back.">
       <ErrorBox error={d.error} />
       <DataTable rows={d.data?.items ?? []} empty={d.loading ? 'Loading…' : 'No remote sessions yet.'} columns={[
         { key: 't', label: 'When', render: (s) => <span title={fmt.date(s.at)}>{fmt.date(s.at)}</span> },
         { key: 'u', label: 'Technician', render: (s) => s.user },
-        { key: 'v', label: 'Session', render: (s) => VIEW_LABEL[s.view] ?? s.view },
+        { key: 'v', label: 'Session', render: (s) => <>{VIEW_LABEL[s.view] ?? s.view}{s.recorded && <> <span className="rec-badge" title="This session was recorded"><Icon name="play" size={11} /> Recorded</span></>}</> },
         { key: 'd', label: 'Device', render: (s) => s.assetId ? <Link to={`/assets/${s.assetId}`}>{s.device ?? s.assetId}</Link> : s.device ?? '—' },
         { key: 'i', label: 'From', render: (s) => <span className="mono">{s.ip ?? '—'}</span> },
+        { key: 'p', label: 'Recording', render: (s) => s.recordingId && canPlay
+          ? <button className="btn sm" onClick={() => setPlaying(s)}><Icon name="play" size={12} /> Play{s.recordings > 1 ? ` (${s.recordings})` : ''}</button>
+          : s.recorded ? <span className="faint">{s.recordingId ? 'Recorded' : 'Being saved…'}</span> : <span className="faint">—</span> },
       ]} />
       {d.data && <Pager page={page} pageSize={50} total={d.data.total} onPage={setPage} />}
+      {playing?.recordingId && <RecordingPlayer id={playing.recordingId} title={`Recorded Session · ${playing.device ?? ''}`} onClose={() => setPlaying(null)} />}
+    </Panel>
+  );
+}
+
+/** Remote Support › Settings › Session Recording. */
+function RecordingPanel({ form, setForm, busy, onSave }: { form: RemoteSettings; setForm: (f: RemoteSettings) => void; busy: boolean; onSave: () => void }) {
+  const groups = useApi(() => api.get<{ id: string; name: string }[]>('/remote/device-groups'), []);
+  const ids = form.recordGroupIds ?? [];
+  return (
+    <Panel title="Session Recording" sub="Record remote desktop, terminal and file sessions on unattended devices and play them back from History">
+      <div className="form-v">
+        <label className="row-check"><input type="checkbox" checked={form.recordSessions} onChange={(e) => setForm({ ...form, recordSessions: e.target.checked })} /> Record remote sessions</label>
+        {form.recordSessions && <>
+          <label className="row-check"><input type="radio" name="rec-scope" checked={form.recordAllDevices} onChange={() => setForm({ ...form, recordAllDevices: true })} /> On every device (quick support sessions too)</label>
+          <label className="row-check"><input type="radio" name="rec-scope" checked={!form.recordAllDevices} onChange={() => setForm({ ...form, recordAllDevices: false })} /> Only on the devices of these device groups</label>
+          {!form.recordAllDevices && <div className="check-list">
+            {(groups.data ?? []).length === 0 && <span className="muted">No device groups yet. Create them under <Link to="/deployment?tab=groups">Software Deployment › Device Groups</Link>.</span>}
+            {(groups.data ?? []).map((g) => <label key={g.id}><input type="checkbox" checked={ids.includes(g.id)}
+              onChange={(e) => setForm({ ...form, recordGroupIds: e.target.checked ? [...ids, g.id] : ids.filter((x) => x !== g.id) })} /> {g.name}</label>)}
+          </div>}
+          <label>Keep recordings for
+            <select className="in" value={form.recordingRetentionDays} onChange={(e) => setForm({ ...form, recordingRetentionDays: Number(e.target.value) })}>
+              {[7, 14, 30, 60, 90, 180, 365, 730].map((n) => <option key={n} value={n}>{n} days</option>)}
+            </select></label>
+          <Callout tone="info" icon="info">The person at the device sees <b>(session recorded)</b> after the technician's name in the consent prompt and on the privacy bar. Recordings are stored on the Zentriq server; playing one back needs the <i>Play recorded sessions</i> permission and is written to the audit log. Check that recording is allowed by your policy and local law, and tell users.</Callout>
+        </>}
+        <div><button className="btn primary" disabled={busy} onClick={onSave}>{busy ? 'Saving…' : 'Save'}</button></div>
+      </div>
     </Panel>
   );
 }
@@ -400,6 +436,8 @@ function Setup({ status, onChanged }: { status: RemoteStatus; onChanged: () => v
             <div><button className="btn primary" disabled={busy} onClick={() => void save()}>{busy ? 'Saving…' : 'Save'}</button></div>
           </div>}
         </Panel>
+
+        {form && <RecordingPanel form={form} setForm={setForm} busy={busy} onSave={() => void save('Saved. Recording applies to sessions started from now on (the remote support service restarts within a minute).')} />}
 
         <Panel title="Internet access" sub="Public address for people outside your network (HTTPS only)"
           right={inet ? <Pill tone={inet.usable ? (inet.applied ? 'ok' : 'info') : 'warn'}>{inet.usable ? (inet.applied ? (inet.verified ? 'Verified' : 'Confirmed') : 'Applying…') : 'Check failed'}</Pill> : <Pill>Not set up</Pill>}>

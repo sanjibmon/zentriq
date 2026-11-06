@@ -15,9 +15,10 @@ export interface RemoteDevice {
   lastAction: { status: string; detail: string | null } | null;
 }
 
-export interface RemoteSession { id: number; at: string; user: string; view: string; device: string | null; assetId: string | null; ip: string | null }
+export interface RemoteSession { id: number; at: string; user: string; view: string; device: string | null; assetId: string | null; ip: string | null; recorded: boolean; recordingId: number | null; recordings: number }
 export interface RemoteSettings {
   prompt: boolean; notify: boolean; privacyBar: boolean; allowTerminal: boolean; internetHost: string | null; internetPort: number | null;
+  recordSessions: boolean; recordAllDevices: boolean; recordGroupIds: string[]; recordingRetentionDays: number;
 }
 
 export interface QuickSession {

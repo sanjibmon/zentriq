@@ -12,13 +12,14 @@ import { useLocations } from '../locations/Locations';
 import { AddToContractDialog, BulkStageDialog, ContractDialog, StockDialog, useLcMeta } from './LifecycleDialogs';
 import { CustomFieldsPanel, ImportDialog, PersonDialog, TagSettingsPanel, type ImportKind } from './LifecycleExtras';
 import { LifecyclePanel } from './LifecyclePanel';
+import { lookUpWarranty, WarrantyKeysPanel, WarrantyLookupPanel } from './Warranty';
 import {
   CONTRACT_KIND, KIND_LABEL, money, moneyShort, STAGE_ORDER, STAGE_TONE, stageLabel, statusLabel,
   type LcAsset, type LcContract, type LcEvent, type LcMeta, type LcPerson, type LcPolicy, type LcRefresh, type LcSummary,
 } from './types';
 
 type Tab = 'overview' | 'assets' | 'people' | 'contracts' | 'refresh' | 'history' | 'settings';
-const TABS: [Tab, string][] = [['overview', 'Overview'], ['assets', 'IT Assets'], ['people', 'People'], ['contracts', 'Contracts'], ['refresh', 'Refresh Planning'], ['history', 'History'], ['settings', 'Policies']];
+const TABS: [Tab, string][] = [['overview', 'Overview'], ['assets', 'IT Assets'], ['people', 'People'], ['contracts', 'Warranty & Contracts'], ['refresh', 'Refresh Planning'], ['history', 'History'], ['settings', 'Settings']];
 
 export function LifecyclePage() {
   const { query, navigate } = useRouter();
@@ -151,6 +152,10 @@ function Assets({ meta, tick, onMsg }: { meta: LcMeta; tick: number; onMsg: (m: 
   const reset = () => { setPage(1); setPicked([]); };
   const allPicked = rows.length > 0 && rows.every((r) => picked.includes(r.id));
   const changed = (m: string) => { setDialog(null); setPicked([]); setLocal((x) => x + 1); onMsg(m); };
+  async function warrantySelected() {
+    setBusy(true);
+    try { changed(await lookUpWarranty(picked)); } catch (e) { onMsg(e instanceof Error ? e.message : String(e)); } finally { setBusy(false); }
+  }
   async function tagSelected() {
     setBusy(true);
     try { const r = await api.post<{ tags: Record<string, string> }>('/lifecycle/tags', { assetIds: picked }); changed(`${Object.keys(r.tags).length} asset(s) have a tag.`); }
@@ -225,6 +230,7 @@ function Assets({ meta, tick, onMsg }: { meta: LcMeta; tick: number; onMsg: (m: 
         <button className="btn sm" onClick={() => setDialog('stage')}>Change stage</button>
         <button className="btn sm" disabled={busy} onClick={() => void tagSelected()}>Give asset tags</button>
         <button className="btn sm" onClick={() => setDialog('contract')}>Add to contract</button>
+        <button className="btn sm" disabled={busy} onClick={() => void warrantySelected()}>Look Up Warranty</button>
         <Link className="btn sm" to={`/lifecycle/labels?ids=${picked.join(',')}`}><Icon name="report" size={13} /> Print labels</Link>
         <button className="btn sm ghost" onClick={() => setPicked([])}>Clear</button>
       </div>}
@@ -365,8 +371,9 @@ function Contracts({ meta, tick, onMsg, onUpload }: { meta: LcMeta; tick: number
         {canEdit && <button className="btn" onClick={onUpload}><Icon name="upload" size={13} /> Bulk upload</button>}
         {canEdit && <button className="btn primary" onClick={() => setEditing('new')}><Icon name="plus" size={13} /> New contract</button>}
       </div>
+      <WarrantyLookupPanel onMsg={onMsg} />
       <ErrorBox error={list.error} />
-      <Panel flush>
+      <Panel title="Contracts" flush>
         <DataTable rows={list.data ?? []} empty={list.loading ? 'Loading…' : 'No contracts yet.'} columns={[
           { key: 'n', label: 'Contract', render: (c) => <button className="linkish" onClick={() => setOpen(c.id)}><b>{c.name}</b></button> },
           { key: 'k', label: 'Type', render: (c) => CONTRACT_KIND[c.kind] ?? c.kind },
@@ -484,6 +491,7 @@ function Policies({ meta, onSaved, onReload }: { meta: LcMeta; onSaved: () => vo
   return (
     <>
       {error && <Callout tone="crit" icon="alert">{error}</Callout>}
+      <WarrantyKeysPanel />
       <TagSettingsPanel meta={meta} onSaved={onReload} />
       <CustomFieldsPanel meta={meta} onSaved={onReload} />
       <Panel title="Policies per device class" sub="Asset tag prefix, depreciation (unless set on the asset) and the age at which devices are due for replacement" flush>

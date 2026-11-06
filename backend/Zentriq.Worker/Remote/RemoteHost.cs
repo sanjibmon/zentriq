@@ -155,6 +155,18 @@ public sealed class RemoteHost(ZentriqPaths paths, ILogger<RemoteHost> logger) :
             }
         }
 
+        // Session recording (Remote Support › Settings).
+        if (domain is not null)
+        {
+            var record = RemoteServerConfig.ReadRecording(src);
+            if (record) Directory.CreateDirectory(paths.RemoteRecordings);
+            if (RemoteServerConfig.ApplyRecording(domain, record, paths.RemoteRecordings))
+            {
+                cfgChanged = true;
+                changes.Add(record ? "session recording on" : "session recording off");
+            }
+        }
+
         if (cfgChanged) File.WriteAllText(cfgPath, cfg.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
         what = string.Join("; ", changes);
         return changes.Count > 0;

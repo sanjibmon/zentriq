@@ -579,3 +579,16 @@ a.kpi:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .note > span .faint { font-size: 12px; overflow-wrap: anywhere; }
 .note:not(.unread) b { font-weight: 500; }
 .kv-list { display: grid; gap: 3px; font-size: 13px; }
+
+/* Build 113: recorded remote sessions, sign-in options */
+.rec-stage { background: #111; border-radius: 8px; overflow: auto; max-height: 64vh; display: flex; justify-content: center; align-items: flex-start; }
+.rec-canvas { max-width: 100%; height: auto; display: block; }
+.rec-text { color: #e9ecef; background: transparent; margin: 0; padding: 12px; width: 100%; min-height: 240px; font-size: 12.5px; white-space: pre-wrap; word-break: break-all; }
+.rec-controls { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
+.rec-badge { display: inline-flex; gap: 4px; align-items: center; color: var(--crit); font-size: 11.5px; font-weight: 600; }
+.login-sso { display: grid; gap: 8px; margin-top: 4px; }
+.login-or { display: flex; align-items: center; gap: 8px; color: var(--faint); font-size: 12px; margin: 6px 0; }
+.login-or::before, .login-or::after { content: ""; flex: 1; border-top: 1px solid var(--line); }
+.btn.ms { display: inline-flex; justify-content: center; gap: 8px; align-items: center; }
+.ms-logo { display: inline-grid; grid-template-columns: 7px 7px; gap: 1px; }
+.ms-logo i { width: 7px; height: 7px; display: block; }

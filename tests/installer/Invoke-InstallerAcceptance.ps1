@@ -119,7 +119,7 @@ Remove-Item $answer -Force   # contains the administrator password
 
 if (-not $installed) {
     foreach ($t in 'T02 PostgreSQL provisioning', 'T03 Database migration', 'T04 Administrator sign-in', 'T05 API and worker services', 'T06 Trial initialization',
-                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection', 'T68 Live agent connection', 'T69 Locations and IT accessories', 'T70 Manual hardware details', 'T71 Standard and Advanced installation', 'T72 Asset lifecycle', 'T73 Cloud and infrastructure', 'T74 Own asset tags, people and bulk upload', 'T75 Backup and restore', 'T76 Roles and groups', 'T77 Log retention and export', 'T78 Agent stop and disable protection', 'T79 Automatic agent update', 'T80 Agent check-in and diagnosis commands', 'T81 Licensing plans and online activation', 'T82 Software Deployment policy', 'T83 Application control on Windows', 'T84 Push deployment', 'T85 Remote support agent tamper protection', 'T86 Software licenses', 'T87 Web apps and accounts', 'T88 Network connected devices') {
+                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection', 'T68 Live agent connection', 'T69 Locations and IT accessories', 'T70 Manual hardware details', 'T71 Standard and Advanced installation', 'T72 Asset lifecycle', 'T73 Cloud and infrastructure', 'T74 Own asset tags, people and bulk upload', 'T75 Backup and restore', 'T76 Roles and groups', 'T77 Log retention and export', 'T78 Agent stop and disable protection', 'T79 Automatic agent update', 'T80 Agent check-in and diagnosis commands', 'T81 Licensing plans and online activation', 'T82 Software Deployment policy', 'T83 Application control on Windows', 'T84 Push deployment', 'T85 Remote support agent tamper protection', 'T86 Software licenses', 'T87 Web apps and accounts', 'T88 Network connected devices', 'T89 Warranty lookup', 'T90 Session recording', 'T91 Directory sign-in') {
         Record $t.Substring(0, 3) $t.Substring(4) 'BLOCKED' 'installation failed'
     }
 } else {
@@ -962,6 +962,108 @@ if (-not $installed) {
             $vs = Api GET '/network/vendors/status' -Session $s
             $notes = @(Api GET '/system/notifications' -Session $s | ForEach-Object { $_ })
             "connected devices $($sum.endpoints) ($($ep.Count) unknown); $($subnets.Count) subnet(s); $($vs.prefixes) MAC vendor prefixes; $($notes.Count) notification(s)"
+        } | Out-Null
+
+        # ---- T89: online warranty lookup ----
+        Check 'T89' 'Warranty lookup: Dell, Lenovo and HP keys stored encrypted, a wrong key is explained, devices of other makers are skipped, expiry overview' {
+            $s = Login
+            $w = Api GET '/lifecycle/warranty' -Session $s
+            Assert (@($w.providers).Count -eq 3) "providers: $(@($w.providers | ForEach-Object { $_.vendor }) -join ',')"
+            Assert ($w.settings.refreshDays -eq 30) "refresh days $($w.settings.refreshDays)"
+            $bad = Invoke-WebRequest "$base/api/v1/lifecycle/warranty/providers/dell" -Method Put -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } -ContentType 'application/json' -Body '{"clientId":"ci-only","enabled":true}' -SkipHttpErrorCheck
+            Assert ($bad.StatusCode -eq 400 -and (Body $bad) -match 'secret') "Dell key without a secret: $($bad.StatusCode)"
+            Api PUT '/lifecycle/warranty/providers/dell' @{ clientId = 'zentriq-ci-not-a-key'; secret = 'zentriq-ci-not-a-secret'; enabled = $true } -Session $s | Out-Null
+            $w = Api GET '/lifecycle/warranty' -Session $s
+            Assert (($w.providers | Where-Object vendor -eq 'dell').configured) 'Dell key not stored'
+            $t = Api POST '/lifecycle/warranty/providers/dell/test' @{ serial = 'ABC1234' } -Session $s
+            Assert (-not $t.ok -and $t.message.Length -gt 10) "test with a made-up key: $($t | ConvertTo-Json -Compress)"
+            $lookup = 'no device'
+            if ($script:agentAsset) {
+                $r = Api POST '/lifecycle/warranty/lookup' @{ assetIds = @($script:agentAsset) } -Session $s
+                Assert (-not $r.queued -and $r.found -eq 0 -and $r.checked -eq 0) "runner VM (not Dell/Lenovo/HP): $($r | ConvertTo-Json -Compress)"
+                $one = Api GET "/lifecycle/warranty/assets/$($script:agentAsset)" -Session $s
+                Assert ($null -eq $one.status) "runner VM looked up: $($one | ConvertTo-Json -Compress)"
+                $lookup = "runner VM skipped ($($r.message))"
+            }
+            $all = Api POST '/lifecycle/warranty/lookup' @{ all = $true } -Session $s
+            Assert $all.queued 'look up all not queued'
+            $x = Api GET '/lifecycle/warranty/expiry' -Session $s
+            Assert ($null -ne $x.total -and $null -ne $x.expired -and $null -ne $x.d30) "expiry overview: $($x | ConvertTo-Json -Compress)"
+            Api PUT '/lifecycle/warranty/providers/dell' @{ clientId = ''; enabled = $false } -Session $s | Out-Null
+            $w = Api GET '/lifecycle/warranty' -Session $s
+            Assert (-not ($w.providers | Where-Object vendor -eq 'dell').configured) 'Dell key not removed'
+            "made-up Dell key: $($t.message); $lookup; $($x.total) asset(s) in the expiry overview ($($x.unknown) without a warranty date)"
+        } | Out-Null
+
+        # ---- T90: remote session recording ----
+        Check 'T90' 'Session recording: settings validated, the engine is configured to record, recordings list and playback protected, off again' {
+            $s = Login
+            $rs = Api GET '/remote/settings' -Session $s
+            Assert ($rs.recordingRetentionDays -eq 90 -and -not $rs.recordSessions) "defaults: $($rs | ConvertTo-Json -Compress)"
+            $rs.recordSessions = $true; $rs.recordAllDevices = $false; $rs.recordGroupIds = @()
+            $bad = Invoke-WebRequest "$base/api/v1/remote/settings" -Method Put -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } -ContentType 'application/json' -Body ($rs | ConvertTo-Json -Depth 4) -SkipHttpErrorCheck
+            Assert ($bad.StatusCode -eq 400) "groups required: $($bad.StatusCode)"
+            $rs.recordAllDevices = $true; $rs.recordingRetentionDays = 30
+            $put = Invoke-WebRequest "$base/api/v1/remote/settings" -Method Put -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } -ContentType 'application/json' -Body ($rs | ConvertTo-Json -Depth 4) -SkipHttpErrorCheck
+            Assert ($put.StatusCode -in 204, 503) "save: $($put.StatusCode) $(Body $put)"
+            Assert (Test-Path (Join-Path $dataDir 'Remote\cert\recording.txt')) 'recording.txt not written for the remote support service'
+            $cfgFile = Join-Path $dataDir 'Remote\data\config.json'
+            $applied = $false
+            for ($i = 0; $i -lt 30 -and -not $applied; $i++) {
+                if (Test-Path $cfgFile) { $applied = (Get-Content $cfgFile -Raw) -match '"sessionRecording"' }
+                if (-not $applied) { Start-Sleep 5 }
+            }
+            Assert $applied 'ZentriqRemote did not add sessionRecording to the engine configuration within 150 s'
+            Assert (Test-Path (Join-Path $dataDir 'Remote\recordings')) 'recordings folder missing'
+            $list = Api GET '/remote/recordings' -Session $s
+            Assert ($null -ne $list.total) 'recordings list'
+            $sess = Api GET '/remote/sessions' -Session $s
+            $missing = Invoke-WebRequest "$base/api/v1/remote/recordings/999999999/file" -WebSession $s -SkipHttpErrorCheck
+            Assert ($missing.StatusCode -eq 404) "unknown recording: $($missing.StatusCode)"
+            $anon = Invoke-WebRequest "$base/api/v1/remote/recordings/1/file" -SkipHttpErrorCheck
+            Assert ($anon.StatusCode -in 401, 403) "playback without sign-in: $($anon.StatusCode)"
+            $rs.recordSessions = $false
+            $off = Invoke-WebRequest "$base/api/v1/remote/settings" -Method Put -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } -ContentType 'application/json' -Body ($rs | ConvertTo-Json -Depth 4) -SkipHttpErrorCheck
+            Assert ($off.StatusCode -in 204, 503) "turn off: $($off.StatusCode)"
+            Assert (-not (Test-Path (Join-Path $dataDir 'Remote\cert\recording.txt'))) 'recording.txt left after turning recording off'
+            "engine configured to record (retention 30 days); $($list.total) recording(s), $($sess.total) session(s) in history; turned off again"
+        } | Out-Null
+
+        # ---- T91: console sign-in with Active Directory and Microsoft Entra ID ----
+        Check 'T91' 'Directory sign-in: Sign In With Microsoft redirects with PKCE, a forged callback is refused, Active Directory errors are clear, group mappings, local sign-in keeps working' {
+            # Sign-in endpoints are rate limited per address (10 a minute): wait out a 429.
+            function Limited([scriptblock] $Call) { for ($i = 0; $i -lt 6; $i++) { $r = & $Call; if ($r.StatusCode -ne 429) { return $r }; Start-Sleep 15 }; $r }
+            $s = Login
+            $o = Invoke-RestMethod "$base/api/v1/auth/options"
+            Assert (-not $o.microsoft -and $null -eq $o.directory) "options before: $($o | ConvertTo-Json -Compress)"
+            $tenant = [guid]::NewGuid().ToString(); $client = [guid]::NewGuid().ToString()
+            $bad = Invoke-WebRequest "$base/api/v1/auth/sign-in/entra" -Method Put -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } -ContentType 'application/json' -Body (@{ enabled = $true; tenantId = 'contoso'; clientId = $client } | ConvertTo-Json) -SkipHttpErrorCheck
+            Assert ($bad.StatusCode -eq 400) "tenant must be a GUID: $($bad.StatusCode)"
+            Api PUT '/auth/sign-in/entra' @{ enabled = $true; tenantId = $tenant; clientId = $client; createUsers = $true; clientSecret = 'zentriq-ci-value' } -Session $s | Out-Null
+            Api PUT '/auth/sign-in/ldap' @{ enabled = $true; host = '127.0.0.1'; port = 636; ldaps = $true; verifyCertificate = $true; domain = 'ZQCI'; createUsers = $true } -Session $s | Out-Null
+            $o = Invoke-RestMethod "$base/api/v1/auth/options"
+            Assert ($o.microsoft -and $o.directory.domain -eq 'ZQCI') "options after: $($o | ConvertTo-Json -Compress)"
+            $start = Limited { Invoke-WebRequest "$base/api/v1/auth/oidc/start" -MaximumRedirection 0 -SkipHttpErrorCheck -ErrorAction SilentlyContinue }
+            $loc = [string]$start.Headers.Location
+            Assert ($start.StatusCode -eq 302 -and $loc.StartsWith("https://login.microsoftonline.com/$tenant/oauth2/v2.0/authorize?")) "start: $($start.StatusCode) $loc"
+            Assert ($loc -match 'code_challenge_method=S256' -and $loc -match "client_id=$client" -and $loc -match 'redirect_uri=https%3A%2F%2F') "authorize URL: $loc"
+            $forged = Limited { Invoke-WebRequest "$base/api/v1/auth/oidc/callback?code=abc&state=forged" -SkipHttpErrorCheck }
+            Assert ($forged.StatusCode -eq 200 -and (Body $forged) -match 'ssoError=') "forged callback: $($forged.StatusCode)"
+            $dir = Limited { Invoke-WebRequest "$base/api/v1/auth/login" -Method Post -Headers @{ 'X-Zentriq-Request' = '1' } -ContentType 'application/json' -Body (@{ email = 'ZQCI\nobody'; password = 'not-a-password'; directory = $true } | ConvertTo-Json) -SkipHttpErrorCheck }
+            Assert ($dir.StatusCode -eq 401 -and (Body $dir) -match 'domain controller') "directory sign-in without a domain controller: $($dir.StatusCode) $(Body $dir)"
+            $empty = Limited { Invoke-WebRequest "$base/api/v1/auth/login" -Method Post -Headers @{ 'X-Zentriq-Request' = '1' } -ContentType 'application/json' -Body (@{ email = 'ZQCI\nobody'; password = ''; directory = $true } | ConvertTo-Json) -SkipHttpErrorCheck }
+            Assert ($empty.StatusCode -eq 401) "empty directory password: $($empty.StatusCode)"
+            $m = Api POST '/auth/sign-in/mappings' @{ provider = 'ldap'; groupRef = 'CN=Zentriq Admins,OU=Groups,DC=zqci,DC=local'; groupName = 'Zentriq Admins'; roleId = 'admin' } -Session $s
+            $si = Api GET '/auth/sign-in' -Session $s
+            Assert (@($si.mappings | Where-Object { $_.id -eq $m.id }).Count -eq 1) 'mapping not listed'
+            Assert ($si.redirectUri -match '/api/v1/auth/oidc/callback$') "redirect URI $($si.redirectUri)"
+            Api DELETE "/auth/sign-in/mappings/$($m.id)" -Session $s | Out-Null
+            Api PUT '/auth/sign-in/entra' @{ enabled = $false; tenantId = $tenant; clientId = $client } -Session $s | Out-Null
+            Api PUT '/auth/sign-in/ldap' @{ enabled = $false; host = '127.0.0.1'; port = 636; ldaps = $true; verifyCertificate = $true } -Session $s | Out-Null
+            $again = Login
+            $me = Api GET '/auth/me' -Session $again
+            Assert ($me.email -eq $adminEmail) 'local sign-in after the directory settings'
+            "authorize redirect to tenant $tenant with PKCE; forged callback refused; AD: $(((Body $dir) | ConvertFrom-Json).title); mapping added and removed; local admin signs in"
         } | Out-Null
     }
 

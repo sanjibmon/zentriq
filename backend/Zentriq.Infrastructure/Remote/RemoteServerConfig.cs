@@ -108,6 +108,47 @@ public static class RemoteServerConfig
         return changed;
     }
 
+    /// <summary>Present when sessions are recorded (written by the API from Remote Support › Settings, applied by ZentriqRemote).</summary>
+    public const string RecordingFile = "recording.txt";
+
+    public static bool ReadRecording(string dir) => File.Exists(Path.Combine(dir, RecordingFile));
+
+    public static void WriteRecording(string dir, bool on)
+    {
+        if (!Directory.Exists(dir)) return;
+        var file = Path.Combine(dir, RecordingFile);
+        if (!on) { if (File.Exists(file)) File.Delete(file); }
+        else File.WriteAllText(file, "on" + Environment.NewLine);
+    }
+
+    /// <summary>
+    /// The engine's session recording: remote desktop (2), terminal (1) and files (5) sessions of accounts flagged for
+    /// recording (Zentriq flags the technician's recording account when the device is in a recorded group), written to
+    /// <paramref name="path"/> as .mcrec files. Zentriq indexes them, plays them back and deletes them after the retention.
+    /// </summary>
+    public static JsonObject RecordingConfig(string path) => new()
+    {
+        ["filepath"] = path,
+        ["onlySelectedUsers"] = true,
+        ["protocols"] = new JsonArray(1, 2, 5),
+    };
+
+    /// <summary>Sets or removes the domain's sessionRecording. Returns true when something changed.</summary>
+    public static bool ApplyRecording(JsonObject domain, bool on, string path)
+    {
+        var have = domain["sessionRecording"]?.ToJsonString();
+        if (!on)
+        {
+            if (have is null) return false;
+            domain.Remove("sessionRecording");
+            return true;
+        }
+        var want = RecordingConfig(path);
+        if (have == want.ToJsonString()) return false;
+        domain["sessionRecording"] = want;
+        return true;
+    }
+
     public static IReadOnlyList<string> ReadLines(string file) =>
         File.Exists(file) ? File.ReadAllLines(file).Select(l => l.Trim()).Where(l => l.Length > 0).ToArray() : [];
 

@@ -36,8 +36,18 @@ public static class AccountEndpoints
         var g = api.MapGroup("/auth").WithTags("Authentication");
 
         // Lets the sign-in page decide whether to offer "Forgot password?" by e-mail.
-        g.MapGet("/options", async (MailService mail, CancellationToken ct) =>
-            Results.Ok(new { passwordResetByEmail = MailService.IsUsable(await mail.LoadAsync(ct)) })).AllowAnonymous();
+        // Also which directory sign-in methods are on (Users, Roles & Groups › Sign-in).
+        g.MapGet("/options", async (MailService mail, Zentriq.Infrastructure.Auth.SignInStore signIn, CancellationToken ct) =>
+        {
+            var ldap = await signIn.LdapAsync(ct);
+            var entra = await signIn.EntraAsync(ct);
+            return Results.Ok(new
+            {
+                passwordResetByEmail = MailService.IsUsable(await mail.LoadAsync(ct)),
+                directory = ldap.Enabled ? new { domain = ldap.Domain } : null,
+                microsoft = entra.Enabled && Zentriq.Infrastructure.Auth.EntraOidc.ValidTenant(entra.TenantId) && entra.ClientId.Length > 0,
+            });
+        }).AllowAnonymous();
 
         // QR code for the pending enrollment secret (rendered on the server; never cached).
         g.MapGet("/mfa/qr", async (RequestContext rc, ZentriqDbContext db, IDataProtectionProvider dp, HttpContext http, CancellationToken ct) =>
@@ -82,6 +92,16 @@ public static class AccountEndpoints
             {
                 await audit.WriteAsync(new AuditActor(null, email, ip), "auth.password_reset_requested", email, "Failure", new { reason = user is null ? "unknown-user" : "disabled" }, ct: ct);
                 return generic;
+            }
+            // Directory accounts sign in with their directory password; it is changed there.
+            await using (var src = ds.CreateCommand("SELECT auth_source FROM zentriq.users WHERE id = @u"))
+            {
+                src.Parameters.AddWithValue("u", user.Id);
+                if (await src.ExecuteScalarAsync(ct) is string source && source != "local")
+                {
+                    await audit.WriteAsync(new AuditActor(user.Id, email, ip), "auth.password_reset_requested", email, "Failure", new { reason = "directory-account" }, ct: ct);
+                    return generic;
+                }
             }
             // At most 3 outstanding requests per user per hour.
             await using (var cnt = ds.CreateCommand("SELECT count(*) FROM zentriq.password_reset_tokens WHERE user_id = @u AND created_at > now() - interval '1 hour'"))

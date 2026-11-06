@@ -6,7 +6,10 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Zentriq.Api.Infrastructure;
 using Zentriq.Application.Security;
+using System.Text.Json;
+using Npgsql;
 using Zentriq.Infrastructure.Audit;
+using Zentriq.Infrastructure.Auth;
 using Zentriq.Infrastructure.Data;
 using Zentriq.Infrastructure.Licensing;
 
@@ -14,7 +17,32 @@ namespace Zentriq.Api.Endpoints;
 
 public static class AuthEndpoints
 {
-    public sealed record LoginBody(string Email, string Password, string? MfaCode);
+    public sealed record LoginBody(string Email, string Password, string? MfaCode, bool? Directory = null);
+    private sealed record OidcState(string State, string Nonce, string Verifier, DateTimeOffset Expires);
+    private const string OidcCookie = "zentriq.oidc";
+    private const string OidcPurpose = "Zentriq.Oidc.v1";
+
+    /// <summary>The redirect URI registered in the Entra app: this console's address.</summary>
+    public static string RedirectUri(HttpContext http) => $"https://{http.Request.Host}/api/v1/auth/oidc/callback";
+
+    private static async Task<string?> AuthSourceAsync(NpgsqlDataSource ds, Guid userId, CancellationToken ct)
+    {
+        await using var cmd = ds.CreateCommand("SELECT auth_source FROM zentriq.users WHERE id = @u");
+        cmd.Parameters.AddWithValue("u", userId);
+        return await cmd.ExecuteScalarAsync(ct) as string;
+    }
+
+    /// <summary>
+    /// A small page that continues to the console (a same-site navigation, so the new session cookie — SameSite=Strict —
+    /// is sent with it).
+    /// </summary>
+    private static IResult Html(string to)
+    {
+        var url = System.Net.WebUtility.HtmlEncode(to);
+        return Results.Content($"<!doctype html><html><head><meta charset=\"utf-8\"><meta http-equiv=\"refresh\" content=\"0;url={url}\"><title>Zentriq</title></head><body><a href=\"{url}\">Continue to Zentriq</a></body></html>", "text/html");
+    }
+
+    private static IResult SsoError(string message) => Html("/?ssoError=" + Uri.EscapeDataString(message));
     public sealed record ChangePasswordBody(string CurrentPassword, string NewPassword);
     public sealed record MfaConfirmBody(string Code);
 
@@ -25,7 +53,7 @@ public static class AuthEndpoints
         var g = api.MapGroup("/auth").WithTags("Authentication");
 
         g.MapPost("/login", async (LoginBody body, ZentriqDbContext db, IPasswordHasher<User> hasher, AuditWriter audit,
-            IDataProtectionProvider dp, LicensingService licensing, HttpContext http, CancellationToken ct) =>
+            IDataProtectionProvider dp, LicensingService licensing, SignInStore signIn, NpgsqlDataSource ds, HttpContext http, CancellationToken ct) =>
         {
             var ip = http.Connection.RemoteIpAddress?.ToString();
             var email = (body.Email ?? "").Trim();
@@ -33,41 +61,135 @@ public static class AuthEndpoints
             var now = DateTimeOffset.UtcNow;
             var threshold = await licensing.GetSettingAsync("security.lockout_threshold", 5, ct);
             var lockMinutes = await licensing.GetSettingAsync("security.lockout_minutes", 15, ct);
+            var source = user is null ? null : await AuthSourceAsync(ds, user.Id, ct);
 
-            IResult Fail(string reason)
+            IResult Fail(string reason, string? title = null)
             {
-                _ = audit.WriteAsync(new AuditActor(user?.Id, email.Length > 0 ? email : "unknown", ip), "auth.login", email, "Failure", new { reason });
-                return Results.Problem(statusCode: 401, title: "The e-mail address or password is incorrect, or the account is locked.");
+                _ = audit.WriteAsync(new AuditActor(user?.Id, email.Length > 0 ? email : "unknown", ip), "auth.login", email, "Failure", new { reason, method = source ?? (body.Directory == true ? "ldap" : "local") });
+                return Results.Problem(statusCode: 401, title: title ?? "The e-mail address or password is incorrect, or the account is locked.");
             }
 
-            if (user is null || user.Status != "active") return Fail(user is null ? "unknown-user" : "disabled");
-            if (user.LockedUntil is { } lu && lu > now) return Fail("locked");
-
-            var verify = hasher.VerifyHashedPassword(user, user.PasswordHash, body.Password ?? "");
-            if (verify == PasswordVerificationResult.Failed)
+            // Active Directory: chosen on the sign-in page, or the account signs in with the directory. DOMAIN\user names
+            // are always directory names.
+            var useDirectory = body.Directory == true || source == "ldap" || (user is null && email.Contains('\\'));
+            if (useDirectory)
             {
-                user.FailedAttempts++;
-                if (user.FailedAttempts >= threshold) { user.LockedUntil = now.AddMinutes(lockMinutes); user.FailedAttempts = 0; }
-                await db.SaveChangesAsync(ct);
-                return Fail("bad-password");
+                var ldap = await signIn.LdapAsync(ct);
+                if (!ldap.Enabled) return Fail("directory-off", "Sign-in with Active Directory accounts is not turned on.");
+                if (user is not null && user.LockedUntil is { } dlu && dlu > now) return Fail("locked");
+                DirectoryIdentity who;
+                try { who = await Task.Run(() => LdapSignIn.Authenticate(ldap, email, body.Password ?? ""), ct); }
+                catch (DirectorySignInException ex)
+                {
+                    if (user is not null && ex.Reason == "bad-password")
+                    {
+                        user.FailedAttempts++;
+                        if (user.FailedAttempts >= threshold) { user.LockedUntil = now.AddMinutes(lockMinutes); user.FailedAttempts = 0; }
+                        await db.SaveChangesAsync(ct);
+                    }
+                    return Fail(ex.Reason, ex.Reason is "bad-password" or "empty" ? null : ex.Message);
+                }
+                try
+                {
+                    var outcome = await DirectoryUsers.ResolveAsync(ds, who, ldap.CreateUsers, ct);
+                    db.ChangeTracker.Clear();
+                    user = await db.Users.Include(u => u.Roles).FirstAsync(u => u.Id == outcome.UserId, ct);
+                    source = "ldap";
+                    if (outcome.Created) await audit.WriteAsync(new AuditActor(user.Id, user.Email, ip), "user.create", user.Email, "Success", new { method = "ldap", roles = outcome.Roles }, ct: ct);
+                }
+                catch (DirectorySignInException ex) { return Fail(ex.Reason, ex.Message); }
+                if (user.LockedUntil is { } lu2 && lu2 > now) return Fail("locked");
             }
-            if (verify == PasswordVerificationResult.SuccessRehashNeeded) user.PasswordHash = hasher.HashPassword(user, body.Password!);
+            else
+            {
+                if (user is null || user.Status != "active") return Fail(user is null ? "unknown-user" : "disabled");
+                // Microsoft Entra ID accounts sign in with "Sign In With Microsoft".
+                if (source == "entra") return Fail("entra-account", "This account signs in with Microsoft. Use Sign In With Microsoft.");
+                if (user.LockedUntil is { } lu && lu > now) return Fail("locked");
+
+                var verify = hasher.VerifyHashedPassword(user, user.PasswordHash, body.Password ?? "");
+                if (verify == PasswordVerificationResult.Failed)
+                {
+                    user.FailedAttempts++;
+                    if (user.FailedAttempts >= threshold) { user.LockedUntil = now.AddMinutes(lockMinutes); user.FailedAttempts = 0; }
+                    await db.SaveChangesAsync(ct);
+                    return Fail("bad-password");
+                }
+                if (verify == PasswordVerificationResult.SuccessRehashNeeded) user.PasswordHash = hasher.HashPassword(user, body.Password!);
+            }
 
             var mfaRequired = (await db.SystemSettings.AsNoTracking().Where(s => s.Key == "security.mfa_required").Select(s => s.Value).FirstOrDefaultAsync(ct))?.Trim() == "true";
             if (user.MfaEnabled)
             {
                 if (string.IsNullOrEmpty(body.MfaCode))
                     return Results.Json(new { mfaRequired = true }, statusCode: 401);
-                var secret = dp.CreateProtector(MfaPurpose).Unprotect(Convert.FromBase64String(user.MfaSecretProtected!));
-                if (!Totp.Verify(secret, body.MfaCode, now)) { user.FailedAttempts++; await db.SaveChangesAsync(ct); return Fail("bad-mfa"); }
+                var mfaKey = dp.CreateProtector(MfaPurpose).Unprotect(Convert.FromBase64String(user.MfaSecretProtected!));
+                if (!Totp.Verify(mfaKey, body.MfaCode, now)) { user.FailedAttempts++; await db.SaveChangesAsync(ct); return Fail("bad-mfa"); }
             }
 
             user.FailedAttempts = 0; user.LockedUntil = null; user.LastLoginAt = now;
             await db.SaveChangesAsync(ct);
             // When MFA is mandatory and this user has not set it up, the session carries no permissions until enrollment is confirmed.
             await SignInAsync(http, db, user, ct, mfaPending: mfaRequired && !user.MfaEnabled);
-            await audit.WriteAsync(new AuditActor(user.Id, user.Email, ip), "auth.login", user.Email, "Success", ct: ct);
+            await audit.WriteAsync(new AuditActor(user.Id, user.Email, ip), "auth.login", user.Email, "Success", new { method = source ?? "local" }, ct: ct);
             return Results.Ok(new { ok = true, mfaEnrollmentRequired = mfaRequired && !user.MfaEnabled });
+        }).AllowAnonymous().RequireRateLimiting("login");
+
+        // ---- Sign In With Microsoft (Microsoft Entra ID, OpenID Connect) ---------------------------------------------
+
+        g.MapGet("/oidc/start", async (string? hint, SignInStore signIn, EntraOidc oidc, IDataProtectionProvider dp, HttpContext http, CancellationToken ct) =>
+        {
+            var entra = await signIn.EntraAsync(ct);
+            if (!entra.Enabled || !EntraOidc.ValidTenant(entra.TenantId) || entra.ClientId.Length == 0) return SsoError("Sign-in with Microsoft is not turned on.");
+            var state = EntraOidc.NewToken();
+            var nonce = EntraOidc.NewToken();
+            var verifier = EntraOidc.NewToken() + EntraOidc.NewToken();
+            var payload = JsonSerializer.Serialize(new OidcState(state, nonce, verifier, DateTimeOffset.UtcNow.AddMinutes(10)));
+            http.Response.Cookies.Append(OidcCookie, dp.CreateProtector(OidcPurpose).Protect(payload), new CookieOptions
+            {
+                HttpOnly = true, Secure = true, SameSite = SameSiteMode.Lax, Path = "/api/v1/auth/oidc", MaxAge = TimeSpan.FromMinutes(10), IsEssential = true,
+            });
+            return Results.Redirect(oidc.AuthorizeUrl(entra, RedirectUri(http), state, nonce, verifier, hint is { Length: > 0 and < 320 } ? hint : null));
+        }).AllowAnonymous().RequireRateLimiting("login");
+
+        g.MapGet("/oidc/callback", async (string? code, string? state, string? error, string? error_description, SignInStore signIn, EntraOidc oidc,
+            IDataProtectionProvider dp, NpgsqlDataSource ds, ZentriqDbContext db, AuditWriter audit, HttpContext http, CancellationToken ct) =>
+        {
+            var ip = http.Connection.RemoteIpAddress?.ToString();
+            var raw = http.Request.Cookies[OidcCookie];
+            http.Response.Cookies.Delete(OidcCookie, new CookieOptions { Path = "/api/v1/auth/oidc", Secure = true, SameSite = SameSiteMode.Lax });
+            async Task<IResult> Failed(string reason, string message, string? who = null)
+            {
+                await audit.WriteAsync(new AuditActor(null, who ?? "unknown", ip), "auth.login", who ?? "Microsoft", "Failure", new { reason, method = "entra", message }, ct: ct);
+                return SsoError(message);
+            }
+            if (!string.IsNullOrEmpty(error)) return await Failed("provider-error", "Microsoft did not sign you in: " + (error_description ?? error));
+            OidcState? st = null;
+            try { if (raw is not null) st = JsonSerializer.Deserialize<OidcState>(dp.CreateProtector(OidcPurpose).Unprotect(raw)); }
+            catch (Exception ex) when (ex is System.Security.Cryptography.CryptographicException or JsonException) { }
+            if (st is null || st.Expires < DateTimeOffset.UtcNow || string.IsNullOrEmpty(state) || !System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
+                    System.Text.Encoding.UTF8.GetBytes(state), System.Text.Encoding.UTF8.GetBytes(st.State)))
+                return await Failed("state", "The sign-in took too long or was started in another browser. Try again.");
+            if (string.IsNullOrEmpty(code)) return await Failed("no-code", "Microsoft did not return a sign-in code.");
+            var entra = await signIn.EntraAsync(ct);
+            if (!entra.Enabled) return await Failed("entra-off", "Sign-in with Microsoft is not turned on.");
+            var appKey = await signIn.EntraSecretAsync(ct);
+            if (string.IsNullOrEmpty(appKey)) return await Failed("not-configured", "Sign-in with Microsoft is not set up completely (client secret missing).");
+            DirectoryIdentity who;
+            try { who = await oidc.SignInAsync(entra, appKey, code, RedirectUri(http), st.Verifier, st.Nonce, ct); }
+            catch (DirectorySignInException ex) { return await Failed(ex.Reason, ex.Message); }
+            DirectoryUsers.Outcome outcome;
+            try { outcome = await DirectoryUsers.ResolveAsync(ds, who, entra.CreateUsers, ct); }
+            catch (DirectorySignInException ex) { return await Failed(ex.Reason, ex.Message, who.Email); }
+            var user = await db.Users.FirstAsync(u => u.Id == outcome.UserId, ct);
+            if (user.LockedUntil is { } lu && lu > DateTimeOffset.UtcNow) return await Failed("locked", "The account is locked. Try again later.", user.Email);
+            if (outcome.Created) await audit.WriteAsync(new AuditActor(user.Id, user.Email, ip), "user.create", user.Email, "Success", new { method = "entra", roles = outcome.Roles }, ct: ct);
+            // Multi-factor authentication is Microsoft Entra ID's (Conditional Access / security defaults), not Zentriq's.
+            user.FailedAttempts = 0; user.LastLoginAt = DateTimeOffset.UtcNow;
+            await db.SaveChangesAsync(ct);
+            await SignInAsync(http, db, user, ct);
+            await audit.WriteAsync(new AuditActor(user.Id, user.Email, ip), "auth.login", user.Email, "Success", new { method = "entra", roles = outcome.Roles }, ct: ct);
+            return Html("/");
         }).AllowAnonymous().RequireRateLimiting("login");
 
         g.MapPost("/logout", async (HttpContext http, RequestContext rc) =>

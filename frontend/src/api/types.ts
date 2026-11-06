@@ -217,6 +217,10 @@ export interface LicensingStatus extends LicenseSummary {
 
 export interface UserRow {
   id: string;
+  /** local | ldap (Active Directory) | entra (Microsoft Entra ID) */
+  authSource?: 'local' | 'ldap' | 'entra';
+  /** Roles from mapped directory groups. */
+  directoryRoles?: string[];
   email: string;
   displayName: string;
   status: string;

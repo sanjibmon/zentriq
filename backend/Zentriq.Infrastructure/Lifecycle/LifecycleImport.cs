@@ -530,7 +530,7 @@ public static class LifecycleImport
                    currency = COALESCE(@cur, currency), vendor = COALESCE(@vendor, vendor), invoice_number = COALESCE(@inv, invoice_number), po_number = COALESCE(@po, po_number),
                    depreciation_method = COALESCE(@dm, depreciation_method), useful_life_months = COALESCE(@life, useful_life_months),
                    warranty_provider = COALESCE(@wp, warranty_provider), warranty_type = COALESCE(@wt, warranty_type),
-                   warranty_start = COALESCE(@ws, warranty_start, CASE WHEN @we::date IS NOT NULL THEN COALESCE(@pd, purchase_date) END), warranty_end = COALESCE(@we, warranty_end),
+                   warranty_start = COALESCE(@ws, warranty_start, CASE WHEN @we::date IS NOT NULL THEN COALESCE(@pd, purchase_date) END), warranty_end = COALESCE(@we, warranty_end), warranty_source = CASE WHEN @we::date IS NOT NULL THEN 'import' ELSE warranty_source END,
                    lessor = COALESCE(@lessor, lessor), lease_end = COALESCE(@le, lease_end), lease_monthly_cost = COALESCE(@lmc, lease_monthly_cost),
                    notes = COALESCE(@notes, notes), custom = custom || @custom, updated_at = now(), updated_by = @by, row_version = row_version + 1
              WHERE asset_id = @id

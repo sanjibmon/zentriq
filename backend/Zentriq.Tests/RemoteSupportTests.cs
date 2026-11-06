@@ -172,6 +172,9 @@ public sealed class RemoteSupportLiveTests : IAsyncLifetime
         Directory.CreateDirectory(data);
         var key = MeshCookie.NewKeyHex();
         var cfg = RemoteServerConfig.Build(new("localhost", Port, key, Convert.ToHexString(Guid.NewGuid().ToByteArray()), data, Path.Combine(_dir, "files"), Path.Combine(_dir, "backups"), AllowedOrigins: RemoteServerConfig.Origins("localhost")));
+        // Session recording as ZentriqRemote applies it (the engine must start with it).
+        Directory.CreateDirectory(Path.Combine(_dir, "recordings"));
+        Assert.True(RemoteServerConfig.ApplyRecording(cfg["domains"]![""]!.AsObject(), true, Path.Combine(_dir, "recordings")));
         File.WriteAllText(Path.Combine(data, "config.json"), cfg.ToJsonString());
         // Branding files next to the configuration, as zentriqctl copies them (the engine reads them at start).
         var repo = new DirectoryInfo(AppContext.BaseDirectory);
@@ -237,6 +240,18 @@ public sealed class RemoteSupportLiveTests : IAsyncLifetime
         using var fresh = new HttpClient(new HttpClientHandler { ServerCertificateCustomValidationCallback = (_, _, _, _) => true });
         var anon = await (await fresh.GetAsync($"https://127.0.0.1:{Port}/?login=" + Uri.EscapeDataString(MeshCookie.Login("user//zq-" + uid.ToString("N"), MeshCookie.NewKeyHex())))).Content.ReadAsStringAsync();
         Assert.DoesNotContain("id=MainDevDesktop", anon);    // a forged link does not sign in
+
+        // A recorded session signs the technician in with the recording account: flagged for recording (user flag 2),
+        // its name tells the person at the device that the session is recorded.
+        var recUrl = await remote.SessionUrlAsync(uid, "Priya Rao", fullRights: false, viewOnly: false, nodeId: null, view: "console", default, recorded: true);
+        Assert.Contains("?login=", recUrl);
+        await using (var c = await MeshControlClient.ConnectAsync(new Uri($"https://127.0.0.1:{Port}/"), "zentriq", key, default))
+        {
+            var flags = await c.UserFlagsAsync(default);
+            Assert.True(flags.TryGetValue("user//" + RemoteSupportService.RecordedMeshUserName(uid), out var f), string.Join(", ", flags.Keys));
+            Assert.Equal(2, f & 2);
+            Assert.Equal(0, flags["user//" + RemoteSupportService.MeshUserName(uid)] & 2);
+        }
 
         // The server signs its Windows agents in the background after start; wait until the installer is served.
         (byte[] bytes, string sha) installer = default;

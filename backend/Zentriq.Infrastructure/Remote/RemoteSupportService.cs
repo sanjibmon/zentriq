@@ -23,6 +23,14 @@ public sealed class RemoteSettings
     public string? InternetHost { get; set; }
     /// <summary>Port published on the router/firewall for <see cref="InternetHost"/> (forwarded to the remote support port).</summary>
     public int? InternetPort { get; set; }
+    /// <summary>Record remote desktop, terminal and file sessions (played back from Remote Support › History).</summary>
+    public bool RecordSessions { get; set; }
+    /// <summary>Record sessions on every device (true) or only on the devices of <see cref="RecordGroupIds"/>.</summary>
+    public bool RecordAllDevices { get; set; } = true;
+    /// <summary>Device groups (Software Deployment › Device Groups) whose sessions are recorded.</summary>
+    public List<Guid> RecordGroupIds { get; set; } = [];
+    /// <summary>Days recordings are kept (then deleted).</summary>
+    public int RecordingRetentionDays { get; set; } = 90;
 }
 
 public sealed record RemoteStatus(bool Installed, bool Running, string? Message, string? PublicUrl, int Port);
@@ -193,19 +201,54 @@ public sealed partial class RemoteSupportService(NpgsqlDataSource ds, ZentriqOpt
     // ---- sessions -----------------------------------------------------------------------------------
 
     public static string MeshUserName(Guid userId) => "zq-" + userId.ToString("N");
+    /// <summary>The engine account used for recorded sessions: flagged for recording, its name tells the user the session is recorded.</summary>
+    public static string RecordedMeshUserName(Guid userId) => MeshUserName(userId) + "-rec";
+    public const string RecordedSuffix = " (session recorded)";
+
+    /// <summary>Zentriq user of an engine account ("user//zq-…" or "user//zq-…-rec"), or null.</summary>
+    public static Guid? UserOfMeshUser(string? meshUser)
+    {
+        var n = meshUser ?? "";
+        var i = n.LastIndexOf('/');
+        if (i >= 0) n = n[(i + 1)..];
+        if (n.EndsWith("-rec", StringComparison.Ordinal)) n = n[..^4];
+        return n.StartsWith("zq-", StringComparison.Ordinal) && Guid.TryParseExact(n[3..], "N", out var g) ? g : null;
+    }
+
+    /// <summary>
+    /// Whether a session on this device is recorded: recording is on and the device is in one of the chosen device
+    /// groups (or all devices are recorded). The remote console and sessions without a device follow "all devices".
+    /// </summary>
+    public async Task<bool> IsRecordedAsync(Guid? assetId, CancellationToken ct)
+    {
+        var s = await SettingsAsync(ct);
+        if (!s.RecordSessions) return false;
+        if (s.RecordAllDevices) return true;
+        if (assetId is null || s.RecordGroupIds.Count == 0) return false;
+        await using var cmd = ds.CreateCommand($"""
+            SELECT EXISTS (SELECT 1 FROM zentriq.device_groups g, zentriq.assets a WHERE a.id = @a AND g.id = ANY(@g) AND {Zentriq.Infrastructure.Deployment.AppControlStore.MemberSql})
+            """);
+        cmd.Parameters.AddWithValue("a", assetId.Value);
+        cmd.Parameters.AddWithValue("g", s.RecordGroupIds.ToArray());
+        return await cmd.ExecuteScalarAsync(ct) is true;
+    }
     public static int ViewMode(string view) => view switch { "desktop" => 11, "terminal" => 12, "files" => 13, _ => 10 };
 
     /// <summary>
     /// A sign-in link for one technician that opens the device (or the full remote console when nodeId is null).
     /// The technician's remote support account is created or updated first; the link is valid for 2 minutes.
     /// </summary>
-    public async Task<string> SessionUrlAsync(Guid userId, string displayName, bool fullRights, bool viewOnly, string? nodeId, string view, CancellationToken ct, string? browserHost = null, string? groupId = null)
+    public async Task<string> SessionUrlAsync(Guid userId, string displayName, bool fullRights, bool viewOnly, string? nodeId, string view, CancellationToken ct, string? browserHost = null, string? groupId = null, bool recorded = false)
     {
         await using var c = await ConnectAsync(ct);
         var mesh = await EnsureGroupAsync(c, null, ct);
-        var name = MeshUserName(userId);
+        // Recorded sessions use a second engine account of the technician: the engine records the sessions of accounts
+        // flagged for recording, and the person at the device sees "(session recorded)" after the technician's name in
+        // the consent prompt and on the privacy bar.
+        var name = recorded ? RecordedMeshUserName(userId) : MeshUserName(userId);
         var meshUser = "user//" + name;
-        await c.EnsureUserAsync(name, displayName, null, ct);
+        await c.EnsureUserAsync(name, recorded ? displayName + RecordedSuffix : displayName, null, ct);
+        if (recorded) await c.SetUserRecordingAsync(meshUser, name, displayName + RecordedSuffix, ct);
         var settings = await SettingsAsync(ct);
         await c.GrantGroupAsync(groupId ?? mesh, meshUser, fullRights ? MeshRights.Full : MeshRights.Technician(settings.AllowTerminal) | (viewOnly ? MeshRights.ViewOnly : 0), ct);
         var url = UrlFor(browserHost) + "?login=" + Uri.EscapeDataString(MeshCookie.Login(meshUser, Key!));
