@@ -137,11 +137,11 @@ public static class LdapSignIn
         var (bind, sam, upn) = Names(username, s.Domain);
         LdapConnection conn;
         try { conn = DirectoryClient.Connect(new DirectorySettings(s.Host, s.DcName, s.Port, s.Ldaps, s.VerifyCertificate, s.BaseDn ?? "", bind, password), TimeSpan.FromSeconds(15)); }
-        catch (DirectoryException ex) when (ex.Message.Contains("LDAP 49", StringComparison.Ordinal))
+        catch (Zentriq.Infrastructure.ActiveDirectory.DirectoryException ex) when (ex.Message.Contains("LDAP 49", StringComparison.Ordinal))
         {
             throw new DirectorySignInException("The user name or password is incorrect.", "bad-password");
         }
-        catch (DirectoryException ex) { throw new DirectorySignInException(ex.Message, "directory-unavailable"); }
+        catch (Zentriq.Infrastructure.ActiveDirectory.DirectoryException ex) { throw new DirectorySignInException(ex.Message, "directory-unavailable"); }
         catch (LdapException ex) { throw new DirectorySignInException("The domain controller cannot be reached: " + ex.Message, "directory-unavailable"); }
         using (conn)
         {
