@@ -8,7 +8,7 @@ import { Icon } from '../../components/Icon';
 import { CsvExportDialog } from '../audit/LogRetention';
 
 export interface ActivityRow {
-  id: string; assetId: string; hostname: string | null; ip: string | null; channel: 'agent' | 'agentless'; kind: 'service' | 'uninstall' | 'agent-update' | 'remote-support' | 'agent-control';
+  id: string; assetId: string; hostname: string | null; ip: string | null; channel: 'agent' | 'agentless'; kind: 'service' | 'uninstall' | 'agent-update' | 'remote-support' | 'agent-control' | 'deploy' | 'patch' | 'script';
   target: string; argument: string | null; operation: string; status: string; detail: string | null; resultState: string | null;
   requestedAt: string; completedAt: string | null; requestedBy: string | null;
 }
@@ -54,6 +54,9 @@ export function ActivityPage() {
           <option value="agent-update">Agent updates</option>
           <option value="remote-support">Remote support agent</option>
           <option value="agent-control">Agent control</option>
+          <option value="deploy">Software deployment</option>
+          <option value="patch">Patch management</option>
+          <option value="script">Scripts</option>
         </select>
         <select className="in" value={status} onChange={(e) => { setPage(1); setStatus(e.target.value); }} aria-label="Result">
           <option value="">Any result</option>
@@ -68,7 +71,11 @@ export function ActivityPage() {
         <DataTable rows={rows} empty={data.loading ? 'Loading…' : 'No device actions yet. Start, stop or restart a service from an asset, or uninstall software from Software Inventory.'} columns={[
           { key: 't', label: 'Requested', render: (r) => <span title={fmt.date(r.requestedAt)}>{fmt.date(r.requestedAt)}</span> },
           { key: 'h', label: 'Device', render: (r) => <Link to={`/assets/${r.assetId}`}><b>{r.hostname ?? r.ip ?? '—'}</b></Link> },
-          { key: 'a', label: 'Action', render: (r) => <>{r.kind === 'remote-support' ? (r.operation === 'install' ? 'Install remote support' : 'Remove remote support') : r.kind === 'agent-control' ? CONTROL[r.operation] ?? fmt.label(r.operation) : OP[r.operation] ?? fmt.label(r.operation)}<div className="faint mono" style={{ fontSize: 11.5 }}>{r.kind === 'agent-update' ? `to ${r.target}` : r.kind === 'remote-support' ? 'Zentriq Remote Support agent' : r.kind === 'agent-control' ? 'Zentriq Agent' : `${r.target}${r.argument ? ` ${r.argument}` : ''}`}</div></> },
+          { key: 'a', label: 'Action', render: (r) => <>{r.kind === 'remote-support' ? (r.operation === 'install' ? 'Install remote support' : 'Remove remote support') : r.kind === 'agent-control' ? CONTROL[r.operation] ?? fmt.label(r.operation)
+            : r.kind === 'patch' ? (r.operation === 'scan' ? 'Scan for updates' : 'Install updates') : r.kind === 'script' ? 'Run script' : r.kind === 'deploy' ? (r.operation === 'install' ? 'Deploy software' : 'Uninstall software') : OP[r.operation] ?? fmt.label(r.operation)}
+            <div className="faint mono" style={{ fontSize: 11.5 }}>{r.kind === 'agent-update' ? `to ${r.target}` : r.kind === 'remote-support' ? 'Zentriq Remote Support agent' : r.kind === 'agent-control' ? 'Zentriq Agent'
+              : r.kind === 'patch' ? <Link to={`/modules/patch?tab=devices&device=${r.assetId}`}>Patch Management</Link> : r.kind === 'script' ? <Link to={`/modules/scripts?tab=runs&run=${r.target}`}>Scripts & Remediation</Link>
+              : r.kind === 'deploy' ? 'Software Deployment' : `${r.target}${r.argument ? ` ${r.argument}` : ''}`}</div></> },
           { key: 'c', label: 'Via', render: (r) => r.channel === 'agent' ? 'Zentriq Agent' : 'WinRM / WMI' },
           { key: 's', label: 'Result', render: (r) => <Pill tone={STATUS[r.status]?.[0] ?? ''}>{STATUS[r.status]?.[1] ?? fmt.label(r.status)}</Pill> },
           { key: 'd', label: 'Detail', className: 'wrap', render: (r) => <span style={{ fontSize: 12.5 }}>{r.detail ?? (r.status === 'queued' ? 'Runs at the device’s next check-in.' : '')}{r.completedAt ? <span className="faint"> · {fmt.ago(r.completedAt)}</span> : null}</span> },

@@ -232,7 +232,7 @@ export function AssetDetailPage({ id, section = ASSETS_SECTION }: { id: string; 
       )}
 
       {tab === 'updates' && (
-        <Panel flush>
+        <Panel flush title="Installed Updates" right={can('patch.view') ? <Link to={`/modules/patch?tab=devices&device=${id}`} className="btn sm">Missing Updates</Link> : undefined}>
           <DataTable rows={(d?.patches ?? []).map((x, i) => ({ ...x, id: i }))} empty="No update history collected." columns={[
             { key: 'i', label: 'Update', render: (x) => <span className="mono">{x.id}</span> },
             { key: 'd', label: 'Description', render: (x) => x.description ?? '—' },

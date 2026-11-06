@@ -178,7 +178,7 @@ export function GroupDialog({ group, onClose, onSaved }: { group: Group | null; 
   );
 }
 
-function DevicePicker({ onPick }: { onPick: (d: { id: string; name: string }) => void }) {
+export function DevicePicker({ onPick }: { onPick: (d: { id: string; name: string }) => void }) {
   const [text, setText] = useState('');
   const [q, setQ] = useState('');
   useEffect(() => { const t = setTimeout(() => setQ(text), 250); return () => clearTimeout(t); }, [text]);

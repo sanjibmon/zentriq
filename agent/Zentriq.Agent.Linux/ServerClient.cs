@@ -182,7 +182,7 @@ internal sealed class ServerClient : IDisposable
         PostJsonAsync<CheckinResponse>("api/agent/v1/checkin", new Dictionary<string, object?>
         {
             ["agentVersion"] = AgentVersion.Current, ["hostname"] = hostname, ["osName"] = osName, ["lastError"] = lastError, ["platform"] = Platform.Id,
-            ["capabilities"] = new[] { "service-control", "software-uninstall", "self-update", "remote-support", "schedule", "uninstall-protection", "presence", "tamper-protection", "linux", "app-control", "software-deploy" },
+            ["capabilities"] = new[] { "service-control", "software-uninstall", "self-update", "remote-support", "schedule", "uninstall-protection", "presence", "tamper-protection", "linux", "app-control", "software-deploy", "patch-management", "scripts" },
             ["offlineSince"] = offlineSince?.ToString("o"), ["uninstallProtected"] = uninstallProtected,
             ["events"] = events is { Count: > 0 } ? events : null,
             ["tamperProtection"] = Protection.Reported(),
@@ -228,6 +228,22 @@ internal sealed class ServerClient : IDisposable
     {
         using var content = new StringContent("{}", Encoding.UTF8, "application/json");
         using var resp = await _http.PostAsync(new Uri(_base, "api/agent/v1/presence/leave"), content).ConfigureAwait(false);
+        await EnsureAsync(resp).ConfigureAwait(false);
+    }
+
+    /// <summary>The result of a scan for missing updates (and of an installation).</summary>
+    public async Task PostPatchesAsync(Dictionary<string, object?> report, CancellationToken ct)
+    {
+        using var content = new StringContent(JsonSerializer.Serialize(report), Encoding.UTF8, "application/json");
+        using var resp = await _http.PostAsync(new Uri(_base, "api/agent/v1/patches"), content, ct).ConfigureAwait(false);
+        await EnsureAsync(resp).ConfigureAwait(false);
+    }
+
+    /// <summary>The output and exit code of a script this device ran.</summary>
+    public async Task PostOutputAsync(string actionId, Dictionary<string, object?> output, CancellationToken ct)
+    {
+        using var content = new StringContent(JsonSerializer.Serialize(output), Encoding.UTF8, "application/json");
+        using var resp = await _http.PostAsync(new Uri(_base, "api/agent/v1/actions/" + Uri.EscapeDataString(actionId) + "/output"), content, ct).ConfigureAwait(false);
         await EnsureAsync(resp).ConfigureAwait(false);
     }
 

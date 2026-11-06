@@ -230,7 +230,7 @@ public static class AssetActionEndpoints
                 """;
             void P(NpgsqlCommand c)
             {
-                c.Parameters.Add(new NpgsqlParameter("k", NpgsqlDbType.Text) { Value = kind is "service" or "uninstall" or "agent-update" or "remote-support" ? kind : DBNull.Value });
+                c.Parameters.Add(new NpgsqlParameter("k", NpgsqlDbType.Text) { Value = kind is "service" or "uninstall" or "agent-update" or "remote-support" or "agent-control" or "deploy" or "patch" or "script" ? kind : DBNull.Value });
                 c.Parameters.Add(new NpgsqlParameter("st", NpgsqlDbType.Text) { Value = status is "succeeded" or "failed" or "pending" or "expired" ? status : DBNull.Value });
                 c.Parameters.Add(new NpgsqlParameter("a", NpgsqlDbType.Uuid) { Value = (object?)assetId ?? DBNull.Value });
                 c.Parameters.Add(new NpgsqlParameter("q", NpgsqlDbType.Text) { Value = string.IsNullOrWhiteSpace(q) ? DBNull.Value : $"%{q.Trim()}%" });
@@ -240,7 +240,7 @@ public static class AssetActionEndpoints
             P(count);
             var total = (long)(await count.ExecuteScalarAsync(ct))!;
             await using var cmd = ds.CreateCommand($"""
-                SELECT x.id, x.asset_id, a.hostname, host(a.primary_ip), x.channel, x.kind, x.target, x.argument, x.operation, x.status, x.detail,
+                SELECT x.id, x.asset_id, a.hostname, host(a.primary_ip), x.channel, x.kind, x.target, CASE WHEN x.kind IN ('deploy','patch','script') THEN NULL ELSE x.argument END, x.operation, x.status, x.detail,
                        x.result_state, x.requested_at, x.completed_at, u.display_name
                   {from} {where} ORDER BY x.requested_at DESC LIMIT @lim OFFSET @off
                 """);

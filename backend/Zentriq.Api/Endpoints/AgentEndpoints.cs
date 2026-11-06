@@ -87,6 +87,7 @@ public static partial class AgentEndpoints
     {
         var g = app.MapGroup("/api/agent/v1").WithTags("Agent protocol");
         MapAgentDeploymentEndpoints(g);
+        MapAgentPatchScriptEndpoints(g);
 
         // Short enrollment codes carry no server key pins: before sending the code, the agent asks the server to prove that
         // it knows the code, bound to the key it serves (see AgentCodes.EnrollProof).
@@ -343,6 +344,8 @@ public static partial class AgentEndpoints
             if (caps.Contains("remote-support")) kinds.Add("remote-support");
             if (caps.Contains("tamper-protection")) kinds.Add("agent-control");
             if (caps.Contains("software-deploy")) kinds.Add("deploy");
+            if (caps.Contains("patch-management")) kinds.Add("patch");
+            if (caps.Contains("scripts")) kinds.Add("script");
             await CompleteUpdatesAsync(ds, agent.Id, req.AgentVersion, ct);
             if (settings.AutoUpdate && caps.Contains("self-update") && agent.AssetId is not null)
                 await QueueAutoUpdateAsync(ds, env, agent.Id, agent.AssetId.Value, req.AgentVersion, settings.AutoUpdateMax, platform, ct);
@@ -355,7 +358,7 @@ public static partial class AgentEndpoints
                 await using var act = ds.CreateCommand("""
                     UPDATE zentriq.asset_actions SET status = 'sent', sent_at = now()
                      WHERE agent_id = @a AND channel = 'agent' AND kind = ANY(@k)
-                       AND requested_at > now() - CASE WHEN kind = 'deploy' THEN interval '7 days' ELSE interval '24 hours' END
+                       AND requested_at > now() - CASE WHEN kind = 'deploy' OR (kind = 'patch' AND operation = 'install') THEN interval '7 days' ELSE interval '24 hours' END
                        AND (status = 'queued' OR (status = 'sent' AND sent_at < now() - interval '30 minutes'))
                     RETURNING id, kind, target, operation, argument
                     """);

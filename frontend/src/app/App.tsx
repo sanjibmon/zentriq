@@ -31,6 +31,8 @@ import { ProductPage } from '../features/licenses/ProductPage';
 import { WebAppPage } from '../features/webapps/WebAppPage';
 import { WebAppsPage } from '../features/webapps/WebAppsPage';
 import { DeploymentPage } from '../features/deployment/DeploymentPage';
+import { PatchPage } from '../features/patch/PatchPage';
+import { ScriptsPage } from '../features/scripts/ScriptsPage';
 import { ActivityPage } from '../features/activity/ActivityPage';
 import { LoginPage } from '../features/login/LoginPage';
 import { ResetPasswordPage } from '../features/login/ResetPasswordPage';
@@ -103,6 +105,8 @@ function Routes() {
   if (path === '/integrations' || path === '/modules/integrations') return <IntegrationsPage />;
   if (path === '/remote' || path === '/modules/remote') return <RemotePage />;
   if (path === '/deployment' || path === '/modules/deploy') return <DeploymentPage />;
+  if (path === '/patch' || path === '/modules/patch') return <PatchPage />;
+  if (path === '/scripts' || path === '/modules/scripts') return <ScriptsPage />;
   const productMatch = /^\/modules\/licenses\/products\/([0-9a-f-]{36})$/i.exec(path);
   if (productMatch) return <ProductPage key={productMatch[1]} id={productMatch[1]!} />;
   if (path === '/licenses' || path === '/modules/licenses' || /^\/modules\/licenses\/licenses\/[0-9a-f-]{36}$/i.test(path)) return <LicensesPage />;

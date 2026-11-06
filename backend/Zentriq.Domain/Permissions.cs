@@ -10,6 +10,12 @@ public static class Permissions
     public const string CredentialsManage = "credentials.manage";
     public const string PatchApprove = "patch.approve";
     public const string PatchDeploy = "patch.deploy";
+    /// <summary>View patch management (missing updates, device patch state, policies, deployments).</summary>
+    public const string PatchView = "patch.view";
+    public const string ScriptsView = "scripts.view";
+    public const string ScriptsManage = "scripts.manage";
+    /// <summary>Run scripts on devices (they run as SYSTEM / root).</summary>
+    public const string ScriptsRun = "scripts.run";
     public const string DeployRun = "deploy.run";
     public const string DeployView = "deploy.view";
     public const string DeployManage = "deploy.manage";
@@ -67,7 +73,8 @@ public static class Permissions
         JobsView, UsersManage, LicensingManage, BackupRun, SettingsManage, AuditView, AgentsManage, DirectoryManage, AssetsControl, SoftwareUninstall, VulnView, VulnManage,
         SecurityView, SecurityManage, IntegrationsManage, RemoteManage, DashboardView, ReportsView, ActivityView, NonItView, NonItManage,
         AccessoriesView, AccessoriesManage, LifecycleView, LifecycleManage, CloudView, CloudManage, DeployView, DeployManage,
-        LicensesView, LicensesManage, WebAppsView, WebAppsManage, RemoteRecordings
+        LicensesView, LicensesManage, WebAppsView, WebAppsManage, RemoteRecordings,
+        PatchView, ScriptsView, ScriptsManage, ScriptsRun
     ];
 }
 

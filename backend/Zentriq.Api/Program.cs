@@ -206,6 +206,8 @@ api.MapCloudEndpoints();
 api.MapDeploymentEndpoints();
 api.MapLicenseEndpoints();
 api.MapWebAppEndpoints();
+api.MapPatchEndpoints();
+api.MapScriptEndpoints();
 app.MapAgentEndpoints();
 api.MapPendingModuleEndpoints();
 app.MapOpenApi("/api/openapi/{documentName}.json").RequireAuthorization(Permissions.SettingsManage);

@@ -60,6 +60,7 @@ builder.Services.AddHostedService<Zentriq.Worker.LifecycleAutomation>();
 builder.Services.AddHostedService<Zentriq.Worker.LicenseService>();
 builder.Services.AddHostedService<Zentriq.Worker.WarrantyWorker>();
 builder.Services.AddHostedService<Zentriq.Worker.RecordingService>();
+builder.Services.AddHostedService<Zentriq.Worker.PatchScriptWorker>();
 builder.Services.AddHostedService<Zentriq.Worker.Cloud.CloudScheduler>();
 builder.Services.AddHostedService<Zentriq.Worker.Integrations.IntegrationService>();
 builder.Services.AddHostedService<Zentriq.Worker.Remote.RemoteSupportSync>();
