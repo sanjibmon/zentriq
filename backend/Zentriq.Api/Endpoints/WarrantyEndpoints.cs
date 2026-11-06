@@ -91,13 +91,10 @@ public static class WarrantyEndpoints
             if (body.All == true || ids.Length > 50)
             {
                 await using (var cmd = ds.CreateCommand($"""
-                    INSERT INTO zentriq.system_settings (key, value, updated_at, updated_by) VALUES ('{WarrantyService.RequestedKey}', to_jsonb(now()), now(), @u)
+                    INSERT INTO zentriq.system_settings (key, value, updated_at) VALUES ('{WarrantyService.RequestedKey}', to_jsonb(now()), now())
                     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()
                     """))
-                {
-                    cmd.Parameters.AddWithValue("u", rc.UserName ?? "");
                     await cmd.ExecuteNonQueryAsync(ct);
-                }
                 if (ids.Length > 0)
                 {
                     await using var due = ds.CreateCommand("DELETE FROM zentriq.warranty_lookups WHERE asset_id = ANY(@ids)");

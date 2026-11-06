@@ -131,21 +131,57 @@ IT asset rows are matched by **asset tag**, then **serial number**:
 
 Contract rows are matched by name; the *Asset tags* column adds assets to the contract. Up to 20,000 rows and 25 MB per file.
 
+## Online warranty lookup (build 113)
+
+Zentriq reads the warranty of **Dell, Lenovo and HP** devices from the manufacturer by serial number and fills the
+warranty of the asset (provider, type of cover, start and end).
+
+| Manufacturer | API key | Where to get it |
+|---|---|---|
+| Dell | Client ID and Client Secret (OAuth 2) | Dell TechDirect › APIs › Warranty API |
+| Lenovo | Client ID | Lenovo account team / Lenovo Support API program |
+| HP | Client ID and Secret (OAuth 2) | HP Developer Portal (developers.hp.com) › HP Warranty API › Get credentials (approved by HP; keys expire after 90 days by default) |
+
+* **Keys:** *Asset Lifecycle › Settings › Online Warranty Lookup* (permission *settings.manage*). Secrets are stored
+  encrypted with the installation's credential key and never shown again. *Test* checks a key with a device of that
+  manufacturer (or a serial number you enter). The API address can be changed (for example a regional gateway).
+* **Which devices:** IT assets whose manufacturer is Dell, Lenovo or HP (Hewlett Packard Enterprise servers are not
+  covered) and that have a serial number. HP also uses the product number the Zentriq Agent reads from Windows
+  (`SystemSKUNumber`, for example `2Z6A6EA#ABU`).
+* **When:** new devices automatically and every 30 days again (*Settings*: 7–365 days; turn off for manual lookups
+  only), failed lookups after a day, unknown serial numbers after 30 days. *Look Up Warranty* on *Warranty &
+  Contracts* checks every device within a few minutes; on *IT Assets* select devices › *Look Up Warranty*; on the
+  device's *Lifecycle* tab *Look Up Warranty* answers at once.
+* **What is kept:** the cover that ends last is the warranty end; all covers (base warranty, ProSupport, Premier,
+  Care Packs …) are listed on the device's *Lifecycle* tab (*Manufacturer Warranty*). Dell Digital Delivery and other
+  non-hardware entitlements are left out.
+* **Dates entered by hand or imported are kept** (the manufacturer's answer is shown next to them) unless *Replace
+  warranty dates entered by hand or imported* is on.
+* **Dashboard:** the *Warranty Expiry* widget (expired, within 30 days, 31–90 days, 3–12 months, more than a year,
+  unknown; the next to end) and the highlight strip (devices in use or in stock out of warranty, warranties ending
+  within 30 days). The *Warranty ending* integration event (30 days before, and on the day) is unchanged.
+* The Zentriq server needs HTTPS access to the vendor's API (directly or through the system proxy).
+
+API: `GET /api/v1/lifecycle/warranty` (keys without secrets, status per manufacturer, settings), `PUT /lifecycle/warranty/settings`,
+`PUT /lifecycle/warranty/providers/{dell|lenovo|hp}`, `POST /lifecycle/warranty/providers/{vendor}/test`, `POST /lifecycle/warranty/lookup`
+(`assetIds` — up to 50 answered at once — or `all`), `GET /lifecycle/warranty/assets/{id}`, `GET /lifecycle/warranty/expiry`.
+
 ## Console
 **Infrastructure › Asset Lifecycle**
 - **Overview:** assets per stage, book value, warranty and contracts ending, refresh due, missing assets, and items needing attention (no tag, not assigned, no warranty, overdue loans), plus recent changes.
 - **IT assets:** filters (stage, status, class, department, location, warranty), sort, column chooser.
-  - Bulk actions: change stage, give tags, add to contract, print labels.
+  - Bulk actions: change stage, give tags, add to contract, look up warranty, print labels.
 - **People:** everyone holding IT assets, with their returnable IT accessories.
   - **Handover form** and **Return form (leaving)**: printable, or save as PDF; signatures for the employee and IT.
-- **Contracts:** create, edit, delete; assets covered.
+- **Warranty & Contracts:** manufacturer warranty per vendor with *Look Up Warranty*; contracts (create, edit, delete; assets covered).
 - **Refresh planning:** candidates (past refresh age, warranty ended, operating system out of support, for example Windows 10) and a five-year replacement budget forecast.
 - **History:** every lifecycle change.
-- **Policies:** tag prefix, depreciation, useful life, salvage %, refresh age per class; currency; not-seen days; automatic tags.
+- **Settings:** warranty API keys (Dell, Lenovo, HP); tag prefix, depreciation, useful life, salvage %, refresh age per class; currency; not-seen days; automatic tags.
 
 **Device page › Lifecycle tab** (also `/lifecycle/assets/<id>`):
 - stage track
 - custody, purchase, book value and warranty
+- manufacturer warranty (covers, ship date) with *Look Up Warranty*
 - Assign / Check in / Change stage / Dispose / Details
 - depreciation schedule and history
 
@@ -184,6 +220,7 @@ Contract rows are matched by name; the *Asset tags* column adds assets to the co
 **Permissions:** reading needs *assets.view*; changes need *assets.manage*.
 
 ## Tests
+- **Build 113:** unit tests for the Dell, Lenovo and HP answers (sign-in, excluded entitlements, product number), PostgreSQL test of the lookup (no key, key stored encrypted, warranty filled, hand-entered dates kept and replaced when set, background due list) and the Windows acceptance test T89.
 - **Unit tests:** book value (straight-line, declining balance, none), schedule, allowed transitions.
 - **PostgreSQL tests:**
   - assign / loan rules, return, retire (reason), disposal requires sanitisation, final stage, event history

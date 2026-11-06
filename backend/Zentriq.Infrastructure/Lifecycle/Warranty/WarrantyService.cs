@@ -48,12 +48,11 @@ public sealed class WarrantyService(NpgsqlDataSource ds, CredentialProtector pro
     {
         s.RefreshDays = Math.Clamp(s.RefreshDays, 7, 365);
         await using var cmd = ds.CreateCommand("""
-            INSERT INTO zentriq.system_settings (key, value, updated_at, updated_by) VALUES (@k, @v::jsonb, now(), @u)
-            ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now(), updated_by = EXCLUDED.updated_by
+            INSERT INTO zentriq.system_settings (key, value, updated_at) VALUES (@k, @v::jsonb, now())
+            ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()
             """);
         cmd.Parameters.AddWithValue("k", SettingsKey);
         cmd.Parameters.AddWithValue("v", JsonSerializer.Serialize(s, Json));
-        cmd.Parameters.Add(new NpgsqlParameter("u", NpgsqlDbType.Text) { Value = (object?)by ?? DBNull.Value });
         await cmd.ExecuteNonQueryAsync(ct);
     }
 

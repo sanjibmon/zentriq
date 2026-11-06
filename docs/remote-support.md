@@ -157,6 +157,30 @@ These settings apply to all unattended devices immediately (quick support sessio
 - **Privacy bar** on the device's screen, with a disconnect button.
 - **Allow technicians to open a terminal** (command line). Remote desktop and file transfer are always available.
 
+## Session recording (build 113)
+
+*Remote Support › Settings › Session Recording* (permission *remote.manage*):
+
+* **Record remote sessions** — remote desktop, terminal and file sessions; **on every device** (quick support
+  sessions too) or **only on the devices of chosen device groups** (*Software Deployment › Device Groups*).
+* **Keep recordings for** 7 days … 2 years (90 days by default); older recordings are deleted from the server.
+* The person at the device sees **(session recorded)** after the technician's name in the consent prompt and on the
+  privacy bar. Check that recording is allowed by your policy and local law, and tell users.
+
+How it works: the engine records the sessions of accounts flagged for recording. A technician has a second engine
+account for recorded sessions (named *&lt;name&gt; (session recorded)*); Zentriq signs them in with it when the device is
+in a recorded group. Recordings are written by the engine to `Remote\recordings` (readable by the API, managed by the
+worker; nobody else), indexed every minute and linked to the session started from the console.
+
+**Playback:** *History* shows *Recorded* on recorded sessions and a **Play** button (permission *remote.recordings*,
+"Play recorded sessions"; administrators have it). The player in the console shows the screen (remote desktop), the
+output (terminal) or the file commands, with play / pause, position and 1–16× speed; *Download* saves the .mcrec
+file. **Every playback and download is written to the audit log** (`remote.recording.play`, `remote.recording.download`).
+
+API: `GET /api/v1/remote/recordings?assetId&sessionId`, `GET /remote/recordings/{id}/file[?download=true]`,
+`GET /remote/device-groups`; `GET /remote/sessions` has `recorded` and `recordingId`; settings `recordSessions`,
+`recordAllDevices`, `recordGroupIds`, `recordingRetentionDays`.
+
 ## Server address and certificate (nothing is tied to a fixed IP)
 
 - **Technicians** are sent to port 8446 on the same address they used to open the console (for example `https://192.168.1.8:8446/` today, `https://10.0.5.20:8446/` after the server moves), unless `Remote.PublicHost` is set in `zentriq.json` (then run Repair).
@@ -184,6 +208,7 @@ The installer ships only the engine files Zentriq uses: the Windows, macOS and L
 
 ## Tests
 
+- **Build 113:** recording file format and index (linked to the session, unfinished files waited for, deleted after the retention), engine configuration, the recording account flagged by the real engine (live test), Windows acceptance test T90.
 - **Unit tests:** sign-in cookie format (matches the engine), server configuration, rights and consent flags, technician rights (terminal on/off), quick support codes and invitation text, internet address parsing and how it is applied to the engine.
 - **Live test (ci-quick, real engine):** the control channel, group, user and consent management, a signed-in session link (a forged link is refused), the agent installer and sync; a quick support session (own group, public run-only invitation page, Windows/Linux/macOS downloads, technician link, end removes the group and the link), the install link, invitation address with an internet name.
 - **Windows acceptance tests:**
