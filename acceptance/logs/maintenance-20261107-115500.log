@@ -1,0 +1,6 @@
+﻿2026-11-07T11:55:00.9798007Z INFO Running maintenance.backup ad3ab5f3-0e04-48ab-940d-9c1356b79eed (attempt 1/1).
+2026-11-07T11:55:01.9918144Z INFO Data protection keys: 1 file(s), 1 secret(s) made portable.
+2026-11-07T11:55:02.1613700Z INFO Backup written: C:\ProgramData\Zentriq\Backups\zentriq-runnervmquqza-20261107-115501-manual.zbak (9636 KiB, database, configuration, certificates, MFA keys, remote support; key E435B58653B20321, password protected).
+2026-11-07T11:55:02.2330298Z INFO CI folder: Copied to C:\ZqBackupDest.
+2026-11-07T11:55:02.2596115Z INFO CI share: Copied to \\localhost\ZqBackups\zentriq.
+2026-11-07T11:55:02.3383880Z INFO Backup C:\ProgramData\Zentriq\Backups\zentriq-runnervmquqza-20261107-115501-manual.zbak completed (succeeded).

@@ -1,0 +1,76 @@
+﻿2026-11-07T12:04:31.9983956Z INFO Existing Zentriq data found; running as repair (data is preserved).
+2026-11-07T12:04:32.0216776Z INFO Reusing configuration: PostgreSQL bundled at localhost:5432, HTTPS port 443.
+2026-11-07T12:04:32.0217710Z INFO zentriqctl 1.1.2 provisioning (mode repair), data directory C:\ProgramData\Zentriq
+2026-11-07T12:04:32.0362189Z STEP 1/16 System compatibility and prerequisite checks
+2026-11-07T12:04:32.0363713Z PROGRESS 0 System compatibility and prerequisite checks
+2026-11-07T12:04:32.1035560Z INFO Windows 10.0.20348.0, 4 CPUs, 73 GB free on C:\
+2026-11-07T12:04:32.1087351Z INFO OK  System compatibility and prerequisite checks (72 ms)
+2026-11-07T12:04:32.1087965Z STEP 2/16 Prepare data directories and permissions
+2026-11-07T12:04:32.1088130Z PROGRESS 6 Prepare data directories and permissions
+2026-11-07T12:04:32.1359496Z INFO Data root C:\ProgramData\Zentriq secured (services: ZentriqApi, ZentriqWorker).
+2026-11-07T12:04:32.1359906Z INFO OK  Prepare data directories and permissions (27 ms)
+2026-11-07T12:04:32.1360019Z STEP 3/16 Install or connect to PostgreSQL
+2026-11-07T12:04:32.1360472Z PROGRESS 12 Install or connect to PostgreSQL
+2026-11-07T12:04:32.2029114Z INFO PostgreSQL service postgresql-x64-17 already exists; reusing it.
+2026-11-07T12:04:32.5294732Z INFO Connected to PostgreSQL 17.11 at localhost:5432.
+2026-11-07T12:04:32.5356454Z INFO OK  Install or connect to PostgreSQL (399 ms)
+2026-11-07T12:04:32.5357142Z STEP 4/16 Create database, roles and protected credentials
+2026-11-07T12:04:32.5357344Z PROGRESS 18 Create database, roles and protected credentials
+2026-11-07T12:04:32.5943798Z INFO Updated role zentriq_owner.
+2026-11-07T12:04:32.6117689Z INFO Updated role zentriq_app.
+2026-11-07T12:04:32.6167387Z INFO Database zentriq already exists; it will be preserved and migrated.
+2026-11-07T12:04:32.9076477Z INFO PostgreSQL accepts authenticated connections for the application role.
+2026-11-07T12:04:32.9099806Z INFO OK  Create database, roles and protected credentials (374 ms)
+2026-11-07T12:04:32.9102257Z STEP 5/16 Pre-upgrade backup
+2026-11-07T12:04:32.9102711Z PROGRESS 25 Pre-upgrade backup
+2026-11-07T12:04:32.9698684Z INFO Schema is current; no pre-upgrade backup needed.
+2026-11-07T12:04:32.9699723Z INFO OK  Pre-upgrade backup (59 ms)
+2026-11-07T12:04:32.9699860Z STEP 6/16 Apply database migrations
+2026-11-07T12:04:32.9699930Z PROGRESS 31 Apply database migrations
+2026-11-07T12:04:33.1219434Z INFO Database schema already current.
+2026-11-07T12:04:33.1238815Z INFO OK  Apply database migrations (153 ms)
+2026-11-07T12:04:33.1239485Z STEP 7/16 Record the installed sections
+2026-11-07T12:04:33.1239601Z PROGRESS 37 Record the installed sections
+2026-11-07T12:04:33.1333486Z INFO Advanced installation: Overview, Discovery & Inventory, Remote Support, Infrastructure, Secure & Remediate, Insight & Admin.
+2026-11-07T12:04:33.1334147Z INFO OK  Record the installed sections (9 ms)
+2026-11-07T12:04:33.1334257Z STEP 8/16 Configure HTTPS certificate
+2026-11-07T12:04:33.1334323Z PROGRESS 43 Configure HTTPS certificate
+2026-11-07T12:04:33.2797361Z INFO Keeping HTTPS certificate 01D62C25DF1F7834A759686328C927B58AAE1C4C (expires 2029-02-09).
+2026-11-07T12:04:33.2872273Z INFO OK  Configure HTTPS certificate (153 ms)
+2026-11-07T12:04:33.2872697Z STEP 9/16 Write configuration
+2026-11-07T12:04:33.2872787Z PROGRESS 50 Write configuration
+2026-11-07T12:04:33.2981826Z INFO Configuration written to C:\ProgramData\Zentriq\Config\zentriq.json (no secrets).
+2026-11-07T12:04:33.2983671Z INFO OK  Write configuration (11 ms)
+2026-11-07T12:04:33.2983844Z STEP 10/16 Configure and start Zentriq services
+2026-11-07T12:04:33.2984005Z PROGRESS 56 Configure and start Zentriq services
+2026-11-07T12:04:35.4805606Z INFO ZentriqWorker: Running, ZentriqApi: Running
+2026-11-07T12:04:35.4806907Z INFO OK  Configure and start Zentriq services (2182 ms)
+2026-11-07T12:04:35.4807137Z STEP 11/16 Configure remote support
+2026-11-07T12:04:35.4807297Z PROGRESS 62 Configure remote support
+2026-11-07T12:04:36.2707706Z INFO Remote support service account: User already exists.
+2026-11-07T12:04:36.7173774Z INFO Remote support administrator rights: Done. This command will only work if MeshCentral is stopped.
+2026-11-07T12:04:36.8744841Z INFO Remote support uses the console's HTTPS certificate.
+2026-11-07T12:04:47.5499314Z INFO Remote support is running on port 8446.
+2026-11-07T12:04:47.5500716Z INFO OK  Configure remote support (12069 ms)
+2026-11-07T12:04:47.5501177Z STEP 12/16 Verify API readiness over HTTPS
+2026-11-07T12:04:47.5501524Z PROGRESS 68 Verify API readiness over HTTPS
+2026-11-07T12:04:50.3849604Z INFO API ready: 200 {"status":"ready","checks":{"database":"ok","schemaVersion":38,"expectedSchemaVersion":38,"initialized":true,"worker":"ok"}}
+2026-11-07T12:04:50.3854160Z INFO OK  Verify API readiness over HTTPS (2835 ms)
+2026-11-07T12:04:50.3854488Z STEP 13/16 Verify the worker processes a test job
+2026-11-07T12:04:50.3854735Z PROGRESS 75 Verify the worker processes a test job
+2026-11-07T12:04:52.4440095Z INFO Worker processed self-test job 1a38d808-ccb0-4d20-b3dc-651579933c7f.
+2026-11-07T12:04:52.4458905Z INFO OK  Verify the worker processes a test job (2060 ms)
+2026-11-07T12:04:52.4459518Z STEP 14/16 Create the first administrator and start the trial
+2026-11-07T12:04:52.4459880Z PROGRESS 81 Create the first administrator and start the trial
+2026-11-07T12:04:52.4517249Z INFO Installation already initialized; the trial is unchanged.
+2026-11-07T12:04:52.4518150Z INFO OK  Create the first administrator and start the trial (5 ms)
+2026-11-07T12:04:52.4518361Z STEP 15/16 Verify the web console and trial state
+2026-11-07T12:04:52.4518566Z PROGRESS 87 Verify the web console and trial state
+2026-11-07T12:04:52.6569763Z INFO Web console loads; license mode Trial; trial committed.
+2026-11-07T12:04:52.6573207Z INFO OK  Verify the web console and trial state (205 ms)
+2026-11-07T12:04:52.6573496Z STEP 16/16 Register maintenance and backup tasks
+2026-11-07T12:04:52.6573752Z PROGRESS 93 Register maintenance and backup tasks
+2026-11-07T12:04:52.7282800Z INFO Registered scheduled task \Zentriq\Maintenance (every 5 min; also runs the backup schedule).
+2026-11-07T12:04:52.7283549Z INFO OK  Register maintenance and backup tasks (70 ms)
+2026-11-07T12:04:52.7283668Z PROGRESS 100 Zentriq is ready
+2026-11-07T12:04:52.7453330Z INFO Zentriq 1.1.2 is ready at https://runnervmquqza/

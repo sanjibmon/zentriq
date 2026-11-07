@@ -1,0 +1,3 @@
+﻿2026-11-07T11:24:25.6733544Z INFO Data protection keys: 1 file(s), 1 secret(s) made portable.
+2026-11-07T11:24:25.8468070Z INFO Backup written: C:\ProgramData\Zentriq\Backups\zentriq-runnervmquqza-20261107-112425-ci.zbak (7007 KiB, database, configuration, certificates, MFA keys, remote support; key E435B58653B20321).
+2026-11-07T11:24:26.0628694Z INFO Backup created: C:\ProgramData\Zentriq\Backups\zentriq-runnervmquqza-20261107-112425-ci.zbak

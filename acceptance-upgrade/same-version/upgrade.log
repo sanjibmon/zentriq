@@ -1,0 +1,123 @@
+[1EDC:1908][2026-11-07T11:14:37]i001: Burn x64 v5.0.2+aa65968c419420d32e3e1b647aea0082f5ca5b78, Windows v10.0 x64 (Build 20348: Service Pack 0), path: D:\a\zentriq\zentriq\artifacts\release-main\Zentriq-Setup-x64.exe
+[1EDC:1908][2026-11-07T11:14:37]i000: Initializing string variable 'ZQ_ANSWERFILE' to value ''
+[1EDC:1908][2026-11-07T11:14:37]i000: Initializing string variable 'ZQ_SECTIONS' to value ''
+[1EDC:1908][2026-11-07T11:14:37]i009: Command Line: '/quiet /norestart /log D:\a\_temp\acceptance-upgrade\same-version\upgrade.log'
+[1EDC:1908][2026-11-07T11:14:37]i000: Setting string variable 'WixBundleOriginalSource' to value 'D:\a\zentriq\zentriq\artifacts\release-main\Zentriq-Setup-x64.exe'
+[1EDC:1908][2026-11-07T11:14:37]i000: Setting string variable 'WixBundleOriginalSourceFolder' to value 'D:\a\zentriq\zentriq\artifacts\release-main\'
+[1EDC:1908][2026-11-07T11:14:37]i000: Setting string variable 'WixBundleLog' to value 'D:\a\_temp\acceptance-upgrade\same-version\upgrade.log'
+[1EDC:1908][2026-11-07T11:14:37]i000: Setting string variable 'WixBundleInProgressName' to value ''
+[1EDC:1908][2026-11-07T11:14:37]i000: Setting string variable 'WixBundleName' to value 'Zentriq'
+[1EDC:1908][2026-11-07T11:14:37]i000: Setting string variable 'WixBundleManufacturer' to value 'Zentriq'
+[1EDC:02F8][2026-11-07T11:14:37]i000: Setting version variable 'WixBundleFileVersion' to value '5.0.2.0'
+[1EDC:02F8][2026-11-07T11:14:37]i000: Setting numeric variable 'WixStdBALanguageId' to value 1033
+[1EDC:1908][2026-11-07T11:14:37]i100: Detect begin, 2 packages
+[1EDC:1908][2026-11-07T11:14:37]i000: Setting string variable 'VcRuntimeInstalled' to value '1'
+[1EDC:1908][2026-11-07T11:14:37]i000: Setting string variable 'VcRuntimeBld' to value '36247'
+[1EDC:1908][2026-11-07T11:14:37]i102: Detected related bundle: {5C84BD06-8F9C-463A-A0C5-10D090D09F11}, type: Upgrade, scope: PerMachine, version: 1.1.1.117, cached: Yes
+[1EDC:1908][2026-11-07T11:14:37]i052: Condition 'VcRuntimeInstalled = 1 AND VcRuntimeBld >= 35211' evaluates to true.
+[1EDC:1908][2026-11-07T11:14:37]i103: Detected related package: {8FA052E2-4113-43BA-9229-44DD5DBF137A}, scope: PerMachine, version: 1.1.1.117, language: 1033 operation: MajorUpgrade
+[1EDC:1908][2026-11-07T11:14:37]i101: Detected package: VcRedistX64, state: Present, cached: No, install registration state: (permanent), cache registration state: (permanent)
+[1EDC:1908][2026-11-07T11:14:37]i101: Detected package: ZentriqMsi, state: Absent, cached: No, install registration state: Absent, cache registration state: Absent
+[1EDC:02F8][2026-11-07T11:14:37]i052: Condition 'WindowsBuildNumber >= 14393' evaluates to true.
+[1EDC:02F8][2026-11-07T11:14:37]i052: Condition 'VersionNT64' evaluates to true.
+[1EDC:1908][2026-11-07T11:14:37]i199: Detect complete, result: 0x0, registration state: None, cached: No, eligible for cleanup: No
+[1EDC:1908][2026-11-07T11:14:37]i200: Plan begin, 2 packages, action: Install
+[1EDC:1908][2026-11-07T11:14:37]w321: Skipping dependency registration on package with no dependency providers: VcRedistX64
+[1EDC:1908][2026-11-07T11:14:37]i222: Planned rollback boundary: 'WixDefaultBoundary', vital: Yes, transaction: No (default: No)
+[1EDC:1908][2026-11-07T11:14:37]i201: Planned package: VcRedistX64, state: Present, default requested: Present, ba requested: Present, execute: None, rollback: None, default cache strategy: Keep, ba requested strategy: Keep, cache: Vital, uncache: No, dependency: None, expected install registration state: (permanent), expected cache registration state: (permanent)
+[1EDC:1908][2026-11-07T11:14:37]i201: Planned package: ZentriqMsi, state: Absent, default requested: Present, ba requested: None, execute: None, rollback: None, default cache strategy: Keep, ba requested strategy: Keep, cache: No, uncache: No, dependency: None, expected install registration state: Absent, expected cache registration state: Absent
+[1EDC:1908][2026-11-07T11:14:37]i207: Planned related bundle: {5C84BD06-8F9C-463A-A0C5-10D090D09F11}, detect type: Upgrade, default plan type: Upgrade, ba plan type: None, default requested: None, ba requested: None, execute: None, rollback: None, default requested restore: None, ba requested restore: None, restore: None, dependency: None
+[1EDC:1908][2026-11-07T11:14:37]i299: Plan complete, result: 0x0
+[1EDC:02F8][2026-11-07T11:14:37]i052: Condition 'WixBundleAction = 2 OR WixBundleCommandLineAction = 1' evaluates to false.
+[1EDC:1908][2026-11-07T11:14:37]i500: Shutting down, exit code: 0x0
+[1EDC:02F8][2026-11-07T11:14:37]i000: The prerequisites were already installed. The bootstrapper application will be reloaded.
+[1EDC:1908][2026-11-07T11:14:37]i006: Bootstrapper application requested to be reloaded.
+[1EDC:1908][2026-11-07T11:14:38]i100: Detect begin, 2 packages
+[1EDC:1908][2026-11-07T11:14:38]i000: Setting string variable 'VcRuntimeInstalled' to value '1'
+[1EDC:1908][2026-11-07T11:14:38]i000: Setting string variable 'VcRuntimeBld' to value '36247'
+[1EDC:1908][2026-11-07T11:14:38]i102: Detected related bundle: {5C84BD06-8F9C-463A-A0C5-10D090D09F11}, type: Upgrade, scope: PerMachine, version: 1.1.1.117, cached: Yes
+[1EDC:1908][2026-11-07T11:14:38]i052: Condition 'VcRuntimeInstalled = 1 AND VcRuntimeBld >= 35211' evaluates to true.
+[1EDC:1908][2026-11-07T11:14:38]i103: Detected related package: {8FA052E2-4113-43BA-9229-44DD5DBF137A}, scope: PerMachine, version: 1.1.1.117, language: 1033 operation: MajorUpgrade
+[1EDC:1908][2026-11-07T11:14:38]i101: Detected package: VcRedistX64, state: Present, cached: No, install registration state: (permanent), cache registration state: (permanent)
+[1EDC:1908][2026-11-07T11:14:38]i101: Detected package: ZentriqMsi, state: Absent, cached: No, install registration state: Absent, cache registration state: Absent
+[1EDC:1FC8][2026-11-07T11:14:38]i052: Condition 'WindowsBuildNumber >= 14393' evaluates to true.
+[1EDC:1FC8][2026-11-07T11:14:38]i052: Condition 'VersionNT64' evaluates to true.
+[1EDC:1908][2026-11-07T11:14:38]i199: Detect complete, result: 0x0, registration state: None, cached: No, eligible for cleanup: No
+[1EDC:1908][2026-11-07T11:14:38]i200: Plan begin, 2 packages, action: Install
+[1EDC:1908][2026-11-07T11:14:38]w321: Skipping dependency registration on package with no dependency providers: VcRedistX64
+[1EDC:1908][2026-11-07T11:14:38]i000: Setting string variable 'WixBundleRollbackLog_ZentriqMsi' to value 'D:\a\_temp\acceptance-upgrade\same-version\upgrade_000_ZentriqMsi_rollback.log'
+[1EDC:1908][2026-11-07T11:14:38]i000: Setting string variable 'WixBundleLog_ZentriqMsi' to value 'D:\a\_temp\acceptance-upgrade\same-version\upgrade_000_ZentriqMsi.log'
+[1EDC:1908][2026-11-07T11:14:38]i000: Setting string variable 'WixBundleLog_{5C84BD06-8F9C-463A-A0C5-10D090D09F11}' to value 'D:\a\_temp\acceptance-upgrade\same-version\upgrade_001_{5C84BD06-8F9C-463A-A0C5-10D090D09F11}.log'
+[1EDC:1908][2026-11-07T11:14:38]i000: Setting string variable 'WixBundleRollbackLog_{5C84BD06-8F9C-463A-A0C5-10D090D09F11}' to value 'D:\a\_temp\acceptance-upgrade\same-version\upgrade_001_{5C84BD06-8F9C-463A-A0C5-10D090D09F11}_rollback.log'
+[1EDC:1908][2026-11-07T11:14:38]i222: Planned rollback boundary: 'WixDefaultBoundary', vital: Yes, transaction: No (default: No)
+[1EDC:1908][2026-11-07T11:14:38]i201: Planned package: VcRedistX64, state: Present, default requested: Present, ba requested: None, execute: None, rollback: None, default cache strategy: Keep, ba requested strategy: Keep, cache: No, uncache: No, dependency: None, expected install registration state: (permanent), expected cache registration state: (permanent)
+[1EDC:1908][2026-11-07T11:14:38]i201: Planned package: ZentriqMsi, state: Absent, default requested: Present, ba requested: Present, execute: Install, rollback: Uninstall, default cache strategy: Keep, ba requested strategy: Keep, cache: Vital, uncache: No, dependency: Register, expected install registration state: Present, expected cache registration state: Present
+[1EDC:1908][2026-11-07T11:14:38]i207: Planned related bundle: {5C84BD06-8F9C-463A-A0C5-10D090D09F11}, detect type: Upgrade, default plan type: Upgrade, ba plan type: Upgrade, default requested: Absent, ba requested: Absent, execute: Uninstall, rollback: Install, default requested restore: ForcePresent, ba requested restore: ForcePresent, restore: Install, dependency: None
+[1EDC:1908][2026-11-07T11:14:38]i299: Plan complete, result: 0x0
+[1EDC:1908][2026-11-07T11:14:38]i300: Apply begin
+[1EDC:1908][2026-11-07T11:14:38]i010: Launching elevated engine process.
+[1EDC:1908][2026-11-07T11:14:38]i011: Launched elevated engine process.
+[1EDC:1908][2026-11-07T11:14:38]i012: Connected to elevated engine.
+[14C0:16C4][2026-11-07T11:14:38]i358: Pausing automatic updates.
+[14C0:16C4][2026-11-07T11:14:38]i359: Paused automatic updates.
+[14C0:16C4][2026-11-07T11:14:38]i360: Creating a system restore point.
+[14C0:16C4][2026-11-07T11:14:38]i362: System restore disabled, system restore point not created.
+[14C0:16C4][2026-11-07T11:14:38]i370: Session begin, registration key: SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{DAF2E968-E7E6-4074-B4E5-842709BB1F70}, options: 0x3, disable resume: No
+[14C0:16C4][2026-11-07T11:14:38]i000: Caching bundle from: 'C:\Windows\TEMP\{4DE9DA9D-9A4C-4C28-A823-2B3A0D2A1A54}\.be\Zentriq-Setup-x64.exe' to: 'C:\ProgramData\Package Cache\{DAF2E968-E7E6-4074-B4E5-842709BB1F70}\Zentriq-Setup-x64.exe'
+[14C0:16C4][2026-11-07T11:14:38]i320: Registering bundle dependency provider: {DAF2E968-E7E6-4074-B4E5-842709BB1F70}, version: 1.1.1.118
+[14C0:16C4][2026-11-07T11:14:38]i371: Updating session, registration key: SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{DAF2E968-E7E6-4074-B4E5-842709BB1F70}, resume: Active, restart initiated: No, disable resume: No
+[14C0:1ED0][2026-11-07T11:14:41]i305: Verified acquired payload: ZentriqMsi at path: C:\ProgramData\Package Cache\.unverified\ZentriqMsi, moving to: C:\ProgramData\Package Cache\{AE2E33D6-62A0-4C37-B2D1-A278AE9B2DBB}v1.1.1.118\Zentriq.msi.
+[14C0:1ED0][2026-11-07T11:14:42]i305: Verified acquired payload: PostgresInstaller at path: C:\ProgramData\Package Cache\.unverified\PostgresInstaller, moving to: C:\ProgramData\Package Cache\{AE2E33D6-62A0-4C37-B2D1-A278AE9B2DBB}v1.1.1.118\prereqs\postgresql-17.11-1-windows-x64.exe.
+[14C0:16C4][2026-11-07T11:14:42]i323: Registering package dependency provider: {AE2E33D6-62A0-4C37-B2D1-A278AE9B2DBB}_v1.1.1.118, version: 1.1.1.118, package: ZentriqMsi
+[14C0:16C4][2026-11-07T11:14:42]i301: Applying execute package: ZentriqMsi, action: Install, path: C:\ProgramData\Package Cache\{AE2E33D6-62A0-4C37-B2D1-A278AE9B2DBB}v1.1.1.118\Zentriq.msi, arguments: ' ZQ_FROM_BUNDLE="1" ZQ_ANSWERFILE="" ZQ_SECTIONS="" ARPSYSTEMCOMPONENT="1" MSIFASTINSTALL="7" REINSTALLMODE="muso" REBOOT=ReallySuppress'
+[1EDC:1908][2026-11-07T11:16:11]i319: Applied execute package: ZentriqMsi, result: 0x0, restart: None
+[14C0:16C4][2026-11-07T11:16:11]i325: Registering dependency: {DAF2E968-E7E6-4074-B4E5-842709BB1F70} on package provider: {AE2E33D6-62A0-4C37-B2D1-A278AE9B2DBB}_v1.1.1.118, package: ZentriqMsi
+[14C0:16C4][2026-11-07T11:16:11]i301: Applying execute package: {5C84BD06-8F9C-463A-A0C5-10D090D09F11}, action: Uninstall, path: C:\ProgramData\Package Cache\{5C84BD06-8F9C-463A-A0C5-10D090D09F11}\Zentriq-Setup-x64.exe, arguments: ' -log "D:\a\_temp\acceptance-upgrade\same-version\upgrade_001_{5C84BD06-8F9C-463A-A0C5-10D090D09F11}.log"'
+[14C0:16C4][2026-11-07T11:16:12]i366: The process for package: {5C84BD06-8F9C-463A-A0C5-10D090D09F11} exited with code: 0x0. The exit code has been translated to type: Success and restart: None.
+[1EDC:1908][2026-11-07T11:16:12]i319: Applied execute package: {5C84BD06-8F9C-463A-A0C5-10D090D09F11}, result: 0x0, restart: None
+[1EDC:1908][2026-11-07T11:16:12]i373: Calculating whether to keep registration
+[1EDC:1908][2026-11-07T11:16:12]i374:   package: VcRedistX64, install registration state: (permanent), cache registration state: (permanent)
+[1EDC:1908][2026-11-07T11:16:12]i374:   package: ZentriqMsi, install registration state: Present, cache registration state: Present
+[1EDC:1908][2026-11-07T11:16:12]i372: Session end, registration key: SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{DAF2E968-E7E6-4074-B4E5-842709BB1F70}, resume: ARP, restart: None, disable resume: No, default registration: Full, ba requested registration: Full
+[14C0:16C4][2026-11-07T11:16:12]i371: Updating session, registration key: SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{DAF2E968-E7E6-4074-B4E5-842709BB1F70}, resume: ARP, restart initiated: No, disable resume: No
+[14C0:16C4][2026-11-07T11:16:12]i420: Resuming automatic updates.
+[14C0:16C4][2026-11-07T11:16:12]i421: Resumed automatic updates.
+[1EDC:1908][2026-11-07T11:16:12]i399: Apply complete, result: 0x0, restart: None, ba requested restart:  No
+[1EDC:1908][2026-11-07T11:16:12]i100: Detect begin, 2 packages
+[1EDC:1908][2026-11-07T11:16:12]i000: Setting string variable 'VcRuntimeInstalled' to value '1'
+[1EDC:1908][2026-11-07T11:16:12]i000: Setting string variable 'VcRuntimeBld' to value '36247'
+[1EDC:1908][2026-11-07T11:16:12]i052: Condition 'VcRuntimeInstalled = 1 AND VcRuntimeBld >= 35211' evaluates to true.
+[1EDC:1908][2026-11-07T11:16:12]i101: Detected package: VcRedistX64, state: Present, cached: No, install registration state: (permanent), cache registration state: (permanent)
+[1EDC:1908][2026-11-07T11:16:12]i101: Detected package: ZentriqMsi, state: Present, cached: Yes, install registration state: Present, cache registration state: Present
+[1EDC:1908][2026-11-07T11:16:12]i199: Detect complete, result: 0x0, registration state: Full, cached: Yes, eligible for cleanup: No
+[1EDC:1908][2026-11-07T11:16:12]i500: Shutting down, exit code: 0x0
+[1EDC:1908][2026-11-07T11:16:12]i502: Cleanup begin.
+[1EDC:1908][2026-11-07T11:16:12]i599: Cleanup complete, result: 0x0
+[1EDC:1908][2026-11-07T11:16:12]i410: Variable: RebootPending = 1
+[1EDC:1908][2026-11-07T11:16:12]i410: Variable: VcRuntimeBld = 36247
+[1EDC:1908][2026-11-07T11:16:12]i410: Variable: VcRuntimeInstalled = 1
+[1EDC:1908][2026-11-07T11:16:12]i410: Variable: VersionNT64 = 10.0.0.0
+[1EDC:1908][2026-11-07T11:16:12]i410: Variable: WindowsBuildNumber = 20348
+[1EDC:1908][2026-11-07T11:16:12]i410: Variable: WixBundleAction = 0
+[1EDC:1908][2026-11-07T11:16:12]i410: Variable: WixBundleCommandLineAction = 6
+[1EDC:1908][2026-11-07T11:16:12]i410: Variable: WixBundleElevated = 1
+[1EDC:1908][2026-11-07T11:16:12]i410: Variable: WixBundleFileVersion = 5.0.2.0
+[1EDC:1908][2026-11-07T11:16:12]i410: Variable: WixBundleInProgressName = 
+[1EDC:1908][2026-11-07T11:16:12]i410: Variable: WixBundleInstalled = 1
+[1EDC:1908][2026-11-07T11:16:12]i410: Variable: WixBundleLog = D:\a\_temp\acceptance-upgrade\same-version\upgrade.log
+[1EDC:1908][2026-11-07T11:16:12]i410: Variable: WixBundleLog_{5C84BD06-8F9C-463A-A0C5-10D090D09F11} = D:\a\_temp\acceptance-upgrade\same-version\upgrade_001_{5C84BD06-8F9C-463A-A0C5-10D090D09F11}.log
+[1EDC:1908][2026-11-07T11:16:12]i410: Variable: WixBundleLog_ZentriqMsi = D:\a\_temp\acceptance-upgrade\same-version\upgrade_000_ZentriqMsi.log
+[1EDC:1908][2026-11-07T11:16:12]i410: Variable: WixBundleManufacturer = Zentriq
+[1EDC:1908][2026-11-07T11:16:12]i410: Variable: WixBundleName = Zentriq
+[1EDC:1908][2026-11-07T11:16:12]i410: Variable: WixBundleOriginalSource = D:\a\zentriq\zentriq\artifacts\release-main\Zentriq-Setup-x64.exe
+[1EDC:1908][2026-11-07T11:16:12]i410: Variable: WixBundleOriginalSourceFolder = D:\a\zentriq\zentriq\artifacts\release-main\
+[1EDC:1908][2026-11-07T11:16:12]i410: Variable: WixBundleProviderKey = {DAF2E968-E7E6-4074-B4E5-842709BB1F70}
+[1EDC:1908][2026-11-07T11:16:12]i410: Variable: WixBundleRollbackLog_{5C84BD06-8F9C-463A-A0C5-10D090D09F11} = D:\a\_temp\acceptance-upgrade\same-version\upgrade_001_{5C84BD06-8F9C-463A-A0C5-10D090D09F11}_rollback.log
+[1EDC:1908][2026-11-07T11:16:12]i410: Variable: WixBundleRollbackLog_ZentriqMsi = D:\a\_temp\acceptance-upgrade\same-version\upgrade_000_ZentriqMsi_rollback.log
+[1EDC:1908][2026-11-07T11:16:12]i410: Variable: WixBundleTag = 
+[1EDC:1908][2026-11-07T11:16:12]i410: Variable: WixBundleUILevel = 2
+[1EDC:1908][2026-11-07T11:16:12]i410: Variable: WixBundleVersion = 1.1.1.118
+[1EDC:1908][2026-11-07T11:16:12]i410: Variable: WixStdBALanguageId = 1033
+[1EDC:1908][2026-11-07T11:16:12]i410: Variable: ZQ_ANSWERFILE = 
+[1EDC:1908][2026-11-07T11:16:12]i410: Variable: ZQ_SECTIONS = 
+[1EDC:1908][2026-11-07T11:16:12]i007: Exit code: 0x0, restarting: No

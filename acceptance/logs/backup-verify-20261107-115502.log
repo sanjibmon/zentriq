@@ -1,0 +1,2 @@
+﻿2026-11-07T11:55:02.8486266Z INFO Backup zentriq-runnervmquqza-20261107-115501-manual.zbak decrypted and readable: version 1.1.1, created 2026-11-07 11:55:02Z, password protected, 31 item(s) (database, configuration, certificates, MFA keys, remote support), 1003 TOC lines.
+2026-11-07T11:55:02.8654678Z INFO Backup verification PASSED.

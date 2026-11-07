@@ -1,0 +1,54 @@
+---- mkdir -p /tmp/zqdummy/DEBIAN
+printf 'Package: zq-ci-dummy\nVersion: 1.0\nArchitecture: all\nMaintainer: Zentriq CI <ci@example.com>\nDescription: Zentriq CI test package\n' > /tmp/zqdummy/DEBIAN/control
+dpkg-deb --build /tmp/zqdummy /tmp/zq-ci-dummy.deb >/dev/null && dpkg -i /tmp/zq-ci-dummy.deb >/dev/null
+
+---- curl -fsSLk --pinnedpubkey 'sha256//OIifqbEOt+rODQVTJmWucTLyxQ+v0HXxk2x9gwtf5Cg=' https://localhost:8444/api/agent/v1/linux/install.sh | sudo sh -s -- --server https://localhost:8444 --code CKRQY-2TMVT-4AAJ6-EHF6T --checkin 2 --inventory 30 --pin 'OIifqbEOt+rODQVTJmWucTLyxQ+v0HXxk2x9gwtf5Cg='
+zentriq-agent --identify
+zentriq-agent --status || true
+Downloading the Zentriq Agent (linux-x64, deb) from https://localhost:8444 ...
+Installing ...
+2026-11-07 12:02:22Z INFO  Enrolling with https://localhost:8444 as runnervmquqza.
+2026-11-07 12:02:22Z INFO  Uninstall and tamper protection is on: removing or stopping the agent needs a one-hour code from the Zentriq console.
+2026-11-07 12:02:22Z INFO  Enrolled as agent 7a047ac0-8152-4c32-9ec1-8953bfd2401b; certificate 3061D650F4F004E119EEC5A3804A4323FDCA939A expires 2027-11-07; checks in every 2 min, sends inventory every 30 min.
+2026-11-07 12:02:22Z INFO  New uninstall code from the console received (valid until 2026-11-07 12:27 UTC).
+2026-11-07 12:02:22Z INFO  Application control policy 14: off, 2 rule(s).
+2026-11-07 12:02:25Z INFO  Inventory collected: runnervmquqza, Ubuntu 24.04.5 LTS (Ubuntu Server, Server), 525 packages, 0 section error(s)
+2026-11-07 12:02:25Z INFO  Inventory uploaded (7 KB compressed).
+Checked in and sent inventory.
+Done. Check with: sudo zentriq-agent --status   (what it detected: sudo zentriq-agent --identify)
+Distribution:  ubuntu (debian family)
+Name:          Ubuntu 24.04.5 LTS
+Version:       24.04 (noble) LTS
+Edition:       Ubuntu Server
+Installation:  Server (server)
+Desktop:       none
+Kernel:        4.4.0-20348-Microsoft
+Architecture:  x86_64
+Packages:      525 (dpkg)
+Device:          (virtual, server)
+Zentriq Agent 1.1.2.118 (linux-x64, installed as deb)
+Status:        enrolled (agent 7a047ac0-8152-4c32-9ec1-8953bfd2401b)
+Server:        https://localhost:8444
+Last check-in: 2026-11-07 12:02:22Z
+Last inventory: 2026-11-07 12:02:25Z
+Intervals:     check-in 2 min, inventory 30 min
+Protection:    on
+
+
+---- setsid nohup /opt/zentriq-agent/zentriq-agent --run >/var/log/zentriq-agent/run.out 2>&1 < /dev/null &
+sleep 3
+
+---- dpkg-query -W -f='${Status}' zq-ci-dummy 2>/dev/null || echo gone
+gone
+
+---- zentriq-agent --protection
+Tamper protection: on (stop with 'zentriq-agent --stop <code>', remove with 'zentriq-agent --uninstall <code>') - not applied yet
+
+---- apt-get remove -y zentriq-agent >/tmp/rm.log 2>&1 && echo REMOVED || echo REFUSED; grep -m1 "is protected" /tmp/rm.log || tail -5 /tmp/rm.log
+REFUSED
+[?1h=The Zentriq Agent is protected: removing it needs a one-hour code from the Zentriq console (Agents › Uninstall code).
+
+---- pkill -f 'zentriq-agent --run' || true; zentriq-agent --uninstall E7DA-WHW6-963D-Y7YZ 2>&1 || true; test -e /opt/zentriq-agent/zentriq-agent && echo STILL || echo GONE
+The Zentriq Agent was removed.
+GONE
+

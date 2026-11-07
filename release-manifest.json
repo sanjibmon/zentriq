@@ -1,0 +1,119 @@
+{
+  "product": "Zentriq",
+  "version": "1.1.1",
+  "build": 118,
+  "packageVersion": "1.1.1.118",
+  "builtAtUtc": "2026-11-07T11:03:01.3065229Z",
+  "gitCommit": "45e353f98c4ad20a30e295edfa6cd04de80afb1a",
+  "builder": {
+    "dotnetSdk": "10.0.403",
+    "os": "Microsoft Windows NT 10.0.20348.0",
+    "wix": "5.0.2"
+  },
+  "signed": false,
+  "signingMode": null,
+  "files": [
+    {
+      "name": "Zentriq-1.1.1-docs.zip",
+      "bytes": 114721,
+      "sha256": "942e0577cbd46bf568c58aaff0dc3af2b7ed83453ebd2c70881356f6e340191e",
+      "signature": null
+    },
+    {
+      "name": "Zentriq-1.1.1-msi-offline-kit.zip",
+      "bytes": 715498696,
+      "sha256": "f9aa903ee08876c39162f3543523bc93110f824a409e7f71adc6eb33ff11ad28",
+      "signature": null
+    },
+    {
+      "name": "zentriq-agent-linux-arm64.deb",
+      "bytes": 28950364,
+      "sha256": "6eba4e8034a97011c0356ea4b41a0d0a5127fd8bd45c67fc0b98e6a216ea994c",
+      "signature": null
+    },
+    {
+      "name": "zentriq-agent-linux-arm64.rpm",
+      "bytes": 28960424,
+      "sha256": "9d6ca6999f382249526dfd70135120b0ca3b9cf102ca4b029ee7ef8c3e8972ea",
+      "signature": null
+    },
+    {
+      "name": "zentriq-agent-linux-arm64.tar.gz",
+      "bytes": 30395742,
+      "sha256": "d4a10124f28b0460e0b6cb5c2d5fee4ba1fccd0ad128a0c920e75431cb891910",
+      "signature": null
+    },
+    {
+      "name": "zentriq-agent-linux-x64.deb",
+      "bytes": 30985164,
+      "sha256": "b95aaa8185d5592513d7892d4b7a2f57860537a6b473ecfbe8f86d6ea86980bc",
+      "signature": null
+    },
+    {
+      "name": "zentriq-agent-linux-x64.rpm",
+      "bytes": 30993628,
+      "sha256": "6003aeb5eaf2e9f552f9a333935ed73db52b43138d78a9339ccae6d1ecafe85d",
+      "signature": null
+    },
+    {
+      "name": "zentriq-agent-linux-x64.tar.gz",
+      "bytes": 32222167,
+      "sha256": "ba6abcfb88579f6cc411becde09f07146a248297c7e85e4937150254e60782a1",
+      "signature": null
+    },
+    {
+      "name": "Zentriq-Setup-x64.exe",
+      "bytes": 716100256,
+      "sha256": "d190df666936884cedb03524f2cab6886b8fce9a9e1cd7bac0d5a60a22163ed0",
+      "signature": "NotSigned"
+    },
+    {
+      "name": "Zentriq.msi",
+      "bytes": 323904285,
+      "sha256": "0ec845703c0acd747c8f817606f5e30492f65eaa3d968808b3af26dbb1182e7a",
+      "signature": "NotSigned"
+    },
+    {
+      "name": "ZentriqAgent-x64.msi",
+      "bytes": 3919872,
+      "sha256": "2450ffabffd6396c3900871d25b1040d7cf55a79dac552f5fc77678812c1729a",
+      "signature": "NotSigned"
+    }
+  ],
+  "prerequisites": {
+    "postgresql": {
+      "file": "postgresql-17.11-1-windows-x64.exe",
+      "product": "PostgreSQL",
+      "version": "17.11-1",
+      "fileVersion": "1.0.0.0",
+      "productVersion": "17",
+      "sha256": "f104c552d8495a6f20738c2a03f643164bc64b9985363329e314dec24559f0b7",
+      "pinned": true,
+      "signer": "CN=EnterpriseDB Corporation, O=EnterpriseDB Corporation, L=Wilmington, S=Delaware, C=US",
+      "signerThumbprint": "7BEDD1269FCCF7A5D95F18274750B79893C06C70",
+      "timestamped": true,
+      "bytes": 373033224,
+      "license": "PostgreSQL License (https://www.postgresql.org/about/licence/); installer by EnterpriseDB"
+    },
+    "vcredist": {
+      "file": "vc_redist.x64.exe",
+      "product": "Microsoft Visual C++ 2015-2022 Redistributable (x64)",
+      "version": "14.44.35211.0",
+      "fileVersion": "14.44.35211.0",
+      "productVersion": "14.44.35211.0",
+      "sha256": "cc0ff0eb1dc3f5188ae6300faef32bf5beeba4bdd6e8e445a9184072096b713b",
+      "pinned": true,
+      "signer": "CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US",
+      "signerThumbprint": "8F985BE8FD256085C90A95D3C74580511A1DB975",
+      "timestamped": true,
+      "bytes": 25635768,
+      "license": "Microsoft Software License Terms - Visual C++ Redistributable (redistribution permitted)"
+    }
+  },
+  "notes": [
+    "Zentriq-Setup-x64.exe: offline bootstrapper (VC++ runtime + PostgreSQL + Zentriq.msi).",
+    "Zentriq.msi: Zentriq only; uses prereqs\\ next to the MSI (see the offline kit) or an existing PostgreSQL server.",
+    "ZentriqAgent-x64.msi: Zentriq Agent for Windows devices (also served by the console at /downloads).",
+    "zentriq-agent-linux-{x64,arm64}.{deb,rpm,tar.gz}: Zentriq Agent for Linux (also served by the server, with the one-line installer)."
+  ]
+}

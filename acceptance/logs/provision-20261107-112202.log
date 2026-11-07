@@ -1,0 +1,156 @@
+﻿2026-11-07T11:22:02.5159593Z INFO zentriqctl 1.1.1 provisioning (mode install), data directory C:\ProgramData\Zentriq
+2026-11-07T11:22:02.5428659Z STEP 1/16 System compatibility and prerequisite checks
+2026-11-07T11:22:02.5430536Z PROGRESS 0 System compatibility and prerequisite checks
+2026-11-07T11:22:02.5696012Z INFO Windows 10.0.20348.0, 4 CPUs, 74 GB free on C:\
+2026-11-07T11:22:02.5697456Z INFO OK  System compatibility and prerequisite checks (26 ms)
+2026-11-07T11:22:02.5697790Z STEP 2/16 Prepare data directories and permissions
+2026-11-07T11:22:02.5697981Z PROGRESS 6 Prepare data directories and permissions
+2026-11-07T11:22:02.6028076Z INFO Data root C:\ProgramData\Zentriq secured (services: ZentriqApi, ZentriqWorker).
+2026-11-07T11:22:02.6028528Z INFO OK  Prepare data directories and permissions (31 ms)
+2026-11-07T11:22:02.6028643Z STEP 3/16 Install or connect to PostgreSQL
+2026-11-07T11:22:02.6029263Z PROGRESS 12 Install or connect to PostgreSQL
+2026-11-07T11:22:02.6416638Z WARN The PostgreSQL data folder C:\ZentriqTestData\postgresql was left by an earlier, incomplete installation (no postgresql-x64-17 service). Moved it to C:\ZentriqTestData\postgresql.incomplete-20261107-112202.
+2026-11-07T11:22:02.6420935Z INFO Installing PostgreSQL to C:\Program Files\PostgreSQL\17 (data: C:\ZentriqTestData\postgresql, port 5432, service postgresql-x64-17).
+2026-11-07T11:22:47.4966264Z INFO Restarting PostgreSQL to apply the local-only listener.
+2026-11-07T11:22:48.3660425Z INFO Connected to PostgreSQL 17.11 at localhost:5432.
+2026-11-07T11:22:48.3674301Z INFO OK  Install or connect to PostgreSQL (45764 ms)
+2026-11-07T11:22:48.3674969Z STEP 4/16 Create database, roles and protected credentials
+2026-11-07T11:22:48.3675150Z PROGRESS 18 Create database, roles and protected credentials
+2026-11-07T11:22:48.4226906Z INFO Created role zentriq_owner.
+2026-11-07T11:22:48.4352549Z INFO Created role zentriq_app.
+2026-11-07T11:22:48.7004931Z INFO Created database zentriq.
+2026-11-07T11:22:48.7674818Z WARN Backup recovery key written to C:\ProgramData\Zentriq\Secrets\backup-recovery-key.txt. Move it to offline storage.
+2026-11-07T11:22:48.8064573Z INFO PostgreSQL accepts authenticated connections for the application role.
+2026-11-07T11:22:48.8079857Z INFO OK  Create database, roles and protected credentials (440 ms)
+2026-11-07T11:22:48.8080366Z STEP 5/16 Pre-upgrade backup
+2026-11-07T11:22:48.8080537Z PROGRESS 25 Pre-upgrade backup
+2026-11-07T11:22:48.9603391Z INFO New database; no backup needed.
+2026-11-07T11:22:48.9604404Z INFO OK  Pre-upgrade backup (152 ms)
+2026-11-07T11:22:48.9604551Z STEP 6/16 Apply database migrations
+2026-11-07T11:22:48.9604635Z PROGRESS 31 Apply database migrations
+2026-11-07T11:22:49.0233930Z INFO Applying migration V0001__baseline.sql
+2026-11-07T11:22:49.2131796Z INFO Applied migration V0001__baseline.sql in 189 ms
+2026-11-07T11:22:49.2134159Z INFO Applying migration V0002__reference_data.sql
+2026-11-07T11:22:49.2209594Z INFO Applied migration V0002__reference_data.sql in 7 ms
+2026-11-07T11:22:49.2210081Z INFO Applying migration V0003__privileges.sql
+2026-11-07T11:22:49.2279448Z INFO Applied migration V0003__privileges.sql in 6 ms
+2026-11-07T11:22:49.2279915Z INFO Applying migration V0004__agents_inventory_profile.sql
+2026-11-07T11:22:49.2488075Z INFO Applied migration V0004__agents_inventory_profile.sql in 20 ms
+2026-11-07T11:22:49.2488657Z INFO Applying migration V0005__directory_password_reset.sql
+2026-11-07T11:22:49.2628803Z INFO Applied migration V0005__directory_password_reset.sql in 13 ms
+2026-11-07T11:22:49.2629415Z INFO Applying migration V0006__asset_actions_ipv4.sql
+2026-11-07T11:22:49.2747734Z INFO Applied migration V0006__asset_actions_ipv4.sql in 11 ms
+2026-11-07T11:22:49.2748298Z INFO Applying migration V0007__software_uninstall.sql
+2026-11-07T11:22:49.2807221Z INFO Applied migration V0007__software_uninstall.sql in 5 ms
+2026-11-07T11:22:49.2807678Z INFO Applying migration V0008__agent_update.sql
+2026-11-07T11:22:49.2842959Z INFO Applied migration V0008__agent_update.sql in 3 ms
+2026-11-07T11:22:49.2843682Z INFO Applying migration V0009__agent_replaced.sql
+2026-11-07T11:22:49.2878255Z INFO Applied migration V0009__agent_replaced.sql in 3 ms
+2026-11-07T11:22:49.2878634Z INFO Applying migration V0010__reports_vulnerabilities.sql
+2026-11-07T11:22:49.3339827Z INFO Applied migration V0010__reports_vulnerabilities.sql in 46 ms
+2026-11-07T11:22:49.3340550Z INFO Applying migration V0011__os_vulns_workflow_report_pdf.sql
+2026-11-07T11:22:49.3523390Z INFO Applied migration V0011__os_vulns_workflow_report_pdf.sql in 18 ms
+2026-11-07T11:22:49.3523950Z INFO Applying migration V0012__security_config_integrations.sql
+2026-11-07T11:22:49.4057357Z INFO Applied migration V0012__security_config_integrations.sql in 53 ms
+2026-11-07T11:22:49.4057958Z INFO Applying migration V0013__departments_inventory_changes.sql
+2026-11-07T11:22:49.4230856Z INFO Applied migration V0013__departments_inventory_changes.sql in 17 ms
+2026-11-07T11:22:49.4231543Z INFO Applying migration V0014__remote_support.sql
+2026-11-07T11:22:49.4384119Z INFO Applied migration V0014__remote_support.sql in 15 ms
+2026-11-07T11:22:49.4384653Z INFO Applying migration V0015__device_types_duplicates.sql
+2026-11-07T11:22:49.4498813Z INFO Applied migration V0015__device_types_duplicates.sql in 11 ms
+2026-11-07T11:22:49.4499488Z INFO Applying migration V0016__network_inventory.sql
+2026-11-07T11:22:49.5023585Z INFO Applied migration V0016__network_inventory.sql in 52 ms
+2026-11-07T11:22:49.5024228Z INFO Applying migration V0017__network_health_nonit_assets.sql
+2026-11-07T11:22:49.5409813Z INFO Applied migration V0017__network_health_nonit_assets.sql in 38 ms
+2026-11-07T11:22:49.5410415Z INFO Applying migration V0018__remote_quick_support.sql
+2026-11-07T11:22:49.5576401Z INFO Applied migration V0018__remote_quick_support.sql in 16 ms
+2026-11-07T11:22:49.5577149Z INFO Applying migration V0019__agent_schedule_uninstall_codes.sql
+2026-11-07T11:22:49.5660352Z INFO Applied migration V0019__agent_schedule_uninstall_codes.sql in 8 ms
+2026-11-07T11:22:49.5660943Z INFO Applying migration V0020__asset_ipv4.sql
+2026-11-07T11:22:49.5692292Z INFO Applied migration V0020__asset_ipv4.sql in 3 ms
+2026-11-07T11:22:49.5692743Z INFO Applying migration V0021__locations_accessories.sql
+2026-11-07T11:22:49.6017743Z INFO Applied migration V0021__locations_accessories.sql in 32 ms
+2026-11-07T11:22:49.6018580Z INFO Applying migration V0022__manual_hardware_identity.sql
+2026-11-07T11:22:49.6136991Z INFO Applied migration V0022__manual_hardware_identity.sql in 11 ms
+2026-11-07T11:22:49.6137472Z INFO Applying migration V0023__asset_lifecycle.sql
+2026-11-07T11:22:49.6478087Z INFO Applied migration V0023__asset_lifecycle.sql in 34 ms
+2026-11-07T11:22:49.6478650Z INFO Applying migration V0024__cloud_infrastructure.sql
+2026-11-07T11:22:49.6738988Z INFO Applied migration V0024__cloud_infrastructure.sql in 26 ms
+2026-11-07T11:22:49.6739459Z INFO Applying migration V0025__cloud_more_platforms.sql
+2026-11-07T11:22:49.6792188Z INFO Applied migration V0025__cloud_more_platforms.sql in 5 ms
+2026-11-07T11:22:49.6792658Z INFO Applying migration V0026__lifecycle_tags_people_import.sql
+2026-11-07T11:22:49.6934499Z INFO Applied migration V0026__lifecycle_tags_people_import.sql in 14 ms
+2026-11-07T11:22:49.6934995Z INFO Applying migration V0027__backup_destinations_and_runs.sql
+2026-11-07T11:22:49.7250901Z INFO Applied migration V0027__backup_destinations_and_runs.sql in 31 ms
+2026-11-07T11:22:49.7251895Z INFO Applying migration V0028__roles_groups_log_retention.sql
+2026-11-07T11:22:49.7619303Z INFO Applied migration V0028__roles_groups_log_retention.sql in 36 ms
+2026-11-07T11:22:49.7619954Z INFO Applying migration V0029__agent_tamper_protection_auto_update.sql
+2026-11-07T11:22:49.7671767Z INFO Applied migration V0029__agent_tamper_protection_auto_update.sql in 5 ms
+2026-11-07T11:22:49.7672348Z INFO Applying migration V0030__licensing_plans.sql
+2026-11-07T11:22:49.7703696Z INFO Applied migration V0030__licensing_plans.sql in 3 ms
+2026-11-07T11:22:49.7704735Z INFO Applying migration V0031__accessory_categories.sql
+2026-11-07T11:22:49.7855042Z INFO Applied migration V0031__accessory_categories.sql in 15 ms
+2026-11-07T11:22:49.7855628Z INFO Applying migration V0032__agent_platform.sql
+2026-11-07T11:22:49.7901063Z INFO Applied migration V0032__agent_platform.sql in 4 ms
+2026-11-07T11:22:49.7901535Z INFO Applying migration V0033__software_deployment.sql
+2026-11-07T11:22:49.8315019Z INFO Applied migration V0033__software_deployment.sql in 41 ms
+2026-11-07T11:22:49.8315610Z INFO Applying migration V0034__app_control_details.sql
+2026-11-07T11:22:49.8347531Z INFO Applied migration V0034__app_control_details.sql in 3 ms
+2026-11-07T11:22:49.8347882Z INFO Applying migration V0035__network_ipam_licenses_webapps.sql
+2026-11-07T11:22:49.8936242Z INFO Applied migration V0035__network_ipam_licenses_webapps.sql in 58 ms
+2026-11-07T11:22:49.8936934Z INFO Applying migration V0036__warranty_recording_directory_signin.sql
+2026-11-07T11:22:49.9275871Z INFO Applied migration V0036__warranty_recording_directory_signin.sql in 33 ms
+2026-11-07T11:22:49.9276367Z INFO Applying migration V0037__patches_scripts.sql
+2026-11-07T11:22:49.9765658Z INFO Applied migration V0037__patches_scripts.sql in 48 ms
+2026-11-07T11:22:49.9766250Z INFO Applying migration V0038__self_service_tray.sql
+2026-11-07T11:22:49.9912877Z INFO Applied migration V0038__self_service_tray.sql in 14 ms
+2026-11-07T11:22:50.0065871Z INFO Applied 38 migration(s).
+2026-11-07T11:22:50.0087205Z INFO OK  Apply database migrations (1048 ms)
+2026-11-07T11:22:50.0087660Z STEP 7/16 Record the installed sections
+2026-11-07T11:22:50.0087768Z PROGRESS 37 Record the installed sections
+2026-11-07T11:22:50.0176548Z INFO Advanced installation: Overview, Discovery & Inventory, Remote Support, Infrastructure, Secure & Remediate, Insight & Admin.
+2026-11-07T11:22:50.0177357Z INFO OK  Record the installed sections (8 ms)
+2026-11-07T11:22:50.0177486Z STEP 8/16 Configure HTTPS certificate
+2026-11-07T11:22:50.0177592Z PROGRESS 43 Configure HTTPS certificate
+2026-11-07T11:22:50.2722771Z INFO Created the local certificate authority "Zentriq Local CA (runnervmquqza)" (Secrets\https-ca.pfx).
+2026-11-07T11:22:50.2977319Z INFO Trusted Zentriq Local CA (runnervmquqza) on this server (LocalMachine\Root). Install it once on technician PCs (Zentriq console: Remote Support › Deployment & settings › Trust this server), or use a CA-issued certificate.
+2026-11-07T11:22:50.5812508Z INFO Issued HTTPS certificate 2D6FE612307BCF28630E49F68566E3D79BD0DBDB from the local CA for localhost, runnervmquqza, 10.1.0.7, 127.0.0.1, 172.30.208.1.
+2026-11-07T11:22:50.6037971Z INFO Created the agent certificate authority (Secrets\agent-ca.pfx).
+2026-11-07T11:22:50.6051125Z INFO OK  Configure HTTPS certificate (587 ms)
+2026-11-07T11:22:50.6051467Z STEP 9/16 Write configuration
+2026-11-07T11:22:50.6051550Z PROGRESS 50 Write configuration
+2026-11-07T11:22:50.6156862Z INFO Configuration written to C:\ProgramData\Zentriq\Config\zentriq.json (no secrets).
+2026-11-07T11:22:50.6157264Z INFO OK  Write configuration (10 ms)
+2026-11-07T11:22:50.6157352Z STEP 10/16 Configure and start Zentriq services
+2026-11-07T11:22:50.6157437Z PROGRESS 56 Configure and start Zentriq services
+2026-11-07T11:22:51.9979130Z INFO ZentriqWorker: Running, ZentriqApi: Running
+2026-11-07T11:22:51.9980253Z INFO OK  Configure and start Zentriq services (1382 ms)
+2026-11-07T11:22:51.9980813Z STEP 11/16 Configure remote support
+2026-11-07T11:22:51.9980943Z PROGRESS 62 Configure remote support
+2026-11-07T11:22:52.4961605Z INFO Remote support service account: Done.
+2026-11-07T11:22:52.9231293Z INFO Remote support administrator rights: Done. This command will only work if MeshCentral is stopped.
+2026-11-07T11:23:05.4594149Z INFO Remote support uses the console's HTTPS certificate.
+2026-11-07T11:23:07.4592192Z INFO Remote support is running on port 8446.
+2026-11-07T11:23:07.4593561Z INFO OK  Configure remote support (15461 ms)
+2026-11-07T11:23:07.4593855Z STEP 12/16 Verify API readiness over HTTPS
+2026-11-07T11:23:07.4594096Z PROGRESS 68 Verify API readiness over HTTPS
+2026-11-07T11:23:10.3580325Z INFO API ready: 200 {"status":"ready","checks":{"database":"ok","schemaVersion":38,"expectedSchemaVersion":38,"initialized":false,"worker":"ok"}}
+2026-11-07T11:23:10.3583533Z INFO OK  Verify API readiness over HTTPS (2898 ms)
+2026-11-07T11:23:10.3583846Z STEP 13/16 Verify the worker processes a test job
+2026-11-07T11:23:10.3583972Z PROGRESS 75 Verify the worker processes a test job
+2026-11-07T11:23:12.4152933Z INFO Worker processed self-test job f67e2148-f0ea-4ca0-8463-f7d593b42fd6.
+2026-11-07T11:23:12.4170823Z INFO OK  Verify the worker processes a test job (2058 ms)
+2026-11-07T11:23:12.4171323Z STEP 14/16 Create the first administrator and start the trial
+2026-11-07T11:23:12.4171478Z PROGRESS 81 Create the first administrator and start the trial
+2026-11-07T11:23:13.0924251Z INFO Initialization: {"outcome":"initialized","trialStartedAt":"2026-11-07T11:23:12.649+00:00","trialExpiresAt":"2026-11-21T11:23:12.649+00:00"}
+2026-11-07T11:23:13.0928692Z INFO OK  Create the first administrator and start the trial (675 ms)
+2026-11-07T11:23:13.0929026Z STEP 15/16 Verify the web console and trial state
+2026-11-07T11:23:13.0929230Z PROGRESS 87 Verify the web console and trial state
+2026-11-07T11:23:13.1879183Z INFO Web console loads; license mode Trial; trial committed.
+2026-11-07T11:23:13.1882811Z INFO OK  Verify the web console and trial state (95 ms)
+2026-11-07T11:23:13.1883126Z STEP 16/16 Register maintenance and backup tasks
+2026-11-07T11:23:13.1883233Z PROGRESS 93 Register maintenance and backup tasks
+2026-11-07T11:23:13.2593296Z INFO Registered scheduled task \Zentriq\Maintenance (every 5 min; also runs the backup schedule).
+2026-11-07T11:23:13.2593914Z INFO OK  Register maintenance and backup tasks (71 ms)
+2026-11-07T11:23:13.2594042Z PROGRESS 100 Zentriq is ready
+2026-11-07T11:23:13.2780043Z INFO Zentriq 1.1.1 is ready at https://localhost/
