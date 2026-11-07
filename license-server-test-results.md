@@ -1,0 +1,11 @@
+# License server setup (Windows MSI)
+
+| ID | Test | Result | Detail |
+|---|---|---|---|
+| S01 | Silent install: PostgreSQL and the license server as Windows services; the portal leads to the setup wizard | **PASS** | services running (server as NT SERVICE\ZentriqLicenseServer, delayed auto start); health 200; /admin -> /setup/; PostgreSQL on 127.0.0.1:5439 only; http on localhost:5080 only; data folder admins/SYSTEM/service only |
+| S02 | Setup wizard: owner, key ceremony, product entry and encrypted backup, backup confirmed, finish | **PASS** | owner created; key zentriq-ci-setup SHA256:05:4A:A4:AE:DC:F3:5A:E6:C8:AA:9C:B2:5A:AA:FE:56:88:F5:DE:B6:EF:B4:D3:57:21:7D:13:A0:9B:4B:99:7E; product entry public only; backup encrypted; finish refused until the backup was confirmed; private key ACL: NT AUTHORITY\SYSTEM, NT SERVICE\ZentriqLicenseServer; passphrase DPAPI-protected |
+| S03 | Licenses: subscription offline file, perpetual online with check-in, customer license file bound online, tampering rejected | **PASS** | subscription ZQ-2026-BCRTHM offline verified; perpetual ZQ-2026-1W4YCW online + check-in; license file bound online; tampered file rejected |
+| S04 | After a restart (as after a reboot) the key is unlocked automatically and the database starts with the server | **PASS** | stopped both services, started the server: database came up as its dependency, key unlocked without a prompt |
+| S05 | Public mode with own certificate: wizard restarts the service, HTTPS on 443 with that certificate, HTTP redirects, wizard not reachable from the network; back to local | **PASS** | restarted by the wizard (pid 6112 -> 5592); https://localhost served the uploaded certificate; port 80 held by another program on this runner [:::80 by System (4)]: reported on the setup page, server kept running on 443 and localhost; wizard 404 from 172.23.240.1; portal reachable over https; back to local: 443 closed |
+| S06 | Database backups: daily backup written by the service, and on demand | **PASS** | 2 backup(s) in C:\ProgramData\Zentriq\LicenseServer\backups |
+| S07 | Uninstall keeps the data; reinstall continues with the same key and licenses | **PASS** | uninstall removed services, firewall rule and program, kept data; reinstall: setup finished, same key, licenses kept |
