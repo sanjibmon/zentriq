@@ -240,7 +240,7 @@ public sealed class Release2DbTests : IAsyncLifetime
         Assert.Contains(sec, arg);
         Assert.DoesNotContain(def, arg);
         Assert.Contains("\"reboot\":\"when-needed\"", arg);
-        Assert.Contains("older", (string)(await Scalar(ds, "SELECT skipped FROM zentriq.patch_job_devices WHERE job_id = @j AND asset_id = @a", ("j", job.Id), ("a", old)))!);
+        Assert.Contains("too old", (string)(await Scalar(ds, "SELECT skipped FROM zentriq.patch_job_devices WHERE job_id = @j AND asset_id = @a", ("j", job.Id), ("a", old)))!);
 
         // "All missing" with a classification filter; declined updates are left out.
         await PatchStore.SetApprovalAsync(ds, [opt], "declined", null, default);
