@@ -38,6 +38,18 @@ internal static class LongActions
         return (true, "started", q.Items.Count > 1 ? "Queued on the device (another one is running)." : "Started on the device.");
     }
 
+    /// <summary>The long actions queued or running on this device now (sent with every check-in, so the server can tell
+    /// which ones a restart of the agent interrupted).</summary>
+    public static string[] Running()
+    {
+        lock (Queues)
+        {
+            var list = new List<string>();
+            foreach (var q in Queues.Values) list.AddRange(q.Ids);
+            return list.ToArray();
+        }
+    }
+
     private static void Loop(Queue q)
     {
         foreach (var (a, work) in q.Items.GetConsumingEnumerable())

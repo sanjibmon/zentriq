@@ -191,6 +191,7 @@ internal sealed class ServerClient : IDisposable
             ["events"] = events is { Count: > 0 } ? events : null,
             ["tamperProtection"] = TamperGuard.ReportedState(),
             ["appControl"] = AppControlAgent.Report(),
+            ["runningActions"] = LongActions.Running(),
         }, ct);
 
     /// <summary>This device's application control policy.</summary>

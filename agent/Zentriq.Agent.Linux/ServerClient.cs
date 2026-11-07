@@ -187,6 +187,7 @@ internal sealed class ServerClient : IDisposable
             ["events"] = events is { Count: > 0 } ? events : null,
             ["tamperProtection"] = Protection.Reported(),
             ["appControl"] = AppControlAgent.Report(),
+            ["runningActions"] = LongActions.Running(),
         }, ct);
 
     public async Task<string> GetAppControlPolicyAsync(CancellationToken ct)

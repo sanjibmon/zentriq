@@ -41,7 +41,7 @@ public static partial class AgentEndpoints
     public sealed record RenewRequest(string Csr);
     public sealed record CheckinRequest(string? AgentVersion, string? Hostname, string? OsName, string? LastError, string[]? Capabilities = null,
         DateTimeOffset? OfflineSince = null, bool? UninstallProtected = null, List<AgentEvent>? Events = null, TamperReport? TamperProtection = null,
-        string? Platform = null, AppControlReport? AppControl = null);
+        string? Platform = null, AppControlReport? AppControl = null, string[]? RunningActions = null);
     /// <summary>
     /// Application control on the device: the policy revision applied, the mode in force (off, audit, block), WDAC (off,
     /// audit, enforce, unsupported) and the remote support agent's protection (on, off, absent).
@@ -352,6 +352,25 @@ public static partial class AgentEndpoints
             // The remote support agent was removed from the device behind the console's back while it is protected: install it again.
             if (req.AppControl?.RemoteProtection == "missing" && caps.Contains("remote-support") && agent.AssetId is not null)
                 await ReinstallRemoteAgentAsync(ds, remote, agent.Id, agent.AssetId.Value, platform, lf, ct);
+            // Patch operations and scripts run beside the check-in; the agent lists those it still has. One that is not listed
+            // was interrupted by a restart of the agent (or of the device): a scan is simply queued again, an installation
+            // or a script is marked failed (it may have run in part).
+            if (req.RunningActions is { } running && (kinds.Contains("patch") || kinds.Contains("script")))
+            {
+                await using var lost = ds.CreateCommand("""
+                    UPDATE zentriq.asset_actions
+                       SET status = CASE WHEN kind = 'patch' AND operation = 'scan' THEN 'queued' ELSE 'failed' END,
+                           completed_at = CASE WHEN kind = 'patch' AND operation = 'scan' THEN NULL ELSE now() END,
+                           sent_at = CASE WHEN kind = 'patch' AND operation = 'scan' THEN NULL ELSE sent_at END,
+                           detail = CASE WHEN kind = 'patch' AND operation = 'scan' THEN 'Interrupted by a restart of the agent; scanning again.'
+                                         ELSE 'Interrupted: the agent or the device restarted while this was running. It may have run in part.' END
+                     WHERE agent_id = @a AND kind IN ('patch','script') AND status = 'running'
+                       AND NOT (id::text = ANY(@ids)) AND COALESCE(sent_at, requested_at) < now() - interval '1 minute'
+                    """);
+                lost.Parameters.AddWithValue("a", agent.Id);
+                lost.Parameters.AddWithValue("ids", running);
+                await lost.ExecuteNonQueryAsync(ct);
+            }
             if (kinds.Count > 0)
             {
                 // Hand out new actions, and re-send ones whose result never arrived (e.g. the device restarted mid-action).
