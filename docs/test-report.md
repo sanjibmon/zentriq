@@ -1,10 +1,40 @@
 # Test report
 
-Latest: GitHub Actions run 42343815521, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
-10.0.20348** VM plus an Ubuntu job for the Linux agent. Release: `v1.1.1-build.116` (pre-release, **unsigned**), package
-version **1.1.1.116**, commit `da6a40f`. Results: unit + PostgreSQL integration tests **437 PASS** (439, 2 skipped);
+Latest: GitHub Actions run 42353554714, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
+10.0.20348** VM plus an Ubuntu job for the Linux agent. Release: `v1.1.1-build.117` (pre-release, **unsigned**), package
+version **1.1.1.117**, commit `678aa0d`. Results: unit + PostgreSQL integration tests **437 PASS** (439, 2 skipped);
 installer acceptance **84 passed, 0 failed** (10 not run: need hardware, a domain, a reboot or old Windows); upgrade
-suites **14/14** (from 1.0.2, same version in place, half-updated server); Linux agent on 11 distributions **11/11**.
+suites **14/14**; Linux agent on 11 distributions **11/11**.
+
+New in build 117:
+
+* Console: menu sections in title case (Discovery & Inventory, Remote Support, Secure & Remediate, Insight & Admin),
+  brighter menu, section headings and "Asset Intelligence"; darker secondary text in the light theme; fields side by
+  side line up (boxes at the bottom of their row, check boxes centred on the boxes).
+* Application control: the block message comes back only when a person starts the installer again; retries by the
+  software, an updater, a script, a task or a service are stopped without a new message for 4 hours (also for
+  re-unpacked copies, by product name and version).
+
+| ID | Test | Result |
+|---|---|---|
+| T83 | Application control on Windows, now also: after the message was closed, a retry started by a script host is stopped without a new message | **PASS** |
+
+| File | SHA256 |
+|---|---|
+| Zentriq-Setup-x64.exe | `77c912979dd1f8eda5d8f95e8da2c226c9c7e1de0df43ffb62d979f3ccb929fb` |
+| Zentriq.msi | `a7201e6b7e28dd2370194cabc49f2169dd1fe789a6e5c3966c625740e5698543` |
+| ZentriqAgent-x64.msi | `23fdabded5d43c5a5b7375840ebe70bf8d39a62def544e2a22df75f69b11ee2e` |
+| zentriq-agent-linux-x64.deb | `b8d554140d7fded5bda785a1d47846acb0715efb830fe54c94dbc60de2e4dd29` |
+| zentriq-agent-linux-x64.rpm | `cf954f0167d8c5be5d7da36f230bd115152045de8edcf7c495843a4d988bba59` |
+| zentriq-agent-linux-x64.tar.gz | `3cba50cfc49c9aebef1c33e6b0385f6e910863687025f1d112b0dbdc9d249957` |
+| zentriq-agent-linux-arm64.deb | `4f1d8dce4cf47686b2c815ed9fd7229aa6c5d23ae39a63dd43ab3b1e7058475d` |
+| zentriq-agent-linux-arm64.rpm | `46eb1d4791037125a60764e9c7e58de4032c3c0db33427c0037cf850f91ecada` |
+| zentriq-agent-linux-arm64.tar.gz | `0b7b80b8a6ba81cfe5a0c94645706bc0f8928dad08cd11a9f5ab0d56a3d7719a` |
+| Zentriq-1.1.1-msi-offline-kit.zip | `0dd84f81f5db84b5e2fb3a1a407e82bf93ce1195b7519316e3414f7ccb3860a4` |
+| Zentriq-1.1.1-docs.zip | `ac820b66e11f1c069d7ffe9137942d1cb7c0fbc865486a50df5857a02f88e6c4` |
+
+
+## Build 116 (run 42343815521, commit `da6a40f`)
 
 New in build 116 (Release 2 of the Endpoint Central comparison; builds 114 and 115 failed T92 / T93 and were not
 released — fixed: a scan was lost when the agent restarted, the Disk Space Report script printed nothing):

@@ -85,7 +85,11 @@ A new installer is **held** while it is checked (product name, publisher, code-s
 The user sees **one message per attempt**. Once it is closed (or the request is sent) it does not come back by itself:
 programs that retry on their own — a downloader or bootstrapper that starts the installer again, a scheduled task —
 are stopped silently, and starting the installer again while the message is still open does not open a second one.
-When the user runs the installer again after closing the message, the message appears again.
+The message appears again only when a **person** starts the installer again (from Explorer, a command prompt, a
+browser or an archive tool) after closing it. Retries by the software itself, an updater, a script, a scheduled task or
+a service are stopped and logged without a new message for 4 hours — also when the installer unpacks a new copy of
+itself each time (recognised by product name and version). A double start within 5 seconds shows one message. Other
+unapproved software shows its own message at once (from build 1.1.1.117).
 
 **What a request and an event show.** Everything the device knows about the installer: product name, version,
 publisher and company, file description and copyright; the installer type (Windows Installer package, NSIS, Inno
