@@ -39,7 +39,7 @@ await page.route('**/api/**', (route) => {
   return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
 });
 const names = ['shell', 'add-device', 'add-accessory', 'add-it-assets', 'patch-policy', 'patch-deploy', 'new-script', 'new-schedule', 'license-product', 'license',
-  'web-app', 'deploy-rule', 'deploy-package', 'deploy-group', 'non-it-asset'];
+  'web-app', 'deploy-rule', 'deploy-package', 'deploy-group', 'non-it-asset', 'deploy-job', 'deploy-offer', 'deploy-decide'];
 for (const n of names) {
   await page.goto(`http://127.0.0.1:4175/?d=${n}`);
   await page.waitForTimeout(700);

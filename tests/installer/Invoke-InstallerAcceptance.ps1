@@ -119,7 +119,7 @@ Remove-Item $answer -Force   # contains the administrator password
 
 if (-not $installed) {
     foreach ($t in 'T02 PostgreSQL provisioning', 'T03 Database migration', 'T04 Administrator sign-in', 'T05 API and worker services', 'T06 Trial initialization',
-                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection', 'T68 Live agent connection', 'T69 Locations and IT accessories', 'T70 Manual hardware details', 'T71 Standard and Advanced installation', 'T72 Asset lifecycle', 'T73 Cloud and infrastructure', 'T74 Own asset tags, people and bulk upload', 'T75 Backup and restore', 'T76 Roles and groups', 'T77 Log retention and export', 'T78 Agent stop and disable protection', 'T79 Automatic agent update', 'T80 Agent check-in and diagnosis commands', 'T81 Licensing plans and online activation', 'T82 Software Deployment policy', 'T83 Application control on Windows', 'T84 Push deployment', 'T85 Remote support agent tamper protection', 'T86 Software licenses', 'T87 Web apps and accounts', 'T88 Network connected devices', 'T89 Warranty lookup', 'T90 Session recording', 'T91 Directory sign-in', 'T92 Patch management', 'T93 Scripts and remediation') {
+                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection', 'T68 Live agent connection', 'T69 Locations and IT accessories', 'T70 Manual hardware details', 'T71 Standard and Advanced installation', 'T72 Asset lifecycle', 'T73 Cloud and infrastructure', 'T74 Own asset tags, people and bulk upload', 'T75 Backup and restore', 'T76 Roles and groups', 'T77 Log retention and export', 'T78 Agent stop and disable protection', 'T79 Automatic agent update', 'T80 Agent check-in and diagnosis commands', 'T81 Licensing plans and online activation', 'T82 Software Deployment policy', 'T83 Application control on Windows', 'T84 Push deployment', 'T85 Remote support agent tamper protection', 'T86 Software licenses', 'T87 Web apps and accounts', 'T88 Network connected devices', 'T89 Warranty lookup', 'T90 Session recording', 'T91 Directory sign-in', 'T92 Patch management', 'T93 Scripts and remediation', 'T94 Tray icon and self-service') {
         Record $t.Substring(0, 3) $t.Substring(4) 'BLOCKED' 'installation failed'
     }
 } else {
@@ -1182,6 +1182,81 @@ if (-not $installed) {
             foreach ($x in $hello, $det, $fix, $slow) { Api DELETE "/scripts/$($x.id)" -Session $s | Out-Null }
             Remove-Item $marker, $fixed -ErrorAction SilentlyContinue
             "ran as $((($d.stdout -split "`n") | Where-Object { $_ -match 'hello' } | Select-Object -First 1).Trim()) (exit 3, stderr kept); disk report: $(($d2.stdout -split "`n")[0].Trim()); remediation: remediated then compliant; time limit stopped the script after $([math]::Round($d5.durationMs / 1000)) s"
+        } | Out-Null
+
+        # ---- T94: tray icon, Software Center and Get Remote Help ----
+        Check 'T94' 'Tray icon: started on the user''s desktop; Software Center installs offered software without administrator rights (and after IT approval); Get Remote Help reaches Remote Support; device information' {
+            $s = Login
+            function Tray-Call($Req) {
+                $p = New-Object System.IO.Pipes.NamedPipeClientStream('.', 'ZentriqAgentTray', [System.IO.Pipes.PipeDirection]::InOut)
+                $p.Connect(5000)
+                $w = New-Object System.IO.StreamWriter($p); $w.AutoFlush = $true
+                $r = New-Object System.IO.StreamReader($p)
+                $w.WriteLine(($Req | ConvertTo-Json -Compress))
+                $line = $r.ReadLine(); $p.Dispose()
+                $o = $line | ConvertFrom-Json
+                if (-not $o.ok) { throw "tray: $($o.error)" }
+                return $o.data
+            }
+            function Shot([string] $Name) {
+                try {
+                    Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+                    $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+                    $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+                    $g = [System.Drawing.Graphics]::FromImage($bmp)
+                    $g.CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
+                    $bmp.Save((Join-Path $OutDir "$Name.png"), [System.Drawing.Imaging.ImageFormat]::Png)
+                    $g.Dispose(); $bmp.Dispose()
+                } catch { Write-Host "screenshot $Name not possible: $($_.Exception.Message)" }
+            }
+            Api PUT '/deployment/self-service/settings' @{ enabled = $true; softwareCenter = $true; remoteHelp = $true; companyName = 'Contoso IT'; supportText = 'Urgent? Call the service desk on 4711.' } -Session $s | Out-Null
+            $tool = Join-Path $OutDir 'zq-ss-tool-setup.exe'
+            Copy-Item (Join-Path $env:windir 'System32\cmd.exe') $tool -Force
+            $marker1 = Join-Path $env:ProgramData 'zq-ss-1.txt'; $marker2 = Join-Path $env:ProgramData 'zq-ss-2.txt'
+            Remove-Item $marker1, $marker2 -ErrorAction SilentlyContinue
+            $p1 = Api POST '/deployment/packages' @{ uploadId = (Dep-Upload $s $tool).uploadId; name = 'ZQ Notepad Plus'; version = '8.6'; publisher = 'CI Publisher'; installArgs = "/c echo ok> `"$marker1`"" } -Session $s
+            $p2 = Api POST '/deployment/packages' @{ uploadId = (Dep-Upload $s $tool).uploadId; name = 'ZQ Visio Viewer'; version = '2024'; publisher = 'CI Publisher'; installArgs = "/c echo ok> `"$marker2`"" } -Session $s
+            Api PUT "/deployment/self-service/packages/$($p1.id)" @{ enabled = $true; approval = $false; description = 'Text editor for code and notes.'; category = 'Productivity' } -Session $s | Out-Null
+            Api PUT "/deployment/self-service/packages/$($p2.id)" @{ enabled = $true; approval = $true; description = 'Opens Visio drawings. Needs approval by IT.'; category = 'Office' } -Session $s | Out-Null
+            # The tray on the signed-in user's desktop.
+            $tray = Dep-Wait { Get-CimInstance Win32_Process -Filter "Name='ZentriqAgent.exe'" | Where-Object CommandLine -match '--tray\b' | Select-Object -First 1 } 120 'the tray icon on the desktop'
+            $owner = Invoke-CimMethod -InputObject $tray -MethodName GetOwner
+            $info = Tray-Call @{ op = 'info' }
+            Assert ($info.computer -eq $env:COMPUTERNAME -and $info.agentVersion -and $info.user) "device information: $($info | ConvertTo-Json -Compress)"
+            # Software Center: offered, installed by the agent, then shown as installed.
+            $cat = @(Tray-Call @{ op = 'catalog' })
+            $c1 = $cat | Where-Object id -eq $p1.id; $c2 = $cat | Where-Object id -eq $p2.id
+            Assert ($c1 -and $c2 -and $c1.state -eq 'available' -and $c2.approval) "catalog: $($cat | ConvertTo-Json -Compress -Depth 4)"
+            $i1 = Tray-Call @{ op = 'install'; packageId = $p1.id }
+            Assert ($i1.state -eq 'installing') "install: $($i1 | ConvertTo-Json -Compress)"
+            Dep-Wait { $x = @(Tray-Call @{ op = 'catalog' }) | Where-Object id -eq $p1.id; if ($x.state -in 'installed', 'failed') { $x } } 180 'the Software Center installation' | ForEach-Object { Assert ($_.state -eq 'installed') "state: $($_.state) $($_.message)" }
+            Assert (Test-Path $marker1) 'the self-service package did not run on the device'
+            # Needs approval: a request, approved in the console, then installed.
+            $i2 = Tray-Call @{ op = 'install'; packageId = $p2.id; reason = 'CI: open the network drawing' }
+            Assert ($i2.state -eq 'pending') "request: $($i2 | ConvertTo-Json -Compress)"
+            $req = (Api GET '/deployment/self-service' -Session $s).requests | Where-Object { $_.packageId -eq $p2.id -and $_.status -eq 'pending' } | Select-Object -First 1
+            Assert ($req -and $req.reason -like 'CI:*' -and $req.user) "request in the console: $($req | ConvertTo-Json -Compress)"
+            Api POST "/deployment/self-service/requests/$($req.id)" @{ approve = $true; note = 'ok' } -Session $s | Out-Null
+            Dep-Wait { $x = @(Tray-Call @{ op = 'catalog' }) | Where-Object id -eq $p2.id; if ($x.state -in 'installed', 'failed') { $x } } 180 'the approved installation' | ForEach-Object { Assert ($_.state -eq 'installed') "state: $($_.state) $($_.message)" }
+            Assert (Test-Path $marker2) 'the approved package did not run on the device'
+            # Get Remote Help: a request in Remote Support, closed by the technician.
+            $h = Tray-Call @{ op = 'help'; message = 'CI: Outlook does not start'; contact = 'ext. 4711' }
+            Assert ($h.number -gt 0) "help: $($h | ConvertTo-Json -Compress)"
+            $hr = @(Api GET '/remote/help-requests' -Session $s | ForEach-Object { $_ }) | Where-Object number -eq $h.number
+            Assert ($hr -and $hr.device -and $hr.contact -eq 'ext. 4711' -and $hr.user) "help request in the console: $($hr | ConvertTo-Json -Compress)"
+            Api POST "/remote/help-requests/$($hr.id)" @{ status = 'closed'; note = 'CI done' } -Session $s | Out-Null
+            $mine = @(Tray-Call @{ op = 'helpList' })
+            Assert (@($mine | Where-Object { $_.number -eq $h.number -and $_.status -eq 'closed' }).Count -eq 1) "the user's requests: $($mine | ConvertTo-Json -Compress)"
+            # The windows, for the record.
+            $agentExe = Join-Path $env:ProgramFiles 'Zentriq Agent\ZentriqAgent.exe'
+            foreach ($w in 'store', 'help', 'info') {
+                $pw = Start-Process $agentExe -ArgumentList '--tray-window', $w -PassThru
+                Start-Sleep 7
+                Shot "tray-$w"
+                Stop-Process -Id $pw.Id -Force -ErrorAction SilentlyContinue
+            }
+            Remove-Item $marker1, $marker2 -ErrorAction SilentlyContinue
+            "tray running for $($owner.Domain)\$($owner.User); Software Center: installed without approval and after approval; help request #$($h.number) in Remote Support and closed; device $($info.computer), agent $($info.agentVersion)"
         } | Out-Null
     }
 

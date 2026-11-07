@@ -1,4 +1,5 @@
 import { api } from '../../api/client';
+import { Field } from '../../components/Form';
 import { useApi } from '../../app/useApi';
 import { useDepartments } from '../departments/Departments';
 import { DevicePicker } from '../deployment/DeploymentDialogs';
@@ -46,20 +47,20 @@ export function TargetPicker({ value, onChange, allLabel = 'All devices with the
   const gl = groups.data ?? [];
   return (
     <>
-      <label>On
+      <Field label="Apply to">
         <select className="in" value={value.to} onChange={(e) => set({ to: e.target.value as TargetState['to'] })}>
           <option value="devices">Devices I choose</option>
           {gl.length > 0 && <option value="groups">Device groups</option>}
           <option value="departments">Departments</option>
           <option value="all">{allLabel}</option>
         </select>
-      </label>
+      </Field>
       {value.to === 'devices' && <>
         <DevicePicker onPick={(d) => { if (!value.assets.some((a) => a.id === d.id)) set({ assets: [...value.assets, d] }); }} />
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>{value.assets.map((a) => <span key={a.id} className="chip">{a.name}<button type="button" className="btn sm" aria-label={`Remove ${a.name}`} onClick={() => set({ assets: value.assets.filter((x) => x.id !== a.id) })}>✕</button></span>)}</div>
       </>}
-      {value.to === 'groups' && <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 14px' }}>{gl.map((g) => <label key={g.id} className="row-check"><input type="checkbox" checked={value.groupIds.includes(g.id)} onChange={() => set({ groupIds: toggle(value.groupIds, g.id) })} /> {g.name} ({g.devices})</label>)}</div>}
-      {value.to === 'departments' && <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 14px' }}>{(deps.data?.items ?? []).map((d) => <label key={d.id} className="row-check"><input type="checkbox" checked={value.departmentIds.includes(d.id)} onChange={() => set({ departmentIds: toggle(value.departmentIds, d.id) })} /> {d.name}</label>)}</div>}
+      {value.to === 'groups' && <div className="fchecks">{gl.map((g) => <label key={g.id} className="row-check"><input type="checkbox" checked={value.groupIds.includes(g.id)} onChange={() => set({ groupIds: toggle(value.groupIds, g.id) })} /> {g.name} ({g.devices})</label>)}</div>}
+      {value.to === 'departments' && <div className="fchecks">{(deps.data?.items ?? []).map((d) => <label key={d.id} className="row-check"><input type="checkbox" checked={value.departmentIds.includes(d.id)} onChange={() => set({ departmentIds: toggle(value.departmentIds, d.id) })} /> {d.name}</label>)}</div>}
     </>
   );
 }

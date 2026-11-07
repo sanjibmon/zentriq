@@ -5,6 +5,7 @@ import { Link, useRouter } from '../../app/router';
 import { useApi } from '../../app/useApi';
 import { useConfirm } from '../../components/Confirm';
 import { Icon } from '../../components/Icon';
+import { Check, Field, Fields, Section } from '../../components/Form';
 import { Modal } from '../../components/Modal';
 import { Callout, DataTable, ErrorBox, fmt, Kpis, PageHead, Panel, Pill } from '../../components/ui';
 import { errText } from '../deployment/types';
@@ -228,26 +229,36 @@ export function AppDialog({ app, onClose, onSaved }: { app: WebApp | null; onClo
   return (
     <Modal wide title={app ? `Edit ${app.name}` : 'Add Web App'} onClose={onClose}
       footer={<><button className="btn" onClick={onClose}>Cancel</button><button className="btn primary" disabled={busy || !f.name.trim()} onClick={() => void save()}>{busy ? 'Saving…' : 'Save'}</button></>}>
-      <div className="form-grid-2">
-        <label>Name<input className="in" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} maxLength={120} autoFocus /></label>
-        <label>Vendor<input className="in" value={f.vendor} onChange={(e) => setF({ ...f, vendor: e.target.value })} /></label>
-        <label>Status
-          <select className="in" value={f.status} onChange={(e) => setF({ ...f, status: e.target.value as AppStatus })}>{(Object.keys(APP_STATUS) as AppStatus[]).map((k) => <option key={k} value={k}>{APP_STATUS[k][0]}</option>)}</select>
-        </label>
-        <label>Category<input className="in" value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })} /></label>
-        <label>Address<input className="in" value={f.url} onChange={(e) => setF({ ...f, url: e.target.value })} placeholder="https://app.example.com" /></label>
-        <label>Domains it is used under (to find it on devices)<textarea className="in mono" rows={2} value={f.domains} onChange={(e) => setF({ ...f, domains: e.target.value })} placeholder="example.com" /></label>
-        <label>Owner<input className="in" value={f.owner} onChange={(e) => setF({ ...f, owner: e.target.value })} /></label>
-        <label>Department
-          <select className="in" value={f.departmentId} onChange={(e) => setF({ ...f, departmentId: e.target.value })}><option value="">—</option>{(deps.data?.items ?? []).map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select>
-        </label>
-        <label>Cost per user<input className="in" type="number" min={0} step="0.01" value={f.costPerUser} onChange={(e) => setF({ ...f, costPerUser: e.target.value })} /></label>
-        <label>Currency<input className="in" maxLength={3} value={f.currency} onChange={(e) => setF({ ...f, currency: e.target.value.toUpperCase() })} /></label>
-        <label>Renewal date<input className="in" type="date" value={f.renewalDate} onChange={(e) => setF({ ...f, renewalDate: e.target.value })} /></label>
-        <label className="row-check" style={{ alignSelf: 'end' }}><input type="checkbox" checked={f.sso} onChange={(e) => setF({ ...f, sso: e.target.checked })} /> Single Sign-On</label>
-        <label style={{ gridColumn: '1 / -1' }}>Notes<textarea className="in" rows={2} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></label>
+      <div className="form-v">
+        {err && <Callout tone="crit" icon="alert">{err}</Callout>}
+        <Section title="Application">
+          <Fields>
+            <Field label="Name" required><input className="in" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} maxLength={120} autoFocus placeholder="e.g. Salesforce" /></Field>
+            <Field label="Vendor" optional><input className="in" value={f.vendor} onChange={(e) => setF({ ...f, vendor: e.target.value })} placeholder="e.g. Salesforce, Inc." /></Field>
+            <Field label="Status"><select className="in" value={f.status} onChange={(e) => setF({ ...f, status: e.target.value as AppStatus })}>{(Object.keys(APP_STATUS) as AppStatus[]).map((k) => <option key={k} value={k}>{APP_STATUS[k][0]}</option>)}</select></Field>
+            <Field label="Category"><input className="in" value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })} placeholder="e.g. CRM" /></Field>
+          </Fields>
+        </Section>
+        <Section title="Where It Is Used" sub="Devices are matched by these domains in their browser history and network connections.">
+          <Fields>
+            <Field label="Address" optional><input className="in" value={f.url} onChange={(e) => setF({ ...f, url: e.target.value })} placeholder="https://app.example.com" /></Field>
+            <Field label="Domains" hint="One per line."><textarea className="in mono" rows={2} value={f.domains} onChange={(e) => setF({ ...f, domains: e.target.value })} placeholder="example.com" /></Field>
+          </Fields>
+          <Check checked={f.sso} onChange={(v) => setF({ ...f, sso: v })} hint="Users sign in with the company identity provider.">Single Sign-On</Check>
+        </Section>
+        <Section title="Ownership and Cost">
+          <Fields>
+            <Field label="Owner" optional><input className="in" value={f.owner} onChange={(e) => setF({ ...f, owner: e.target.value })} placeholder="Name of the person" /></Field>
+            <Field label="Department"><select className="in" value={f.departmentId} onChange={(e) => setF({ ...f, departmentId: e.target.value })}><option value="">— Not assigned —</option>{(deps.data?.items ?? []).map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select></Field>
+          </Fields>
+          <Fields cols={3}>
+            <Field label="Cost per user" optional><input className="in" type="number" min={0} step="0.01" value={f.costPerUser} onChange={(e) => setF({ ...f, costPerUser: e.target.value })} placeholder="0.00" /></Field>
+            <Field label="Currency"><input className="in" maxLength={3} value={f.currency} onChange={(e) => setF({ ...f, currency: e.target.value.toUpperCase() })} /></Field>
+            <Field label="Renewal date" optional><input className="in" type="date" value={f.renewalDate} onChange={(e) => setF({ ...f, renewalDate: e.target.value })} /></Field>
+          </Fields>
+          <Field label="Notes" optional><textarea className="in" rows={2} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></Field>
+        </Section>
       </div>
-      {err && <Callout tone="crit" icon="alert">{err}</Callout>}
     </Modal>
   );
 }

@@ -106,7 +106,7 @@ internal static class Notice
     }
 
     /// <summary>Starts the notice on the user's desktop; returns its process handle (or zero).</summary>
-    private static IntPtr StartInSession(int session, string arguments)
+    internal static IntPtr StartInSession(int session, string arguments)
     {
         IntPtr token = IntPtr.Zero, env = IntPtr.Zero;
         try

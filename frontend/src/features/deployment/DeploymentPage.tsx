@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { SelfServiceTab } from './SelfServiceTab';
 import { api } from '../../api/client';
 import { useAuth } from '../../app/auth';
 import { Link, useRouter } from '../../app/router';
@@ -13,10 +14,10 @@ import {
   type InventoryDevice, type InventoryRow, type Job, type JobDevice, type Mode, type Package, type Rule, type Settings, type Summary,
 } from './types';
 
-type Tab = 'overview' | 'approved' | 'catalog' | 'inventory' | 'requests' | 'events' | 'groups' | 'packages' | 'deployments' | 'devices';
+type Tab = 'overview' | 'approved' | 'catalog' | 'inventory' | 'requests' | 'events' | 'groups' | 'packages' | 'deployments' | 'selfservice' | 'devices';
 const TABS: [Tab, string][] = [
   ['overview', 'Overview'], ['approved', 'Approved Software'], ['catalog', 'Software Catalogue'], ['inventory', 'Found on Devices'], ['requests', 'Requests'],
-  ['events', 'Events'], ['groups', 'Device Groups'], ['packages', 'Packages'], ['deployments', 'Deployments'], ['devices', 'Devices'],
+  ['events', 'Events'], ['groups', 'Device Groups'], ['packages', 'Packages'], ['deployments', 'Deployments'], ['selfservice', 'Self-Service'], ['devices', 'Devices'],
 ];
 
 export function DeploymentPage() {
@@ -65,6 +66,7 @@ export function DeploymentPage() {
       {tab === 'groups' && <GroupsTab {...ctx} reloadGroups={groups.reload} />}
       {tab === 'packages' && <PackagesTab {...ctx} />}
       {tab === 'deployments' && <DeploymentsTab {...ctx} />}
+      {tab === 'selfservice' && <SelfServiceTab {...ctx} />}
       {tab === 'devices' && <DevicesTab {...ctx} />}
     </>
   );

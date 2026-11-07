@@ -6,6 +6,7 @@ import { Link, useRouter } from '../../app/router';
 import { useApi } from '../../app/useApi';
 import { CategoryChart, HBars } from '../../components/charts';
 import { useConfirm } from '../../components/Confirm';
+import { Check, Choices, Field, Fields, Section } from '../../components/Form';
 import { Icon } from '../../components/Icon';
 import { Callout, DataTable, ErrorBox, fmt, Kpis, PageHead, Pager, Panel, Pill } from '../../components/ui';
 import {
@@ -257,13 +258,15 @@ function ExceptionDialog({ ruleId, assetIds, label, baselineId, onClose, onSaved
         <div className="body form-v">
           {error && <Callout tone="crit" icon="alert">{error}</Callout>}
           <p className="muted" style={{ margin: 0, fontSize: 13 }}>The check is shown as <b>Exception</b> instead of failed and leaves the score. Record why (business need, compensating control) — it is kept for audit.</p>
-          <label>Reason / compensating control
+          <Field label="Reason / compensating control" required hint="Kept for audit.">
             <textarea className="in" rows={3} value={reason} onChange={(e) => setReason(e.target.value)} required minLength={5} maxLength={1000} placeholder="e.g. Print server — Print Spooler required; access limited by firewall" />
-          </label>
-          <label className="check-inline"><input type="checkbox" checked={never} onChange={(e) => setNever(e.target.checked)} /> No expiry date</label>
-          {!never && <label>Review / expires on
-            <input className="in" type="date" value={expires} min={new Date(Date.now() + 86400000).toISOString().slice(0, 10)} max={new Date(Date.now() + 730 * 86400000).toISOString().slice(0, 10)} onChange={(e) => setExpires(e.target.value)} required />
-          </label>}
+          </Field>
+          <Fields>
+            {!never ? <Field label="Review / expires on">
+              <input className="in" type="date" value={expires} min={new Date(Date.now() + 86400000).toISOString().slice(0, 10)} max={new Date(Date.now() + 730 * 86400000).toISOString().slice(0, 10)} onChange={(e) => setExpires(e.target.value)} required />
+            </Field> : <Field label="Review / expires on"><input className="in" value="Never" disabled /></Field>}
+            <div className="ff"><span className="ff-l">&nbsp;</span><Check checked={never} onChange={setNever}>No expiry date</Check></div>
+          </Fields>
         </div>
         <footer>
           <button type="button" className="btn" onClick={onClose} disabled={busy}>Cancel</button>
@@ -381,19 +384,22 @@ function BaselineEditor({ id, copyFrom, readOnly, onClose, onSaved }: { id: stri
         <div className="modal-b">
           {error && <Callout tone="crit" icon="alert">{error}</Callout>}
           <fieldset disabled={readOnly} style={{ border: 0, padding: 0, margin: 0 }}>
-            <div className="form-grid-2">
-              <label>Name<input className="in" value={form.name} onChange={(e) => set({ name: e.target.value })} required maxLength={120} /></label>
-              <label>Description<input className="in" value={form.description ?? ''} onChange={(e) => set({ description: e.target.value })} maxLength={500} /></label>
-            </div>
-            <div style={{ display: 'flex', gap: 18, margin: '10px 0', flexWrap: 'wrap' }}>
-              <span className="muted">Applies to:</span>
-              <label className="check-inline"><input type="checkbox" checked={form.categories.length === 0 || form.categories.includes('server')} onChange={() => toggleCat('server')} /> Servers</label>
-              <label className="check-inline"><input type="checkbox" checked={form.categories.length === 0 || form.categories.includes('endpoint')} onChange={() => toggleCat('endpoint')} /> Workstations</label>
-              <label className="check-inline"><input type="checkbox" checked={form.enabled} onChange={(e) => set({ enabled: e.target.checked })} /> Baseline is on</label>
-            </div>
+            <Section title="Baseline">
+              <Fields>
+                <Field label="Name" required><input className="in" value={form.name} onChange={(e) => set({ name: e.target.value })} required maxLength={120} placeholder="e.g. CIS Level 1 — Workstations" /></Field>
+                <Field label="Description" optional><input className="in" value={form.description ?? ''} onChange={(e) => set({ description: e.target.value })} maxLength={500} /></Field>
+              </Fields>
+              <div className="ff"><span className="ff-l">Applies to</span>
+                <Choices>
+                  <Check checked={form.categories.length === 0 || form.categories.includes('server')} onChange={() => toggleCat('server')}>Servers</Check>
+                  <Check checked={form.categories.length === 0 || form.categories.includes('endpoint')} onChange={() => toggleCat('endpoint')}>Workstations</Check>
+                </Choices>
+              </div>
+              <Check checked={form.enabled} onChange={(v) => set({ enabled: v })} hint="Off: devices are not checked against this baseline.">Baseline is on</Check>
+            </Section>
             {groups.map((g) => (
               <div key={g} style={{ marginTop: 10 }}>
-                <h4 style={{ margin: '6px 0' }}>{g}</h4>
+                <h4 className="fs-t">{g}</h4>
                 <div className="tbl-wrap"><table className="t">
                   <thead><tr><th style={{ width: 40 }}>On</th><th>Check</th><th>Applies to</th><th style={{ width: 130 }}>Severity</th><th>Settings</th></tr></thead>
                   <tbody>{form.rules.filter((r) => r.category === g).map((r) => (

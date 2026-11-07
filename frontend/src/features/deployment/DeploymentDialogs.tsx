@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import type { Asset, Paged } from '../../api/types';
 import { useApi } from '../../app/useApi';
+import { Check, Choices, Field, Fields, Section } from '../../components/Form';
 import { Modal } from '../../components/Modal';
 import { Callout, fmt } from '../../components/ui';
 import { useDepartments } from '../departments/Departments';
@@ -38,24 +39,31 @@ export function RuleDialog({ rule, groups, onClose, onSaved }: { rule: Rule | nu
     </>}>
       <div className="form-v">
         {error && <Callout tone="crit" icon="alert">{error}</Callout>}
-        <div style={{ display: 'flex', gap: 16 }}>
-          <label className="row-check"><input type="radio" checked={f.action === 'allow'} onChange={() => set('action', 'allow')} /> Approve</label>
-          <label className="row-check"><input type="radio" checked={f.action === 'block'} onChange={() => set('action', 'block')} /> Block (even when an approval matches)</label>
-        </div>
-        <div className="grid-2 tight">
-          <label>Software name<input className="in" value={f.name} autoFocus onChange={(e) => set('name', e.target.value)} placeholder="e.g. Notepad++* (wildcards * and ?)" /></label>
-          <label>Publisher or code-signing certificate<input className="in" value={f.publisher} onChange={(e) => set('publisher', e.target.value)} placeholder="e.g. Notepad++ Team" /></label>
-          <label>From version<input className="in" value={f.versionMin} onChange={(e) => set('versionMin', e.target.value)} placeholder="any" /></label>
-          <label>Up to version<input className="in" value={f.versionMax} onChange={(e) => set('versionMax', e.target.value)} placeholder="any" /></label>
-          <label>Platform<select className="in" value={f.platform} onChange={(e) => set('platform', e.target.value)}><option value="">Windows and Linux</option><option value="windows">Windows</option><option value="linux">Linux (package name)</option></select></label>
-          <label>For<select className="in" value={f.groupId} onChange={(e) => set('groupId', e.target.value)} disabled={!!rule?.assetId}>
-            <option value="">{rule?.assetId ? `Device ${rule.device}` : 'All devices'}</option>{groups.map((g) => <option key={g.id} value={g.id}>Group {g.name}</option>)}</select></label>
-          <label>Installer SHA-256 (optional)<input className="in mono" value={f.sha256} onChange={(e) => set('sha256', e.target.value)} placeholder="exactly this file" /></label>
-          <label>Until (optional)<input className="in" type="date" value={f.expiresAt} onChange={(e) => set('expiresAt', e.target.value)} /></label>
-          <label>Shown as<input className="in" value={f.label} onChange={(e) => set('label', e.target.value)} placeholder={f.name || 'name'} /></label>
-          <label>Note<input className="in" value={f.note} onChange={(e) => set('note', e.target.value)} placeholder="e.g. approved by IT security, ticket 1234" /></label>
-        </div>
-        <small className="muted">Every part you fill in must match. Name and publisher accept several values separated by “;”. A publisher matches the company name of the installer or the name in its valid code-signing certificate.</small>
+        <Section title="Decision">
+          <div className="seg2" role="radiogroup" aria-label="Decision">
+            <button type="button" role="radio" aria-checked={f.action === 'allow'} className={f.action === 'allow' ? 'on ok' : ''} onClick={() => set('action', 'allow')}>Approve</button>
+            <button type="button" role="radio" aria-checked={f.action === 'block'} className={f.action === 'block' ? 'on crit' : ''} onClick={() => set('action', 'block')}>Block <small>even when an approval matches</small></button>
+          </div>
+        </Section>
+        <Section title="Which Software" sub="Every part you fill in must match. Name and publisher accept several values separated by “;”; * and ? are wildcards. A publisher matches the company name of the installer or the name in its valid code-signing certificate.">
+          <Fields>
+            <Field label="Software name"><input className="in" value={f.name} autoFocus onChange={(e) => set('name', e.target.value)} placeholder="e.g. Notepad++*" /></Field>
+            <Field label="Publisher or signing certificate"><input className="in" value={f.publisher} onChange={(e) => set('publisher', e.target.value)} placeholder="e.g. Notepad++ Team" /></Field>
+            <Field label="From version" optional><input className="in" value={f.versionMin} onChange={(e) => set('versionMin', e.target.value)} placeholder="Any" /></Field>
+            <Field label="Up to version" optional><input className="in" value={f.versionMax} onChange={(e) => set('versionMax', e.target.value)} placeholder="Any" /></Field>
+            <Field label="Installer SHA-256" optional span hint="Exactly this file."><input className="in mono" value={f.sha256} onChange={(e) => set('sha256', e.target.value)} placeholder="64 hexadecimal characters" /></Field>
+          </Fields>
+        </Section>
+        <Section title="Where and How Long">
+          <Fields>
+            <Field label="Platform"><select className="in" value={f.platform} onChange={(e) => set('platform', e.target.value)}><option value="">Windows and Linux</option><option value="windows">Windows</option><option value="linux">Linux (package name)</option></select></Field>
+            <Field label="For"><select className="in" value={f.groupId} onChange={(e) => set('groupId', e.target.value)} disabled={!!rule?.assetId}>
+              <option value="">{rule?.assetId ? `Device ${rule.device}` : 'All devices'}</option>{groups.map((g) => <option key={g.id} value={g.id}>Group {g.name}</option>)}</select></Field>
+            <Field label="Until" optional hint="Empty: no end date."><input className="in" type="date" value={f.expiresAt} onChange={(e) => set('expiresAt', e.target.value)} /></Field>
+            <Field label="Shown as" optional><input className="in" value={f.label} onChange={(e) => set('label', e.target.value)} placeholder={f.name || 'Name in the list'} /></Field>
+            <Field label="Note" optional span><input className="in" value={f.note} onChange={(e) => set('note', e.target.value)} placeholder="e.g. approved by IT security, ticket 1234" /></Field>
+          </Fields>
+        </Section>
       </div>
     </Modal>
   );
@@ -84,25 +92,27 @@ export function DecideDialog({ title, item, groups, endpoint, onClose, onDone }:
     <Modal title={title} onClose={onClose} footer={<><button className="btn" onClick={onClose}>Cancel</button><button className="btn primary" disabled={busy || (scope === 'group' && !groupId)} onClick={() => void go()}>Approve</button></>}>
       <div className="form-v">
         {error && <Callout tone="crit" icon="alert">{error}</Callout>}
-        <div><b>{item.name}</b>{item.version && ` ${item.version}`} <span className="muted">{item.publisher ?? ''}</span></div>
-        <label>Approve for
-          <select className="in" value={scope} onChange={(e) => setScope(e.target.value as typeof scope)}>
-            <option value="all">All devices</option>
-            {groups.length > 0 && <option value="group">A device group</option>}
-            {item.device && <option value="device">Only {item.device}</option>}
-          </select>
-        </label>
-        {scope === 'group' && <label>Group<select className="in" value={groupId} onChange={(e) => setGroupId(e.target.value)}>{groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select></label>}
-        <label>Match
-          <select className="in" value={match} onChange={(e) => setMatch(e.target.value)}>
-            {item.publisher && item.platform !== 'linux' && <option value="name-publisher">This software from this publisher (any version)</option>}
-            <option value="name">This software (any version)</option>
-            {item.version && <option value="name-version">Only version {item.version}</option>}
-            {item.publisher && <option value="publisher">Everything from {item.publisher}</option>}
-            {item.sha256 && <option value="hash">Only this exact file (SHA-256)</option>}
-          </select>
-        </label>
-        <label>Note (optional)<input className="in" value={note} onChange={(e) => setNote(e.target.value)} /></label>
+        <div className="pick-head"><b>{item.name}</b>{item.version && ` ${item.version}`} <span className="muted">{item.publisher ?? ''}</span></div>
+        <Fields>
+          <Field label="Approve for">
+            <select className="in" value={scope} onChange={(e) => setScope(e.target.value as typeof scope)}>
+              <option value="all">All devices</option>
+              {groups.length > 0 && <option value="group">A device group</option>}
+              {item.device && <option value="device">Only {item.device}</option>}
+            </select>
+          </Field>
+          {scope === 'group' ? <Field label="Group"><select className="in" value={groupId} onChange={(e) => setGroupId(e.target.value)}>{groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select></Field> : <span />}
+          <Field label="Match" span>
+            <select className="in" value={match} onChange={(e) => setMatch(e.target.value)}>
+              {item.publisher && item.platform !== 'linux' && <option value="name-publisher">This software from this publisher (any version)</option>}
+              <option value="name">This software (any version)</option>
+              {item.version && <option value="name-version">Only version {item.version}</option>}
+              {item.publisher && <option value="publisher">Everything from {item.publisher}</option>}
+              {item.sha256 && <option value="hash">Only this exact file (SHA-256)</option>}
+            </select>
+          </Field>
+          <Field label="Note" optional span><input className="in" value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. ticket 1234" /></Field>
+        </Fields>
       </div>
     </Modal>
   );
@@ -141,38 +151,43 @@ export function GroupDialog({ group, onClose, onSaved }: { group: Group | null; 
     </>}>
       <div className="form-v">
         {error && <Callout tone="crit" icon="alert">{error}</Callout>}
-        <div className="grid-2 tight">
-          <label>Name<input className="in" value={f.name} autoFocus onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="e.g. Finance laptops" /></label>
-          <label>Description<input className="in" value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} /></label>
-        </div>
-        <fieldset className="fieldset"><legend>Departments</legend>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 14px' }}>
-            {(deps.data?.items ?? []).map((d) => <label key={d.id} className="row-check"><input type="checkbox" checked={f.departmentIds.includes(d.id)} onChange={() => toggle('departmentIds', d.id)} /> {d.name}</label>)}
-            {deps.data?.items.length === 0 && <span className="muted">No departments yet.</span>}
+        <Section title="Group">
+          <Fields>
+            <Field label="Name" required><input className="in" value={f.name} autoFocus onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="e.g. Finance laptops" /></Field>
+            <Field label="Description" optional><input className="in" value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} /></Field>
+          </Fields>
+        </Section>
+        <Section title="Members" sub="Devices in any of the chosen departments or locations, plus the devices you add. At least one is needed.">
+          <div className="ff"><span className="ff-l">Departments</span>
+            <Choices>
+              {(deps.data?.items ?? []).map((d) => <Check key={d.id} checked={f.departmentIds.includes(d.id)} onChange={() => toggle('departmentIds', d.id)}>{d.name}</Check>)}
+              {deps.data?.items.length === 0 && <span className="muted">No departments yet.</span>}
+            </Choices>
           </div>
-        </fieldset>
-        <fieldset className="fieldset"><legend>Locations</legend>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 14px' }}>
-            {(locs.data?.items ?? []).map((l) => <label key={l.id} className="row-check"><input type="checkbox" checked={f.locationIds.includes(l.id)} onChange={() => toggle('locationIds', l.id)} /> {l.name}</label>)}
-            {locs.data?.items.length === 0 && <span className="muted">No locations yet.</span>}
+          <div className="ff"><span className="ff-l">Locations</span>
+            <Choices>
+              {(locs.data?.items ?? []).map((l) => <Check key={l.id} checked={f.locationIds.includes(l.id)} onChange={() => toggle('locationIds', l.id)}>{l.name}</Check>)}
+              {locs.data?.items.length === 0 && <span className="muted">No locations yet.</span>}
+            </Choices>
           </div>
-        </fieldset>
-        <fieldset className="fieldset"><legend>Devices</legend>
-          <DevicePicker onPick={(d) => { if (!f.assetIds.includes(d.id)) { setF({ ...f, assetIds: [...f.assetIds, d.id] }); setDevices([...devices, d]); } }} />
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
-            {f.assetIds.map((id) => <span key={id} className="chip">{devices.find((d) => d.id === id)?.name ?? id}
-              <button type="button" className="btn sm" aria-label="Remove" onClick={() => setF({ ...f, assetIds: f.assetIds.filter((x) => x !== id) })}>✕</button></span>)}
+          <div className="ff"><span className="ff-l">Devices</span>
+            <DevicePicker onPick={(d) => { if (!f.assetIds.includes(d.id)) { setF({ ...f, assetIds: [...f.assetIds, d.id] }); setDevices([...devices, d]); } }} />
+            {f.assetIds.length > 0 && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {f.assetIds.map((id) => <span key={id} className="chip">{devices.find((d) => d.id === id)?.name ?? id}
+                <button type="button" className="btn sm" aria-label="Remove" onClick={() => setF({ ...f, assetIds: f.assetIds.filter((x) => x !== id) })}>✕</button></span>)}
+            </div>}
           </div>
-        </fieldset>
-        <div className="grid-2 tight">
-          <label>Only devices running<select className="in" value={f.platform} onChange={(e) => setF({ ...f, platform: e.target.value })}><option value="">Windows and Linux</option><option value="windows">Windows</option><option value="linux">Linux</option></select></label>
-          <label>Application control<select className="in" value={f.appMode} onChange={(e) => setF({ ...f, appMode: e.target.value as Mode | '' })}>
-            <option value="">As for the organisation</option><option value="off">Off for this group</option><option value="audit">Audit</option><option value="block">Block</option></select></label>
-          <label>Windows Defender Application Control (WDAC)<select className="in" value={f.wdacMode} onChange={(e) => setF({ ...f, wdacMode: e.target.value as Wdac })}>
-            <option value="off">Off</option><option value="audit">Audit — Windows logs what it would block</option><option value="enforce">Enforce — Windows runs only Windows and installed programs</option></select>
-            <small className="muted">WDAC lets Windows itself refuse programs outside Program Files (downloads, user profiles, USB drives) — portable programs too. Run it in audit for a while first; Windows editions without the ConfigCI module report “not available”. A device in several groups gets the strictest setting.</small>
-          </label>
-        </div>
+        </Section>
+        <Section title="Application Control" sub="A device in several groups gets the strictest setting.">
+          <Fields cols={3}>
+            <Field label="Only devices running"><select className="in" value={f.platform} onChange={(e) => setF({ ...f, platform: e.target.value })}><option value="">Windows and Linux</option><option value="windows">Windows</option><option value="linux">Linux</option></select></Field>
+            <Field label="Application control"><select className="in" value={f.appMode} onChange={(e) => setF({ ...f, appMode: e.target.value as Mode | '' })}>
+              <option value="">As for the organisation</option><option value="off">Off for this group</option><option value="audit">Audit</option><option value="block">Block</option></select></Field>
+            <Field label="Windows WDAC"><select className="in" value={f.wdacMode} onChange={(e) => setF({ ...f, wdacMode: e.target.value as Wdac })}>
+              <option value="off">Off</option><option value="audit">Audit — logs what it would block</option><option value="enforce">Enforce — only Windows and installed programs</option></select></Field>
+          </Fields>
+          <small className="ff-h">WDAC lets Windows itself refuse programs outside Program Files (downloads, user profiles, USB drives) — portable programs too. Run it in audit for a while first; Windows editions without the ConfigCI module report “not available”.</small>
+        </Section>
       </div>
     </Modal>
   );
@@ -233,24 +248,35 @@ export function PackageDialog({ pkg, onClose, onSaved }: { pkg: Package | null; 
     </>}>
       <div className="form-v">
         {error && <Callout tone="crit" icon="alert">{error}</Callout>}
-        {!pkg && <label>Installer<input className="in" type="file" accept=".msi,.exe,.deb,.rpm" disabled={!!progress} onChange={(e) => { const file = e.target.files?.[0]; if (file) void upload(file); }} /></label>}
-        {progress && <Callout tone="info" icon="upload">{progress}</Callout>}
-        {up && <small className="muted">{up.fileName} · {up.format.toUpperCase()} · {fmt.bytes(up.size)} · SHA-256 <span className="mono">{up.sha256.slice(0, 20)}…</span></small>}
+        {!pkg && <Section title="Installer" sub="MSI or EXE for Windows, DEB or RPM for Linux. It is checked and stored on the server.">
+          <label className={`dropzone${up ? ' done' : ''}`}>
+            <input type="file" accept=".msi,.exe,.deb,.rpm" disabled={!!progress} onChange={(e) => { const file = e.target.files?.[0]; if (file) void upload(file); }} />
+            <span className="dz-t">{up ? up.fileName : 'Choose an installer…'}</span>
+            <span className="dz-s">{up ? `${up.format.toUpperCase()} · ${fmt.bytes(up.size)} · SHA-256 ${up.sha256.slice(0, 16)}…` : '.msi  .exe  .deb  .rpm'}</span>
+          </label>
+          {progress && <Callout tone="info" icon="upload">{progress}</Callout>}
+        </Section>}
         {(pkg || up) && <>
-          <div className="grid-2 tight">
-            <label>Software name<input className="in" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></label>
-            <label>Version<input className="in" value={f.version} onChange={(e) => setF({ ...f, version: e.target.value })} /></label>
-            <label>Publisher<input className="in" value={f.publisher} onChange={(e) => setF({ ...f, publisher: e.target.value })} /></label>
-            <label>{format === 'deb' || format === 'rpm' ? 'Package name (for uninstall)' : 'Name it installs under (for uninstall and the approved list)'}<input className="in" value={f.detectName} onChange={(e) => setF({ ...f, detectName: e.target.value })} placeholder={f.name} /></label>
-          </div>
-          {(format === 'msi' || format === 'exe') && <div className="grid-2 tight">
-            <label>Silent install switches<input className="in mono" value={f.installArgs} onChange={(e) => setF({ ...f, installArgs: e.target.value })} placeholder={format === 'msi' ? '/qn /norestart' : 'e.g. /S, /VERYSILENT, /quiet'} />
-              <small className="muted">{format === 'msi' ? 'msiexec /i <package> plus these (properties such as ALLUSERS=1 too).' : 'Setup programs install silently only with their own switch: NSIS /S, Inno Setup /VERYSILENT /NORESTART, InstallShield /s, WiX bundles /quiet. The software catalogue lists them for well-known software.'}</small></label>
-            {format === 'msi' && <label>Uninstall switches<input className="in mono" value={f.uninstallArgs} onChange={(e) => setF({ ...f, uninstallArgs: e.target.value })} placeholder="/qn /norestart" /></label>}
-          </div>}
-          <label>Notes<input className="in" value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></label>
-          {!pkg && <label className="row-check"><input type="checkbox" checked={f.approve} onChange={(e) => setF({ ...f, approve: e.target.checked })} /> Add it to the approved software (so it is not reported or removed once installed)</label>}
-          {pkg && <label className="row-check"><input type="checkbox" checked={f.active} onChange={(e) => setF({ ...f, active: e.target.checked })} /> Can be deployed</label>}
+          <Section title="Software">
+            <Fields>
+              <Field label="Software name" required><input className="in" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></Field>
+              <Field label="Version" optional><input className="in" value={f.version} onChange={(e) => setF({ ...f, version: e.target.value })} /></Field>
+              <Field label="Publisher" optional><input className="in" value={f.publisher} onChange={(e) => setF({ ...f, publisher: e.target.value })} /></Field>
+              <Field label={format === 'deb' || format === 'rpm' ? 'Package name' : 'Installs under the name'} hint="For uninstall and the approved software list."><input className="in" value={f.detectName} onChange={(e) => setF({ ...f, detectName: e.target.value })} placeholder={f.name} /></Field>
+            </Fields>
+          </Section>
+          {(format === 'msi' || format === 'exe') && <Section title="Silent Installation">
+            <Fields>
+              <Field label="Install switches" span={format !== 'msi'} hint={format === 'msi' ? 'msiexec /i <package> plus these (properties such as ALLUSERS=1 too).' : 'Setup programs install silently only with their own switch: NSIS /S, Inno Setup /VERYSILENT /NORESTART, InstallShield /s, WiX bundles /quiet.'}>
+                <input className="in mono" value={f.installArgs} onChange={(e) => setF({ ...f, installArgs: e.target.value })} placeholder={format === 'msi' ? '/qn /norestart' : 'e.g. /S'} /></Field>
+              {format === 'msi' && <Field label="Uninstall switches"><input className="in mono" value={f.uninstallArgs} onChange={(e) => setF({ ...f, uninstallArgs: e.target.value })} placeholder="/qn /norestart" /></Field>}
+            </Fields>
+          </Section>}
+          <Section title="Options">
+            <Field label="Notes" optional><input className="in" value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></Field>
+            {!pkg && <Check checked={f.approve} onChange={(v) => setF({ ...f, approve: v })} hint="So it is not reported or removed once installed.">Add it to the approved software</Check>}
+            {pkg && <Check checked={f.active} onChange={(v) => setF({ ...f, active: v })}>Can be deployed</Check>}
+          </Section>
         </>}
       </div>
     </Modal>
@@ -287,26 +313,29 @@ export function DeployDialog({ pkg, groups, onClose, onDone }: { pkg: Package; g
     </>}>
       <div className="form-v">
         {error && <Callout tone="crit" icon="alert">{error}</Callout>}
-        <div style={{ display: 'flex', gap: 16 }}>
-          <label className="row-check"><input type="radio" checked={operation === 'install'} onChange={() => setOperation('install')} /> Install</label>
-          <label className="row-check"><input type="radio" checked={operation === 'uninstall'} onChange={() => setOperation('uninstall')} /> Uninstall</label>
-        </div>
-        <label>On
-          <select className="in" value={to} onChange={(e) => setTo(e.target.value as typeof to)}>
-            <option value="devices">Devices I choose</option>
-            {groups.length > 0 && <option value="groups">Device groups</option>}
-            <option value="departments">Departments</option>
-            <option value="all">All {pkg.platform === 'linux' ? 'Linux' : 'Windows'} devices with the Zentriq Agent</option>
-          </select>
-        </label>
-        {to === 'devices' && <>
-          <DevicePicker onPick={(d) => { if (!assets.some((a) => a.id === d.id)) setAssets([...assets, d]); }} />
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>{assets.map((a) => <span key={a.id} className="chip">{a.name}<button type="button" className="btn sm" aria-label="Remove" onClick={() => setAssets(assets.filter((x) => x.id !== a.id))}>✕</button></span>)}</div>
-        </>}
-        {to === 'groups' && <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 14px' }}>{groups.map((g) => <label key={g.id} className="row-check"><input type="checkbox" checked={groupIds.includes(g.id)} onChange={() => setGroupIds(groupIds.includes(g.id) ? groupIds.filter((x) => x !== g.id) : [...groupIds, g.id])} /> {g.name} ({g.devices})</label>)}</div>}
-        {to === 'departments' && <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 14px' }}>{(deps.data?.items ?? []).map((d) => <label key={d.id} className="row-check"><input type="checkbox" checked={departmentIds.includes(d.id)} onChange={() => setDepartmentIds(departmentIds.includes(d.id) ? departmentIds.filter((x) => x !== d.id) : [...departmentIds, d.id])} /> {d.name}</label>)}</div>}
-        <label>Note (optional)<input className="in" value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. change 4711" /></label>
-        <small className="muted">Online devices start within seconds; the others when they next connect (up to 7 days). Devices of the other platform, without the Zentriq Agent or with an older agent are skipped and listed.</small>
+        <Section title="Action">
+          <div className="seg2" role="radiogroup" aria-label="Action">
+            <button type="button" role="radio" aria-checked={operation === 'install'} className={operation === 'install' ? 'on' : ''} onClick={() => setOperation('install')}>Install</button>
+            <button type="button" role="radio" aria-checked={operation === 'uninstall'} className={operation === 'uninstall' ? 'on crit' : ''} onClick={() => setOperation('uninstall')}>Uninstall</button>
+          </div>
+        </Section>
+        <Section title="Devices" sub="Online devices start within seconds; the others when they next connect (up to 7 days). Devices of the other platform, without the Zentriq Agent or with an older agent are skipped and listed.">
+          <Field label="Apply to">
+            <select className="in" value={to} onChange={(e) => setTo(e.target.value as typeof to)}>
+              <option value="devices">Devices I choose</option>
+              {groups.length > 0 && <option value="groups">Device groups</option>}
+              <option value="departments">Departments</option>
+              <option value="all">All {pkg.platform === 'linux' ? 'Linux' : 'Windows'} devices with the Zentriq Agent</option>
+            </select>
+          </Field>
+          {to === 'devices' && <>
+            <DevicePicker onPick={(d) => { if (!assets.some((a) => a.id === d.id)) setAssets([...assets, d]); }} />
+            {assets.length > 0 && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>{assets.map((a) => <span key={a.id} className="chip">{a.name}<button type="button" className="btn sm" aria-label="Remove" onClick={() => setAssets(assets.filter((x) => x.id !== a.id))}>✕</button></span>)}</div>}
+          </>}
+          {to === 'groups' && <Choices>{groups.map((g) => <Check key={g.id} checked={groupIds.includes(g.id)} onChange={() => setGroupIds(groupIds.includes(g.id) ? groupIds.filter((x) => x !== g.id) : [...groupIds, g.id])}>{g.name} ({g.devices})</Check>)}</Choices>}
+          {to === 'departments' && <Choices>{(deps.data?.items ?? []).map((d) => <Check key={d.id} checked={departmentIds.includes(d.id)} onChange={() => setDepartmentIds(departmentIds.includes(d.id) ? departmentIds.filter((x) => x !== d.id) : [...departmentIds, d.id])}>{d.name}</Check>)}</Choices>}
+          <Field label="Note" optional><input className="in" value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. change 4711" /></Field>
+        </Section>
       </div>
     </Modal>
   );

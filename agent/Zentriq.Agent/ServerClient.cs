@@ -238,6 +238,16 @@ internal sealed class ServerClient : IDisposable
         await EnsureAsync(resp).ConfigureAwait(false);
     }
 
+    /// <summary>A JSON call to the agent API (the tray icon's requests); returns the answer's body.</summary>
+    public async Task<string> SendJsonAsync(HttpMethod method, string path, object? body, CancellationToken ct)
+    {
+        using var req = new HttpRequestMessage(method, new Uri(_base, "api/agent/v1/" + path));
+        if (body is not null) req.Content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
+        using var resp = await _http.SendAsync(req, ct).ConfigureAwait(false);
+        await EnsureAsync(resp).ConfigureAwait(false);
+        return await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+    }
+
     /// <summary>The result of a scan for missing updates (and of an installation).</summary>
     public async Task PostPatchesAsync(Dictionary<string, object?> report, CancellationToken ct)
     {

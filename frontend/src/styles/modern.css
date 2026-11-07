@@ -663,3 +663,31 @@ textarea.in { padding: 9px 12px; font-size: 14px; line-height: 1.45; }
 .fchecks label.row-check { font-weight: 500; align-items: center; }
 .fchecks label.row-check input { margin: 0; }
 .form-v .chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 4px 3px 10px; border: 1px solid var(--line-strong); border-radius: 999px; font-size: 12.5px; font-weight: 500; }
+
+/* Build 118, after the first screenshots: the same look in every window */
+.nav { padding-left: 10px; padding-right: 10px; }
+.modal-card :is(.form-grid, .form-grid-2, .grid-2.tight, .grid-3.tight, .sla-grid, .fgrid) > label:not(.row-check):not(.check-inline),
+.modal :is(.form-grid, .form-grid-2, .grid-2.tight, .grid-3.tight, .fgrid) > label:not(.row-check):not(.check-inline) { font-size: 13px; font-weight: 600; color: var(--fg); }
+:is(.ff-c, .form-v label, .modal-card label, .modal label) > :is(input.in, select.in, textarea.in) { font-weight: 400; color: var(--fg); }
+input[type=file].in { height: auto; padding: 7px 10px; }
+.code-box { min-height: 260px; font-size: 12.5px; white-space: pre; }
+.fs-t { margin: 14px 0 6px; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--accent-strong, var(--accent)); }
+.pick-head { padding: 10px 14px; border: 1px solid var(--line); border-radius: 10px; background: color-mix(in srgb, var(--bg) 60%, var(--surface)); }
+.form-sections { gap: 0; }
+.form-sections > section + section { border-top: 1px solid var(--line); padding-top: 18px; margin-top: 18px; }
+.form-sections section > h4 { margin: 0 0 12px; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--accent-strong, var(--accent)); }
+/* Two-way choice as large buttons (Approve / Block, Install / Uninstall) */
+.seg2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.seg2 > button { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 10px 14px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface); color: var(--fg); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; text-align: left; }
+.seg2 > button small { font-size: 12px; font-weight: 400; color: var(--muted); }
+.seg2 > button:hover { border-color: var(--accent); }
+.seg2 > button.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); box-shadow: inset 0 0 0 1px var(--accent); }
+.seg2 > button.on.ok { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 10%, var(--surface)); box-shadow: inset 0 0 0 1px var(--ok); }
+.seg2 > button.on.crit { border-color: var(--crit); background: color-mix(in srgb, var(--crit) 9%, var(--surface)); box-shadow: inset 0 0 0 1px var(--crit); }
+/* File drop area */
+.dropzone { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 96px; padding: 16px; border: 1.5px dashed var(--line-strong); border-radius: 12px; background: color-mix(in srgb, var(--bg) 55%, var(--surface)); cursor: pointer; text-align: center; }
+.dropzone:hover { border-color: var(--accent); }
+.dropzone.done { border-style: solid; border-color: var(--ok); }
+.dropzone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.dropzone .dz-t { font-size: 14px; font-weight: 600; color: var(--fg); }
+.dropzone .dz-s { font-size: 12px; color: var(--muted); }

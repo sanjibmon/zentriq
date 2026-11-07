@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { api } from '../../api/client';
 import { useApi } from '../../app/useApi';
+import { Check, Field, Fields, Section } from '../../components/Form';
 import { Modal } from '../../components/Modal';
 import { Callout, DataTable } from '../../components/ui';
 import { errText } from '../deployment/types';
@@ -43,49 +44,57 @@ export function ProductDialog({ product, isNew, onClose, onSaved }: { product: P
   return (
     <Modal wide title={editing ? `Edit ${editing.name}` : 'Add Software Product'} onClose={onClose}
       footer={<><button className="btn" onClick={onClose}>Cancel</button><button className="btn primary" disabled={busy || !f.name.trim()} onClick={() => void save()}>{busy ? 'Saving…' : 'Save'}</button></>}>
-      <div className="form-grid-2">
-        <label>Name<input className="in" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} maxLength={160} autoFocus /></label>
-        <label>Publisher<input className="in" value={f.publisher} onChange={(e) => setF({ ...f, publisher: e.target.value })} /></label>
-        <label>Kind
-          <select className="in" value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value as 'installed' | 'cloud' })}>
-            <option value="installed">Installed Software (found in the inventory)</option>
-            <option value="cloud">Cloud Subscription (Microsoft 365, web app accounts)</option>
-          </select>
-        </label>
-        <label>Counted
-          <select className="in" value={f.metric} onChange={(e) => setF({ ...f, metric: e.target.value as Metric })}>
-            {(Object.keys(METRIC_LABEL) as Metric[]).map((m) => <option key={m} value={m}>{METRIC_LABEL[m]}</option>)}
-          </select>
-        </label>
-        <label>Category<input className="in" value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })} /></label>
-        <label className="row-check" style={{ alignSelf: 'end' }}><input type="checkbox" checked={!f.needsLicense} onChange={(e) => setF({ ...f, needsLicense: !e.target.checked })} /> Free / Open Source (No Licence Needed)</label>
-        {f.kind === 'installed' ? <>
-          <label>Installed as (one per line, * and ? allowed)<textarea className="in mono" rows={4} value={f.names} onChange={(e) => setF({ ...f, names: e.target.value })} placeholder={'Microsoft Visio*\nMicrosoft Office Visio*'} /></label>
-          <label>But not<textarea className="in mono" rows={4} value={f.excludes} onChange={(e) => setF({ ...f, excludes: e.target.value })} placeholder="*Viewer*" /></label>
-          <label>From publisher (optional)<textarea className="in mono" rows={2} value={f.publishers} onChange={(e) => setF({ ...f, publishers: e.target.value })} placeholder="Microsoft*" /></label>
-          <div style={{ alignSelf: 'end' }}><button type="button" className="btn" onClick={() => void test()}>Test Against Inventory</button></div>
-        </> : <>
-          <label>Microsoft 365 SKUs (one per line)<textarea className="in mono" rows={3} value={f.skus} onChange={(e) => setF({ ...f, skus: e.target.value })} placeholder={'SPE_E3\nVISIOCLIENT'} /></label>
-          <label>Web app (its active accounts are counted)
-            <select className="in" value={f.webAppId} onChange={(e) => setF({ ...f, webAppId: e.target.value })}>
-              <option value="">—</option>
-              {(apps.data ?? []).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-            </select>
-          </label>
-        </>}
-        <label style={{ gridColumn: '1 / -1' }}>Notes<textarea className="in" rows={2} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></label>
+      <div className="form-v">
+        {err && <Callout tone="crit" icon="alert">{err}</Callout>}
+        <Section title="Product">
+          <Fields>
+            <Field label="Name" required><input className="in" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} maxLength={160} autoFocus placeholder="e.g. Microsoft Visio" /></Field>
+            <Field label="Publisher" optional><input className="in" value={f.publisher} onChange={(e) => setF({ ...f, publisher: e.target.value })} placeholder="e.g. Microsoft" /></Field>
+            <Field label="Kind">
+              <select className="in" value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value as 'installed' | 'cloud' })}>
+                <option value="installed">Installed software (found in the inventory)</option>
+                <option value="cloud">Cloud subscription (Microsoft 365, web app accounts)</option>
+              </select>
+            </Field>
+            <Field label="Counted">
+              <select className="in" value={f.metric} onChange={(e) => setF({ ...f, metric: e.target.value as Metric })}>
+                {(Object.keys(METRIC_LABEL) as Metric[]).map((m) => <option key={m} value={m}>{METRIC_LABEL[m]}</option>)}
+              </select>
+            </Field>
+            <Field label="Category" optional><input className="in" value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })} placeholder="e.g. Office" /></Field>
+          </Fields>
+          <Check checked={!f.needsLicense} onChange={(v) => setF({ ...f, needsLicense: !v })} hint="Installations are listed but never counted as unlicensed.">Free / open source (no licence needed)</Check>
+        </Section>
+        {f.kind === 'installed' ? <Section title="How It Is Found" sub="Names as they appear in the software inventory; * and ? are wildcards, one per line.">
+          <Fields>
+            <Field label="Installed as"><textarea className="in mono" rows={4} value={f.names} onChange={(e) => setF({ ...f, names: e.target.value })} placeholder={'Microsoft Visio*\nMicrosoft Office Visio*'} /></Field>
+            <Field label="But not" optional><textarea className="in mono" rows={4} value={f.excludes} onChange={(e) => setF({ ...f, excludes: e.target.value })} placeholder="*Viewer*" /></Field>
+            <Field label="From publisher" optional><textarea className="in mono" rows={2} value={f.publishers} onChange={(e) => setF({ ...f, publishers: e.target.value })} placeholder="Microsoft*" /></Field>
+            <div className="ff"><span className="ff-l">&nbsp;</span><div><button type="button" className="btn" onClick={() => void test()}>Test Against Inventory</button></div></div>
+          </Fields>
+        </Section> : <Section title="How It Is Counted">
+          <Fields>
+            <Field label="Microsoft 365 SKUs" hint="One per line."><textarea className="in mono" rows={3} value={f.skus} onChange={(e) => setF({ ...f, skus: e.target.value })} placeholder={'SPE_E3\nVISIOCLIENT'} /></Field>
+            <Field label="Web app" hint="Its active accounts are counted.">
+              <select className="in" value={f.webAppId} onChange={(e) => setF({ ...f, webAppId: e.target.value })}>
+                <option value="">—</option>
+                {(apps.data ?? []).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+              </select>
+            </Field>
+          </Fields>
+        </Section>}
+        {preview && (
+          <div>
+            <b>{preview.reduce((a, p) => a + p.devices, 0).toLocaleString()} installation(s) match</b>
+            <DataTable rows={preview.map((p) => ({ ...p, id: p.name }))} empty="Nothing installed matches." columns={[
+              { key: 'n', label: 'Installed As', className: 'wrap', render: (p) => p.name },
+              { key: 'p', label: 'Publisher', className: 'wrap', render: (p) => p.publisher ?? '—' },
+              { key: 'd', label: 'Devices', render: (p) => p.devices },
+            ]} />
+          </div>
+        )}
+        <Section title="Notes"><textarea className="in" rows={2} aria-label="Notes" value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></Section>
       </div>
-      {preview && (
-        <div style={{ marginTop: 12 }}>
-          <b>{preview.reduce((a, p) => a + p.devices, 0).toLocaleString()} installation(s) match</b>
-          <DataTable rows={preview.map((p) => ({ ...p, id: p.name }))} empty="Nothing installed matches." columns={[
-            { key: 'n', label: 'Installed As', className: 'wrap', render: (p) => p.name },
-            { key: 'p', label: 'Publisher', className: 'wrap', render: (p) => p.publisher ?? '—' },
-            { key: 'd', label: 'Devices', render: (p) => p.devices },
-          ]} />
-        </div>
-      )}
-      {err && <Callout tone="crit" icon="alert">{err}</Callout>}
     </Modal>
   );
 }
@@ -129,71 +138,82 @@ export function LicenseDialog({ license, productId, products, onClose, onSaved }
   return (
     <Modal wide title={license ? `Edit ${license.name}` : 'Add Licence'} onClose={onClose}
       footer={<><button className="btn" onClick={onClose}>Cancel</button><button className="btn primary" disabled={busy || !f.name.trim() || !f.productId} onClick={() => void save()}>{busy ? 'Saving…' : 'Save'}</button></>}>
-      <div className="form-grid-2">
-        <label>Software product
-          <select className="in" value={f.productId} onChange={(e) => { const p = products.find((x) => x.id === e.target.value); setF({ ...f, productId: e.target.value, name: f.name || p?.name || '' }); }} disabled={!!productId && !license}>
-            <option value="">Choose…</option>
-            {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
-        </label>
-        <label>Licence name<input className="in" value={f.name} onChange={(e) => set('name', e.target.value)} maxLength={200} placeholder="e.g. Visio Plan 2 · 2026 renewal" /></label>
-        <label>Type
-          <select className="in" value={f.licenseType} onChange={(e) => set('licenseType', e.target.value)}>
-            {(Object.keys(TYPE_LABEL) as LicenseType[]).map((t) => <option key={t} value={t}>{TYPE_LABEL[t]}</option>)}
-          </select>
-        </label>
-        <label>Counted
-          <select className="in" value={f.metric} onChange={(e) => set('metric', e.target.value)}>
-            <option value="">As the Product</option>
-            {(Object.keys(METRIC_LABEL) as Metric[]).map((m) => <option key={m} value={m}>{METRIC_LABEL[m]}</option>)}
-          </select>
-        </label>
-        {!free && <label>Quantity
-          <div className="toolbar-row" style={{ margin: 0 }}>
-            <input className="in grow" type="number" min={0} value={f.quantity} disabled={f.unlimited || !!license?.cloudSku} onChange={(e) => set('quantity', e.target.value)}
-              placeholder={license?.cloudSku ? 'From Microsoft 365' : ''} />
-            <label className="row-check"><input type="checkbox" checked={f.unlimited} onChange={(e) => set('unlimited', e.target.checked)} /> Unlimited</label>
-          </div>
-        </label>}
-        <label>{sub ? 'Ends / renews on' : 'Term ends (if any)'}<input className="in" type="date" value={f.endDate} onChange={(e) => set('endDate', e.target.value)} /></label>
-        {sub && <label className="row-check" style={{ alignSelf: 'end' }}><input type="checkbox" checked={f.autoRenew} onChange={(e) => set('autoRenew', e.target.checked)} /> Renews Automatically</label>}
-        {sub && <label>Billing
-          <select className="in" value={f.billing} onChange={(e) => set('billing', e.target.value)}>
-            <option value="">—</option><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="annual">Annual</option><option value="multi_year">Multi-Year</option>
-          </select>
-        </label>}
-        {!sub && !free && <label>Support / maintenance ends<input className="in" type="date" value={f.maintenanceEnd} onChange={(e) => set('maintenanceEnd', e.target.value)} /></label>}
-        <label>Warn before the end (days)<input className="in" type="number" min={0} max={365} value={f.notifyDays} onChange={(e) => set('notifyDays', e.target.value)} /></label>
-        <label>Start date<input className="in" type="date" value={f.startDate} onChange={(e) => set('startDate', e.target.value)} /></label>
-        <label>Purchase date<input className="in" type="date" value={f.purchaseDate} onChange={(e) => set('purchaseDate', e.target.value)} /></label>
-        <label>Edition<input className="in" value={f.edition} onChange={(e) => set('edition', e.target.value)} placeholder="Professional, Standard…" /></label>
-        <label>Version<input className="in" value={f.version} onChange={(e) => set('version', e.target.value)} placeholder="2024" /></label>
-        <label className="row-check" style={{ alignSelf: 'end' }}><input type="checkbox" checked={f.downgradeRights} onChange={(e) => set('downgradeRights', e.target.checked)} /> Downgrade Rights</label>
-        <label>Vendor<input className="in" value={f.vendor} onChange={(e) => set('vendor', e.target.value)} /></label>
-        <label>Reseller<input className="in" value={f.reseller} onChange={(e) => set('reseller', e.target.value)} /></label>
-        <label>PO number<input className="in" value={f.poNumber} onChange={(e) => set('poNumber', e.target.value)} /></label>
-        <label>Invoice number<input className="in" value={f.invoiceNumber} onChange={(e) => set('invoiceNumber', e.target.value)} /></label>
-        <label>Contract / agreement<input className="in" value={f.contractNumber} onChange={(e) => set('contractNumber', e.target.value)} /></label>
-        <label>Unit cost<input className="in" type="number" min={0} step="0.01" value={f.unitCost} onChange={(e) => set('unitCost', e.target.value)} /></label>
-        <label>Total cost<input className="in" type="number" min={0} step="0.01" value={f.totalCost} onChange={(e) => set('totalCost', e.target.value)} placeholder="Unit cost × quantity" /></label>
-        <label>Currency<input className="in" value={f.currency} maxLength={3} onChange={(e) => set('currency', e.target.value.toUpperCase())} /></label>
-        <label>Department
-          <select className="in" value={f.departmentId} onChange={(e) => set('departmentId', e.target.value)}>
-            <option value="">—</option>
-            {(deps.data?.items ?? []).map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-          </select>
-        </label>
-        <label>Owner<input className="in" value={f.owner} onChange={(e) => set('owner', e.target.value)} placeholder="Who manages it" /></label>
-        <label>Licence key {license?.hasKey && <small className="faint">stored ({license.keyHint}) — enter a new one to replace it</small>}
-          <input className="in mono" value={f.licenseKey} onChange={(e) => set('licenseKey', e.target.value)} autoComplete="off" placeholder="Stored encrypted" />
-          {license?.hasKey && <label className="row-check"><input type="checkbox" checked={f.clearKey} onChange={(e) => set('clearKey', e.target.checked)} /> Remove the Stored Key</label>}
-        </label>
-        {license && <label>Status
-          <select className="in" value={f.status} onChange={(e) => set('status', e.target.value)}><option value="active">Active</option><option value="retired">Retired</option></select>
-        </label>}
-        <label style={{ gridColumn: '1 / -1' }}>Notes<textarea className="in" rows={2} value={f.notes} onChange={(e) => set('notes', e.target.value)} /></label>
+      <div className="form-v">
+        {err && <Callout tone="crit" icon="alert">{err}</Callout>}
+        <Section title="Licence">
+          <Fields>
+            <Field label="Software product" required>
+              <select className="in" value={f.productId} onChange={(e) => { const p = products.find((x) => x.id === e.target.value); setF({ ...f, productId: e.target.value, name: f.name || p?.name || '' }); }} disabled={!!productId && !license}>
+                <option value="">— Choose —</option>
+                {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </Field>
+            <Field label="Licence name" required><input className="in" value={f.name} onChange={(e) => set('name', e.target.value)} maxLength={200} placeholder="e.g. Visio Plan 2 · 2026 renewal" /></Field>
+            <Field label="Type">
+              <select className="in" value={f.licenseType} onChange={(e) => set('licenseType', e.target.value)}>
+                {(Object.keys(TYPE_LABEL) as LicenseType[]).map((t) => <option key={t} value={t}>{TYPE_LABEL[t]}</option>)}
+              </select>
+            </Field>
+            <Field label="Counted">
+              <select className="in" value={f.metric} onChange={(e) => set('metric', e.target.value)}>
+                <option value="">As the product</option>
+                {(Object.keys(METRIC_LABEL) as Metric[]).map((m) => <option key={m} value={m}>{METRIC_LABEL[m]}</option>)}
+              </select>
+            </Field>
+            {!free && <Field label="Quantity" hint={license?.cloudSku ? 'Taken from Microsoft 365.' : undefined}>
+              <input className="in" type="number" min={0} value={f.quantity} disabled={f.unlimited || !!license?.cloudSku} onChange={(e) => set('quantity', e.target.value)} placeholder={f.unlimited ? 'Unlimited' : 'e.g. 50'} />
+            </Field>}
+            {!free && <div className="ff"><span className="ff-l">&nbsp;</span><Check checked={f.unlimited} onChange={(v) => set('unlimited', v)}>Unlimited (site licence)</Check></div>}
+            <Field label="Edition" optional><input className="in" value={f.edition} onChange={(e) => set('edition', e.target.value)} placeholder="e.g. Professional" /></Field>
+            <Field label="Version" optional><input className="in" value={f.version} onChange={(e) => set('version', e.target.value)} placeholder="e.g. 2024" /></Field>
+          </Fields>
+          <Check checked={f.downgradeRights} onChange={(v) => set('downgradeRights', v)} hint="Older versions installed on devices count against this licence.">Downgrade rights</Check>
+          {license && <Fields><Field label="Status"><select className="in" value={f.status} onChange={(e) => set('status', e.target.value)}><option value="active">Active</option><option value="retired">Retired</option></select></Field></Fields>}
+        </Section>
+        <Section title="Term and Dates">
+          <Fields cols={3}>
+            <Field label="Start date" optional><input className="in" type="date" value={f.startDate} onChange={(e) => set('startDate', e.target.value)} /></Field>
+            <Field label={sub ? 'Ends / renews on' : 'Term ends'} optional={!sub}><input className="in" type="date" value={f.endDate} onChange={(e) => set('endDate', e.target.value)} /></Field>
+            <Field label="Warn before the end" hint="Days."><input className="in" type="number" min={0} max={365} value={f.notifyDays} onChange={(e) => set('notifyDays', e.target.value)} /></Field>
+            {!sub && !free && <Field label="Support ends" optional hint="Maintenance / software assurance."><input className="in" type="date" value={f.maintenanceEnd} onChange={(e) => set('maintenanceEnd', e.target.value)} /></Field>}
+            {sub && <Field label="Billing">
+              <select className="in" value={f.billing} onChange={(e) => set('billing', e.target.value)}>
+                <option value="">—</option><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="annual">Annual</option><option value="multi_year">Multi-Year</option>
+              </select>
+            </Field>}
+          </Fields>
+          {sub && <Check checked={f.autoRenew} onChange={(v) => set('autoRenew', v)}>Renews automatically</Check>}
+        </Section>
+        <Section title="Purchase">
+          <Fields cols={3}>
+            <Field label="Purchase date" optional><input className="in" type="date" value={f.purchaseDate} onChange={(e) => set('purchaseDate', e.target.value)} /></Field>
+            <Field label="Vendor" optional><input className="in" value={f.vendor} onChange={(e) => set('vendor', e.target.value)} placeholder="e.g. Microsoft" /></Field>
+            <Field label="Reseller" optional><input className="in" value={f.reseller} onChange={(e) => set('reseller', e.target.value)} /></Field>
+            <Field label="PO number" optional><input className="in" value={f.poNumber} onChange={(e) => set('poNumber', e.target.value)} /></Field>
+            <Field label="Invoice number" optional><input className="in" value={f.invoiceNumber} onChange={(e) => set('invoiceNumber', e.target.value)} /></Field>
+            <Field label="Contract / agreement" optional><input className="in" value={f.contractNumber} onChange={(e) => set('contractNumber', e.target.value)} /></Field>
+            <Field label="Unit cost" optional><input className="in" type="number" min={0} step="0.01" value={f.unitCost} onChange={(e) => set('unitCost', e.target.value)} placeholder="0.00" /></Field>
+            <Field label="Total cost" optional hint="Empty: unit cost × quantity."><input className="in" type="number" min={0} step="0.01" value={f.totalCost} onChange={(e) => set('totalCost', e.target.value)} placeholder="0.00" /></Field>
+            <Field label="Currency"><input className="in" value={f.currency} maxLength={3} onChange={(e) => set('currency', e.target.value.toUpperCase())} /></Field>
+          </Fields>
+        </Section>
+        <Section title="Ownership and Key">
+          <Fields>
+            <Field label="Department">
+              <select className="in" value={f.departmentId} onChange={(e) => set('departmentId', e.target.value)}>
+                <option value="">— Not assigned —</option>
+                {(deps.data?.items ?? []).map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+              </select>
+            </Field>
+            <Field label="Owner" optional><input className="in" value={f.owner} onChange={(e) => set('owner', e.target.value)} placeholder="Who manages it" /></Field>
+            <Field label="Licence key" optional span hint={license?.hasKey ? `Stored (${license.keyHint}) — enter a new one to replace it.` : 'Stored encrypted; shown only to people with the licence permission.'}>
+              <input className="in mono" value={f.licenseKey} onChange={(e) => set('licenseKey', e.target.value)} autoComplete="off" placeholder="XXXXX-XXXXX-XXXXX-XXXXX-XXXXX" />
+            </Field>
+          </Fields>
+          {license?.hasKey && <Check checked={f.clearKey} onChange={(v) => set('clearKey', v)}>Remove the stored key</Check>}
+          <Field label="Notes" optional><textarea className="in" rows={2} value={f.notes} onChange={(e) => set('notes', e.target.value)} /></Field>
+        </Section>
       </div>
-      {err && <Callout tone="crit" icon="alert">{err}</Callout>}
     </Modal>
   );
 }

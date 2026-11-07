@@ -28,6 +28,8 @@ internal static class Program
         if (args.Length == 0 && !Environment.UserInteractive) return AgentService.RunAsService();
         if (args.Length > 0 && args[0].Equals("--stop-prompt", StringComparison.OrdinalIgnoreCase)) return StopPrompt.RunDialog();
         if (args.Length > 0 && args[0].Equals("--app-notice", StringComparison.OrdinalIgnoreCase)) return Notice.RunDialog(args.Length > 1 ? args[1] : null);
+        if (args.Length > 0 && args[0].Equals("--tray", StringComparison.OrdinalIgnoreCase)) return TrayApp.Run();
+        if (args.Length > 0 && args[0].Equals("--tray-window", StringComparison.OrdinalIgnoreCase)) return TrayApp.Window(args.Length > 1 ? args[1] : null);
         Log.Console = true;
         var cmd = args.Length > 0 ? args[0].ToLowerInvariant() : "--help";
         try
@@ -358,12 +360,15 @@ internal sealed partial class AgentService
         _guard = new Thread(() => { try { TamperGuard.Loop(token); } catch (Exception ex) { Log.Error("Tamper protection check stopped", ex); } }) { IsBackground = true, Name = "guard" };
         _guard.Start();
         _pipe = new Thread(() => { try { TamperGuard.PipeLoop(token); } catch (Exception ex) { Log.Error("Local control pipe stopped", ex); } }) { IsBackground = true, Name = "pipe" };
+        new Thread(() => { try { TrayHost.Loop(token); } catch (Exception ex) { Log.Error("Tray icon host stopped", ex); } }) { IsBackground = true, Name = "tray" }.Start();
+        new Thread(() => { try { TrayHost.PipeLoop(token); } catch (Exception ex) { Log.Error("Tray pipe stopped", ex); } }) { IsBackground = true, Name = "tray pipe" }.Start();
         _pipe.Start();
     }
 
     private void OnStop()
     {
         _cts?.Cancel();
+        TrayHost.StopAll();
         _presence?.Join(TimeSpan.FromSeconds(3));   // closing the live connection shows the device offline at once
         _thread?.Join(TimeSpan.FromSeconds(25));
         Log.Info("Zentriq Agent stopped.");

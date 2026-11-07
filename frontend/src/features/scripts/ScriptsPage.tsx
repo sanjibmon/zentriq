@@ -4,6 +4,7 @@ import { useAuth } from '../../app/auth';
 import { Link, useRouter } from '../../app/router';
 import { useApi } from '../../app/useApi';
 import { useConfirm } from '../../components/Confirm';
+import { Check, Choices, Field, Fields, Section } from '../../components/Form';
 import { Icon } from '../../components/Icon';
 import { Modal } from '../../components/Modal';
 import { Callout, DataTable, ErrorBox, fmt, Kpis, PageHead, Panel, Pill, type Tone } from '../../components/ui';
@@ -157,21 +158,24 @@ export function ScriptDialog({ script, copy, onClose, onSaved }: { script: Scrip
     </>}>
       <div className="form-v">
         {error && <Callout tone="crit" icon="alert">{error}</Callout>}
-        <div className="form-grid-2">
-          <label>Name<input className="in" value={f.name} maxLength={120} onChange={(e) => setF({ ...f, name: e.target.value })} /></label>
-          <label>Category<input className="in" value={f.category} maxLength={60} onChange={(e) => setF({ ...f, category: e.target.value })} placeholder="e.g. Maintenance" /></label>
-          <label>Platform<select className="in" value={f.platform} onChange={(e) => { const p = e.target.value as 'windows' | 'linux'; setF({ ...f, platform: p, language: LANGS_OF[p].includes(f.language) ? f.language : LANGS_OF[p][0]! }); }}>
-            <option value="windows">Windows</option><option value="linux">Linux</option></select></label>
-          <label>Language<select className="in" value={f.language} onChange={(e) => setF({ ...f, language: e.target.value as Language })}>{LANGS_OF[f.platform].map((l) => <option key={l} value={l}>{LANG[l]}</option>)}</select></label>
-        </div>
-        <label>Description<input className="in" value={f.description} maxLength={1000} onChange={(e) => setF({ ...f, description: e.target.value })} /></label>
-        <label>Script<textarea className="in mono" rows={16} spellCheck={false} value={f.content} onChange={(e) => setF({ ...f, content: e.target.value })} style={{ fontSize: 12.5, whiteSpace: 'pre' }}
-          placeholder={f.language === 'powershell' ? "Get-Service Spooler" : f.language === 'cmd' ? '@echo off\nipconfig /all' : f.language === 'python' ? 'print("hello")' : 'df -h'} /></label>
-        <div className="form-grid-2">
-          <label>Default parameters (optional)<input className="in mono" value={f.parameters} maxLength={1000} onChange={(e) => setF({ ...f, parameters: e.target.value })} placeholder={f.language === 'powershell' ? '-Name Spooler' : 'cron'} /></label>
-          <label>Time limit (seconds)<input className="in" type="number" min={10} max={14400} value={f.timeoutSeconds} onChange={(e) => setF({ ...f, timeoutSeconds: Number(e.target.value) })} /></label>
-        </div>
-        <small className="muted">Scripts run as {f.platform === 'linux' ? 'root' : 'SYSTEM'} without a window. Exit code 0 means success; for a detection script, 0 means the device is fine and any other code runs the fix. Output is kept up to 64 KB per device.</small>
+        <Section title="Script">
+          <Fields>
+            <Field label="Name" required><input className="in" value={f.name} maxLength={120} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="e.g. Clear the print queue" /></Field>
+            <Field label="Category" hint="Scripts are grouped by it."><input className="in" value={f.category} maxLength={60} onChange={(e) => setF({ ...f, category: e.target.value })} placeholder="e.g. Maintenance" /></Field>
+            <Field label="Platform"><select className="in" value={f.platform} onChange={(e) => { const p = e.target.value as 'windows' | 'linux'; setF({ ...f, platform: p, language: LANGS_OF[p].includes(f.language) ? f.language : LANGS_OF[p][0]! }); }}>
+              <option value="windows">Windows</option><option value="linux">Linux</option></select></Field>
+            <Field label="Language"><select className="in" value={f.language} onChange={(e) => setF({ ...f, language: e.target.value as Language })}>{LANGS_OF[f.platform].map((l) => <option key={l} value={l}>{LANG[l]}</option>)}</select></Field>
+            <Field label="Description" optional span><input className="in" value={f.description} maxLength={1000} onChange={(e) => setF({ ...f, description: e.target.value })} placeholder="What it does, for the people who run it." /></Field>
+          </Fields>
+        </Section>
+        <Section title="Code" sub={`Runs as ${f.platform === 'linux' ? 'root' : 'SYSTEM'} without a window. Exit code 0 means success; for a detection script, 0 means the device is fine and any other code runs the fix.`}>
+          <textarea className="in mono code-box" rows={14} spellCheck={false} aria-label="Script" value={f.content} onChange={(e) => setF({ ...f, content: e.target.value })}
+            placeholder={f.language === 'powershell' ? "Get-Service Spooler" : f.language === 'cmd' ? '@echo off\nipconfig /all' : f.language === 'python' ? 'print("hello")' : 'df -h'} />
+          <Fields>
+            <Field label="Default parameters" optional hint="Can be changed for each run."><input className="in mono" value={f.parameters} maxLength={1000} onChange={(e) => setF({ ...f, parameters: e.target.value })} placeholder={f.language === 'powershell' ? '-Name Spooler' : 'cron'} /></Field>
+            <Field label="Time limit (seconds)" hint="Stopped after this time. Output is kept up to 64 KB per device."><input className="in" type="number" min={10} max={14400} value={f.timeoutSeconds} onChange={(e) => setF({ ...f, timeoutSeconds: Number(e.target.value) })} /></Field>
+          </Fields>
+        </Section>
       </div>
     </Modal>
   );
@@ -204,13 +208,15 @@ function RunDialog({ script, remediation, scripts, onClose, onDone }: { script: 
     </>}>
       <div className="form-v">
         {error && <Callout tone="crit" icon="alert">{error}</Callout>}
-        <div className="faint" style={{ fontSize: 12.5 }}>{script.platform === 'linux' ? 'Linux' : 'Windows'} · {LANG[script.language]} · runs as {script.platform === 'linux' ? 'root' : 'SYSTEM'} · time limit {script.timeoutSeconds} s</div>
-        <label>Parameters<input className="in mono" value={parameters} maxLength={1000} onChange={(e) => setParameters(e.target.value)} /></label>
-        <label className="row-check"><input type="checkbox" checked={withDetect} onChange={(e) => setWithDetect(e.target.checked)} disabled={detectOptions.length === 0} /> Remediation: run a detection script first and this script only where it finds a problem</label>
-        {withDetect && <label>Detection script<select className="in" value={detectId} onChange={(e) => setDetectId(e.target.value)}>{detectOptions.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>}
-        <TargetPicker value={targets} onChange={setTargets} allLabel={`All ${script.platform === 'linux' ? 'Linux' : 'Windows'} devices with the Zentriq Agent`} />
-        <label>Note (optional)<input className="in" value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. ticket 4711" /></label>
-        <small className="muted">Online devices run it within seconds, the others when they next connect (up to 24 hours). Every run is written to the audit log.</small>
+        <Section title="Script" sub={`${script.platform === 'linux' ? 'Linux' : 'Windows'} · ${LANG[script.language]} · runs as ${script.platform === 'linux' ? 'root' : 'SYSTEM'} · time limit ${script.timeoutSeconds} s`}>
+          <Field label="Parameters" optional><input className="in mono" value={parameters} maxLength={1000} onChange={(e) => setParameters(e.target.value)} /></Field>
+          <Check checked={withDetect} disabled={detectOptions.length === 0} onChange={setWithDetect} hint="A detection script runs first; this script runs only where it finds a problem.">Remediation</Check>
+          {withDetect && <Field label="Detection script"><select className="in" value={detectId} onChange={(e) => setDetectId(e.target.value)}>{detectOptions.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></Field>}
+        </Section>
+        <Section title="Devices" sub="Online devices run it within seconds, the others when they next connect (up to 24 hours). Every run is written to the audit log.">
+          <TargetPicker value={targets} onChange={setTargets} allLabel={`All ${script.platform === 'linux' ? 'Linux' : 'Windows'} devices with the Zentriq Agent`} />
+          <Field label="Note" optional><input className="in" value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. ticket 4711" /></Field>
+        </Section>
       </div>
     </Modal>
   );
@@ -345,26 +351,32 @@ export function ScheduleDialog({ schedule, scripts, onClose, onSaved }: { schedu
     </>}>
       <div className="form-v">
         {error && <Callout tone="crit" icon="alert">{error}</Callout>}
-        <label>Name<input className="in" value={f.name} maxLength={120} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="e.g. Keep the Print Spooler running" /></label>
-        <div className="form-grid-2">
-          <label>Script (the fix, for a remediation)<select className="in" value={f.scriptId} onChange={(e) => setF({ ...f, scriptId: e.target.value, detectScriptId: '' })}>
-            {scripts.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.platform === 'linux' ? 'Linux' : 'Windows'})</option>)}</select></label>
-          <label>Detection script (optional)<select className="in" value={f.detectScriptId} onChange={(e) => setF({ ...f, detectScriptId: e.target.value })}>
-            <option value="">None — always run the script</option>{detects.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
-        </div>
-        <label>Parameters<input className="in mono" value={f.parameters} maxLength={1000} onChange={(e) => setF({ ...f, parameters: e.target.value })} placeholder={script?.parameters ?? ''} /></label>
-        <TargetPicker value={targets} onChange={setTargets} />
-        <div className="form-grid-2">
-          <label>Frequency<select className="in" value={f.frequency} onChange={(e) => setF({ ...f, frequency: e.target.value as Schedule['frequency'] })}>
-            <option value="once">Once</option><option value="hourly">Every hour</option><option value="daily">Every day</option><option value="weekly">Every week</option></select></label>
-          {f.frequency === 'once'
-            ? <label>At<input className="in" type="datetime-local" value={f.runOnceAt} onChange={(e) => setF({ ...f, runOnceAt: e.target.value })} /></label>
-            : <label>{f.frequency === 'hourly' ? 'Minute (the hour is ignored)' : 'At (server time)'}<input className="in" type="time" value={f.atTime} onChange={(e) => setF({ ...f, atTime: e.target.value })} /></label>}
-        </div>
-        {f.frequency === 'weekly' && <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 14px' }}>
-          {DAYS.map((d, i) => <label key={d} className="row-check"><input type="checkbox" checked={f.days.includes(i)} onChange={() => setF({ ...f, days: f.days.includes(i) ? f.days.filter((x) => x !== i) : [...f.days, i].sort() })} /> {d}</label>)}
-        </div>}
-        <label className="row-check"><input type="checkbox" checked={f.enabled} onChange={(e) => setF({ ...f, enabled: e.target.checked })} /> On</label>
+        <Section title="What Runs">
+          <Fields>
+            <Field label="Name" required span><input className="in" value={f.name} maxLength={120} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="e.g. Keep the Print Spooler running" /></Field>
+            <Field label="Script" hint="The fix, for a remediation."><select className="in" value={f.scriptId} onChange={(e) => setF({ ...f, scriptId: e.target.value, detectScriptId: '' })}>
+              {scripts.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.platform === 'linux' ? 'Linux' : 'Windows'})</option>)}</select></Field>
+            <Field label="Detection script" optional hint="Runs first; the script runs only where it finds a problem."><select className="in" value={f.detectScriptId} onChange={(e) => setF({ ...f, detectScriptId: e.target.value })}>
+              <option value="">None — always run the script</option>{detects.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></Field>
+            <Field label="Parameters" optional span><input className="in mono" value={f.parameters} maxLength={1000} onChange={(e) => setF({ ...f, parameters: e.target.value })} placeholder={script?.parameters ?? ''} /></Field>
+          </Fields>
+        </Section>
+        <Section title="Devices">
+          <TargetPicker value={targets} onChange={setTargets} />
+        </Section>
+        <Section title="When">
+          <Fields>
+            <Field label="Frequency"><select className="in" value={f.frequency} onChange={(e) => setF({ ...f, frequency: e.target.value as Schedule['frequency'] })}>
+              <option value="once">Once</option><option value="hourly">Every hour</option><option value="daily">Every day</option><option value="weekly">Every week</option></select></Field>
+            {f.frequency === 'once'
+              ? <Field label="At"><input className="in" type="datetime-local" value={f.runOnceAt} onChange={(e) => setF({ ...f, runOnceAt: e.target.value })} /></Field>
+              : <Field label="At" hint={f.frequency === 'hourly' ? 'Only the minute counts.' : 'Server time.'}><input className="in" type="time" value={f.atTime} onChange={(e) => setF({ ...f, atTime: e.target.value })} /></Field>}
+          </Fields>
+          {f.frequency === 'weekly' && <div className="ff"><span className="ff-l">Days<i className="req" aria-hidden="true">*</i></span><Choices>
+            {DAYS.map((d, i) => <Check key={d} checked={f.days.includes(i)} onChange={() => setF({ ...f, days: f.days.includes(i) ? f.days.filter((x) => x !== i) : [...f.days, i].sort() })}>{d}</Check>)}
+          </Choices></div>}
+          <Check checked={f.enabled} onChange={(v) => setF({ ...f, enabled: v })} hint="Off: the schedule is kept but does not run.">Schedule is on</Check>
+        </Section>
       </div>
     </Modal>
   );

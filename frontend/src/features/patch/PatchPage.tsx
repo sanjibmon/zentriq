@@ -4,6 +4,7 @@ import { useAuth } from '../../app/auth';
 import { Link, useRouter } from '../../app/router';
 import { useApi } from '../../app/useApi';
 import { useConfirm } from '../../components/Confirm';
+import { Check, Choices, Field, Fields, Section } from '../../components/Form';
 import { Icon } from '../../components/Icon';
 import { Modal } from '../../components/Modal';
 import { Callout, DataTable, ErrorBox, fmt, Kpis, PageHead, Panel, Pill, type Tone } from '../../components/ui';
@@ -343,20 +344,19 @@ export function DeployDialog({ preset, onClose, onDone }: { preset: DeployPreset
     </>}>
       <div className="form-v">
         {error && <Callout tone="crit" icon="alert">{error}</Callout>}
-        {preset.allMissing && <div><b style={{ fontSize: 13 }}>Classifications</b>
-          <div className="check-grid" style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 14px', marginTop: 6 }}>
-            {Object.entries(CLASS_LABEL).map(([k, l]) => <label key={k} className="row-check"><input type="checkbox" checked={classes.includes(k)} onChange={() => setClasses(classes.includes(k) ? classes.filter((x) => x !== k) : [...classes, k])} /> {l}</label>)}
-          </div>
-          <small className="muted">Declined updates are not installed.</small>
-        </div>}
-        {!preset.allMissing && (preset.titles?.length ?? 0) > 1 && <div className="faint" style={{ fontSize: 12.5 }}>{preset.titles!.slice(0, 5).join(' · ')}{preset.titles!.length > 5 ? ` · +${preset.titles!.length - 5}` : ''}</div>}
-        <TargetPicker value={targets} onChange={setTargets} />
-        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-          <label className="row-check"><input type="radio" checked={reboot === 'when-needed'} onChange={() => setReboot('when-needed')} /> Restart when the updates need it (with a notice)</label>
-          <label className="row-check"><input type="radio" checked={reboot === 'never'} onChange={() => setReboot('never')} /> Do not restart</label>
-        </div>
-        <label>Note (optional)<input className="in" value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. change 4711" /></label>
-        <small className="muted">Online devices start within seconds, the others when they next connect (up to 7 days). Each device installs only what it is missing and scans again afterwards.</small>
+        {preset.allMissing && <Section title="Which Updates" sub="Everything missing in these classifications; declined updates are not installed.">
+          <Choices>{Object.entries(CLASS_LABEL).map(([k, l]) => <Check key={k} checked={classes.includes(k)} onChange={() => setClasses(classes.includes(k) ? classes.filter((x) => x !== k) : [...classes, k])}>{l}</Check>)}</Choices>
+        </Section>}
+        {!preset.allMissing && (preset.titles?.length ?? 0) > 1 && <Section title="Updates"><div className="faint" style={{ fontSize: 12.5 }}>{preset.titles!.slice(0, 5).join(' · ')}{preset.titles!.length > 5 ? ` · +${preset.titles!.length - 5}` : ''}</div></Section>}
+        <Section title="Devices" sub="Online devices start within seconds, the others when they next connect (up to 7 days). Each device installs only what it is missing and scans again afterwards.">
+          <TargetPicker value={targets} onChange={setTargets} />
+        </Section>
+        <Section title="Options">
+          <Fields>
+            <Field label="Restart"><select className="in" value={reboot} onChange={(e) => setReboot(e.target.value as typeof reboot)}><option value="when-needed">When the updates need it (with a notice)</option><option value="never">Do not restart</option></select></Field>
+            <Field label="Note" optional><input className="in" value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. change 4711" /></Field>
+          </Fields>
+        </Section>
       </div>
     </Modal>
   );
@@ -469,40 +469,38 @@ export function PolicyDialog({ policy, onClose, onSaved }: { policy: Policy | nu
     </>}>
       <div className="form-v">
         {error && <Callout tone="crit" icon="alert">{error}</Callout>}
-        <div className="form-grid-2">
-          <label>Name<input className="in" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="e.g. Security updates on Wednesday" maxLength={120} /></label>
-          <label>Platform<select className="in" value={f.platform} onChange={(e) => setF({ ...f, platform: e.target.value as 'windows' | 'linux' })}><option value="windows">Windows</option><option value="linux">Linux</option></select></label>
-        </div>
-        <div><b style={{ fontSize: 13 }}>Classifications</b>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 14px', marginTop: 6 }}>
-            {(f.platform === 'linux' ? ['security', 'updates'] : Object.keys(CLASS_LABEL)).map((k) => <label key={k} className="row-check"><input type="checkbox" checked={f.classifications.includes(k)} onChange={() => setF({ ...f, classifications: toggle(f.classifications, k) })} /> {f.platform === 'linux' && k === 'updates' ? 'Other Package Updates' : CLASS_LABEL[k]}</label>)}
+        <Section title="Policy">
+          <Fields>
+            <Field label="Name" required><input className="in" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="e.g. Security updates on Wednesday" maxLength={120} /></Field>
+            <Field label="Platform"><select className="in" value={f.platform} onChange={(e) => setF({ ...f, platform: e.target.value as 'windows' | 'linux' })}><option value="windows">Windows</option><option value="linux">Linux</option></select></Field>
+          </Fields>
+          <Check checked={f.enabled} onChange={(v) => setF({ ...f, enabled: v })} hint="Off: the policy is kept but does not install anything.">Policy is on</Check>
+        </Section>
+        <Section title="Which Updates" sub="At least one classification. Declined updates are never installed by a policy.">
+          <div className="ff"><span className="ff-l">Classifications<i className="req" aria-hidden="true">*</i></span>
+            <Choices>{(f.platform === 'linux' ? ['security', 'updates'] : Object.keys(CLASS_LABEL)).map((k) => <Check key={k} checked={f.classifications.includes(k)} onChange={() => setF({ ...f, classifications: toggle(f.classifications, k) })}>{f.platform === 'linux' && k === 'updates' ? 'Other Package Updates' : CLASS_LABEL[k]}</Check>)}</Choices>
           </div>
-        </div>
-        <div><b style={{ fontSize: 13 }}>Severity</b> <span className="faint" style={{ fontSize: 12 }}>(none chosen: any)</span>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 14px', marginTop: 6 }}>
-            {['critical', 'important', 'moderate', 'low'].map((k) => <label key={k} className="row-check"><input type="checkbox" checked={f.severities.includes(k)} onChange={() => setF({ ...f, severities: toggle(f.severities, k) })} /> {SEVERITY[k]![1]}</label>)}
+          <div className="ff"><span className="ff-l">Severity<span className="opt">none chosen: any</span></span>
+            <Choices>{['critical', 'important', 'moderate', 'low'].map((k) => <Check key={k} checked={f.severities.includes(k)} onChange={() => setF({ ...f, severities: toggle(f.severities, k) })}>{SEVERITY[k]![1]}</Check>)}</Choices>
           </div>
-        </div>
-        <div className="form-grid-2">
-          <label className="row-check"><input type="checkbox" checked={f.approvedOnly} onChange={(e) => setF({ ...f, approvedOnly: e.target.checked })} /> Only approved updates</label>
-          <label>Wait after the release (days)<input className="in" type="number" min={0} max={365} value={f.delayDays} onChange={(e) => setF({ ...f, delayDays: Number(e.target.value) })} /></label>
-        </div>
-        <TargetPicker value={targets} onChange={setTargets} />
-        <div><b style={{ fontSize: 13 }}>Maintenance Window</b>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 14px', marginTop: 6 }}>
-            {DAYS.map((d, i) => <label key={d} className="row-check"><input type="checkbox" checked={f.days.includes(i)} onChange={() => setF({ ...f, days: toggle(f.days, i).sort() })} /> {d}</label>)}
+          <Fields>
+            <Field label="Wait after the release" hint="Days after Microsoft or the distribution released the update."><input className="in" type="number" min={0} max={365} value={f.delayDays} onChange={(e) => setF({ ...f, delayDays: Number(e.target.value) })} /></Field>
+            <div className="ff"><span className="ff-l">Approval</span><Check checked={f.approvedOnly} onChange={(v) => setF({ ...f, approvedOnly: v })} hint="Only updates approved in the Updates tab.">Only approved updates</Check></div>
+          </Fields>
+        </Section>
+        <Section title="Devices">
+          <TargetPicker value={targets} onChange={setTargets} />
+        </Section>
+        <Section title="Maintenance Window" sub="Devices that are offline when the window opens install the updates when they next connect (up to 7 days).">
+          <div className="ff"><span className="ff-l">Days<i className="req" aria-hidden="true">*</i></span>
+            <Choices>{DAYS.map((d, i) => <Check key={d} checked={f.days.includes(i)} onChange={() => setF({ ...f, days: toggle(f.days, i).sort() })}>{d}</Check>)}</Choices>
           </div>
-        </div>
-        <div className="form-grid-2">
-          <label>Starts at (server time)<input className="in" type="time" value={f.startTime} onChange={(e) => setF({ ...f, startTime: e.target.value })} /></label>
-          <label>Lasts (hours)<input className="in" type="number" min={1} max={24} value={f.windowHours} onChange={(e) => setF({ ...f, windowHours: Number(e.target.value) })} /></label>
-        </div>
-        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-          <label className="row-check"><input type="radio" checked={f.reboot === 'when-needed'} onChange={() => setF({ ...f, reboot: 'when-needed' })} /> Restart when needed</label>
-          <label className="row-check"><input type="radio" checked={f.reboot === 'never'} onChange={() => setF({ ...f, reboot: 'never' })} /> Do not restart</label>
-          <label className="row-check"><input type="checkbox" checked={f.enabled} onChange={(e) => setF({ ...f, enabled: e.target.checked })} /> On</label>
-        </div>
-        <small className="muted">Devices that are offline when the window opens install the updates when they next connect (up to 7 days). Declined updates are never installed by a policy.</small>
+          <Fields cols={3}>
+            <Field label="Starts at" hint="Server time."><input className="in" type="time" value={f.startTime} onChange={(e) => setF({ ...f, startTime: e.target.value })} /></Field>
+            <Field label="Lasts (hours)"><input className="in" type="number" min={1} max={24} value={f.windowHours} onChange={(e) => setF({ ...f, windowHours: Number(e.target.value) })} /></Field>
+            <Field label="Restart"><select className="in" value={f.reboot} onChange={(e) => setF({ ...f, reboot: e.target.value as typeof f.reboot })}><option value="when-needed">Restart when needed</option><option value="never">Do not restart</option></select></Field>
+          </Fields>
+        </Section>
       </div>
     </Modal>
   );

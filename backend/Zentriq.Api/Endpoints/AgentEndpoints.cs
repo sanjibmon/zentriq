@@ -88,6 +88,7 @@ public static partial class AgentEndpoints
         var g = app.MapGroup("/api/agent/v1").WithTags("Agent protocol");
         MapAgentDeploymentEndpoints(g);
         MapAgentPatchScriptEndpoints(g);
+        MapAgentTrayEndpoints(g);
 
         // Short enrollment codes carry no server key pins: before sending the code, the agent asks the server to prove that
         // it knows the code, bound to the key it serves (see AgentCodes.EnrollProof).

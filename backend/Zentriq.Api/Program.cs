@@ -208,6 +208,7 @@ api.MapLicenseEndpoints();
 api.MapWebAppEndpoints();
 api.MapPatchEndpoints();
 api.MapScriptEndpoints();
+api.MapSelfServiceEndpoints();
 app.MapAgentEndpoints();
 api.MapPendingModuleEndpoints();
 app.MapOpenApi("/api/openapi/{documentName}.json").RequireAuthorization(Permissions.SettingsManage);

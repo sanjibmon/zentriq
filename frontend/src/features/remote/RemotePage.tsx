@@ -9,6 +9,7 @@ import { CopyBox } from '../../components/CopyBox';
 import { Icon } from '../../components/Icon';
 import { Modal } from '../../components/Modal';
 import { Callout, DataTable, ErrorBox, fmt, Kpis, PageHead, Pager, Panel, Pill } from '../../components/ui';
+import { HelpRequests } from './HelpRequests';
 import { InternetSetup } from './InternetSetup';
 import { RecordingPlayer } from './RecordingPlayer';
 import { TrustPanel } from './TrustPanel';
@@ -17,8 +18,8 @@ import {
   type QuickSession, type RemoteDevice, type RemoteSession, type RemoteSettings, type RemoteStatus, type RemoteView,
 } from './remote';
 
-type Tab = 'quick' | 'devices' | 'sessions' | 'setup';
-const TABS: [Tab, string][] = [['quick', 'Quick Support'], ['devices', 'Unattended Devices'], ['sessions', 'History'], ['setup', 'Settings']];
+type Tab = 'quick' | 'devices' | 'help' | 'sessions' | 'setup';
+const TABS: [Tab, string][] = [['quick', 'Quick Support'], ['devices', 'Unattended Devices'], ['help', 'Help Requests'], ['sessions', 'History'], ['setup', 'Settings']];
 const err = (e: unknown) => {
   const b = (e as { body?: { errors?: Record<string, string[]>; title?: string } }).body;
   return b?.errors ? Object.values(b.errors).flat().join(' ') : e instanceof Error ? e.message : String(e);
@@ -47,6 +48,7 @@ export function RemotePage() {
       {s && s.installed && !s.running && <Callout tone="crit" icon="alert">Remote support is installed but not running: {s.message}</Callout>}
       {s && tab === 'quick' && <Quick status={s} allowTerminal={settings.data?.allowTerminal ?? true} creating={creating} setCreating={setCreating} onMsg={setMsg} onChanged={status.reload} />}
       {s && tab === 'devices' && <Devices status={s} allowTerminal={settings.data?.allowTerminal ?? true} onMsg={setMsg} onChanged={status.reload} />}
+      {tab === 'help' && <HelpRequests onMsg={setMsg} />}
       {tab === 'sessions' && <Sessions />}
       {s && tab === 'setup' && <Setup status={s} onChanged={() => { status.reload(); settings.reload(); }} />}
     </>

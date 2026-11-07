@@ -14,7 +14,8 @@ import { DeployDialog as PatchDeployDialog, PolicyDialog } from '../features/pat
 import { ScheduleDialog, ScriptDialog } from '../features/scripts/ScriptsPage';
 import { LicenseDialog, ProductDialog } from '../features/licenses/LicenseDialogs';
 import { AppDialog } from '../features/webapps/WebAppsPage';
-import { GroupDialog, PackageDialog, RuleDialog } from '../features/deployment/DeploymentDialogs';
+import { DecideDialog, DeployDialog, GroupDialog, PackageDialog, RuleDialog } from '../features/deployment/DeploymentDialogs';
+import { OfferDialog } from '../features/deployment/SelfServiceTab';
 import { AssetForm } from '../features/nonit/NonItDialogs';
 import '../styles/zentriq.css';
 import '../styles/app.css';
@@ -43,6 +44,9 @@ const DIALOGS: Record<string, () => ReactNode> = {
   'deploy-rule': () => <RuleDialog rule={null} groups={[]} onClose={no} onSaved={no} />,
   'deploy-package': () => <PackageDialog pkg={null} onClose={no} onSaved={no} />,
   'deploy-group': () => <GroupDialog group={null} onClose={no} onSaved={no} />,
+  'deploy-job': () => <DeployDialog pkg={{ id: 'p', name: '7-Zip', version: '24.08', platform: 'windows' } as never} groups={[]} onClose={no} onDone={no} />,
+  'deploy-offer': () => <OfferDialog offer={{ id: 'p', name: '7-Zip', version: '24.08', publisher: 'Igor Pavlov', platform: 'windows', size: 1600000, enabled: false, approval: false, description: null, category: null, groupIds: [], installs: 0, pending: 0 }} groups={[{ id: 'g', name: 'Finance laptops', platform: null } as never]} onClose={no} onSaved={no} />,
+  'deploy-decide': () => <DecideDialog title="Approve Software" item={{ name: 'Notepad++', version: '8.6', publisher: 'Notepad++ Team', platform: 'windows', device: 'PC-41' } as never} groups={[]} endpoint="/x" onClose={no} onDone={no} />,
   'non-it-asset': () => <AssetForm asset={null} categories={[]} groups={[]} departments={[]} fields={[]} onClose={no} onSaved={no} onListsChanged={no} />,
 };
 
