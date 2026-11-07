@@ -691,3 +691,7 @@ input[type=file].in { height: auto; padding: 7px 10px; }
 .dropzone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .dropzone .dz-t { font-size: 14px; font-weight: 600; color: var(--fg); }
 .dropzone .dz-s { font-size: 12px; color: var(--muted); }
+/* Blocks next to fields (a check box beside a box) take the same three rows, so everything lines up */
+.fgrid > div.ff { display: grid; grid-row: span 3; grid-template-rows: subgrid; row-gap: 6px; align-content: start; margin-bottom: 16px; }
+.fgrid > div.ff > .fcheck { align-self: center; }
+.fgrid > span:empty { grid-row: span 3; }

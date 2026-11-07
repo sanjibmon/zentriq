@@ -50,7 +50,7 @@ export function SelfServiceTab({ tick, canManage, canRun, groups, changed, faile
         ]} />
       </Panel>
       <Panel title="Software Center" sub="Packages users can install themselves from the tray icon. The agent installs them as SYSTEM: no administrator rights needed, even where Group Policy blocks user installations." flush>
-        <DataTable rows={d?.packages ?? []} empty={data.loading ? 'Loading…' : <>No packages yet. Upload one in <Link to="/modules/deploy?tab=packages">Packages</Link>.</>} columns={[
+        <DataTable rows={d?.packages ?? []} empty={data.loading ? 'Loading…' : 'No packages yet. Upload one in the Packages tab.'} columns={[
           { key: 'n', label: 'Package', className: 'wrap', render: (p) => <><b>{p.name}</b>{p.version && <span className="faint"> {p.version}</span>}<div className="faint" style={{ fontSize: 11.5 }}>{[p.publisher, p.platform === 'linux' ? 'Linux' : 'Windows', fmt.bytes(p.size)].filter(Boolean).join(' · ')}</div></> },
           { key: 'o', label: 'Offered', render: (p) => p.enabled ? <Pill tone="ok">In Software Center</Pill> : <span className="faint">No</span> },
           { key: 'a', label: 'Approval', render: (p) => p.enabled ? (p.approval ? 'IT approves first' : 'Installs at once') : <span className="faint">—</span> },
