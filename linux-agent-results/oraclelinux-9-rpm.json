@@ -1,0 +1,1640 @@
+{
+  "schema": 1,
+  "source": "agent",
+  "collectedAt": "2026-11-07T12:14:49.2029664+00:00",
+  "collectorVersion": "1.1.2.171",
+  "device": {
+    "hostname": "104b6093114c",
+    "fqdn": null,
+    "domain": null,
+    "manufacturer": "Microsoft Corporation",
+    "model": "Virtual Machine",
+    "serialNumber": "0000-0007-2100-0965-0284-6779-31",
+    "sku": null,
+    "smbiosUuid": "640F1993-A05B-4B2B-B6AC-908360061C31",
+    "chassis": "virtual",
+    "category": "server",
+    "description": null,
+    "location": null,
+    "contact": null,
+    "identifiedBy": null
+  },
+  "os": {
+    "family": "linux",
+    "name": "Oracle Linux Server 9.8",
+    "version": "9.8",
+    "build": "7.0.0-1019-azure",
+    "architecture": "x86_64",
+    "installDate": null,
+    "lastBoot": "2026-11-07T12:08:38.2729664+00:00",
+    "isServer": true,
+    "ubr": null,
+    "displayVersion": null,
+    "installationType": "Server",
+    "editionId": "Oracle Linux Server",
+    "distribution": "ol",
+    "distributionFamily": "rhel",
+    "desktopEnvironment": null,
+    "kernel": "7.0.0-1019-azure",
+    "packageManager": "rpm",
+    "lts": null
+  },
+  "hardware": {
+    "cpuName": "Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz",
+    "cpuCores": 2,
+    "cpuThreads": 4,
+    "memoryBytes": 16758394880,
+    "biosVendor": "Microsoft Corporation",
+    "biosVersion": "Hyper-V UEFI Release v4.1",
+    "biosDate": "2026-04-22T00:00:00+00:00",
+    "tpmPresent": false,
+    "tpmVersion": null,
+    "isVirtual": true,
+    "disks": [
+      {
+        "model": "Virtual Disk",
+        "serial": null,
+        "sizeBytes": 161061273600,
+        "mediaType": "HDD",
+        "interface": null
+      }
+    ],
+    "volumes": [
+      {
+        "name": "/pkg",
+        "fileSystem": "ext4",
+        "sizeBytes": 154993672192,
+        "freeBytes": 89631629312,
+        "encrypted": null
+      }
+    ]
+  },
+  "network": [
+    {
+      "name": "eth0",
+      "mac": "A6:08:00:F3:36:1A",
+      "ipv4": [
+        "172.17.0.2"
+      ],
+      "ipv6": [],
+      "gateway": "172.17.0.1",
+      "dhcp": null,
+      "speedMbps": null,
+      "alias": null,
+      "status": null
+    }
+  ],
+  "software": [
+    {
+      "name": "gpg-pubkey",
+      "version": "8d8b756f-61e772ef",
+      "publisher": "(none)",
+      "installDate": null,
+      "architecture": "(none)",
+      "source": "rpm"
+    },
+    {
+      "name": "gpg-pubkey",
+      "version": "8b4efbe6-61e77439",
+      "publisher": "(none)",
+      "installDate": null,
+      "architecture": "(none)",
+      "source": "rpm"
+    },
+    {
+      "name": "tzdata",
+      "version": "2026e-1.el9_8",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "redhat-release",
+      "version": "9.8-0.7.0.1.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "python3-setuptools-wheel",
+      "version": "53.0.0-15.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "publicsuffix-list-dafsa",
+      "version": "20210518-3.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "pcre2-syntax",
+      "version": "10.40-7.0.1.el9_8",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "ncurses-base",
+      "version": "6.2-12.20210508.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "ncurses-libs",
+      "version": "6.2-12.20210508.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "oraclelinux-release",
+      "version": "9.8-1.0.7.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "setup",
+      "version": "2.13.7-10.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "filesystem",
+      "version": "3.16-5.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "basesystem",
+      "version": "11-13.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "bash",
+      "version": "5.1.8-9.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libgcc",
+      "version": "11.5.0-14.0.1.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "glibc-langpack-en",
+      "version": "2.34-275.0.1.el9_8",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "glibc-common",
+      "version": "2.34-275.0.1.el9_8",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "glibc",
+      "version": "2.34-275.0.1.el9_8",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "zlib",
+      "version": "1.2.11-40.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libacl",
+      "version": "2.4.0-1.el9_8",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "xz-libs",
+      "version": "5.2.5-8.el9_8.1",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "bzip2-libs",
+      "version": "1.0.8-11.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libxcrypt",
+      "version": "4.4.18-3.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libzstd",
+      "version": "1.5.5-1.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libcap",
+      "version": "2.48-10.el9_8.1",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "popt",
+      "version": "1.18-8.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libuuid",
+      "version": "2.37.4-25.0.1.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "sqlite-libs",
+      "version": "3.34.1-11.el9_8",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "crypto-policies",
+      "version": "20260224-1.0.1.gitea0f072.el9_8",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "libcap-ng",
+      "version": "0.8.2-7.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "audit-libs",
+      "version": "3.1.5-8.0.1.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libgpg-error",
+      "version": "1.42-5.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "elfutils-libelf",
+      "version": "0.194-1.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libxml2",
+      "version": "2.9.13-14.el9_8.5",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libcom_err",
+      "version": "1.46.5-8.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libffi",
+      "version": "3.4.2-8.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libsepol",
+      "version": "3.6-3.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libsmartcols",
+      "version": "2.37.4-25.0.1.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "readline",
+      "version": "8.1-4.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libgcrypt",
+      "version": "1.10.0-13.el9_8",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "expat",
+      "version": "2.5.0-6.el9_8.7",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "gmp",
+      "version": "6.2.0-13.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "keyutils-libs",
+      "version": "1.6.3-1.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libattr",
+      "version": "2.6.0-1.el9_8",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libstdc\u002B\u002B",
+      "version": "11.5.0-14.0.1.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libtasn1",
+      "version": "4.16.0-10.el9_8",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "p11-kit",
+      "version": "0.26.4-1.el9_8",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libunistring",
+      "version": "0.9.10-15.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libidn2",
+      "version": "2.3.0-7.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "lua-libs",
+      "version": "5.4.4-4.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "lz4-libs",
+      "version": "1.9.3-5.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "pcre2",
+      "version": "10.40-7.0.1.el9_8",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libselinux",
+      "version": "3.6-3.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "sed",
+      "version": "4.8-10.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "findutils",
+      "version": "4.8.0-7.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libsemanage",
+      "version": "3.6-5.el9_6",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "shadow-utils",
+      "version": "4.9-16.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libassuan",
+      "version": "2.5.5-3.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "file-libs",
+      "version": "5.39-17.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "gdbm-libs",
+      "version": "1.23-1.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "json-c",
+      "version": "0.14-11.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libsigsegv",
+      "version": "2.13-4.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "pcre",
+      "version": "8.44-4.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "grep",
+      "version": "3.6-5.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libutempter",
+      "version": "1.2.1-6.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "chkconfig",
+      "version": "1.24-2.0.1.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libselinux-utils",
+      "version": "3.6-3.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libpsl",
+      "version": "0.21.1-5.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "attr",
+      "version": "2.6.0-1.el9_8",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "keyutils",
+      "version": "1.6.3-1.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "mpfr",
+      "version": "4.1.0-10.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "gawk",
+      "version": "5.1.0-6.el9_8.1",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libcomps",
+      "version": "0.1.18-1.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libbpf",
+      "version": "1.5.0-3.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libksba",
+      "version": "1.5.1-7.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "acl",
+      "version": "2.4.0-1.el9_8",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "alternatives",
+      "version": "1.24-2.0.1.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "p11-kit-trust",
+      "version": "0.26.4-1.el9_8",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "diffutils",
+      "version": "3.7-12.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "ipcalc",
+      "version": "1.0.0-5.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libbrotli",
+      "version": "1.0.9-10.0.1.el9_8",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libcbor",
+      "version": "0.7.0-5.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libdb",
+      "version": "5.3.28-57.0.1.el9_6",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libeconf",
+      "version": "0.4.1-7.el9_8",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libedit",
+      "version": "3.1-39.20210216cvs.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libgomp",
+      "version": "11.5.0-14.0.1.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libmnl",
+      "version": "1.0.4-16.el9_4",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libnghttp2",
+      "version": "1.43.0-6.el9_8.2",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libseccomp",
+      "version": "2.5.2-2.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libtool-ltdl",
+      "version": "2.4.6-46.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libverto",
+      "version": "0.3.2-3.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libyaml",
+      "version": "0.2.5-7.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "nettle",
+      "version": "3.10.1-1.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "gnutls",
+      "version": "3.8.10-9.el9_8",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "npth",
+      "version": "1.6-8.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "psmisc",
+      "version": "23.4-3.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "iproute",
+      "version": "6.17.0-2.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libestr",
+      "version": "0.1.11-4.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libfastjson",
+      "version": "0.99.9-5.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "systemd-rpm-macros",
+      "version": "252-67.0.2.el9_8.6",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "libssh-config",
+      "version": "0.10.4-19.el9_8",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "libreport-filesystem",
+      "version": "2.15.2-6.0.3.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "dnf-data",
+      "version": "4.14.0-34.0.1.el9_8",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "dhcp-common",
+      "version": "4.4.2-20.b1.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "coreutils-common",
+      "version": "8.32-41.0.1.el9_8.1",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "openssl-fips-provider-so",
+      "version": "3.0.7-11.0.1.el9_8",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "openssl-fips-provider",
+      "version": "3.0.7-11.0.1.el9_8",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "openssl-libs",
+      "version": "3.5.8-2.0.1.el9_8",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "coreutils",
+      "version": "8.32-41.0.1.el9_8.1",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "ca-certificates",
+      "version": "2026.2.92_v9.0.319-90.3.el9_8",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "systemd-libs",
+      "version": "252-67.0.2.el9_8.6",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "krb5-libs",
+      "version": "1.21.1-10.0.1.el9_8.1",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libblkid",
+      "version": "2.37.4-25.0.1.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libmount",
+      "version": "2.37.4-25.0.1.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "glib2",
+      "version": "2.68.4-19.el9_8.10",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libfdisk",
+      "version": "2.37.4-25.0.1.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "initscripts-rename-device",
+      "version": "10.11.8-4.0.1.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "util-linux-core",
+      "version": "2.37.4-25.0.1.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "cyrus-sasl-lib",
+      "version": "2.1.27-22.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libssh",
+      "version": "0.10.4-19.el9_8",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "dbus-libs",
+      "version": "1.12.20-8.0.1.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libfido2",
+      "version": "1.13.0-2.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "procps-ng",
+      "version": "3.3.17-14.0.1.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "python3-pip-wheel",
+      "version": "21.3.1-2.el9_8",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "python3",
+      "version": "3.9.25-7.0.1.el9_8.6",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "python3-libs",
+      "version": "3.9.25-7.0.1.el9_8.6",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "python3-dbus",
+      "version": "1.2.18-2.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "python3-libcomps",
+      "version": "0.1.18-1.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "python3-six",
+      "version": "1.15.0-9.0.1.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "python3-dateutil",
+      "version": "2.9.0.post0-1.el9_7",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "python3-systemd",
+      "version": "234-19.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "gzip",
+      "version": "1.12-2.el9_8",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "cracklib",
+      "version": "2.9.6-28.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "cracklib-dicts",
+      "version": "2.9.6-28.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "openssl",
+      "version": "3.5.8-2.0.1.el9_8",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libpwquality",
+      "version": "1.4.4-8.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "pam",
+      "version": "1.5.1-28.0.1.el9_8.1",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "util-linux",
+      "version": "2.37.4-25.0.1.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "openssh",
+      "version": "9.9p1-13.0.1.el9_8",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "kmod-libs",
+      "version": "28-11.0.1.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "dbus",
+      "version": "1.12.20-8.0.1.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "systemd-pam",
+      "version": "252-67.0.2.el9_8.6",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "systemd",
+      "version": "252-67.0.2.el9_8.6",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "dbus-common",
+      "version": "1.12.20-8.0.1.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "dbus-broker",
+      "version": "28-9.el9_8",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "elfutils-default-yama-scope",
+      "version": "0.194-1.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "elfutils-libs",
+      "version": "0.194-1.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "initscripts-service",
+      "version": "10.11.8-4.0.1.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "iputils",
+      "version": "20210202-15.0.1.el9_7",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libarchive",
+      "version": "3.5.3-11.el9_8",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libevent",
+      "version": "2.1.13-1.el9_8",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "openldap",
+      "version": "2.6.8-4.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libcurl",
+      "version": "7.76.1-40.el9_8.9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "curl",
+      "version": "7.76.1-40.el9_8.9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "rpm",
+      "version": "4.16.1.3-40.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "rpm-libs",
+      "version": "4.16.1.3-40.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libmodulemd",
+      "version": "2.13.0-2.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libsolv",
+      "version": "0.7.24-6.el9_8",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "gnupg2",
+      "version": "2.3.3-5.el9_7",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "gpgme",
+      "version": "1.15.1-6.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "librepo",
+      "version": "1.19.0-1.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libdnf",
+      "version": "0.69.0-18.0.1.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "python3-libdnf",
+      "version": "0.69.0-18.0.1.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "python3-hawkey",
+      "version": "0.69.0-18.0.1.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "python3-gpg",
+      "version": "1.15.1-6.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "rpm-build-libs",
+      "version": "4.16.1.3-40.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "tpm2-tss",
+      "version": "3.2.3-1.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "ima-evm-utils",
+      "version": "1.6.2-2.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "rpm-sign-libs",
+      "version": "4.16.1.3-40.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "python3-rpm",
+      "version": "4.16.1.3-40.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "python3-dnf",
+      "version": "4.14.0-34.0.1.el9_8",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "dnf",
+      "version": "4.14.0-34.0.1.el9_8",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "python3-dnf-plugins-core",
+      "version": "4.3.0-26.0.1.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "dnf-plugins-core",
+      "version": "4.3.0-26.0.1.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "libuser",
+      "version": "0.63-17.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "passwd",
+      "version": "0.80-12.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "yum-utils",
+      "version": "4.3.0-26.0.1.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "yum",
+      "version": "4.14.0-34.0.1.el9_8",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "policycoreutils",
+      "version": "3.6-5.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "oraclelinux-release-el9",
+      "version": "1.0-29.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "rsyslog",
+      "version": "8.2510.0-2.0.1.el9_8.2",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "dhcp-client",
+      "version": "4.4.2-20.b1.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "initscripts",
+      "version": "10.11.8-4.0.1.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "openssh-server",
+      "version": "9.9p1-13.0.1.el9_8",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "openssh-clients",
+      "version": "9.9p1-13.0.1.el9_8",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "tar",
+      "version": "1.34-13.el9_8",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "vim-minimal",
+      "version": "8.2.2637-26.0.1.el9_8.23",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "rootfiles",
+      "version": "8.1-35.el9",
+      "publisher": "Oracle America",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "zentriq-agent",
+      "version": "1.1.2.171-1",
+      "publisher": "(none)",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    }
+  ],
+  "patches": [],
+  "services": [],
+  "security": {
+    "antivirus": [],
+    "firewallEnabled": false,
+    "diskEncryption": null,
+    "secureBoot": false,
+    "hardening": null,
+    "linux": {
+      "sshRootLogin": "prohibit-password",
+      "sshPasswordAuth": true,
+      "sshPort": 22,
+      "sshServer": false,
+      "selinux": "disabled",
+      "apparmor": true,
+      "autoUpdates": false,
+      "firewall": null,
+      "passMaxDays": 99999,
+      "extraUid0": [],
+      "auditd": null,
+      "timeSync": null,
+      "telnetServer": false,
+      "pendingUpdates": 4,
+      "pendingSecurityUpdates": 6,
+      "rebootRequired": false
+    }
+  },
+  "users": {
+    "loggedOn": null,
+    "localAdmins": [
+      "root"
+    ]
+  },
+  "errors": [],
+  "printer": null,
+  "ports": null,
+  "networkDevice": null,
+  "licenses": null,
+  "webHosts": null
+}

@@ -1,0 +1,78 @@
+==== A01 Ubuntu 24.04 (apt / dpkg)
+Package-manager hooks installed.
+Application control: block (policy 7, 1 rule(s)); package-manager hooks installed; remote support protection absent.
+approved package installed: OK
+debconf: delaying package configuration, since apt-utils is not installed
+Fetched 350 kB in 1s (321 kB/s)
+
+Zentriq: This is unauthorized software. Please contact your administrator for further installation.
+  Not approved: unzip 6.0-28ubuntu4.1, zip 3.0-13ubuntu0.2
+  To ask for approval: zentriq-agent --request unzip --reason "why you need it"
+dpkg: error: error executing hook '[ ! -x /opt/zentriq-agent/zentriq-agent ] || /opt/zentriq-agent/zentriq-agent --check-dpkg', exit code 256
+E: Sub-process /usr/bin/dpkg returned an error code (2)
+unapproved package refused with the message: OK
+Your request for zip was sent to your administrator. You can install it once it is approved.
+request by a normal user: OK
+audit mode: installed and reported: OK
+hooks removed with the agent: OK
+ALLDONE
+==== A02 Debian 12 (dpkg -i)
+Package-manager hooks installed.
+Application control: block (policy 7, 1 rule(s)); package-manager hooks installed; remote support protection absent.
+approved package installed: OK
+
+Zentriq: This is unauthorized software. Please contact your administrator for further installation.
+  Not approved: zip 3.0-13+deb12u1
+  To ask for approval: zentriq-agent --request zip --reason "why you need it"
+dpkg: error: error executing hook '[ ! -x /opt/zentriq-agent/zentriq-agent ] || /opt/zentriq-agent/zentriq-agent --check-dpkg', exit code 256
+unapproved package refused with the message: OK
+Your request for zip was sent to your administrator. You can install it once it is approved.
+request by a normal user: OK
+audit mode: installed and reported: OK
+hooks removed with the agent: OK
+ALLDONE
+==== A03 Rocky Linux 9 (dnf)
+Package-manager hooks installed.
+Application control: block (policy 7, 1 rule(s)); package-manager hooks installed; remote support protection absent.
+approved package installed: OK
+Error: Zentriq: This is unauthorized software. Please contact your administrator for further installation.
+  Not approved: unzip 6.0-60.el9_8, zip 3.0-35.el9
+  To ask for approval: zentriq-agent --request unzip --reason "why you need it"
+unapproved package refused with the message: OK
+Your request for zip was sent to your administrator. You can install it once it is approved.
+request by a normal user: OK
+audit mode: installed and reported: OK
+hooks removed with the agent: OK
+ALLDONE
+==== A04 Amazon Linux 2023 (dnf)
+Package-manager hooks installed.
+Application control: block (policy 7, 1 rule(s)); package-manager hooks installed; remote support protection absent.
+approved package installed: OK
+Error: Zentriq: This is unauthorized software. Please contact your administrator for further installation.
+  Not approved: zip 3.0-28.amzn2023.0.4, unzip 6.0-68.amzn2023.0.2
+  To ask for approval: zentriq-agent --request zip --reason "why you need it"
+unapproved package refused with the message: OK
+Your request for zip was sent to your administrator. You can install it once it is approved.
+request by a normal user: OK
+audit mode: installed and reported: OK
+hooks removed with the agent: OK
+ALLDONE
+==== A05 openSUSE Leap 15.6 (zypper: reported, not stopped)
+Package-manager hooks installed.
+Application control: block (policy 7, 1 rule(s)); package-manager hooks installed; remote support protection absent.
+approved package installed: OK
+unapproved package reported (zypper cannot be stopped from a plugin): OK
+Your request for zip was sent to your administrator. You can install it once it is approved.
+request by a normal user: OK
+audit mode: installed and reported: OK
+hooks removed with the agent: OK
+ALLDONE
+# Zentriq application control on Linux (containers, x64)
+
+| ID | Distribution | Result | Checks |
+|---|---|---|---|
+| A01 | Ubuntu 24.04 (apt / dpkg) | **PASS** | approved package installed: OK;unapproved package refused with the message: OK;request by a normal user: OK;audit mode: installed and reported: OK;hooks removed with the agent: OK; |
+| A02 | Debian 12 (dpkg -i) | **PASS** | approved package installed: OK;unapproved package refused with the message: OK;request by a normal user: OK;audit mode: installed and reported: OK;hooks removed with the agent: OK; |
+| A03 | Rocky Linux 9 (dnf) | **PASS** | approved package installed: OK;unapproved package refused with the message: OK;request by a normal user: OK;audit mode: installed and reported: OK;hooks removed with the agent: OK; |
+| A04 | Amazon Linux 2023 (dnf) | **PASS** | approved package installed: OK;unapproved package refused with the message: OK;request by a normal user: OK;audit mode: installed and reported: OK;hooks removed with the agent: OK; |
+| A05 | openSUSE Leap 15.6 (zypper: reported, not stopped) | **PASS** | approved package installed: OK;unapproved package reported (zypper cannot be stopped from a plugin): OK;request by a normal user: OK;audit mode: installed and reported: OK;hooks removed with the agent: OK; |

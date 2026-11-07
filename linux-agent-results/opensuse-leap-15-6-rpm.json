@@ -1,0 +1,1242 @@
+{
+  "schema": 1,
+  "source": "agent",
+  "collectedAt": "2026-11-07T12:16:39.3606125+00:00",
+  "collectorVersion": "1.1.2.171",
+  "device": {
+    "hostname": "bb73ea89224e",
+    "fqdn": null,
+    "domain": null,
+    "manufacturer": "Microsoft Corporation",
+    "model": "Virtual Machine",
+    "serialNumber": "0000-0007-2100-0965-0284-6779-31",
+    "sku": null,
+    "smbiosUuid": "640F1993-A05B-4B2B-B6AC-908360061C31",
+    "chassis": "virtual",
+    "category": "server",
+    "description": null,
+    "location": null,
+    "contact": null,
+    "identifiedBy": null
+  },
+  "os": {
+    "family": "linux",
+    "name": "openSUSE Leap 15.6",
+    "version": "15.6",
+    "build": "7.0.0-1019-azure",
+    "architecture": "x86_64",
+    "installDate": null,
+    "lastBoot": "2026-11-07T12:08:43.1406125+00:00",
+    "isServer": true,
+    "ubr": null,
+    "displayVersion": null,
+    "installationType": "Server",
+    "editionId": "openSUSE Leap Server",
+    "distribution": "opensuse-leap",
+    "distributionFamily": "suse",
+    "desktopEnvironment": null,
+    "kernel": "7.0.0-1019-azure",
+    "packageManager": "rpm",
+    "lts": null
+  },
+  "hardware": {
+    "cpuName": "Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz",
+    "cpuCores": 2,
+    "cpuThreads": 4,
+    "memoryBytes": 16758394880,
+    "biosVendor": "Microsoft Corporation",
+    "biosVersion": "Hyper-V UEFI Release v4.1",
+    "biosDate": "2026-04-22T00:00:00+00:00",
+    "tpmPresent": false,
+    "tpmVersion": null,
+    "isVirtual": true,
+    "disks": [],
+    "volumes": [
+      {
+        "name": "/pkg",
+        "fileSystem": "ext4",
+        "sizeBytes": 154993672192,
+        "freeBytes": 89086230528,
+        "encrypted": null
+      }
+    ]
+  },
+  "network": [],
+  "software": [
+    {
+      "name": "openSUSE-release-appliance-docker",
+      "version": "15.6-lp156.417.4.1",
+      "publisher": "openSUSE",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "cracklib-dict-small",
+      "version": "2.9.11-150600.1.90",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libsemanage-conf",
+      "version": "3.5-150600.1.48",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "boost-license1_66_0",
+      "version": "1.66.0-150200.12.7.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "crypto-policies",
+      "version": "20230920.570ea89-150600.3.16.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "libldap-data",
+      "version": "2.4.46-150600.25.3.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "libssh-config",
+      "version": "0.9.8-150600.11.12.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libtirpc-netconfig",
+      "version": "1.3.4-150300.3.23.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "file-magic",
+      "version": "5.32-7.14.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "system-user-root",
+      "version": "20190513-3.3.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "filesystem",
+      "version": "15.0-11.8.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "glibc",
+      "version": "2.38-150600.14.46.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libuuid1",
+      "version": "2.39.3-150600.4.21.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libsmartcols1",
+      "version": "2.39.3-150600.4.21.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libsasl2-3",
+      "version": "2.1.28-150600.7.14.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libnghttp2-14",
+      "version": "1.40.0-150600.25.5.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "liblzma5",
+      "version": "5.4.1-150600.3.3.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libfa1",
+      "version": "1.14.1-150600.3.3.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libcom_err2",
+      "version": "1.47.0-150600.4.6.2",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libblkid1",
+      "version": "2.39.3-150600.4.21.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libfdisk1",
+      "version": "2.39.3-150600.4.21.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libz1",
+      "version": "1.2.13-150500.4.6.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libxml2-2",
+      "version": "2.10.3-150500.5.38.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libunistring2",
+      "version": "0.9.10-1.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "update-alternatives",
+      "version": "1.19.0.4-150000.4.7.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libsqlite3-0",
+      "version": "3.51.3-150000.3.39.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libpcre1",
+      "version": "8.45-150000.20.13.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "liblua5_3-5",
+      "version": "5.3.6-3.6.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libkeyutils1",
+      "version": "1.6.3-5.6.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libjitterentropy3",
+      "version": "3.4.1-150000.1.12.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libgmp10",
+      "version": "6.1.2-4.9.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libgcc_s1",
+      "version": "15.2.0\u002Bgit10201-150000.1.9.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libmagic1",
+      "version": "5.32-7.14.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libidn2-0",
+      "version": "2.2.0-3.6.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libstdc\u002B\u002B6",
+      "version": "15.2.0\u002Bgit10201-150000.1.9.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libpsl5",
+      "version": "0.20.1-150000.3.3.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libncurses6",
+      "version": "6.1-150000.5.33.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "terminfo-base",
+      "version": "6.1-150000.5.33.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "ncurses-utils",
+      "version": "6.1-150000.5.33.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libverto1",
+      "version": "0.2.6-3.20",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libpopt0",
+      "version": "1.16-3.22",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libnpth0",
+      "version": "1.5-2.11",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libattr1",
+      "version": "2.4.47-2.19",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "fillup",
+      "version": "1.42-2.18",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libcap-ng0",
+      "version": "0.7.9-4.37",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libcrypt1",
+      "version": "4.4.15-150300.4.7.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "perl-base",
+      "version": "5.26.1-150300.17.20.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libbrotlicommon1",
+      "version": "1.0.7-150200.3.5.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libboost_system1_66_0",
+      "version": "1.66.0-150200.12.7.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libbrotlidec1",
+      "version": "1.0.7-150200.3.5.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libboost_thread1_66_0",
+      "version": "1.66.0-150200.12.7.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libzstd1",
+      "version": "1.5.5-150600.1.3",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libsepol2",
+      "version": "3.5-150600.1.49",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libpcre2-8-0",
+      "version": "10.42-150600.1.26",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libgpg-error0",
+      "version": "1.47-150600.1.3",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "kubic-locale-archive",
+      "version": "2.38-150600.18.3",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "libsigc-2_0-0",
+      "version": "2.12.1-150600.1.2",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libksba8",
+      "version": "1.6.4-150600.1.2",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libbz2-1",
+      "version": "1.0.8-150400.1.122",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libeconf0",
+      "version": "0.5.2-150400.3.6.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libcap2",
+      "version": "2.63-150400.3.6.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libaudit1",
+      "version": "3.0.6-150400.4.16.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libelf1",
+      "version": "0.185-150400.5.8.3",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libyaml-cpp0_6",
+      "version": "0.6.3-150400.4.3.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libreadline7",
+      "version": "7.0-150400.27.6.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libdw1",
+      "version": "0.185-150400.5.8.3",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "bash",
+      "version": "4.4-150400.27.6.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "bash-sh",
+      "version": "4.4-150400.27.6.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "cpio",
+      "version": "2.13-150400.3.6.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libaugeas0",
+      "version": "1.14.1-150600.3.3.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libopenssl3",
+      "version": "3.1.4-150600.5.50.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libselinux1",
+      "version": "3.5-150600.3.3.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libglib-2_0-0",
+      "version": "2.78.6-150600.4.35.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libgcrypt20",
+      "version": "1.10.3-150600.3.9.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libudev1",
+      "version": "254.27-150600.4.62.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "login_defs",
+      "version": "4.17.2-150600.17.18.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "libldap-2_4-2",
+      "version": "2.4.46-150600.25.3.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libmount1",
+      "version": "2.39.3-150600.4.21.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "krb5",
+      "version": "1.20.1-150600.11.14.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libssh4",
+      "version": "0.9.8-150600.11.12.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libcurl4",
+      "version": "8.14.1-150600.4.40.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libacl1",
+      "version": "2.2.52-4.3.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libassuan0",
+      "version": "2.5.5-150000.4.7.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libzio1",
+      "version": "1.06-2.20",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "info",
+      "version": "6.5-4.17",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libcrack2",
+      "version": "2.9.11-150600.1.90",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "cracklib",
+      "version": "2.9.11-150600.1.90",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libzck1",
+      "version": "1.1.16-150600.9.3",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libsemanage2",
+      "version": "3.5-150600.1.48",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "sed",
+      "version": "4.9-150600.1.4",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "findutils",
+      "version": "4.8.0-150300.3.3.2",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libtirpc3",
+      "version": "1.3.4-150300.3.23.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "patterns-base-fips",
+      "version": "20200505-lp156.17.3.1",
+      "publisher": "openSUSE",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libusb-1_0-0",
+      "version": "1.0.24-150400.3.3.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "coreutils",
+      "version": "8.32-150400.9.9.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "pinentry",
+      "version": "1.1.0-4.3.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "grep",
+      "version": "3.1-150000.4.6.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "gawk",
+      "version": "4.2.1-150000.3.3.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "diffutils",
+      "version": "3.6-4.3.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libnsl2",
+      "version": "1.2.0-2.44",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "gpg2",
+      "version": "2.4.4-150600.3.15.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "permissions",
+      "version": "20240826-150600.10.18.2",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libgpgme11",
+      "version": "1.23.0-150600.3.5.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "openSUSE-release",
+      "version": "15.6-lp156.417.4.1",
+      "publisher": "openSUSE",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "rpm-config-SUSE",
+      "version": "1-150400.14.3.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "rpm-ndb",
+      "version": "4.14.3-150400.59.16.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "pam",
+      "version": "1.3.0-150000.6.86.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libsolv-tools-base",
+      "version": "0.7.34-150600.8.19.2",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libsubid5",
+      "version": "4.17.2-150600.17.18.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libzypp",
+      "version": "17.37.18-150600.3.82.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "shadow",
+      "version": "4.17.2-150600.17.18.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "zypper",
+      "version": "1.14.94-150600.10.52.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "sysuser-shadow",
+      "version": "3.2-150400.3.5.3",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "system-group-hardware",
+      "version": "20170617-150400.24.2.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "libutempter0",
+      "version": "1.1.6-3.42",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "util-linux",
+      "version": "2.39.3-150600.4.21.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "aaa_base",
+      "version": "84.87\u002Bgit20180409.04c9dae-150300.10.28.2",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "liblz4-1",
+      "version": "1.9.4-150600.1.4",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "openssl",
+      "version": "3.1.4-150600.2.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "curl",
+      "version": "8.14.1-150600.4.40.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "timezone",
+      "version": "2025b-150600.91.6.2",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libsystemd0",
+      "version": "254.27-150600.4.62.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "openssl-3",
+      "version": "3.1.4-150600.5.50.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libffi7",
+      "version": "3.2.1.git259-10.8",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "gpg-pubkey",
+      "version": "3fa1d6ce-67c856ee",
+      "publisher": "(none)",
+      "installDate": null,
+      "architecture": "(none)",
+      "source": "rpm"
+    },
+    {
+      "name": "openSUSE-build-key",
+      "version": "1.0-lp156.8.2",
+      "publisher": "openSUSE",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "libtasn1-6",
+      "version": "4.13-150000.4.14.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libtasn1",
+      "version": "4.13-150000.4.14.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "netcfg",
+      "version": "11.6-150000.3.6.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "libprocps8",
+      "version": "3.3.17-150000.7.42.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "procps",
+      "version": "3.3.17-150000.7.42.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libp11-kit0",
+      "version": "0.23.22-150500.8.3.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "p11-kit",
+      "version": "0.23.22-150500.8.3.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "p11-kit-tools",
+      "version": "0.23.22-150500.8.3.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "ca-certificates",
+      "version": "2\u002Bgit20240416.98ae794-150300.4.3.3",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "ca-certificates-mozilla",
+      "version": "2.84-150200.44.1",
+      "publisher": "SUSE LLC \u003Chttps://www.suse.com/\u003E",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "gpg-pubkey",
+      "version": "25db7ae0-645bae34",
+      "publisher": "(none)",
+      "installDate": null,
+      "architecture": "(none)",
+      "source": "rpm"
+    },
+    {
+      "name": "gpg-pubkey",
+      "version": "39db7c82-5f68629b",
+      "publisher": "(none)",
+      "installDate": null,
+      "architecture": "(none)",
+      "source": "rpm"
+    },
+    {
+      "name": "gpg-pubkey",
+      "version": "3dbdc284-53674dd4",
+      "publisher": "(none)",
+      "installDate": null,
+      "architecture": "(none)",
+      "source": "rpm"
+    },
+    {
+      "name": "gpg-pubkey",
+      "version": "65176565-61a0ee8f",
+      "publisher": "(none)",
+      "installDate": null,
+      "architecture": "(none)",
+      "source": "rpm"
+    },
+    {
+      "name": "gpg-pubkey",
+      "version": "29b700a4-6a17fa38",
+      "publisher": "(none)",
+      "installDate": null,
+      "architecture": "(none)",
+      "source": "rpm"
+    },
+    {
+      "name": "zentriq-agent",
+      "version": "1.1.2.171-1",
+      "publisher": "(none)",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    }
+  ],
+  "patches": [],
+  "services": [],
+  "security": {
+    "antivirus": [],
+    "firewallEnabled": false,
+    "diskEncryption": null,
+    "secureBoot": false,
+    "hardening": null,
+    "linux": {
+      "sshRootLogin": null,
+      "sshPasswordAuth": null,
+      "sshPort": null,
+      "sshServer": false,
+      "selinux": null,
+      "apparmor": true,
+      "autoUpdates": false,
+      "firewall": null,
+      "passMaxDays": 99999,
+      "extraUid0": [],
+      "auditd": null,
+      "timeSync": null,
+      "telnetServer": false,
+      "pendingUpdates": 0,
+      "pendingSecurityUpdates": 0,
+      "rebootRequired": null
+    }
+  },
+  "users": {
+    "loggedOn": null,
+    "localAdmins": [
+      "root"
+    ]
+  },
+  "errors": [],
+  "printer": null,
+  "ports": null,
+  "networkDevice": null,
+  "licenses": null,
+  "webHosts": null
+}

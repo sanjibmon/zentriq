@@ -1,0 +1,875 @@
+{
+  "schema": 1,
+  "source": "agent",
+  "collectedAt": "2026-11-07T12:12:45.9626906+00:00",
+  "collectorVersion": "1.1.2.171",
+  "device": {
+    "hostname": "7375a8d05b71",
+    "fqdn": null,
+    "domain": null,
+    "manufacturer": "Microsoft Corporation",
+    "model": "Virtual Machine",
+    "serialNumber": "0000-0007-2100-0965-0284-6779-31",
+    "sku": null,
+    "smbiosUuid": "640F1993-A05B-4B2B-B6AC-908360061C31",
+    "chassis": "virtual",
+    "category": "server",
+    "description": null,
+    "location": null,
+    "contact": null,
+    "identifiedBy": null
+  },
+  "os": {
+    "family": "linux",
+    "name": "Ubuntu 24.04.5 LTS",
+    "version": "24.04",
+    "build": "7.0.0-1019-azure",
+    "architecture": "x86_64",
+    "installDate": null,
+    "lastBoot": "2026-11-07T12:08:37.5726907+00:00",
+    "isServer": true,
+    "ubr": null,
+    "displayVersion": "noble",
+    "installationType": "Server",
+    "editionId": "Ubuntu Server",
+    "distribution": "ubuntu",
+    "distributionFamily": "debian",
+    "desktopEnvironment": null,
+    "kernel": "7.0.0-1019-azure",
+    "packageManager": "dpkg",
+    "lts": true
+  },
+  "hardware": {
+    "cpuName": "Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz",
+    "cpuCores": 2,
+    "cpuThreads": 4,
+    "memoryBytes": 16758394880,
+    "biosVendor": "Microsoft Corporation",
+    "biosVersion": "Hyper-V UEFI Release v4.1",
+    "biosDate": "2026-04-22T00:00:00+00:00",
+    "tpmPresent": false,
+    "tpmVersion": null,
+    "isVirtual": true,
+    "disks": [
+      {
+        "model": "Virtual Disk",
+        "serial": null,
+        "sizeBytes": 161061273600,
+        "mediaType": "HDD",
+        "interface": null
+      }
+    ],
+    "volumes": [
+      {
+        "name": "/pkg",
+        "fileSystem": "ext4",
+        "sizeBytes": 154993672192,
+        "freeBytes": 91279921152,
+        "encrypted": null
+      }
+    ]
+  },
+  "network": [],
+  "software": [
+    {
+      "name": "apt",
+      "version": "2.8.3",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "base-files",
+      "version": "13ubuntu10.5",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "base-passwd",
+      "version": "3.6.3build1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "bash",
+      "version": "5.2.21-2ubuntu4",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "bsdutils",
+      "version": "1:2.39.3-9ubuntu6.6",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "ca-certificates",
+      "version": "20260816ubuntu0.24.04.2",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "all",
+      "source": "dpkg"
+    },
+    {
+      "name": "coreutils",
+      "version": "9.4-3ubuntu6.3",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "dash",
+      "version": "0.5.12-6ubuntu5",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "debconf",
+      "version": "1.5.86ubuntu1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "all",
+      "source": "dpkg"
+    },
+    {
+      "name": "debianutils",
+      "version": "5.17build1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "diffutils",
+      "version": "1:3.10-1ubuntu0.1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "dpkg",
+      "version": "1.22.6ubuntu6.6",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "e2fsprogs",
+      "version": "1.47.0-2.4~exp1ubuntu4.1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "findutils",
+      "version": "4.9.0-5build1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "gcc-14-base",
+      "version": "14.2.0-4ubuntu2~24.04.1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "gpgv",
+      "version": "2.4.4-2ubuntu17.6",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "grep",
+      "version": "3.11-4build1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "gzip",
+      "version": "1.12-1ubuntu3.2",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "hostname",
+      "version": "3.23\u002Bnmu2ubuntu2",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "init-system-helpers",
+      "version": "1.66ubuntu1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "all",
+      "source": "dpkg"
+    },
+    {
+      "name": "libacl1",
+      "version": "2.3.2-1build1.1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libapt-pkg6.0t64",
+      "version": "2.8.3",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libassuan0",
+      "version": "2.5.6-1build1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libattr1",
+      "version": "1:2.5.2-1ubuntu0.1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libaudit-common",
+      "version": "1:3.1.2-2.1ubuntu0.1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "all",
+      "source": "dpkg"
+    },
+    {
+      "name": "libaudit1",
+      "version": "1:3.1.2-2.1ubuntu0.1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libblkid1",
+      "version": "2.39.3-9ubuntu6.6",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libbz2-1.0",
+      "version": "1.0.8-5.1ubuntu0.1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libc-bin",
+      "version": "2.39-0ubuntu8.9",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libc6",
+      "version": "2.39-0ubuntu8.9",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libcap-ng0",
+      "version": "0.8.4-2build2",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libcap2",
+      "version": "1:2.66-5ubuntu2.4",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libcom-err2",
+      "version": "1.47.0-2.4~exp1ubuntu4.1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libcrypt1",
+      "version": "1:4.4.36-4build1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libdb5.3t64",
+      "version": "5.3.28\u002Bdfsg2-7",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libdebconfclient0",
+      "version": "0.271ubuntu3",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libext2fs2t64",
+      "version": "1.47.0-2.4~exp1ubuntu4.1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libffi8",
+      "version": "3.4.6-1build1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libgcc-s1",
+      "version": "14.2.0-4ubuntu2~24.04.1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libgcrypt20",
+      "version": "1.10.3-2ubuntu0.2",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libgmp10",
+      "version": "2:6.3.0\u002Bdfsg-2ubuntu6.1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libgnutls30t64",
+      "version": "3.8.3-1.1ubuntu3.6",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libgpg-error0",
+      "version": "1.47-3build2.1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libhogweed6t64",
+      "version": "3.9.1-2.2build1.1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libidn2-0",
+      "version": "2.3.7-2build1.1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "liblz4-1",
+      "version": "1.9.4-1build1.1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "liblzma5",
+      "version": "5.6.1\u002Breally5.4.5-1ubuntu0.4",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libmd0",
+      "version": "1.1.0-2build1.1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libmount1",
+      "version": "2.39.3-9ubuntu6.6",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libncursesw6",
+      "version": "6.4\u002B20240113-1ubuntu2.2",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libnettle8t64",
+      "version": "3.9.1-2.2build1.1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libnpth0t64",
+      "version": "1.6-3.1build1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libp11-kit0",
+      "version": "0.25.3-4ubuntu2.2",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libpam-modules",
+      "version": "1.5.3-5ubuntu5.7",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libpam-modules-bin",
+      "version": "1.5.3-5ubuntu5.7",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libpam-runtime",
+      "version": "1.5.3-5ubuntu5.7",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "all",
+      "source": "dpkg"
+    },
+    {
+      "name": "libpam0g",
+      "version": "1.5.3-5ubuntu5.7",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libpcre2-8-0",
+      "version": "10.42-4ubuntu2.1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libproc2-0",
+      "version": "2:4.0.4-4ubuntu3.3",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libseccomp2",
+      "version": "2.5.5-1ubuntu3.1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libselinux1",
+      "version": "3.5-2ubuntu2.1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libsemanage-common",
+      "version": "3.5-1build5",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "all",
+      "source": "dpkg"
+    },
+    {
+      "name": "libsemanage2",
+      "version": "3.5-1build5",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libsepol2",
+      "version": "3.5-2build1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libsmartcols1",
+      "version": "2.39.3-9ubuntu6.6",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libss2",
+      "version": "1.47.0-2.4~exp1ubuntu4.1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libssl3t64",
+      "version": "3.0.13-0ubuntu3.16",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libstdc\u002B\u002B6",
+      "version": "14.2.0-4ubuntu2~24.04.1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libsystemd0",
+      "version": "255.4-1ubuntu8.18",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libtasn1-6",
+      "version": "4.19.0-3ubuntu0.24.04.2",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libtinfo6",
+      "version": "6.4\u002B20240113-1ubuntu2.2",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libudev1",
+      "version": "255.4-1ubuntu8.18",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libunistring5",
+      "version": "1.1-2build1.1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libuuid1",
+      "version": "2.39.3-9ubuntu6.6",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libxxhash0",
+      "version": "0.8.2-2build1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libzstd1",
+      "version": "1.5.5\u002Bdfsg2-2build1.1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "login",
+      "version": "1:4.13\u002Bdfsg1-4ubuntu3.2",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "logsave",
+      "version": "1.47.0-2.4~exp1ubuntu4.1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "mawk",
+      "version": "1.3.4.20240123-1build1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "mount",
+      "version": "2.39.3-9ubuntu6.6",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "ncurses-base",
+      "version": "6.4\u002B20240113-1ubuntu2.2",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "all",
+      "source": "dpkg"
+    },
+    {
+      "name": "ncurses-bin",
+      "version": "6.4\u002B20240113-1ubuntu2.2",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "openssl",
+      "version": "3.0.13-0ubuntu3.16",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "passwd",
+      "version": "1:4.13\u002Bdfsg1-4ubuntu3.2",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "perl-base",
+      "version": "5.38.2-3.2ubuntu0.6",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "procps",
+      "version": "2:4.0.4-4ubuntu3.3",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "sed",
+      "version": "4.9-2ubuntu0.24.04.1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "sensible-utils",
+      "version": "0.0.22",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "all",
+      "source": "dpkg"
+    },
+    {
+      "name": "sysvinit-utils",
+      "version": "3.08-6ubuntu3",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "tar",
+      "version": "1.35\u002Bdfsg-3ubuntu0.4",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "ubuntu-keyring",
+      "version": "2023.11.28.1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "all",
+      "source": "dpkg"
+    },
+    {
+      "name": "unminimize",
+      "version": "0.2.1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "util-linux",
+      "version": "2.39.3-9ubuntu6.6",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "zentriq-agent",
+      "version": "1.1.2.171",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "zlib1g",
+      "version": "1:1.3.dfsg-3.1ubuntu2.3",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    }
+  ],
+  "patches": [],
+  "services": [],
+  "security": {
+    "antivirus": [],
+    "firewallEnabled": false,
+    "diskEncryption": null,
+    "secureBoot": false,
+    "hardening": null,
+    "linux": {
+      "sshRootLogin": null,
+      "sshPasswordAuth": null,
+      "sshPort": null,
+      "sshServer": false,
+      "selinux": null,
+      "apparmor": true,
+      "autoUpdates": false,
+      "firewall": null,
+      "passMaxDays": 99999,
+      "extraUid0": [],
+      "auditd": null,
+      "timeSync": null,
+      "telnetServer": false,
+      "pendingUpdates": 3,
+      "pendingSecurityUpdates": 3,
+      "rebootRequired": null
+    }
+  },
+  "users": {
+    "loggedOn": null,
+    "localAdmins": [
+      "root",
+      "ubuntu"
+    ]
+  },
+  "errors": [],
+  "printer": null,
+  "ports": null,
+  "networkDevice": null,
+  "licenses": null,
+  "webHosts": null
+}
