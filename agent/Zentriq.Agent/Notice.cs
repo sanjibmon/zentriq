@@ -42,9 +42,16 @@ internal static class Notice
         }
     }
 
+    /// <summary>When the message was last shown for this software (by file hash, or by name and version: an installer that
+    /// unpacks a new copy of itself for every retry is the same software).</summary>
+    private static readonly Dictionary<string, DateTime> LastShown = new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
+    private static string NameKey(int session, SoftwareCandidate c) => session + "|" + (c.Name ?? "") + "|" + (c.Version ?? "");
+
     public static bool ShownRecently(int session, SoftwareCandidate c, TimeSpan within)
     {
-        lock (Gate) return Open.TryGetValue(Key(session, c), out var s) && DateTime.UtcNow - s.At < within;
+        lock (Gate)
+            return (Open.TryGetValue(Key(session, c), out var s) && DateTime.UtcNow - s.At < within)
+                || (!string.IsNullOrEmpty(c.Name) && LastShown.TryGetValue(NameKey(session, c), out var at) && DateTime.UtcNow - at < within);
     }
 
     public static void Show(int session, SoftwareCandidate c, AppControlPolicy policy, string? user)
@@ -61,7 +68,9 @@ internal static class Notice
         if (process == IntPtr.Zero) { Log.Warn($"Application control: could not show the message in session {session}."); return; }
         lock (Gate)
         {
-            foreach (var old in Open.Where(kv => DateTime.UtcNow - kv.Value.At > TimeSpan.FromHours(2)).Select(kv => kv.Key).ToList())
+            foreach (var old in LastShown.Where(kv => DateTime.UtcNow - kv.Value > TimeSpan.FromHours(6)).Select(kv => kv.Key).ToList()) LastShown.Remove(old);
+            if (!string.IsNullOrEmpty(c.Name)) LastShown[NameKey(session, c)] = DateTime.UtcNow;
+            foreach (var old in Open.Where(kv => DateTime.UtcNow - kv.Value.At > TimeSpan.FromHours(6)).Select(kv => kv.Key).ToList())
             {
                 if (Open[old].Process != IntPtr.Zero) CloseHandle(Open[old].Process);
                 Open.Remove(old);

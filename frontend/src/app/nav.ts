@@ -15,7 +15,7 @@ export interface NavItem {
 // Same groups, labels and icons as the Zentriq prototype navigation.
 export const NAV: [string, NavItem[]][] = [
   ['Overview', [{ id: 'dashboard', label: 'Dashboard', icon: 'dashboard', path: '/', ready: true, permission: 'dashboard.view' }]],
-  ['Discover & inventory', [
+  ['Discovery & Inventory', [
     { id: 'discovery', label: 'Discovery & Scans', icon: 'radar', path: '/discovery', ready: true, permission: 'assets.view' },
     { id: 'assets', label: 'IT Asset Inventory', icon: 'box', path: '/assets', ready: true, permission: 'assets.view' },
     { id: 'nonit', label: 'Non-IT Asset Inventory', icon: 'chair', path: '/non-it', ready: true, permission: 'nonit.view' },
@@ -26,14 +26,14 @@ export const NAV: [string, NavItem[]][] = [
     { id: 'agents', label: 'Agents', icon: 'host', path: '/agents', ready: true, permission: 'assets.view' },
     { id: 'activity', label: 'Activity Log', icon: 'activity', path: '/activity', ready: true, permission: 'activity.view' },
   ]],
-  ['Remote support', [
+  ['Remote Support', [
     { id: 'remote', label: 'Remote Support', icon: 'remote', path: '/remote', ready: true, permission: 'remote.start' },
   ]],
   ['Infrastructure', [
     { id: 'cloud', label: 'Cloud & Infrastructure', icon: 'cloud', path: '/cloud', ready: true, permission: 'cloud.view' },
     { id: 'lifecycle', label: 'Asset Lifecycle', icon: 'cycle', path: '/lifecycle', ready: true, permission: 'lifecycle.view' },
   ]],
-  ['Secure & remediate', [
+  ['Secure & Remediate', [
     { id: 'patch', label: 'Patch Management', icon: 'patch', path: '/modules/patch', ready: true, permission: 'patch.view' },
     { id: 'scripts', label: 'Scripts & Remediation', icon: 'terminal', path: '/modules/scripts', ready: true, permission: 'scripts.view' },
     { id: 'vuln', label: 'Vulnerability Management', icon: 'bug', path: '/vulnerabilities', ready: true, permission: 'vuln.view' },
@@ -42,7 +42,7 @@ export const NAV: [string, NavItem[]][] = [
     { id: 'licenses', label: 'Software Licenses', icon: 'key', path: '/modules/licenses', ready: true, permission: 'licenses.view' },
     { id: 'webapps', label: 'Web Apps & Accounts', icon: 'globe', path: '/modules/webapps', ready: true, permission: 'webapps.view' },
   ]],
-  ['Insight & admin', [
+  ['Insight & Admin', [
     { id: 'reports', label: 'Reports & Analytics', icon: 'report', path: '/reports', ready: true, permission: 'reports.view' },
     { id: 'integrations', label: 'Integrations & Automation', icon: 'plug', path: '/integrations', ready: true, permission: 'integrations.manage' },
     { id: 'licensing', label: 'Licensing', icon: 'key', path: '/licensing', ready: true, permission: 'licensing.manage', admin: true },
@@ -57,8 +57,8 @@ export const ALL_NAV = NAV.flatMap(([, items]) => items);
 
 /** Product section of each navigation group (installed by Standard / Advanced setup, enabled by the edition). */
 export const SECTION_OF_GROUP: Record<string, string> = {
-  'Overview': 'overview', 'Discover & inventory': 'discover', 'Remote support': 'remote',
-  'Infrastructure': 'infrastructure', 'Secure & remediate': 'secure', 'Insight & admin': 'insight',
+  'Overview': 'overview', 'Discovery & Inventory': 'discover', 'Remote Support': 'remote',
+  'Infrastructure': 'infrastructure', 'Secure & Remediate': 'secure', 'Insight & Admin': 'insight',
 };
 
 /** The navigation item and section a path belongs to (longest matching path wins). */

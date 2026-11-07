@@ -167,7 +167,11 @@ internal static class InstallerWatch
                 var parentName = parent is null ? null : Path.GetFileName(parent);
                 // A launcher that is not the user's shell (a downloader, a bootstrapper, an updater) belongs to this attempt.
                 if (!again && ppid > 4 && (parentName is null || !UserShells.Contains(parentName)) && !AutoStarters.Contains(parentName ?? "")) Blocked[ppid] = DateTime.UtcNow;
-                if (!again && parentName is not null && AutoStarters.Contains(parentName) && Notice.ShownRecently(session, candidate, TimeSpan.FromMinutes(60))) again = true;
+                // The message comes back only when a person starts the software again (from Explorer, a command prompt, a
+                // browser, …). Retries by the software itself, an updater, a scheduled task or a service do not show it again
+                // for 4 hours; a double start by the person (within 5 seconds) shows it once.
+                var byPerson = parentName is not null && UserShells.Contains(parentName);
+                if (!again && Notice.ShownRecently(session, candidate, byPerson ? TimeSpan.FromSeconds(5) : TimeSpan.FromHours(4))) again = true;
                 if (!again && Notice.IsOpen(session, candidate)) again = true;   // the message for this software is still on the screen
             }
             KillTree(pid, h, Blocked);

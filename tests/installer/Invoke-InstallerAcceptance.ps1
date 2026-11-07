@@ -821,6 +821,16 @@ if (-not $installed) {
                 $p3 = Run-Setup
                 $again = Dep-Wait { Get-CimInstance Win32_Process -Filter "Name='ZentriqAgent.exe'" | Where-Object CommandLine -match '--app-notice' | Select-Object -First 1 } 20 'the message for a new attempt'
                 Stop-Process -Id $again.ProcessId -Force -ErrorAction SilentlyContinue
+                # Closed, then started again by something other than a person (a script host here, as an updater or a
+                # retrying bootstrapper would): stopped, but no new message.
+                Start-Sleep 2
+                $vbs = Join-Path $env:TEMP 'zq-ci-retry.vbs'
+                Set-Content -LiteralPath $vbs -Encoding ASCII -Value ('CreateObject("WScript.Shell").Run """' + $setup + '"" -n 25 127.0.0.1", 0, False')
+                Start-Process (Join-Path $env:WINDIR 'System32\wscript.exe') -ArgumentList "//B `"$vbs`"" -Wait
+                Start-Sleep 6
+                Assert (-not (Get-CimInstance Win32_Process -Filter "Name='ZentriqAgent.exe'" | Where-Object CommandLine -match '--app-notice')) 'the message came back for a retry not started by a person'
+                Assert (-not (Get-Process -Name ([IO.Path]::GetFileNameWithoutExtension($setup)) -ErrorAction SilentlyContinue)) 'the retried installer was not stopped'
+                Remove-Item $vbs -ErrorAction SilentlyContinue
                 $req = Dep-Wait { @(Api GET '/deployment/requests?status=pending' -Session $s | ForEach-Object { $_ }) | Where-Object { $_.sha256 -eq $sha } | Select-Object -First 1 } 90 'the request in Requests'
                 Assert ($req.reason -like 'CI test*' -and $req.user) "request: $($req | ConvertTo-Json -Compress)"
                 # The request carries everything the device knows about the installer.

@@ -126,8 +126,8 @@ public static class ProductSections
 
     public static readonly IReadOnlyDictionary<string, string> Titles = new Dictionary<string, string>
     {
-        [Overview] = "Overview", [Discover] = "Discover & inventory", [Remote] = "Remote support",
-        [Infrastructure] = "Infrastructure", [Secure] = "Secure & remediate", [Insight] = "Insight & admin",
+        [Overview] = "Overview", [Discover] = "Discovery & Inventory", [Remote] = "Remote Support",
+        [Infrastructure] = "Infrastructure", [Secure] = "Secure & Remediate", [Insight] = "Insight & Admin",
     };
 
     public static readonly IReadOnlyDictionary<string, string[]> ModulesOf = new Dictionary<string, string[]>

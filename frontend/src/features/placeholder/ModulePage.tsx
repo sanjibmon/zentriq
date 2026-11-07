@@ -46,7 +46,7 @@ export function SectionLockedPage({ section, label }: { section: SectionInfo; la
               <p className="muted" style={{ margin: '0 0 10px' }}>
                 {notInstalled
                   ? `This server was installed with the Standard installation, which does not include ${section.title}. Run Zentriq Setup on the server, choose Update › Advanced installation and tick ${section.title}. Your data and settings are kept.`
-                  : `Your license is for the Standard edition (Overview, Discover & inventory, Insight & admin). ${section.title} is part of the Advanced edition. Contact your Zentriq partner to upgrade; the new license is imported on the Licensing page and the section is available at once.`}
+                  : `Your license is for the Standard edition (Overview, Discovery & Inventory, Insight & Admin). ${section.title} is part of the Advanced edition. Contact your Zentriq partner to upgrade; the new license is imported on the Licensing page and the section is available at once.`}
               </p>
               {!notInstalled && can('licensing.manage') && <Link className="btn primary" to="/licensing">Open Licensing</Link>}
             </div>
