@@ -17,6 +17,8 @@ Zentriq does not change where devices get their updates; it does not download up
 
 * **Scans**: automatic every 24 hours (*Settings*: 1–168 hours, or off), and on demand (*Scan Now* on a device,
   *Scan All Devices* on the overview). A scan runs beside the agent's check-in, so the device stays reachable.
+  A scan interrupted by a restart of the agent or the device runs again; an interrupted installation is reported
+  as interrupted.
 * Each update is stored with its KB number, classification (*Critical Updates*, *Security Updates*, *Definition
   Updates*, *Updates*, *Update Rollups*, *Feature Packs*, *Service Packs*, *Drivers*, *Tools*, *Upgrades* — by
   category ID, so it also works on non-English Windows), MSRC severity, product, release date, size, whether it may

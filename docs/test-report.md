@@ -1,10 +1,48 @@
 # Test report
 
-Latest: GitHub Actions run 42253237747, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
-10.0.20348** VM plus an Ubuntu job for the Linux agent. Release: `v1.1.1-build.113` (pre-release, **unsigned**), package
-version **1.1.1.113**, commit `23fed34`. Results: unit + PostgreSQL integration tests **408 PASS** (410, 2 skipped);
-installer acceptance **82 passed, 0 failed** (10 not run: need hardware, a domain, a reboot or old Windows); upgrade
+Latest: GitHub Actions run 42343815521, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
+10.0.20348** VM plus an Ubuntu job for the Linux agent. Release: `v1.1.1-build.116` (pre-release, **unsigned**), package
+version **1.1.1.116**, commit `da6a40f`. Results: unit + PostgreSQL integration tests **437 PASS** (439, 2 skipped);
+installer acceptance **84 passed, 0 failed** (10 not run: need hardware, a domain, a reboot or old Windows); upgrade
 suites **14/14** (from 1.0.2, same version in place, half-updated server); Linux agent on 11 distributions **11/11**.
+
+New in build 116 (Release 2 of the Endpoint Central comparison; builds 114 and 115 failed T92 / T93 and were not
+released — fixed: a scan was lost when the agent restarted, the Disk Space Report script printed nothing):
+
+* **Patch Management** — the agent scans for missing updates (Windows Update Agent: Windows Update or WSUS; apt, dnf,
+  yum, zypper on Linux), every 24 h and on demand; missing updates with classification, severity, CVEs and devices;
+  approve / decline; deployments to devices, groups, departments or all with restart behaviour; automatic deployment
+  policies with a maintenance window; device patch state (missing, failed, restart pending, installed).
+* **Scripts & Remediation** — script library (PowerShell, Command Prompt, Bash, sh, Python) with 12 ready-made
+  scripts; runs as SYSTEM / root with parameters, time limit, output and exit code per device; checksum checked by
+  the agent; remediations (detection, fix, check) and schedules; can be turned off; everything audited.
+* Long agent actions (patch scans and installations, scripts) run beside the check-in; one interrupted by a restart
+  is scanned again or reported as interrupted.
+
+| ID | Test | Result |
+|---|---|---|
+| T92 | Patch management: real Windows Update scan of the runner (0 missing), device state, policy validation, a deployment of an update the device does not miss is skipped with the reason, settings validation, activity log without the payload | **PASS** |
+| T93 | Scripts: PowerShell as NT AUTHORITY\SYSTEM with parameters, exit code 3 and stderr kept; ready-made Disk Space Report; remediation (remediated, then compliant); 10-second time limit; turned off; ready-made scripts cannot be deleted | **PASS** |
+
+Not testable on the build VM: installing real Windows updates (the runner was up to date), a Linux patch scan on the
+11 distributions (the Linux agent's parsers are unit-tested with real apt, dnf, dnf 5 and zypper output).
+
+| File | SHA256 |
+|---|---|
+| Zentriq-Setup-x64.exe | `a12078e6d80e181107861a54e3e25af83b42800167864b2afc42668b8bebf899` |
+| Zentriq.msi | `081987ed90921000633b49cd2154fe433411d585ab91d1eea33289e681531b48` |
+| ZentriqAgent-x64.msi | `d06f81e9f7450c493e560bc98a36428510e79f557a9b8eb3c89d2a0c04eecf36` |
+| zentriq-agent-linux-x64.deb | `07fade1270c94739a090112e74de99a221f01a106134f74c224c4654cb28549a` |
+| zentriq-agent-linux-x64.rpm | `141e9e46a60a17c6240a375ec26fd18364eb604ab40412fa839dae92de748d36` |
+| zentriq-agent-linux-x64.tar.gz | `1f285e318cf081853a77200be6ee621e6a037e48d56555b7ed1a16480ec9dbf6` |
+| zentriq-agent-linux-arm64.deb | `93d77c94f5e5e9d5db78c31a063f9a26cd77163328b62075d4a12a2e0e158092` |
+| zentriq-agent-linux-arm64.rpm | `65b1e21d9bd3bcbb36791757ad44f30a851a9f3adff855beea8fd4afd5abcadd` |
+| zentriq-agent-linux-arm64.tar.gz | `3061b0a562c3d391dcac620007e54903241f93ca6628df7cd652ff8ffc0f5508` |
+| Zentriq-1.1.1-msi-offline-kit.zip | `caf99975a560fcf45e270677eae761d1c025739ae344668d0810b13e5c4557e5` |
+| Zentriq-1.1.1-docs.zip | `8d3520acc310e20d7afedf55c4e6cd6899d6408f00ea490b7ba92e3365920d2a` |
+
+
+## Build 113 (run 42253237747, commit `23fed34`)
 
 New in build 113 (Release 1 of the Endpoint Central comparison):
 
