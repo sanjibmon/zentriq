@@ -468,8 +468,8 @@ internal static class TrayApp
             _ctx = ctx;
             var bar = new Panel { Dock = DockStyle.Top, Height = 46 };
             var searchLabel = new Label { Text = "Search", AutoSize = true, Location = new Point(0, 12), ForeColor = Muted };
-            _search.Location = new Point(56, 8); _search.Width = 380;
-            _category.Location = new Point(452, 7); _category.Width = 220;
+            _search.Location = new Point(56, 8); _search.Width = 330;
+            _category.Location = new Point(400, 7); _category.Width = 200;
             var refresh = Secondary("Refresh", 80); refresh.Location = new Point(_category.Right + 10, 5); refresh.Height = 30;
             refresh.Click += (_, _) => Load();
             bar.Controls.AddRange(new Control[] { searchLabel, _search, _category, refresh });
@@ -642,32 +642,34 @@ internal static class TrayApp
         private readonly ListView _history = new ListView { View = View.Details, FullRowSelect = true, HeaderStyle = ColumnHeaderStyle.Nonclickable, BorderStyle = BorderStyle.FixedSingle };
         private readonly Button _send = Primary("Send Request", 140);
 
-        public HelpForm() : base("Get Remote Help", "Tell IT what is wrong — a technician contacts you and can connect to this computer with your consent", new Size(620, 600))
+        public HelpForm() : base("Get Remote Help", "Tell IT what is wrong — a technician contacts you and, with your consent, connects to this computer", new Size(620, 600))
         {
             var y = 4;
+            var content = new Panel { Dock = DockStyle.Fill, BackColor = Color.White };
             Label L(string text, int top) => new Label { Text = text, AutoSize = true, Location = new Point(0, top), Font = new Font("Segoe UI Semibold", 9.75f), ForeColor = Ink };
-            Body.Controls.Add(L("What is the problem?", y));
-            _message.Location = new Point(0, y + 24); _message.Size = new Size(576, 120); _message.Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top;
-            Body.Controls.Add(_message);
+            content.Controls.Add(L("What is the problem?", y));
+            _message.Location = new Point(0, y + 24); _message.Size = new Size(560, 120); _message.Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top;
+            content.Controls.Add(_message);
             y += 158;
-            Body.Controls.Add(L("How can we reach you? (phone or extension, optional)", y));
+            content.Controls.Add(L("How can we reach you? (phone or extension, optional)", y));
             _contact.Location = new Point(0, y + 24); _contact.Width = 300;
-            Body.Controls.Add(_contact);
+            content.Controls.Add(_contact);
             y += 66;
             _send.Location = new Point(0, y); _send.Click += (_, _) => Send();
-            _result.Location = new Point(156, y + 8); _result.Size = new Size(420, 22);
-            Body.Controls.AddRange(new Control[] { _send, _result });
+            _result.Location = new Point(156, y + 8); _result.Size = new Size(400, 22);
+            content.Controls.AddRange(new Control[] { _send, _result });
             y += 50;
             if (TrayContext.Support.Length > 0)
             {
-                Body.Controls.Add(new Label { Text = TrayContext.Support, AutoSize = false, Location = new Point(0, y), Size = new Size(576, 38), ForeColor = Muted });
+                content.Controls.Add(new Label { Text = TrayContext.Support, AutoSize = false, Location = new Point(0, y), Size = new Size(560, 38), ForeColor = Muted });
                 y += 42;
             }
-            Body.Controls.Add(L("Your requests", y));
-            _history.Location = new Point(0, y + 24); _history.Size = new Size(576, 120);
+            content.Controls.Add(L("Your requests", y));
+            _history.Location = new Point(0, y + 24); _history.Size = new Size(560, 120);
             _history.Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top | AnchorStyles.Bottom;
-            _history.Columns.Add("Number", 80); _history.Columns.Add("Problem", 310); _history.Columns.Add("Status", 90); _history.Columns.Add("Sent", 90);
-            Body.Controls.Add(_history);
+            _history.Columns.Add("Number", 80); _history.Columns.Add("Problem", 280); _history.Columns.Add("Status", 90); _history.Columns.Add("Sent", 100);
+            content.Controls.Add(_history);
+            Body.Controls.Add(content);
             AcceptButton = null;
             Shown += (_, _) => { _message.Focus(); LoadHistory(); };
         }
