@@ -1072,14 +1072,31 @@ if (-not $installed) {
             $sum = Api GET '/patches/summary' -Session $s
             Assert ($sum.devices -ge 1) "devices with a capable agent: $($sum.devices), older agents: $($sum.olderAgents)"
             $req = Api POST '/patches/scan' @{ assetIds = @($script:agentAsset) } -Session $s
-            # An automatic scan may already be running: wait for a finished one (the scan runs beside the check-in).
-            $dev = Dep-Wait {
-                $x = Api GET "/patches/devices/$($script:agentAsset)" -Session $s
-                $last = @($x.actions | Where-Object operation -eq 'scan') | Select-Object -First 1
-                if ($x.scan -and $last -and $last.status -in 'succeeded', 'failed') { $x }
-            } 1500 'the patch scan on the runner'
+            function Last-Scan { @((Api GET "/patches/devices/$($script:agentAsset)" -Session $s).actions | Where-Object operation -eq 'scan') | Select-Object -First 1 }
+            # The agent takes the scan (an automatic one may already be running beside the check-in).
+            $first = Dep-Wait { $l = Last-Scan; if ($l -and $l.status -in 'running', 'succeeded', 'failed') { $l } } 300 'the agent to start the patch scan'
+            # A first Windows Update scan on a fresh VM can take very long: give it 5 minutes, then make Windows Update
+            # unavailable (as on devices where the service is disabled) and check that the scan ends and says why.
+            $done = $null
+            $deadline = (Get-Date).AddMinutes(5)
+            while ((Get-Date) -lt $deadline -and -not $done) { $l = Last-Scan; if ($l.status -in 'succeeded', 'failed') { $done = $l } else { Start-Sleep 10 } }
+            $wuNote = ''
+            if (-not $done -or (Api GET "/patches/devices/$($script:agentAsset)" -Session $s).scan.ok -ne $true) {
+                $wuStart = (Get-CimInstance Win32_Service -Filter "Name='wuauserv'").StartMode
+                Stop-Service wuauserv -Force -ErrorAction SilentlyContinue
+                Set-Service wuauserv -StartupType Disabled
+                try {
+                    Dep-Wait { $l = Last-Scan; if ($l.status -in 'succeeded', 'failed') { $l } } 600 'the running scan to end after Windows Update stopped' | Out-Null
+                    $again = Api POST '/patches/scan' @{ assetIds = @($script:agentAsset) } -Session $s
+                    Assert ($again.requested -eq 1) "second scan request: $($again | ConvertTo-Json -Compress)"
+                    $done = Dep-Wait { $x = Api GET "/patches/devices/$($script:agentAsset)" -Session $s; $l = @($x.actions | Where-Object operation -eq 'scan') | Select-Object -First 1
+                        if ($l.status -in 'succeeded', 'failed' -and $x.scan) { $l } } 300 'the scan with Windows Update disabled'
+                    $wuNote = ' (Windows Update disabled for the check)'
+                } finally { Set-Service wuauserv -StartupType $(if ($wuStart -eq 'Auto') { 'Automatic' } elseif ($wuStart -eq 'Disabled') { 'Disabled' } else { 'Manual' }) }
+            }
+            $dev = Api GET "/patches/devices/$($script:agentAsset)" -Session $s
             $scanText = if ($dev.scan.ok) { "$($dev.scan.missing) missing update(s) from $($dev.scan.source)$(if ($dev.scan.rebootPending) { ', restart pending' })" }
-                else { Assert ($dev.scan.message -match 'Windows Update') "scan error: $($dev.scan.message)"; "scan not possible here: $($dev.scan.message)" }
+                else { Assert ($dev.scan.message -match 'Windows Update') "scan error: $($dev.scan.message)"; "scan failed as expected$($wuNote): $($dev.scan.message)" }
             $devices = @(Api GET '/patches/devices' -Session $s | ForEach-Object { $_ })
             $me = $devices | Where-Object id -eq $script:agentAsset
             Assert ($me -and $me.capable -and $me.scannedAt) "device list: $($me | ConvertTo-Json -Compress)"

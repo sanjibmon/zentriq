@@ -115,7 +115,7 @@ public static class ScriptStore
             """, null, 120),
         new("Disk Space Report", "Free space of every fixed drive.", "Information", "windows", "powershell", """
             Get-CimInstance Win32_LogicalDisk -Filter 'DriveType=3' | ForEach-Object {
-              '{0} {1:N1} GB free of {2:N1} GB ({3:N0}%)' -f $_.DeviceID, ($_.FreeSpace / 1GB), ($_.Size / 1GB), (100 * $_.FreeSpace / [math]::Max(1, $_.Size))
+              '{0} {1:N1} GB free of {2:N1} GB ({3:N0}%)' -f $_.DeviceID, ($_.FreeSpace / 1GB), ($_.Size / 1GB), (100.0 * $_.FreeSpace / [math]::Max(1.0, [double]$_.Size))
             }
             """, null, 60),
         new("Local Administrators", "Lists the members of the local Administrators group.", "Information", "windows", "powershell", """

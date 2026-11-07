@@ -196,7 +196,9 @@ internal static class PatchAgent
         {
             var ps = Path.Combine(Environment.SystemDirectory, @"WindowsPowerShell\v1.0\powershell.exe");
             var args = $"-NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"{file}\"" + (idsFile is null ? "" : $" -IdsFile \"{idsFile}\"");
+            Log.Info(idsFile is null ? "Patch management: scanning with the Windows Update Agent." : "Patch management: installing updates with the Windows Update Agent.");
             var r = ScriptRunner.Start(ps, args, Root, timeout, Encoding.UTF8, ct);
+            Log.Info($"Patch management: the Windows Update Agent {(r.TimedOut ? "did not answer" : "answered")} after {r.Milliseconds / 1000} s (exit code {r.ExitCode}).");
             if (r.TimedOut) return (null, $"Windows Update did not answer within {timeout.TotalMinutes:0} minutes.");
             var json = r.Stdout.Trim();
             var start = json.IndexOf('{');

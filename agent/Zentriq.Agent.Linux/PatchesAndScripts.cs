@@ -316,7 +316,7 @@ internal static class Scripts
             var timedOut = false;
             while (!proc.WaitForExit(1000))
                 if (DateTime.UtcNow > deadline || ct.IsCancellationRequested) { timedOut = true; try { proc.Kill(entireProcessTree: true); } catch (Exception) { } break; }
-            if (!timedOut) proc.WaitForExit(); else proc.WaitForExit(10000);
+            if (!timedOut) Task.Run(() => proc.WaitForExit()).Wait(TimeSpan.FromSeconds(30)); else proc.WaitForExit(10000);   // a child may keep the output pipe open
             string so, se;
             lock (o) so = o.ToString();
             lock (e) se = e.ToString();

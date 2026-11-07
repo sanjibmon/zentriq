@@ -210,7 +210,8 @@ internal static class ScriptRunner
         {
             if (DateTime.UtcNow > deadline || ct.IsCancellationRequested) { timedOut = true; KillTree(proc.Id); break; }
         }
-        if (!timedOut) proc.WaitForExit();   // drains the output
+        // Drain the output, but not forever: a process the script started may keep the output pipe open.
+        if (!timedOut) System.Threading.Tasks.Task.Run(() => proc.WaitForExit()).Wait(TimeSpan.FromSeconds(30));
         else proc.WaitForExit(10000);
         string so, se;
         lock (o) so = o.ToString();
