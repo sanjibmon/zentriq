@@ -215,3 +215,7 @@ The installer ships only the engine files Zentriq uses: the Windows, macOS and L
   - **T59:** service and health; branded sign-in page and installer; the remote agent connects; a session link opens the signed-in device view.
   - **T60:** removing and reinstalling the remote agent through the Zentriq Agent from the console.
   - **T65:** quick support end to end: create a session, the invitation page is run-only, the support app (`connect`) joins the session's group, the technician's desktop link opens, the session is in History; ending it removes the group and the link; install link page.
+
+## Help requests from the tray icon
+
+From build 118 users send help requests from the tray icon (*Get Remote Help*); they appear in *Remote Support › Help Requests* with Connect, Take and Close. See [tray-and-self-service.md](tray-and-self-service.md).

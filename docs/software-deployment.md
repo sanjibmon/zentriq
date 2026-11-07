@@ -189,3 +189,7 @@ acceptance tests T82–T85 (catalogue and inventory approval, audit → block fo
 request from the desktop, approval by SHA-256, push installation with status, retry and uninstall, WDAC audit, remote
 support agent protection). First released in **build 1.1.1.109**: T82–T85 and Linux A01–A05 all pass. Build **1.1.1.110** adds the once-per-attempt message and installer details to T83 (pass). Results:
 [test report](test-report.md).
+
+## Self-service (Software Center)
+
+From build 118 packages can be offered in the Software Center of the tray icon (*Software Deployment › Self-Service*); users install them without administrator rights, optionally after approval. See [tray-and-self-service.md](tray-and-self-service.md).
