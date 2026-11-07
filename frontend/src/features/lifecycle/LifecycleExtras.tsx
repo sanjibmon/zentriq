@@ -1,4 +1,5 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
+import { Field } from '../../components/Form';
 import { api } from '../../api/client';
 import { useAuth } from '../../app/auth';
 import { useApi } from '../../app/useApi';
@@ -12,9 +13,6 @@ import type { LcField, LcImportResult, LcMeta, LcPerson } from './types';
 
 const err = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
-function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: ReactNode }) {
-  return <label>{label}{children}{hint && <small className="muted">{hint}</small>}</label>;
-}
 
 // ---- bulk upload ----------------------------------------------------------------------------------------------------
 

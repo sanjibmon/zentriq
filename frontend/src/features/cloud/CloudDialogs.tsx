@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { Field } from '../../components/Form';
 import { api } from '../../api/client';
 import type { Credential } from '../../api/types';
 import { useApi } from '../../app/useApi';
@@ -9,9 +10,6 @@ import { PROVIDERS, type CloudAccount, type Provider } from './types';
 const err = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const list = (s: string) => s.split(/[\s,;]+/).map((x) => x.trim()).filter(Boolean);
 
-function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: ReactNode }) {
-  return <label>{label}{children}{hint && <small className="muted">{hint}</small>}</label>;
-}
 
 const HELP: Record<Provider, ReactNode> = {
   azure: <>In the Azure portal: <b>Microsoft Entra ID › App registrations › New registration</b>; then <b>Certificates &amp; secrets › New client secret</b>.

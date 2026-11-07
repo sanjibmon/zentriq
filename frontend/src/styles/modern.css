@@ -607,10 +607,59 @@ a.kpi:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .rail-foot { color: var(--rail-muted); }
 .page-head p, .panel-head .sub, .muted { color: var(--muted); }
 
-/* Fields side by side line up: the boxes sit on the bottom of their row, whatever the length of the labels above them;
-   a check box next to a box is centred on the box. */
-input.in, select.in { box-sizing: border-box; margin: 0; vertical-align: middle; line-height: normal; }
-:is(.form-grid, .form-grid-2, .grid-2.tight, .grid-3.tight, .sla-grid) > label:not(.row-check):not(.check-inline) { align-content: end; justify-content: flex-end; align-self: stretch; }
-:is(.form-grid, .form-grid-2, .grid-2.tight, .grid-3.tight, .sla-grid) > label:is(.row-check, .check-inline) { align-self: end; min-height: 36px; display: flex; align-items: center; }
-:is(.form-grid, .form-grid-2, .grid-2.tight, .grid-3.tight, .sla-grid) > label > :is(input.in, select.in) { width: 100%; }
 .toolbar-row > :is(input.in, select.in, .btn), .filter-bar > :is(input.in, select.in, .btn) { align-self: center; }
+
+/* ---- Build 118: module names in boxes; one layout for every add / edit window ---- */
+.nav { padding-left: 2px; padding-right: 2px; }
+.nav a { height: 38px; margin: 3px 0; border: 1px solid rgba(255, 255, 255, .13); background: rgba(255, 255, 255, .035); border-radius: 10px; }
+.nav a:hover { border-color: rgba(255, 255, 255, .26); background: rgba(255, 255, 255, .08); }
+.nav a.active { border-color: rgba(79, 195, 211, .75); background: rgba(56, 179, 196, .24); box-shadow: inset 3px 0 0 #4FC3D3; }
+.nav-group { margin-top: 16px; margin-bottom: 4px; }
+
+/* Windows */
+.modal-scrim { background: rgba(8, 18, 26, .52); }
+.modal-card { width: min(680px, 100%); border-radius: 16px; overflow: hidden; }
+.modal-card.wide { width: min(900px, 100%); }
+.modal-card header, .modal-h { padding: 18px 24px 16px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.modal-card header h2 { font-size: 17.5px; font-weight: 700; letter-spacing: -.005em; }
+.modal-card .body, .modal-b { padding: 20px 24px 8px; overflow: auto; }
+.modal-card footer, .modal-f { padding: 14px 24px; border-top: 1px solid var(--line); background: color-mix(in srgb, var(--bg) 70%, var(--surface)); gap: 10px; }
+.modal-card > form { display: flex; flex-direction: column; min-height: 0; }
+.modal-card .form-v { gap: 16px; }
+
+/* Fields: the label above, the box, then a hint; boxes side by side line up (subgrid: label / box / hint rows). */
+input.in, select.in { height: 38px; padding: 0 12px; font-size: 14px; background: var(--surface); }
+textarea.in { padding: 9px 12px; font-size: 14px; line-height: 1.45; }
+.form-v label, .ff { font-size: 13px; font-weight: 600; color: var(--fg); }
+.form-v label small, .ff-h { font-size: 12px; font-weight: 400; color: var(--muted); line-height: 1.45; }
+:is(.form-grid, .form-grid-2, .grid-2.tight, .grid-3.tight, .sla-grid, .fgrid) { row-gap: 0; column-gap: 20px; align-items: stretch; }
+:is(.form-grid, .form-grid-2, .grid-2.tight, .grid-3.tight, .sla-grid, .fgrid) > label:not(.row-check):not(.check-inline) {
+  display: grid; grid-row: span 3; grid-template-rows: subgrid; row-gap: 6px; align-content: start; margin-bottom: 16px; min-width: 0; }
+:is(.form-grid, .form-grid-2, .grid-2.tight, .grid-3.tight, .sla-grid, .fgrid) > label:is(.row-check, .check-inline) {
+  grid-row: span 3; align-self: start; margin-top: 22px; min-height: 38px; display: flex; align-items: center; gap: 8px; font-weight: 500; }
+:is(.form-grid, .form-grid-2, .grid-2.tight, .grid-3.tight, .sla-grid, .fgrid) > :not(label) { margin-bottom: 16px; }
+:is(.form-grid, .form-grid-2, .grid-2.tight, .grid-3.tight, .sla-grid, .fgrid) > label > :is(input.in, select.in, textarea.in, .ff-c) { width: 100%; }
+.grid-2.tight, .fgrid.c2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grid-3.tight, .fgrid.c3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.fgrid { display: grid; }
+.fgrid.c1 { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 720px) { .grid-2.tight, .grid-3.tight, .fgrid.c2, .fgrid.c3 { grid-template-columns: minmax(0, 1fr); } }
+.ff { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.ff.span { grid-column: 1 / -1; }
+.ff-l { display: flex; align-items: baseline; gap: 6px; }
+.ff-l .opt { font-weight: 400; color: var(--faint); font-size: 12px; }
+.ff .req { color: var(--crit); font-style: normal; font-weight: 700; }
+.ff-c { display: flex; gap: 8px; align-items: center; min-width: 0; }
+.ff-c > :is(input.in, select.in, textarea.in) { flex: 1 1 auto; min-width: 0; width: 100%; }
+.ff-c > .btn { flex: none; }
+.form-v label.row-check, .fcheck { display: flex; align-items: flex-start; gap: 10px; font-weight: 500; font-size: 13.5px; }
+.form-v label.row-check input[type=checkbox], .fcheck input[type=checkbox], .form-v label.row-check input[type=radio] { width: 16px; height: 16px; margin: 2px 0 0; flex: none; accent-color: var(--accent); }
+.fcheck small { display: block; font-weight: 400; color: var(--muted); font-size: 12px; margin-top: 2px; }
+.fs { display: grid; gap: 12px; }
+.fs + .fs { border-top: 1px solid var(--line); padding-top: 18px; margin-top: 4px; }
+.fs-h h3 { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--accent-strong, var(--accent)); }
+.fs-h p { margin: 3px 0 0; font-size: 12.5px; color: var(--muted); }
+.fchecks { display: flex; flex-wrap: wrap; gap: 8px 18px; }
+.fchecks label.row-check { font-weight: 500; align-items: center; }
+.fchecks label.row-check input { margin: 0; }
+.form-v .chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 4px 3px 10px; border: 1px solid var(--line-strong); border-radius: 999px; font-size: 12.5px; font-weight: 500; }

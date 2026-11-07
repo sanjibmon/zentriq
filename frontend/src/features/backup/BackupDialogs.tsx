@@ -1,4 +1,5 @@
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useState, type FormEvent } from 'react';
+import { Field } from '../../components/Form';
 import { api } from '../../api/client';
 import { useApi } from '../../app/useApi';
 import { Icon } from '../../components/Icon';
@@ -6,9 +7,6 @@ import { Modal } from '../../components/Modal';
 import { Callout, fmt, Pill } from '../../components/ui';
 import { errText, KIND_HELP, type BackupFile, type BackupInfo, type Destination, type Kind } from './types';
 
-function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: ReactNode }) {
-  return <label>{label}{children}{hint && <small className="muted">{hint}</small>}</label>;
-}
 
 const KINDS: { kind: Kind; title: string; icon: 'folder' | 'network' | 'upload' | 'terminal' | 'cloud' }[] = [
   { kind: 'folder', title: 'Local or attached disk', icon: 'folder' },

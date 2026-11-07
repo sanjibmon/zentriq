@@ -107,6 +107,16 @@ jobs:
           set -o pipefail
           npm install --no-audit --no-fund
           npm run build 2>&1 | tee build.log
+      - name: Console screenshots (shell and add / edit windows)
+        if: always()
+        continue-on-error: true
+        working-directory: frontend
+        run: |
+          set -o pipefail
+          npx vite build -c vite.gallery.config.ts 2>&1 | tail -5
+          npm install --no-save --no-audit --no-fund playwright@1.48.2
+          npx playwright install --with-deps chromium > /dev/null
+          node scripts/screens.mjs dist-gallery "$RUNNER_TEMP/screens" 2>&1 | tee screens.log
       - name: Push logs to the ci-quick-logs branch
         if: always()
         run: |
@@ -115,6 +125,7 @@ jobs:
           if [ -d "$RUNNER_TEMP/linux-agent/results" ]; then cp -r "$RUNNER_TEMP/linux-agent/results" "$d/linux-agent-results"; fi
           cp frontend/build.log "$d/console.log" 2>/dev/null || true
           if [ -d frontend/dist ]; then cp -r frontend/dist "$d/dist"; fi
+          if [ -d "$RUNNER_TEMP/screens" ]; then cp -r "$RUNNER_TEMP/screens" "$d/screens"; cp frontend/screens.log "$d/" 2>/dev/null || true; fi
           echo "run $GITHUB_RUN_ID commit $GITHUB_SHA branch $GITHUB_REF_NAME status ${{ job.status }}" > "$d/RUN.txt"
           cd "$d" && git init -q && git checkout -q -b ci-quick-logs && git add -A
           git -c user.name=ci -c user.email=ci@localhost commit -q -m "ci-quick logs for run $GITHUB_RUN_ID"

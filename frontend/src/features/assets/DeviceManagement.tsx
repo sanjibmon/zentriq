@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { Field, Fields, Section } from '../../components/Form';
 import { api } from '../../api/client';
 import type { Asset } from '../../api/types';
 import { Link } from '../../app/router';
@@ -74,31 +75,36 @@ export function AddDeviceDialog({ onClose, onDone }: { onClose: () => void; onDo
   return (
     <div className="modal-scrim" role="dialog" aria-modal="true" aria-labelledby="add-dev-title">
       <form className="modal-card wide" onSubmit={save}>
-        <header><h2 id="add-dev-title">Add device</h2></header>
+        <header><h2 id="add-dev-title">Add Device</h2></header>
         <div className="body form-v">
           {error && <Callout tone="crit" icon="alert">{error}</Callout>}
-          <div className="grid-2 tight">
-            <label>Host name <input className="in" value={f.hostname} onChange={set('hostname')} maxLength={255} placeholder="e.g. PRN-FLOOR2" autoFocus /></label>
-            <label>IP address <input className="in mono" value={f.ip} onChange={set('ip')} placeholder="e.g. 192.168.1.40" /></label>
-            <label>Device type <DeviceTypeSelect value={f.deviceType} onChange={(v) => setF({ ...f, deviceType: v })} /></label>
-            <label>MAC address <input className="in mono" value={f.macAddress} onChange={set('macAddress')} placeholder="00:1A:2B:3C:4D:5E" /></label>
-            <label>Manufacturer <input className="in" value={f.manufacturer} onChange={set('manufacturer')} maxLength={200} /></label>
-            <label>Model <input className="in" value={f.model} onChange={set('model')} maxLength={200} /></label>
-            <label>Serial number <input className="in mono" value={f.serialNumber} onChange={set('serialNumber')} maxLength={200} /></label>
-            <label>Operating system / firmware <input className="in" value={f.osName} onChange={set('osName')} maxLength={200} /></label>
-            <label>Department / unit
-              <DepartmentSelect value={f.departmentId} onChange={(v) => setF({ ...f, departmentId: v })} list={deps.data?.items ?? []} onAdded={deps.reload} canAdd />
-            </label>
-            <label>Owner <input className="in" value={f.ownerName} onChange={set('ownerName')} maxLength={200} /></label>
-            <label>Criticality
-              <select className="in" value={f.criticality} onChange={set('criticality')}>{['Critical', 'High', 'Medium', 'Low'].map((c) => <option key={c}>{c}</option>)}</select>
-            </label>
-          </div>
-          <small className="muted">A host name or an IP address is required. When a scan or an agent finds this device later, its details are added to this record (matched by name, address, serial number or MAC address).</small>
+          <Section title="Identification" sub="A host name or an IP address is required. A later scan or agent adds its details to this record.">
+            <Fields>
+              <Field label="Host name"><input className="in" value={f.hostname} onChange={set('hostname')} maxLength={255} placeholder="e.g. PRN-FLOOR2" autoFocus /></Field>
+              <Field label="IP address"><input className="in mono" value={f.ip} onChange={set('ip')} placeholder="e.g. 192.168.1.40" /></Field>
+              <Field label="Device type" required><DeviceTypeSelect value={f.deviceType} onChange={(v) => setF({ ...f, deviceType: v })} /></Field>
+              <Field label="MAC address" optional><input className="in mono" value={f.macAddress} onChange={set('macAddress')} placeholder="00:1A:2B:3C:4D:5E" /></Field>
+            </Fields>
+          </Section>
+          <Section title="Hardware">
+            <Fields>
+              <Field label="Manufacturer"><input className="in" value={f.manufacturer} onChange={set('manufacturer')} maxLength={200} placeholder="e.g. HP" /></Field>
+              <Field label="Model"><input className="in" value={f.model} onChange={set('model')} maxLength={200} placeholder="e.g. LaserJet M404" /></Field>
+              <Field label="Serial number"><input className="in mono" value={f.serialNumber} onChange={set('serialNumber')} maxLength={200} /></Field>
+              <Field label="Operating system / firmware"><input className="in" value={f.osName} onChange={set('osName')} maxLength={200} /></Field>
+            </Fields>
+          </Section>
+          <Section title="Ownership">
+            <Fields cols={3}>
+              <Field label="Department"><DepartmentSelect value={f.departmentId} onChange={(v) => setF({ ...f, departmentId: v })} list={deps.data?.items ?? []} onAdded={deps.reload} canAdd /></Field>
+              <Field label="Owner"><input className="in" value={f.ownerName} onChange={set('ownerName')} maxLength={200} placeholder="Name of the person" /></Field>
+              <Field label="Criticality"><select className="in" value={f.criticality} onChange={set('criticality')}>{['Critical', 'High', 'Medium', 'Low'].map((c) => <option key={c}>{c}</option>)}</select></Field>
+            </Fields>
+          </Section>
         </div>
         <footer>
           <button type="button" className="btn" onClick={onClose} disabled={busy}>Cancel</button>
-          <button type="submit" className="btn primary" disabled={busy || !f.deviceType || (!f.hostname.trim() && !f.ip.trim())}>{busy ? 'Adding…' : 'Add device'}</button>
+          <button type="submit" className="btn primary" disabled={busy || !f.deviceType || (!f.hostname.trim() && !f.ip.trim())}>{busy ? 'Adding…' : 'Add Device'}</button>
         </footer>
       </form>
     </div>

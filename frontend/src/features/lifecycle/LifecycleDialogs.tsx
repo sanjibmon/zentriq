@@ -1,4 +1,5 @@
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useState, type FormEvent } from 'react';
+import { Check, Field, Section } from '../../components/Form';
 import { api } from '../../api/client';
 import { useApi } from '../../app/useApi';
 import { Modal } from '../../components/Modal';
@@ -17,9 +18,6 @@ const err = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const num = (s: string) => (s.trim() === '' ? null : Number(s));
 const day = (s: string) => (s.trim() === '' ? null : s);
 
-function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: ReactNode }) {
-  return <label>{label}{children}{hint && <small className="muted">{hint}</small>}</label>;
-}
 
 function Footer({ busy, onClose, label = 'Save', danger }: { busy: boolean; onClose: () => void; label?: string; danger?: boolean }) {
   return (
@@ -271,45 +269,52 @@ export function StockDialog({ meta, onClose, onDone }: { meta: LcMeta; onClose: 
   }
   const stages = meta.stages.filter((s) => s.id === 'planned' || s.id === 'on_order' || s.id === 'in_stock');
   return (
-    <Modal title="Add new IT assets (stock / on order)" wide onClose={onClose} footer={<Footer busy={busy} onClose={onClose} label={`Add ${list.length || ''} item(s)`} />}>
+    <Modal title="Add New IT Assets" wide onClose={onClose} footer={<Footer busy={busy} onClose={onClose} label={`Add ${list.length || ''} Item(s)`} />}>
       <form id="lc-form" className="form-v" onSubmit={(e) => void submit(e)}>
         {error && <Callout tone="crit" icon="alert">{error}</Callout>}
-        <small className="muted">For devices Zentriq has not seen yet (new purchases). When one is first seen by an agent or a scan with the same serial number, its inventory is recorded on this item and it moves to <b>In use</b> by itself.</small>
-        <div className="grid-3 tight">
-          <Field label="Stage">
-            <select className="in" value={stage} onChange={(e) => { const s = e.target.value as Stage; setStage(s); setStatus(meta.stages.find((x) => x.id === s)?.statuses[0]?.id ?? ''); }}>
-              {stages.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
-            </select>
+        <Section title="Items" sub={<>For devices Zentriq has not seen yet (new purchases, stock, on order). When an agent or a scan first finds one with the same serial number, it moves to <b>In use</b> by itself.</>}>
+          <div className="grid-3 tight">
+            <Field label="Stage" required>
+              <select className="in" value={stage} onChange={(e) => { const s = e.target.value as Stage; setStage(s); setStatus(meta.stages.find((x) => x.id === s)?.statuses[0]?.id ?? ''); }}>
+                {stages.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+              </select>
+            </Field>
+            <Field label="Status">
+              <select className="in" value={status} onChange={(e) => setStatus(e.target.value)}>
+                {(stages.find((s) => s.id === stage)?.statuses ?? []).map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+              </select>
+            </Field>
+            <Field label="Device type" required><DeviceTypeSelect value={type} onChange={setType} /></Field>
+            <Field label="Manufacturer"><input className="in" value={mf} onChange={(e) => setMf(e.target.value)} maxLength={200} placeholder="e.g. Dell" /></Field>
+            <Field label="Model"><input className="in" value={model} onChange={(e) => setModel(e.target.value)} maxLength={200} placeholder="e.g. Latitude 5450" /></Field>
+          </div>
+        </Section>
+        <Section title={`Serial Numbers (${list.length})`}>
+          <Field label={withTags ? 'Serial number and asset tag, one item per line' : 'Serial numbers'} required
+            hint={withTags ? 'Serial, then your tag: "5CG4410XYZ ACME-LAP-0101" (space, tab or comma between). Lines without a tag get one by the tag settings.'
+              : `One per line (or separated by commas). A barcode scanner can type them in.${meta.tags.mode === 'auto' ? ` Tags are given automatically (${meta.tags.example} …).` : ''}`}>
+            <textarea className="in mono" rows={5} value={serials} onChange={(e) => setSerials(e.target.value)} required placeholder={withTags ? '5CG4410XYZ  ACME-LAP-0101\n5CG4410XZA  ACME-LAP-0102' : '5CG4410XYZ\n5CG4410XZA'} />
           </Field>
-          <Field label="Status">
-            <select className="in" value={status} onChange={(e) => setStatus(e.target.value)}>
-              {(stages.find((s) => s.id === stage)?.statuses ?? []).map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
-            </select>
-          </Field>
-          <Field label="Device type"><DeviceTypeSelect value={type} onChange={setType} /></Field>
-          <Field label="Manufacturer"><input className="in" value={mf} onChange={(e) => setMf(e.target.value)} maxLength={200} /></Field>
-          <Field label="Model"><input className="in" value={model} onChange={(e) => setModel(e.target.value)} maxLength={200} /></Field>
-        </div>
-        <Field label={withTags ? `Serial number and asset tag, one item per line (${list.length})` : `Serial numbers (${list.length})`}
-          hint={withTags ? 'Serial, then your tag: "5CG4410XYZ ACME-LAP-0101" (space, tab or comma between). Lines without a tag get one by the tag settings.'
-            : `One per line (or separated by commas). A barcode scanner can type them in.${meta.tags.mode === 'auto' ? ` Tags are given automatically (${meta.tags.example} …).` : ''}`}>
-          <textarea className="in mono" rows={5} value={serials} onChange={(e) => setSerials(e.target.value)} required placeholder={withTags ? '5CG4410XYZ  ACME-LAP-0101\n5CG4410XZA  ACME-LAP-0102' : ''} />
-        </Field>
-        <label className="row-check"><input type="checkbox" checked={withTags} onChange={(e) => setWithTags(e.target.checked)} /> <span>I'll enter our own asset tag after each serial number</span></label>
-        <div className="grid-3 tight">
-          <Field label="Purchase date"><input className="in" type="date" value={f.purchaseDate} onChange={set('purchaseDate')} /></Field>
-          <Field label="Cost per item"><input className="in" type="number" min={0} step="0.01" value={f.purchaseCost} onChange={set('purchaseCost')} /></Field>
-          <Field label="Currency"><input className="in mono" value={f.currency} onChange={set('currency')} maxLength={3} /></Field>
-          <Field label="Vendor"><input className="in" value={f.vendor} onChange={set('vendor')} maxLength={200} /></Field>
-          <Field label="Invoice"><input className="in" value={f.invoiceNumber} onChange={set('invoiceNumber')} maxLength={100} /></Field>
-          <Field label="Purchase order"><input className="in" value={f.poNumber} onChange={set('poNumber')} maxLength={100} /></Field>
-          <Field label="Warranty provider"><input className="in" value={f.warrantyProvider} onChange={set('warrantyProvider')} maxLength={200} /></Field>
-          <Field label="Warranty ends"><input className="in" type="date" value={f.warrantyEnd} onChange={set('warrantyEnd')} /></Field>
-        </div>
-        <div className="grid-2 tight">
-          <Field label="Department / unit"><DepartmentSelect value={dep} onChange={setDep} list={deps.data?.items ?? []} onAdded={deps.reload} canAdd /></Field>
-          <Field label="Location (store)"><LocationSelect value={loc} onChange={setLoc} list={locs.data?.items ?? []} onAdded={locs.reload} canAdd /></Field>
-        </div>
+          <Check checked={withTags} onChange={setWithTags}>I'll enter our own asset tag after each serial number</Check>
+        </Section>
+        <Section title="Purchase & Warranty">
+          <div className="grid-3 tight">
+            <Field label="Purchase date"><input className="in" type="date" value={f.purchaseDate} onChange={set('purchaseDate')} /></Field>
+            <Field label="Cost per item"><input className="in" type="number" min={0} step="0.01" value={f.purchaseCost} onChange={set('purchaseCost')} /></Field>
+            <Field label="Currency"><input className="in mono" value={f.currency} onChange={set('currency')} maxLength={3} /></Field>
+            <Field label="Vendor"><input className="in" value={f.vendor} onChange={set('vendor')} maxLength={200} /></Field>
+            <Field label="Invoice"><input className="in" value={f.invoiceNumber} onChange={set('invoiceNumber')} maxLength={100} /></Field>
+            <Field label="Purchase order"><input className="in" value={f.poNumber} onChange={set('poNumber')} maxLength={100} /></Field>
+            <Field label="Warranty provider"><input className="in" value={f.warrantyProvider} onChange={set('warrantyProvider')} maxLength={200} /></Field>
+            <Field label="Warranty ends"><input className="in" type="date" value={f.warrantyEnd} onChange={set('warrantyEnd')} /></Field>
+          </div>
+        </Section>
+        <Section title="Where">
+          <div className="grid-2 tight">
+            <Field label="Department / unit"><DepartmentSelect value={dep} onChange={setDep} list={deps.data?.items ?? []} onAdded={deps.reload} canAdd /></Field>
+            <Field label="Location (store)"><LocationSelect value={loc} onChange={setLoc} list={locs.data?.items ?? []} onAdded={locs.reload} canAdd /></Field>
+          </div>
+        </Section>
       </form>
     </Modal>
   );

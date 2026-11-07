@@ -317,7 +317,7 @@ function DeviceDialog({ id, name, canDeploy, onClose, onDeploy }: { id: string; 
 
 // ---- deploy -----------------------------------------------------------------------------------------------------------
 
-function DeployDialog({ preset, onClose, onDone }: { preset: DeployPreset; onClose: () => void; onDone: (m: string) => void }) {
+export function DeployDialog({ preset, onClose, onDone }: { preset: DeployPreset; onClose: () => void; onDone: (m: string) => void }) {
   const [targets, setTargets] = useState<TargetState>(emptyTargets(preset.assets ?? []));
   const [classes, setClasses] = useState<string[]>(preset.classifications ?? Object.keys(CLASS_LABEL).filter((c) => c !== 'upgrade' && c !== 'driver'));
   const [reboot, setReboot] = useState<'when-needed' | 'never'>('when-needed');
@@ -444,7 +444,7 @@ function PoliciesTab({ tick, canApprove, changed, failed }: Ctx) {
   );
 }
 
-function PolicyDialog({ policy, onClose, onSaved }: { policy: Policy | null; onClose: () => void; onSaved: (m: string) => void }) {
+export function PolicyDialog({ policy, onClose, onSaved }: { policy: Policy | null; onClose: () => void; onSaved: (m: string) => void }) {
   const [f, setF] = useState({
     name: policy?.name ?? '', enabled: policy?.enabled ?? true, platform: policy?.platform ?? 'windows', classifications: policy?.classifications ?? ['critical', 'security'],
     severities: policy?.severities ?? [], approvedOnly: policy?.approvedOnly ?? false, delayDays: policy?.delayDays ?? 0, days: policy?.days ?? [3], startTime: policy?.startTime ?? '22:00',

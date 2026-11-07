@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import { Check, Field, Fields, Section } from '../../components/Form';
 import { api } from '../../api/client';
 import type { Asset, Paged } from '../../api/types';
 import { useApi } from '../../app/useApi';
@@ -48,41 +49,46 @@ export function ItemDialog({ item, categories, onClose, onSaved }: { item: Acces
     } catch (x) { setError(errText(x)); } finally { setBusy(false); }
   }
   return (
-    <Modal title={item ? `Edit ${item.name}` : 'Add accessory'} onClose={onClose} footer={<>
+    <Modal title={item ? `Edit ${item.name}` : 'Add Accessory'} onClose={onClose} footer={<>
       <button type="button" className="btn" onClick={onClose} disabled={busy}>Cancel</button>
       <button type="submit" form="acc-item" className="btn primary" disabled={busy || !f.name.trim() || !f.category.trim()}>{busy ? 'Saving…' : 'Save'}</button>
     </>}>
       <form id="acc-item" className="form-v" onSubmit={save}>
         {error && <Callout tone="crit" icon="alert">{error}</Callout>}
-        <div className="grid-2 tight">
-          <label>Name<input className="in" value={f.name} onChange={(e) => set('name', e.target.value)} placeholder="e.g. Logitech M90 USB mouse" autoFocus /></label>
-          <label>Category
-            {newCat === null ? (
-              <select className="in" value={f.category} onChange={(e) => e.target.value === '__add' ? setNewCat('') : set('category', e.target.value)}>
-                <option value="">Choose a category…</option>
-                {cats.map((c) => <option key={c} value={c}>{c}</option>)}
-                <option value="__add">+ Add category…</option>
-              </select>
-            ) : (
-              <span className="cat-add">
+        <Section title="Accessory">
+          <Fields>
+            <Field label="Name" required><input className="in" value={f.name} onChange={(e) => set('name', e.target.value)} placeholder="e.g. Logitech M90 USB mouse" autoFocus /></Field>
+            <Field label="Category" required>
+              {newCat === null ? (
+                <select className="in" value={f.category} onChange={(e) => e.target.value === '__add' ? setNewCat('') : set('category', e.target.value)}>
+                  <option value="">Choose a category…</option>
+                  {cats.map((c) => <option key={c} value={c}>{c}</option>)}
+                  <option value="__add">+ Add category…</option>
+                </select>
+              ) : (<>
                 <input className="in" value={newCat} maxLength={60} autoFocus placeholder="New category name" onChange={(e) => setNewCat(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void saveCategory(); } if (e.key === 'Escape') { e.stopPropagation(); setNewCat(null); } }} />
                 <button type="button" className="btn sm primary" disabled={!newCat.trim()} onClick={() => void saveCategory()}>Add</button>
                 <button type="button" className="btn sm" aria-label="Cancel" title="Cancel" onClick={() => setNewCat(null)}>✕</button>
-              </span>
-            )}
-          </label>
-          <label>Brand<input className="in" value={f.brand} onChange={(e) => set('brand', e.target.value)} /></label>
-          <label>Model<input className="in" value={f.model} onChange={(e) => set('model', e.target.value)} /></label>
-          <label>SKU / part number / barcode<input className="in" value={f.sku} onChange={(e) => set('sku', e.target.value)} /></label>
-          <label>Unit cost<input className="in" type="number" min={0} step="0.01" value={f.unitCost} onChange={(e) => set('unitCost', e.target.value)} /></label>
-          <label>Reorder level<input className="in" type="number" min={0} value={f.reorderLevel} onChange={(e) => set('reorderLevel', e.target.value)} />
-            <small className="muted">Alert when the stock at a location falls to this number (0 = no alert).</small></label>
-        </div>
-        <label className="row-check"><input type="checkbox" checked={f.returnable} onChange={(e) => set('returnable', e.target.checked)} /> Returnable — expected back when the person leaves (untick for consumables such as cables or batteries)</label>
-        <label className="row-check"><input type="checkbox" checked={f.serialTracked} disabled={!!item && item.movements > 0} onChange={(e) => set('serialTracked', e.target.checked)} /> Track each unit by serial number (docking stations, premium headsets…)</label>
-        {item && <label className="row-check"><input type="checkbox" checked={f.active} onChange={(e) => set('active', e.target.checked)} /> Active (untick to hide it; the history is kept)</label>}
-        <label>Notes<textarea className="in" rows={2} value={f.notes} onChange={(e) => set('notes', e.target.value)} /></label>
+              </>)}
+            </Field>
+            <Field label="Brand"><input className="in" value={f.brand} onChange={(e) => set('brand', e.target.value)} placeholder="e.g. Logitech" /></Field>
+            <Field label="Model"><input className="in" value={f.model} onChange={(e) => set('model', e.target.value)} placeholder="e.g. M90" /></Field>
+            <Field label="SKU / part number / barcode" span><input className="in" value={f.sku} onChange={(e) => set('sku', e.target.value)} /></Field>
+          </Fields>
+        </Section>
+        <Section title="Stock">
+          <Fields>
+            <Field label="Unit cost"><input className="in" type="number" min={0} step="0.01" value={f.unitCost} onChange={(e) => set('unitCost', e.target.value)} placeholder="0.00" /></Field>
+            <Field label="Reorder level" hint="Alert when the stock at a location falls to this number (0 = no alert)."><input className="in" type="number" min={0} value={f.reorderLevel} onChange={(e) => set('reorderLevel', e.target.value)} /></Field>
+          </Fields>
+          <Check checked={f.returnable} onChange={(v) => set('returnable', v)} hint="Expected back when the person leaves. Untick for consumables such as cables or batteries.">Returnable</Check>
+          <Check checked={f.serialTracked} disabled={!!item && item.movements > 0} onChange={(v) => set('serialTracked', v)} hint="For docking stations, premium headsets and similar.">Track each unit by serial number</Check>
+          {item && <Check checked={f.active} onChange={(v) => set('active', v)} hint="Untick to hide it; the history is kept.">Active</Check>}
+        </Section>
+        <Section title="Notes">
+          <textarea className="in" rows={2} value={f.notes} onChange={(e) => set('notes', e.target.value)} aria-label="Notes" />
+        </Section>
       </form>
     </Modal>
   );

@@ -134,7 +134,7 @@ function LibraryTab({ scripts, loading, canManage, canRun, changed, failed, run 
   );
 }
 
-function ScriptDialog({ script, copy, onClose, onSaved }: { script: Script | null; copy?: boolean; onClose: () => void; onSaved: (m: string) => void }) {
+export function ScriptDialog({ script, copy, onClose, onSaved }: { script: Script | null; copy?: boolean; onClose: () => void; onSaved: (m: string) => void }) {
   const [f, setF] = useState({
     name: script ? (copy ? `${script.name} (copy)` : script.name) : '', description: script?.description ?? '', category: script?.category ?? 'General',
     platform: script?.platform ?? 'windows', language: script?.language ?? 'powershell', content: script?.content ?? '', parameters: script?.parameters ?? '', timeoutSeconds: script?.timeoutSeconds ?? 600,
@@ -319,7 +319,7 @@ function SchedulesTab({ tick, canManage, scripts, changed, failed }: Ctx) {
   );
 }
 
-function ScheduleDialog({ schedule, scripts, onClose, onSaved }: { schedule: Schedule | null; scripts: Script[]; onClose: () => void; onSaved: (m: string) => void }) {
+export function ScheduleDialog({ schedule, scripts, onClose, onSaved }: { schedule: Schedule | null; scripts: Script[]; onClose: () => void; onSaved: (m: string) => void }) {
   const [f, setF] = useState({
     name: schedule?.name ?? '', enabled: schedule?.enabled ?? true, scriptId: schedule?.scriptId ?? scripts[0]?.id ?? '', detectScriptId: schedule?.detectScriptId ?? '',
     parameters: schedule?.parameters ?? '', frequency: schedule?.frequency ?? 'daily', days: schedule?.days ?? [1], atTime: schedule?.atTime ?? '02:00',
