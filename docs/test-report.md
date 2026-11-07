@@ -1,10 +1,44 @@
 # Test report
 
-Latest: GitHub Actions run 42353554714, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
-10.0.20348** VM plus an Ubuntu job for the Linux agent. Release: `v1.1.1-build.117` (pre-release, **unsigned**), package
-version **1.1.1.117**, commit `678aa0d`. Results: unit + PostgreSQL integration tests **437 PASS** (439, 2 skipped);
-installer acceptance **84 passed, 0 failed** (10 not run: need hardware, a domain, a reboot or old Windows); upgrade
+Latest: GitHub Actions run 42365189724, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
+10.0.20348** VM plus an Ubuntu job for the Linux agent. Release: `v1.1.1-build.118` (pre-release, **unsigned**), package
+version **1.1.1.118**, commit `45e353f`. Results: unit + PostgreSQL integration tests **439 PASS** (441, 2 skipped);
+installer acceptance **85 passed, 0 failed** (10 not run: need hardware, a domain, a reboot or old Windows); upgrade
 suites **14/14**; Linux agent on 11 distributions **11/11**.
+
+New in build 118:
+
+* Tray icon of the Windows agent for every signed-in user: **Software Center** (software IT offers, installed by the
+  agent as SYSTEM without administrator rights, optionally after approval in the console), **Get Remote Help** (help
+  requests in Remote Support › Help Requests with Connect, Take and Close), **Device Information** and **Check In
+  Now**. Console: Software Deployment › Self-Service (offered packages, requests to approve, tray settings).
+* Console: menu items in boxes; every add / edit window rebuilt in titled sections with aligned fields (devices,
+  accessories, IT assets, Non-IT assets, patch policies and installs, scripts, runs and schedules, licences and
+  products, web apps, deployment rules, packages, groups and deployments, security baselines and exceptions).
+  Screenshots of the windows are taken in every quick CI run (`ci-quick-logs/screens`).
+
+| ID | Test | Result |
+|---|---|---|
+| T94 | Tray icon: started on the user's desktop; Software Center installs offered software without administrator rights (and after IT approval); Get Remote Help reaches Remote Support; device information | **PASS** — tray running for the signed-in user; installed without approval and after approval; help request #1 in Remote Support and closed; agent 1.1.1.118 |
+
+PostgreSQL tests added: `TrayDbTests` (offered packages per platform and device group, install at once without a second
+job, request and approval, missing package file, help request numbers, tray settings).
+
+| File | SHA256 |
+|---|---|
+| Zentriq-Setup-x64.exe | `d190df666936884cedb03524f2cab6886b8fce9a9e1cd7bac0d5a60a22163ed0` |
+| Zentriq.msi | `0ec845703c0acd747c8f817606f5e30492f65eaa3d968808b3af26dbb1182e7a` |
+| ZentriqAgent-x64.msi | `2450ffabffd6396c3900871d25b1040d7cf55a79dac552f5fc77678812c1729a` |
+| zentriq-agent-linux-x64.deb | `b95aaa8185d5592513d7892d4b7a2f57860537a6b473ecfbe8f86d6ea86980bc` |
+| zentriq-agent-linux-x64.rpm | `6003aeb5eaf2e9f552f9a333935ed73db52b43138d78a9339ccae6d1ecafe85d` |
+| zentriq-agent-linux-x64.tar.gz | `ba6abcfb88579f6cc411becde09f07146a248297c7e85e4937150254e60782a1` |
+| zentriq-agent-linux-arm64.deb | `6eba4e8034a97011c0356ea4b41a0d0a5127fd8bd45c67fc0b98e6a216ea994c` |
+| zentriq-agent-linux-arm64.rpm | `9d6ca6999f382249526dfd70135120b0ca3b9cf102ca4b029ee7ef8c3e8972ea` |
+| zentriq-agent-linux-arm64.tar.gz | `d4a10124f28b0460e0b6cb5c2d5fee4ba1fccd0ad128a0c920e75431cb891910` |
+| Zentriq-1.1.1-msi-offline-kit.zip | `f9aa903ee08876c39162f3543523bc93110f824a409e7f71adc6eb33ff11ad28` |
+| Zentriq-1.1.1-docs.zip | `942e0577cbd46bf568c58aaff0dc3af2b7ed83453ebd2c70881356f6e340191e` |
+
+## Build 117 (run 42353554714, commit `678aa0d`)
 
 New in build 117:
 
