@@ -1,12 +1,49 @@
 # Test report
 
-Latest: GitHub Actions run 42365189724, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
-10.0.20348** VM plus an Ubuntu job for the Linux agent. Release: `v1.1.1-build.118` (pre-release, **unsigned**), package
-version **1.1.1.118**, commit `45e353f`. Results: unit + PostgreSQL integration tests **439 PASS** (441, 2 skipped);
+Latest: GitHub Actions run 42868622076, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
+10.0.20348** VM plus an Ubuntu job for the Linux agent. Release: `v1.1.1-build.119` (pre-release, **unsigned**), package
+version **1.1.1.119**, commit `a5ab68e`. Results: unit + PostgreSQL integration tests **448 PASS** (450, 2 skipped);
 installer acceptance **85 passed, 0 failed** (10 not run: need hardware, a domain, a reboot or old Windows); upgrade
-suites **14/14**; Linux agent on 11 distributions **11/11**.
+suites **14/14** (schema 39); Linux agent on 11 distributions **11/11**.
 
-New in build 118:
+New in build 119:
+
+* Console menu: each module is a heading with an icon that opens and closes its pages (one module open at a time; the
+  module of the current page opens by itself); pages stay in boxes, indented under the heading.
+* Network Inventory: switches, routers and neighbours open inside Network Inventory (`/network/devices/{id}`).
+* Remote sessions are compact: Desktop, Files (and Terminal when allowed) only; registry, software, events, details,
+  console, Intel AMT and plugins are hidden and their rights not granted.
+* Licences: addresses that do not answer are never added; addresses answered only by refused connections (routers,
+  firewalls) with no name, MAC or device type are listed in the scan result but not added; devices without an agent
+  that did not answer their last scan stop counting until they answer again; agents always count.
+* A scanned address that an agent reports as another adapter of its device is merged into that device (one licence).
+* Filters stay until cleared (per browser); page controls at the top of every paged list as well.
+* Printers: recognised by SNMP device identifier (about 20 makers) without the Printer-MIB, model from the printer
+  name, more printer web pages, ports 9101/9102, longer SNMP wait.
+* Tray: Get Remote Help has its left margin (build 118 had none). The screenshot shows the problem box and the
+  request list still running past the right edge; fixed on `dev/ui-119` for the next build.
+
+PostgreSQL test added: `Release119DbTests` (unreachable device without agent takes no licence and counts again when it
+answers; agent device always counts; Wi-Fi address of an inventoried laptop merged into it). Unit tests: printer makers
+recognised by device identifier, compact remote session flags (`hide=53`) and rights.
+
+| File | SHA256 |
+|---|---|
+| Zentriq-Setup-x64.exe | `1743088abf1720a93f8fcab52deee338b576ca37439b0cf1b4a7b7adbdb0c3e6` |
+| Zentriq.msi | `2c8b263110d740692d1f0b82e6fae48a5199c1b4ee6da1c14f11f351f56c82e6` |
+| ZentriqAgent-x64.msi | `8876cc333bf9ff177f44d54fe752963f008e80283d614185611e54624e04680a` |
+| zentriq-agent-linux-x64.deb | `f3f92f9460c2add7175aa508671bb29f9b640a6cf7c59dd0344e1ba96d48161a` |
+| zentriq-agent-linux-x64.rpm | `0cc62996500c805fe2064a9f12eace8405d420242b1d990511c4a82b31de7fcd` |
+| zentriq-agent-linux-x64.tar.gz | `be0765f18b3a02b33b41a7e619eeae52ae2ced64d2812c05d3c68333c8cdcd16` |
+| zentriq-agent-linux-arm64.deb | `7161d43f851ed0308d0fd94758318ec7d0a2f884c7feb30d03a7b02e8c174638` |
+| zentriq-agent-linux-arm64.rpm | `a1cd9921dd85852f180ddd2c018ae42de26f2a2dc6bbab132167e7e2f90c98d9` |
+| zentriq-agent-linux-arm64.tar.gz | `0466ad38039e69d178a8439c0d6cedd0de15f2b8cfb4d47a84d75bdbe9210373` |
+| Zentriq-1.1.1-msi-offline-kit.zip | `470a19bbadff62d5670f39eab497960db02a67c97f37a65f14bf2368d4cca5a6` |
+| Zentriq-1.1.1-docs.zip | `a5937539dcdb8c9e7a086da9511bbbc926ed0bbe9db8863ce2b0feb3d3eebb4e` |
+
+## Build 118 (run 42365189724, commit `45e353f`)
+
+Results: 439 PASS (2 skipped); acceptance 85/0; upgrade 14/14; Linux 11/11.
 
 * Tray icon of the Windows agent for every signed-in user: **Software Center** (software IT offers, installed by the
   agent as SYSTEM without administrator rights, optionally after approval in the console), **Get Remote Help** (help
