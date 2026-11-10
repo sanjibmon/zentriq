@@ -113,7 +113,8 @@ public sealed class Release121DbTests : IAsyncLifetime
         await new SqlMigrator(NullLogger<SqlMigrator>.Instance).MigrateAsync(_db.OwnerConnection, _db.App, "1.1.0-test");
         await using var c = new NpgsqlConnection(_db.AppConnection);
         await c.OpenAsync();
-        var protector = new CredentialProtector(() => new AppSecrets { CredentialKey = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)) });
+        var keys = new AppSecrets { CredentialKey = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)) };
+        var protector = new CredentialProtector(() => keys);
         var asset = (Guid)(await Scalar(c, "INSERT INTO zentriq.assets (hostname, category, status, source, os_family) VALUES ('dev-7', 'endpoint', 'active', 'agent', 'windows') RETURNING id"))!;
         var other = (Guid)(await Scalar(c, "INSERT INTO zentriq.assets (hostname, category, status, source, os_family) VALUES ('fin-2', 'endpoint', 'active', 'agent', 'windows') RETURNING id"))!;
         var group = (Guid)(await Scalar(c, "INSERT INTO zentriq.device_groups (name, asset_ids) VALUES ('Developers', ARRAY[@a]::uuid[]) RETURNING id", ("a", asset)))!;
