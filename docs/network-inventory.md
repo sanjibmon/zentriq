@@ -88,6 +88,10 @@ MAC address and ARP tables are stored in their own tables, not in the device doc
 - **Unmanaged switches**: suspected unmanaged switches behind ports, with their MAC addresses and the known devices among them. It also lists switches that cannot be managed over SNMP, with what to do about each.
 - **Firmware**: versions in use per manufacturer and model. Mixed versions of the same model are highlighted.
 
+Devices opened from Network Inventory (switches, routers, neighbours, connected devices) **stay in Network Inventory**
+(`/network/devices/{id}`, opens on the Network tab, with *All network devices* to go back); the menu keeps Network
+Inventory selected.
+
 On a **device page**, the **Network** tab shows:
 
 - for every device, **Connected to**: the switch and port where its MAC address was learned, with the VLAN, and whether it is behind an unmanaged switch;

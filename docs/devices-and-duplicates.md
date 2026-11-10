@@ -29,7 +29,7 @@ The type also sets the device's category (endpoint, server, network device, prin
 
 ## How devices without an agent are recognised
 
-A discovery scan probes the usual ports. It also always probes ports that identify devices that cannot run an agent: 9100, 515 and 631 (printing), 23, 8080, 8443, 4443 and 10443 (web management), 554 (cameras), 5060 (IP phones), 8291 (MikroTik), 902 (VMware hosts) and 3260 (iSCSI storage).
+A discovery scan probes the usual ports. It also always probes ports that identify devices that cannot run an agent: 9100–9102, 515 and 631 (printing), 23, 8080, 8443, 4443 and 10443 (web management), 554 (cameras), 5060 (IP phones), 8291 (MikroTik), 902 (VMware hosts) and 3260 (iSCSI storage).
 
 Evidence is used in this order, strongest first:
 
@@ -38,6 +38,14 @@ Evidence is used in this order, strongest first:
    - **Printers and multifunction devices (Printer-MIB):** page count, status (idle, printing and so on), and each supply with its level in %. The device page shows supplies as bars, with low levels in red.
    - **Switches, routers and firewalls:** physical ports, how many are connected, whether the device switches (bridge table) and whether it routes (IP forwarding). It is classified as a switch, router or firewall from these and from its vendor.
 2. **The web interface:** the page title, *Server* header and certificate names of the device's management page. Zentriq reads these without signing in. About 80 product families are recognised: HP, Canon, Kyocera, Xerox, Ricoh, Epson and Brother printers; Fujitsu scanners; FortiGate, Palo Alto, SonicWall, Sophos, pfSense/OPNsense, WatchGuard, Check Point and Cisco ASA firewalls; MikroTik, Ubiquiti and DrayTek routers; Cisco, HPE Aruba, Netgear and D-Link switches; UniFi, Aruba, Ruckus and Omada access points; Synology, QNAP and TrueNAS storage; Hikvision, Dahua and Axis cameras; Yealink, Poly and Grandstream phones; APC and Eaton UPS units; ESXi and Proxmox hosts; F5 and NetScaler load balancers. When the title contains a model (for example "FortiGate-60F"), it becomes the device's model.
+   **Printers (build 119):** a device whose SNMP device OID belongs to a printer maker (HP JetDirect, Ricoh, Canon,
+   Brother, Kyocera, Xerox, FUJIFILM / Fuji Xerox, Konica Minolta, Epson, Lexmark, Sharp, Toshiba TEC, OKI, Zebra,
+   Samsung, Pantum, Dell, Riso, TSC, Honeywell / Intermec) is a printer even when it does not answer the Printer-MIB
+   (SNMPv1, older firmware); the printer's own name (Printer-MIB *prtGeneralPrinterName*) becomes the model. The web
+   interfaces of Ricoh (*Web Image Monitor*), Canon (*Remote UI*), Xerox (*CentreWare*), Samsung (*SyncThru*), Kyocera
+   (*Command Center RX*), Toshiba (*TopAccess*, e-STUDIO), Konica Minolta (*PageScope*), FUJIFILM (*ApeosPort*,
+   *DocuCentre*), Epson (*EpsonNet*) and label / receipt printers are recognised too. SNMP waits up to 3 seconds for a
+   printer that answers slowly.
 3. **Open ports:** a weak first guess. For example, 9100 means a printer and 554 means a camera.
 
 The scan result shows what was recognised and why, for example: *Recognised as Firewall (Fortinet FortiGate-60F): web interface mentions "fortigate"*. The device page shows the same evidence under *Recognised by*.
@@ -56,7 +64,11 @@ A computer with collected inventory (agent or credentialed scan) keeps its type.
 
 ## Duplicates
 
-Two active records are the same device when they share a **host name**, a **serial number** or a **network adapter (MAC)**. Some matches are not treated as duplicates:
+Two active records are the same device when they share a **host name**, a **serial number** or a **network adapter (MAC)**,
+or when a record found only by its address (a scan) has an address that is **another adapter of an inventoried device**
+(build 119 — for example the Wi-Fi address of a laptop whose agent reports both its Ethernet and Wi-Fi addresses). The
+device then appears once, with all its IP addresses, and takes one license. Addresses that several inventoried devices
+report (shared virtual adapters such as 172.17.0.1 or 192.168.56.1) are not used for this. Some matches are not treated as duplicates:
 
 - **Generic serial numbers**, such as "To be filled by O.E.M.".
 - **Locally administered or multicast MAC addresses**, such as VPN or Npcap adapters and randomised Wi-Fi addresses, because these repeat across devices.

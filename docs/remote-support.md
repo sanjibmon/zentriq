@@ -81,6 +81,12 @@ Remote sessions open in the engine's modern interface, styled by Zentriq (`insta
 
 Settings › Advanced shows only status, address, service and permissions; engine details were removed.
 
+**Compact session (build 119).** A session opened for a device shows only that device: no engine header, footer, side
+menu or "back to the device list". The tabs are **Desktop** and **Files** (plus *General*, and *Terminal* when it is
+allowed in Settings). Registry, software list, events, details, console, Intel AMT and plugins are left out — Zentriq
+has them already (Software Inventory, Activity Log, Scripts & Remediation, the device page). In the Remote Support list
+each device has **Remote desktop** and **Files**; the *⋯* menu appears only when the terminal is allowed.
+
 ## Install for unattended access
 
 Settings › *Install for unattended access* offers three ways: through the Zentriq Agent (select devices, **Install**), the Windows installer (`ZentriqRemoteSupport.exe -fullinstall`), and an **install link** valid for 3 days whose page offers Windows, macOS and Linux — useful for laptops outside the office. The installer bundles the Windows, macOS (universal, Apple silicon, Intel) and Linux (x64, ARM64) agents.

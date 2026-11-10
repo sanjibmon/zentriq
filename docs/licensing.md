@@ -17,6 +17,16 @@ without internet access are activated offline with the same file.
 * An IT device counts when it is `active`, not merged into another asset, and was seen by discovery or an agent in the
   last **30 days** (`licensing.billable_seen_within_days`). Retired, archived, merged (duplicate), planned, on-order
   and in-stock assets do not count.
+* **Only reachable devices count (build 119).** Scanning an address range does not use up licenses for addresses where
+  nothing answers:
+  * an address that does not answer is never added as a device;
+  * an address that only *refuses* connections, with no DNS name, no MAC address, no open port and nothing recognisable
+    (routers and firewalls often answer like this for every unused address) is listed in the scan results but **not
+    added** — it is added once it has a name, an open port or the agent;
+  * a device **without the Zentriq Agent** whose address did not answer its last scan does not count until it answers
+    again (devices with an agent always count: a laptop that is off is still yours);
+  * a device with **two addresses** (Ethernet and Wi-Fi, two network cards) is one device: a scanned address that is
+    another adapter of an inventoried device does not count and is merged into it (see Devices and duplicates).
 * A virtual machine that is also an inventoried device (for example, it runs the agent) counts **once**, as a cloud
   instance, not as an IT device.
 * The Licensing page also shows the IT devices by type (endpoints, servers, network devices, other) for information.
