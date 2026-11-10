@@ -723,5 +723,6 @@ input[type=file].in { height: auto; padding: 7px 10px; }
 /* Page navigation above lists too */
 .pager-top { border-top: 0; border-bottom: 1px solid var(--line); }
 /* Room for the full module names */
-@media (min-width: 900px) { .app:not(.collapsed) { grid-template-columns: 268px minmax(0, 1fr); } }
-.nav .nav-head, .nav a.nav-mod { font-size: 14.5px; gap: 10px; letter-spacing: 0; }
+@media (min-width: 900px) { .app:not(.collapsed) { grid-template-columns: 272px minmax(0, 1fr); } }
+.nav .nav-head, .nav a.nav-mod { font-size: 14px; gap: 10px; letter-spacing: 0; padding: 0 8px; }
+.nav .nav-head .nav-chev { flex: none; margin-left: 2px; }
