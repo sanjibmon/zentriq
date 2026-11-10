@@ -216,7 +216,7 @@ internal static class Privilege
 
             // A filtered (limited) token: take its elevated linked token.
             var token = logonToken;
-            if (TokenInt(token, 18 /* TokenElevationType */) == 3 /* limited */ && GetTokenInformation(token, 19 /* TokenLinkedToken */, out var linked, IntPtr.Size, out _)) token = linked;
+            if (TokenInt(token, 18 /* TokenElevationType */) == 3 /* limited */ && GetTokenInformation(token, 19 /* TokenLinkedToken */, out IntPtr linked, IntPtr.Size, out _)) token = linked;
             if (TokenInt(token, 20 /* TokenElevation */) == 0) throw new InvalidOperationException("Windows did not give the logon administrator rights.");
             if (!DuplicateTokenEx(token, 0x02000000 /* MAXIMUM_ALLOWED */, IntPtr.Zero, 2, 1 /* primary */, out primary)) throw new Win32Exception(Marshal.GetLastWin32Error());
             if (token != logonToken) CloseHandle(token);
