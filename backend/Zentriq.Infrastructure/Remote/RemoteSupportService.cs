@@ -232,6 +232,9 @@ public sealed partial class RemoteSupportService(NpgsqlDataSource ds, ZentriqOpt
         cmd.Parameters.AddWithValue("g", s.RecordGroupIds.ToArray());
         return await cmd.ExecuteScalarAsync(ct) is true;
     }
+    /// <summary>Engine page parts hidden in device sessions: 1 header, 4 footer, 16 side menu, 32 back buttons.</summary>
+    public const int CompactHide = 1 | 4 | 16 | 32;
+
     public static int ViewMode(string view) => view switch { "desktop" => 11, "terminal" => 12, "files" => 13, _ => 10 };
 
     /// <summary>
@@ -255,7 +258,8 @@ public sealed partial class RemoteSupportService(NpgsqlDataSource ds, ZentriqOpt
         if (nodeId is not null)
         {
             var tail = nodeId.StartsWith("node//", StringComparison.Ordinal) ? nodeId["node//".Length..] : nodeId;
-            url += "&gotonode=" + Uri.EscapeDataString(tail) + "&viewmode=" + ViewMode(view);
+            // A compact session window: only the device (no engine header, footer, side menu or "back to the device list").
+            url += "&gotonode=" + Uri.EscapeDataString(tail) + "&viewmode=" + ViewMode(view) + "&hide=" + CompactHide;
         }
         return url;
     }

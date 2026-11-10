@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { api } from '../../api/client';
 import { useAuth } from '../../app/auth';
 import { Link, useRouter } from '../../app/router';
+import { useSticky } from '../../app/sticky';
 import { useApi } from '../../app/useApi';
 import { useConfirm } from '../../components/Confirm';
 import { Icon } from '../../components/Icon';
@@ -119,9 +120,9 @@ interface Ctx { tick: number; canManage: boolean; changed: (t: string) => void; 
 
 function AppsTab({ tick, canManage, changed, failed, initialFilter, openAdd }: Ctx & { initialFilter: string; openAdd: boolean }) {
   const { navigate } = useRouter();
-  const [status, setStatus] = useState('');
-  const [filter, setFilter] = useState(initialFilter);
-  const [q, setQ] = useState('');
+  const [status, setStatus] = useSticky('WebAppsPage.AppsTab.status', '');
+  const [filter, setFilter] = useSticky('WebAppsPage.AppsTab.filter', initialFilter);
+  const [q, setQ] = useSticky('WebAppsPage.AppsTab.q', '');
   const [picked, setPicked] = useState<string[]>([]);
   const [edit, setEdit] = useState<WebApp | 'new' | null>(openAdd ? 'new' : null);
   const [catalog, setCatalog] = useState(false);
@@ -169,8 +170,8 @@ function AppsTab({ tick, canManage, changed, failed, initialFilter, openAdd }: C
 }
 
 export function AccountsTable({ tick, canManage, changed, failed, initialFilter, appId, onEdit }: Ctx & { initialFilter: string; appId?: string; onEdit?: (a: Account) => void }) {
-  const [filter, setFilter] = useState(initialFilter);
-  const [q, setQ] = useState('');
+  const [filter, setFilter] = useSticky('WebAppsPage.AccountsTable.filter', initialFilter);
+  const [q, setQ] = useSticky('WebAppsPage.AccountsTable.q', '');
   const confirm = useConfirm();
   const data = useApi(() => api.get<Account[]>('/webapps/accounts', { appId, filter, q }), [appId, filter, q, tick]);
   async function remove(a: Account) {

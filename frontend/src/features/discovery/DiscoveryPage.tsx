@@ -5,6 +5,7 @@ import { CredentialDialog, CredentialsPanel, KINDS } from './CredentialsPanel';
 import { DirectoryPanel, errorText } from './DirectoryPanel';
 import { useAuth } from '../../app/auth';
 import { Link, useRouter } from '../../app/router';
+import { useSticky } from '../../app/sticky';
 import { useApi } from '../../app/useApi';
 import { Callout, DataTable, ErrorBox, fmt, PageHead, Pager, Panel, Pill, statusTone } from '../../components/ui';
 import { useConfirm } from '../../components/Confirm';
@@ -83,6 +84,7 @@ export function DiscoveryPage() {
           {picked.length > 0 && <button className="btn sm" onClick={() => void removePicked()}>Delete selected ({picked.length})</button>}
           <button className="btn sm" onClick={() => void removeOld()}>Delete old scans…</button>
         </div>} title="Scan history">
+        {scans.data && <Pager top page={page} pageSize={25} total={scans.data.total} onPage={setPage} />}
         <DataTable rows={pageRows} empty={scans.loading ? 'Loading…' : 'No scans yet. Start one with New scan.'} columns={[
           ...(can('scans.run') ? [{ key: 'sel', label: <input type="checkbox" className="row-sel" aria-label="Select all finished scans" checked={allPicked} onChange={(e) => setPicked(e.target.checked ? selectable.map((r) => r.id) : [])} />, render: (r: Scan) => finished(r) ? <input type="checkbox" className="row-sel" aria-label={`Select scan ${r.number}`} checked={picked.includes(r.id)} onChange={(e) => setPicked((p) => e.target.checked ? [...p, r.id] : p.filter((x) => x !== r.id))} /> : null }] : []),
           { key: 'n', label: 'Scan', render: (r) => <><button className="link" onClick={() => setDetail(r)} title="Show the result for each device"><b>{r.name || `Scan #${r.number}`}</b></button><div className="faint" style={{ fontSize: 11.5 }}>#{r.number} · {fmt.label(r.scanType)}</div></> },
@@ -112,8 +114,8 @@ const RESULT_TONE: Record<string, 'ok' | 'warn' | 'crit' | ''> = {
 
 /** Per-host results of one scan: what responded, what was collected and why not. */
 function ScanDetail({ scan, onClose }: { scan: Scan; onClose: () => void }) {
-  const [status, setStatus] = useState('');
-  const [q, setQ] = useState('');
+  const [status, setStatus] = useSticky('DiscoveryPage.ScanDetail.status', '');
+  const [q, setQ] = useSticky('DiscoveryPage.ScanDetail.q', '');
   const [page, setPage] = useState(1);
   const results = useApi(() => api.get<Paged<ScanResultRow>>(`/discovery/scans/${scan.id}/results`, { status, q, page, pageSize: 50 }), [scan.id, status, q, page]);
   const info = useApi(() => api.get<{ scan: Scan; log: { occurredAt: string; level: string; message: string }[] }>(`/discovery/scans/${scan.id}`), [scan.id]);
@@ -146,6 +148,7 @@ function ScanDetail({ scan, onClose }: { scan: Scan; onClose: () => void }) {
           </div>
           <ErrorBox error={results.error} />
           <Panel flush>
+            {results.data && <Pager top page={page} pageSize={50} total={results.data.total} onPage={setPage} />}
             <DataTable rows={results.data?.items ?? []} empty={results.loading ? 'Loading…' : 'No results.'} columns={[
               { key: 't', label: 'Device', render: (r) => <><b className="mono">{r.ip ?? r.target}</b><div className="faint" style={{ fontSize: 11.5 }}>{r.hostname && r.hostname !== r.ip ? r.hostname : ''}</div></> },
               { key: 's', label: 'Result', render: (r) => <Pill tone={RESULT_TONE[r.status] ?? ''}>{fmt.label(r.status)}</Pill> },

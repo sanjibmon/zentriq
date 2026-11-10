@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { api } from '../../api/client';
 import { useAuth } from '../../app/auth';
 import { useRouter } from '../../app/router';
+import { useSticky } from '../../app/sticky';
 import { useApi } from '../../app/useApi';
 import { CategoryChart } from '../../components/charts';
 import { Icon } from '../../components/Icon';
@@ -88,14 +89,14 @@ function AssetsTab({ tick, summary, categories, departments, canEdit, onOpen, on
   onOpen: (id: string) => void; onReload: () => void; onAdd: () => void; onUpload: () => void;
 }) {
   const { query } = useRouter();
-  const [q, setQ] = useState('');
-  const [search, setSearch] = useState('');
-  const [group, setGroup] = useState('');
-  const [category, setCategory] = useState('');
-  const [status, setStatus] = useState(query.get('status') ?? 'active');
-  const [department, setDepartment] = useState(query.get('department') ?? '');
-  const [due, setDue] = useState(query.get('due') ?? '');
-  const [sort, setSort] = useState<{ col: string; dir: 'asc' | 'desc' } | null>(null);
+  const [q, setQ] = useSticky('NonItPage.AssetsTab.q', '');
+  const [search, setSearch] = useSticky('NonItPage.AssetsTab.search', '');
+  const [group, setGroup] = useSticky('NonItPage.AssetsTab.group', '');
+  const [category, setCategory] = useSticky('NonItPage.AssetsTab.category', '');
+  const [status, setStatus] = useSticky('NonItPage.AssetsTab.status', query.get('status') ?? 'active');
+  const [department, setDepartment] = useSticky('NonItPage.AssetsTab.department', query.get('department') ?? '');
+  const [due, setDue] = useSticky('NonItPage.AssetsTab.due', query.get('due') ?? '');
+  const [sort, setSort] = useSticky<{ col: string; dir: 'asc' | 'desc' } | null>('NonItPage.AssetsTab.sort', null);
   const [page, setPage] = useState(1);
   const [sel, setSel] = useState<string[]>([]);
   const [bulk, setBulk] = useState(false);
@@ -223,6 +224,7 @@ function AssetsTab({ tick, summary, categories, departments, canEdit, onOpen, on
         </Panel>
       ) : (
         <div className="tbl-wrap">
+          {data.data && data.data.total > 50 && <Pager top page={page} pageSize={50} total={data.data.total} onPage={setPage} />}
           <table className="t">
             <thead>
               <tr>
@@ -289,9 +291,9 @@ function BulkChange({ ids, categories, departments, onClose, onDone }: {
 function CategoriesTab({ list, groups, canEdit, onChanged }: { list: NonItCategory[]; groups: NonItGroup[]; canEdit: boolean; onChanged: () => void }) {
   const confirm = useConfirm();
   const [name, setName] = useState('');
-  const [group, setGroup] = useState('');
+  const [group, setGroup] = useSticky('NonItPage.CategoriesTab.group', '');
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState('');
+  const [filter, setFilter] = useSticky('NonItPage.CategoriesTab.filter', '');
   async function run(f: () => Promise<unknown>) {
     setError(null);
     try { await f(); onChanged(); } catch (e) { setError(errText(e)); }

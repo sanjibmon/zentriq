@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import { useAuth } from '../../app/auth';
 import { Link, useRouter } from '../../app/router';
+import { useSticky } from '../../app/sticky';
 import { useApi } from '../../app/useApi';
 import { useConfirm } from '../../components/Confirm';
 import { Check, Choices, Field, Fields, Section } from '../../components/Form';
@@ -89,8 +90,8 @@ export function ScriptsPage() {
 function LibraryTab({ scripts, loading, canManage, canRun, changed, failed, run }: Ctx & { loading: boolean }) {
   const [edit, setEdit] = useState<{ script: Script | null; copy?: boolean } | null>(null);
   const [view, setView] = useState<Script | null>(null);
-  const [q, setQ] = useState('');
-  const [platform, setPlatform] = useState('');
+  const [q, setQ] = useSticky('ScriptsPage.LibraryTab.q', '');
+  const [platform, setPlatform] = useSticky('ScriptsPage.LibraryTab.platform', '');
   const confirm = useConfirm();
   const rows = scripts.filter((s) => (!platform || s.platform === platform) && (!q || `${s.name} ${s.description ?? ''} ${s.category}`.toLowerCase().includes(q.toLowerCase())));
   async function remove(s: Script) {

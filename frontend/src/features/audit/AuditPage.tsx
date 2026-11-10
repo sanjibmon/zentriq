@@ -4,6 +4,7 @@ import type { AuditEvent, Paged } from '../../api/types';
 import { useApi } from '../../app/useApi';
 import { DataTable, ErrorBox, fmt, PageHead, Pager, Panel, Pill, statusTone } from '../../components/ui';
 import { useRouter } from '../../app/router';
+import { useSticky } from '../../app/sticky';
 import { Icon } from '../../components/Icon';
 import { CsvExportDialog, LogRetention } from './LogRetention';
 
@@ -11,9 +12,9 @@ export function AuditPage() {
   const { query, navigate } = useRouter();
   const tab = query.get('tab') === 'retention' ? 'retention' : 'log';
   const [csv, setCsv] = useState(false);
-  const [q, setQ] = useState('');
-  const [search, setSearch] = useState('');
-  const [outcome, setOutcome] = useState('');
+  const [q, setQ] = useSticky('AuditPage.AuditPage.q', '');
+  const [search, setSearch] = useSticky('AuditPage.AuditPage.search', '');
+  const [outcome, setOutcome] = useSticky('AuditPage.AuditPage.outcome', '');
   const [page, setPage] = useState(1);
   const data = useApi(() => api.get<Paged<AuditEvent>>('/audit', { q: search, outcome, page, pageSize: 50 }), [search, outcome, page]);
   return (
@@ -37,6 +38,7 @@ export function AuditPage() {
       </form>
       <ErrorBox error={data.error} />
       <Panel flush>
+        {data.data && <Pager top page={page} pageSize={50} total={data.data.total} onPage={setPage} />}
         <DataTable rows={data.data?.items ?? []} empty={data.loading ? 'Loading…' : 'No events.'} columns={[
           { key: 't', label: 'Time', render: (r) => <span className="mono">{fmt.date(r.occurredAt)}</span> },
           { key: 'u', label: 'User', render: (r) => r.actorName },

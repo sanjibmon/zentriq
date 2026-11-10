@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { api } from '../../api/client';
 import { useAuth } from '../../app/auth';
 import { Link, useRouter } from '../../app/router';
+import { useSticky } from '../../app/sticky';
 import { useApi } from '../../app/useApi';
 import { useConfirm } from '../../components/Confirm';
 import { Icon } from '../../components/Icon';
@@ -142,8 +143,8 @@ export function DaysPill({ days, date, autoRenew }: { days: number | null; date:
 
 function ProductsTab({ tick, canManage, changed, initialStatus }: Ctx & { initialStatus: string }) {
   const { navigate } = useRouter();
-  const [status, setStatus] = useState(initialStatus);
-  const [q, setQ] = useState('');
+  const [status, setStatus] = useSticky('LicensesPage.ProductsTab.status', initialStatus);
+  const [q, setQ] = useSticky('LicensesPage.ProductsTab.q', '');
   const [adding, setAdding] = useState(false);
   const data = useApi(() => api.get<Compliance[]>('/sam/products', { status, q }), [status, q, tick]);
   return (
@@ -180,8 +181,8 @@ function ProductsTab({ tick, canManage, changed, initialStatus }: Ctx & { initia
 function LicensesTab({ tick, canManage, changed, failed, initialFilter, openId, openAdd }: Ctx & { initialFilter: string; openId: string | null; openAdd: boolean }) {
   const { navigate } = useRouter();
   const confirm = useConfirm();
-  const [filter, setFilter] = useState(initialFilter);
-  const [q, setQ] = useState('');
+  const [filter, setFilter] = useSticky('LicensesPage.LicensesTab.filter', initialFilter);
+  const [q, setQ] = useSticky('LicensesPage.LicensesTab.q', '');
   const [edit, setEdit] = useState<License | 'new' | null>(openAdd ? 'new' : null);
   const [renew, setRenew] = useState<License | null>(null);
   const [alloc, setAlloc] = useState<License | null>(null);
@@ -318,7 +319,7 @@ function UseCell({ used, total }: { used: number; total: number }) {
 }
 
 function CloudUsers({ sku, initialFilter, onClose }: { sku?: CloudSku; initialFilter: string; onClose: () => void }) {
-  const [filter, setFilter] = useState(initialFilter);
+  const [filter, setFilter] = useSticky('LicensesPage.CloudUsers.filter', initialFilter);
   const data = useApi(() => api.get<CloudUser[]>('/sam/cloud/users', { connectionId: sku?.connectionId, skuId: sku?.skuId, filter }), [sku, filter]);
   return (
     <Panel flush title={`Users${sku ? ` · ${sku.name ?? sku.skuPart}` : ''}`} right={<div className="toolbar-row" style={{ margin: 0 }}>
@@ -340,8 +341,8 @@ function CloudUsers({ sku, initialFilter, onClose }: { sku?: CloudSku; initialFi
 // ---- activation ------------------------------------------------------------------------------------------------------
 
 function ActivationTab({ initialFilter }: { initialFilter: string }) {
-  const [filter, setFilter] = useState(initialFilter || 'problems');
-  const [q, setQ] = useState('');
+  const [filter, setFilter] = useSticky('LicensesPage.ActivationTab.filter', initialFilter || 'problems');
+  const [q, setQ] = useSticky('LicensesPage.ActivationTab.q', '');
   const data = useApi(() => api.get<{ rows: Activation[]; channels: Record<string, number> }>('/sam/activation', { filter: filter === 'all' ? null : filter, q }), [filter, q]);
   const rows = (data.data?.rows ?? []).map((r, i) => ({ ...r, id: `${r.assetId}:${r.product}:${i}` }));
   const channels = Object.entries(data.data?.channels ?? {}).sort((a, b) => b[1] - a[1]);
@@ -416,7 +417,7 @@ function DiscoverTab({ canManage, changed, failed }: Ctx) {
 
 export function AlertsTab({ tick, canManage, changed, failed, scope }: Ctx & { scope: 'licenses' | 'webapps' }) {
   const { navigate } = useRouter();
-  const [status, setStatus] = useState('open');
+  const [status, setStatus] = useSticky('LicensesPage.AlertsTab.status', 'open');
   const base = scope === 'webapps' ? '/webapps/alerts' : '/sam/alerts';
   const data = useApi(() => api.get<Alert[]>(base, { status }), [status, tick, base]);
   return (

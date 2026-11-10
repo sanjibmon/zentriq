@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useAuth } from '../app/auth';
-import { NAV, SECTION_OF_GROUP } from '../app/nav';
+import { GROUP_ICON, NAV, SECTION_OF_GROUP } from '../app/nav';
 import { Link, useRouter } from '../app/router';
 import { Icon } from './Icon';
 import { LogoMark, PRODUCT } from './Logo';
@@ -16,6 +16,11 @@ export function Shell({ children }: { children: ReactNode }) {
   const { path, navigate } = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [menu, setMenu] = useState(false);
+  // One module open at a time: the module of the current page opens by itself; clicking another module closes this one.
+  const groupOf = (p: string) => NAV.find(([, items]) => items.some((i) => (i.path === '/' ? p === '/' : p === i.path || p.startsWith(i.path + '/'))))?.[0] ?? null;
+  const [open, setOpen] = useState<string | null>(() => groupOf(path));
+  const routeGroup = groupOf(path);
+  useEffect(() => { if (routeGroup) setOpen(routeGroup); }, [routeGroup]);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -45,16 +50,26 @@ export function Shell({ children }: { children: ReactNode }) {
             const locked = !!sec && lic.featuresEnabled && !sec.enabled;
             const shown = items.filter((i) => (!i.permission || can(i.permission)) && (i.admin || !sec || sec.installed));
             if (shown.length === 0) return null;
+            const link = (i: (typeof shown)[number], mod = false) => (
+              <Link key={i.id} to={i.path} className={`${mod ? 'nav-mod ' : ''}${active(i.path) ? 'active' : ''}${locked && !i.admin ? ' locked' : ''}`} title={locked && !i.admin ? `${i.label} — requires the Advanced edition` : i.label}>
+                <Icon name={mod ? GROUP_ICON[group] ?? i.icon : i.icon} />
+                <span>{mod ? group : i.label}</span>
+                {locked && !i.admin && <Icon name="lock" size={12} className="nav-lock-ico" />}
+              </Link>
+            );
+            // A module with one page is a link of its own; the menu collapsed to icons shows every page.
+            if (shown.length === 1 && !collapsed) return <div key={group} className="nav-sec">{link(shown[0]!, true)}</div>;
+            const isOpen = collapsed || open === group;
+            const here = shown.some((i) => active(i.path));
             return (
-              <div key={group}>
-                <div className="nav-group">{group}{locked && <span className="nav-lock" title="Not included in your license">Advanced</span>}</div>
-                {shown.map((i) => (
-                  <Link key={i.id} to={i.path} className={`${active(i.path) ? 'active' : ''}${locked && !i.admin ? ' locked' : ''}`} title={locked && !i.admin ? `${i.label} — requires the Advanced edition` : i.label}>
-                    <Icon name={i.icon} />
-                    <span>{i.label}</span>
-                    {locked && !i.admin && <Icon name="lock" size={12} className="nav-lock-ico" />}
-                  </Link>
-                ))}
+              <div key={group} className={`nav-sec${isOpen ? ' open' : ''}`}>
+                {!collapsed && <button type="button" className={`nav-head${here ? ' here' : ''}`} aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : group)}>
+                  <Icon name={GROUP_ICON[group] ?? 'apps'} />
+                  <span>{group}</span>
+                  {locked && <span className="nav-lock" title="Not included in your license">Advanced</span>}
+                  <Icon name="chev" size={14} className="nav-chev" />
+                </button>}
+                {isOpen && <div className="nav-items">{shown.map((i) => link(i))}</div>}
               </div>
             );
           })}

@@ -3,6 +3,7 @@ import { api } from '../../api/client';
 import type { Asset, Paged } from '../../api/types';
 import { useAuth } from '../../app/auth';
 import { Link, useRouter } from '../../app/router';
+import { useSticky } from '../../app/sticky';
 import { useApi } from '../../app/useApi';
 import { Callout, DataTable, ErrorBox, fmt, PageHead, Pager, Panel, Pill, statusTone, type Column, type Tone } from '../../components/ui';
 import { useConfirm } from '../../components/Confirm';
@@ -51,26 +52,26 @@ export function AssetsPage() {
   const { query } = useRouter();
   const { can } = useAuth();
   const confirm = useConfirm();
-  const [q, setQ] = useState(query.get('q') ?? '');
-  const [search, setSearch] = useState(query.get('q') ?? '');
-  const [category, setCategory] = useState(query.get('category') ?? '');
-  const [deviceType, setDeviceType] = useState(query.get('deviceType') ?? '');
+  const [q, setQ] = useSticky('AssetsPage.AssetsPage.q', query.get('q') ?? '');
+  const [search, setSearch] = useSticky('AssetsPage.AssetsPage.search', query.get('q') ?? '');
+  const [category, setCategory] = useSticky('AssetsPage.AssetsPage.category', query.get('category') ?? '');
+  const [deviceType, setDeviceType] = useSticky('AssetsPage.AssetsPage.deviceType', query.get('deviceType') ?? '');
   const [adding, setAdding] = useState(false);
   const [showDups, setShowDups] = useState(false);
   const dups = useDuplicates();
   const deleteDevices = useDeleteDevices();
-  const [department, setDepartment] = useState(query.get('department') ?? '');
-  const [location, setLocation] = useState(query.get('location') ?? '');
+  const [department, setDepartment] = useSticky('AssetsPage.AssetsPage.department', query.get('department') ?? '');
+  const [location, setLocation] = useSticky('AssetsPage.AssetsPage.location', query.get('location') ?? '');
   const locs = useLocations();
   const [assign, setAssign] = useState(false);
   const [manageDeps, setManageDeps] = useState(false);
   const deps = useDepartments();
-  const [status, setStatus] = useState('');
-  const [agent, setAgent] = useState(query.get('agent') ?? '');
-  const [inventory, setInventory] = useState(query.get('inventory') ?? '');
+  const [status, setStatus] = useSticky('AssetsPage.AssetsPage.status', '');
+  const [agent, setAgent] = useSticky('AssetsPage.AssetsPage.agent', query.get('agent') ?? '');
+  const [inventory, setInventory] = useSticky('AssetsPage.AssetsPage.inventory', query.get('inventory') ?? '');
   const [facet, setFacet] = useState<{ facet: string; value: string; label: string } | null>(
     query.get('facet') && query.get('value') != null ? { facet: query.get('facet')!, value: query.get('value')!, label: query.get('label') ?? `${query.get('facet')}: ${query.get('value')}` } : null);
-  const [offline, setOffline] = useState(query.get('offlineDays') ?? '');
+  const [offline, setOffline] = useSticky('AssetsPage.AssetsPage.offline', query.get('offlineDays') ?? '');
   const [page, setPage] = useState(1);
   const [picked, setPicked] = useState<string[]>([]);
   const [msg, setMsg] = useState<{ tone: 'info' | 'crit'; text: string } | null>(null);
@@ -204,6 +205,7 @@ export function AssetsPage() {
       )}
       <ErrorBox error={data.error} />
       <Panel flush>
+        {data.data && <Pager top page={page} pageSize={pageSize} total={data.data.total} onPage={(p) => { setPage(p); setPicked([]); }} />}
         <DataTable rows={rows} empty={data.loading ? 'Loading…' : 'No assets match. Run a discovery scan to find devices.'} columns={columns} />
         {data.data && <Pager page={page} pageSize={pageSize} total={data.data.total} onPage={(p) => { setPage(p); setPicked([]); }} />}
       </Panel>

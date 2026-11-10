@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import { useAuth } from '../../app/auth';
 import { Link, useRouter } from '../../app/router';
+import { useSticky } from '../../app/sticky';
 import { useApi } from '../../app/useApi';
 import { useColumns } from '../../components/columns';
 import { useConfirm } from '../../components/Confirm';
@@ -129,16 +130,16 @@ function Assets({ meta, tick, onMsg }: { meta: LcMeta; tick: number; onMsg: (m: 
   const canEdit = can('lifecycle.manage');
   const deps = useDepartments();
   const locs = useLocations();
-  const [q, setQ] = useState(query.get('q') ?? '');
-  const [search, setSearch] = useState(query.get('q') ?? '');
-  const [stage, setStage] = useState(query.get('stage') ?? '');
-  const [status, setStatus] = useState(query.get('status') ?? '');
-  const [cls, setCls] = useState(query.get('class') ?? '');
-  const [dep, setDep] = useState('');
-  const [loc, setLoc] = useState('');
-  const [warranty, setWarranty] = useState(query.get('warranty') ?? '');
+  const [q, setQ] = useSticky('LifecyclePage.Assets.q', query.get('q') ?? '');
+  const [search, setSearch] = useSticky('LifecyclePage.Assets.search', query.get('q') ?? '');
+  const [stage, setStage] = useSticky('LifecyclePage.Assets.stage', query.get('stage') ?? '');
+  const [status, setStatus] = useSticky('LifecyclePage.Assets.status', query.get('status') ?? '');
+  const [cls, setCls] = useSticky('LifecyclePage.Assets.cls', query.get('class') ?? '');
+  const [dep, setDep] = useSticky('LifecyclePage.Assets.dep', '');
+  const [loc, setLoc] = useSticky('LifecyclePage.Assets.loc', '');
+  const [warranty, setWarranty] = useSticky('LifecyclePage.Assets.warranty', query.get('warranty') ?? '');
   const [untagged] = useState(query.get('untagged') === '1');
-  const [sort, setSort] = useState('name');
+  const [sort, setSort] = useSticky('LifecyclePage.Assets.sort', 'name');
   const [page, setPage] = useState(1);
   const [picked, setPicked] = useState<string[]>([]);
   const [dialog, setDialog] = useState<'stage' | 'contract' | null>(null);
@@ -236,6 +237,7 @@ function Assets({ meta, tick, onMsg }: { meta: LcMeta; tick: number; onMsg: (m: 
       </div>}
       <ErrorBox error={data.error} />
       <Panel flush>
+        {data.data && <Pager top page={page} pageSize={pageSize} total={data.data.total} onPage={(p) => { setPage(p); setPicked([]); }} />}
         <DataTable rows={rows} columns={columns} empty={data.loading ? 'Loading…' : 'No IT assets match.'} />
         {data.data && <Pager page={page} pageSize={pageSize} total={data.data.total} onPage={(p) => { setPage(p); setPicked([]); }} />}
       </Panel>
@@ -252,9 +254,9 @@ function People({ meta, tick, onMsg, onUpload }: { meta: LcMeta; tick: number; o
   const { can } = useAuth();
   const canEdit = can('lifecycle.manage');
   const confirm = useConfirm();
-  const [q, setQ] = useState('');
-  const [search, setSearch] = useState('');
-  const [status, setStatus] = useState('active');
+  const [q, setQ] = useSticky('LifecyclePage.People.q', '');
+  const [search, setSearch] = useSticky('LifecyclePage.People.search', '');
+  const [status, setStatus] = useSticky('LifecyclePage.People.status', 'active');
   const [holding, setHolding] = useState(false);
   const [local, setLocal] = useState(0);
   const [edit, setEdit] = useState<LcPerson | 'new' | null>(null);
@@ -439,7 +441,7 @@ function Refresh({ meta }: { meta: LcMeta }) {
 
 function History({ meta }: { meta: LcMeta }) {
   const [page, setPage] = useState(1);
-  const [kind, setKind] = useState('');
+  const [kind, setKind] = useSticky('LifecyclePage.History.kind', '');
   const ev = useApi(() => api.get<{ items: LcEvent[]; total: number }>('/lifecycle/events', { kind, page, pageSize: 50 }), [kind, page]);
   return (
     <>
@@ -451,6 +453,7 @@ function History({ meta }: { meta: LcMeta }) {
       </div>
       <ErrorBox error={ev.error} />
       <Panel flush>
+        {ev.data && <Pager top page={page} pageSize={50} total={ev.data.total} onPage={setPage} />}
         <DataTable rows={ev.data?.items ?? []} empty={ev.loading ? 'Loading…' : 'No changes.'} columns={[
           { key: 'at', label: 'When', render: (e) => fmt.date(e.at) },
           { key: 'a', label: 'Asset', render: (e) => <Link to={`/lifecycle/assets/${e.assetId}`}>{e.assetTag || e.name || '—'}</Link> },

@@ -290,8 +290,19 @@ public static class MeshRights
     /// <summary>Chat with the user and send notifications.</summary>
     public const uint ChatNotify = 16384;
 
-    /// <summary>A technician's rights: remote desktop and files (always), chat, terminal when allowed.</summary>
-    public static uint Technician(bool terminal) => RemoteControl | ChatNotify | NoAmt | (terminal ? 0 : NoTerminal);
+    /// <summary>Own events only (the device's event history is in Zentriq's Activity Log).</summary>
+    public const uint LimitEvents = 8192;
+    /// <summary>No registry editor (Zentriq has Scripts &amp; Remediation for that).</summary>
+    public const uint NoRegistry = 4194304;
+    /// <summary>No software list (Zentriq has the Software Inventory).</summary>
+    public const uint NoSoftware = 8388608;
+
+    /// <summary>
+    /// A technician's rights: a compact session — remote desktop and file transfer (always), chat with the user, the
+    /// terminal when allowed. The registry editor, software list, Intel AMT and the device's event history are left out:
+    /// Zentriq has them already.
+    /// </summary>
+    public static uint Technician(bool terminal) => RemoteControl | ChatNotify | NoAmt | LimitEvents | NoRegistry | NoSoftware | (terminal ? 0 : NoTerminal);
 
     /// <summary>Quick support sessions: every kind of access needs the user's approval, the user is notified and sees the bar.</summary>
     public const int QuickConsent = 1 | 2 | 4 | 8 | 16 | 32 | 64;

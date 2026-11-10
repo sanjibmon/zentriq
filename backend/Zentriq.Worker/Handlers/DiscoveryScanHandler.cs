@@ -41,7 +41,7 @@ public sealed class DiscoveryScanHandler(NpgsqlDataSource ds, IHostPinger pinger
     /// Ports that identify devices which cannot run an agent: printing (9100, 515, 631), Telnet, web management (8080, 8443,
     /// 4443, 10443), video (554), SIP phones (5060), MikroTik (8291), VMware hosts (902), iSCSI storage (3260). Always probed.
     /// </summary>
-    internal static readonly int[] IdentificationPorts = [9100, 515, 631, 23, 8080, 8443, 4443, 10443, 554, 5060, 8291, 902, 3260];
+    internal static readonly int[] IdentificationPorts = [9100, 9101, 9102, 515, 631, 23, 8080, 8443, 4443, 10443, 554, 5060, 8291, 902, 3260];
 
     /// <summary>Read-only SNMP v2c with the factory community "public": most printers and many switches answer it.</summary>
     internal static readonly ScanCredential PublicSnmp = new(Guid.Empty, "SNMP community 'public' (read-only)", "snmp_v2c", null,
@@ -207,10 +207,13 @@ public sealed class DiscoveryScanHandler(NpgsqlDataSource ds, IHostPinger pinger
             var snmpCreds = SnmpCredentials();
             if (snmpCreds.Count > 0)
             {
-                var snmp = await agentless.TryCollectAsync(ip, hostname, [], false, snmpCreds, timeout, ct);
+                // Printers and switches on busy networks answer SNMP slowly: give them a little longer than a TCP probe.
+                var snmp = await agentless.TryCollectAsync(ip, hostname, [], false, snmpCreds, Max(timeout, TimeSpan.FromMilliseconds(1500)), ct);
                 if (snmp.Outcome == CollectionAttempt.Success) return await StoreInventoryAsync(scanId, target, ip, snmp, probe, adObject, license, ct);
             }
-            await RecordAsync(scanId, target, ip, hostname, ScanResultStatus.Unreachable, [], "No response on any probed port (host down, filtered or not routed)." + adNote, probe.DurationMs, false, null, ct);
+            var marked = await MarkUnreachableAsync(ip, ct);
+            await RecordAsync(scanId, target, ip, hostname, ScanResultStatus.Unreachable, [], "No response on any probed port (host down, filtered or not routed)." + adNote
+                + (marked > 0 ? " The device recorded at this address is not counted for the license while it does not answer." : ""), probe.DurationMs, false, null, ct);
             return new(ScanResultStatus.Unreachable, false, false);
         }
 
@@ -225,7 +228,7 @@ public sealed class DiscoveryScanHandler(NpgsqlDataSource ds, IHostPinger pinger
         var windowsPorts = probe.OpenPorts.Intersect(new[] { 135, 139, 445, 3389, 5985, 5986 }).Any();
         if (_snmpPublic && !windowsPorts && !_creds.Any(c => c.Kind == "snmp_v2c" && c.Secret.Community == "public"))
         {
-            var pub = await agentless.TryCollectAsync(ip, hostname, probe.OpenPorts, true, [PublicSnmp], timeout, ct);
+            var pub = await agentless.TryCollectAsync(ip, hostname, probe.OpenPorts, true, [PublicSnmp], Max(timeout, TimeSpan.FromMilliseconds(3000)), ct);
             if (pub.Outcome == CollectionAttempt.Success) return await StoreInventoryAsync(scanId, target, ip, pub, probe, adObject, license, ct);
         }
         // No inventory protocol: recognise the device from its web interface and open ports.
@@ -258,7 +261,13 @@ public sealed class DiscoveryScanHandler(NpgsqlDataSource ds, IHostPinger pinger
 
         if (fingerprint.DeviceType is { } recognised)
             detail += $" Recognised as {Zentriq.Inventory.DeviceTypes.Get(recognised)?.Label ?? recognised}{(fingerprint.Manufacturer is { } mk ? $" ({(fingerprint.Model is { } md ? (md.StartsWith(mk, StringComparison.OrdinalIgnoreCase) ? md : mk + " " + md) : mk)})" : "")}: {string.Join("; ", fingerprint.Evidence)}.";
-        var (assetId, created, updated, assetNote) = await ReconcileAssetAsync(ip, hostname, probe.OpenPorts, fingerprint, license, ct);
+        // Only refused connections, no name, nothing recognised: often a router or firewall answering for an unused address.
+        // Such an address is listed in the scan results but not added as a device (and so takes no license).
+        var identified = !probe.RefusedOnly || hostname is not null || probe.Mac is not null || fingerprint.DeviceType is not null;
+        var (assetId, created, updated, assetNote) = await ReconcileAssetAsync(ip, hostname, probe.OpenPorts, fingerprint, license, ct, createIfNew: identified);
+        if (assetId is null && !identified)
+            assetNote = "Not added to the inventory: only refused connections and nothing identifies a device at this address (routers and firewalls often answer for unused addresses). " +
+                        "It is added once it has a name in DNS, an open port or the Zentriq Agent.";
         if (assetId is { } macAsset && probe.Mac is { } mac)
         {
             await using (var m = ds.CreateCommand("UPDATE zentriq.assets SET mac_address = COALESCE(mac_address, @m::macaddr) WHERE id = @id"))
@@ -382,7 +391,7 @@ public sealed class DiscoveryScanHandler(NpgsqlDataSource ds, IHostPinger pinger
     /// Matches by IP then hostname among active assets; creates a new asset when nothing matches,
     /// enforcing the workload limit transactionally.
     /// </summary>
-    private async Task<(Guid? Id, bool Created, bool Updated, string? Note)> ReconcileAssetAsync(IPAddress ip, string? hostname, int[] openPorts, Zentriq.Inventory.Fingerprint fp, Application.Licensing.LicenseStatus license, CancellationToken ct)
+    private async Task<(Guid? Id, bool Created, bool Updated, string? Note)> ReconcileAssetAsync(IPAddress ip, string? hostname, int[] openPorts, Zentriq.Inventory.Fingerprint fp, Application.Licensing.LicenseStatus license, CancellationToken ct, bool createIfNew = true)
     {
         await using var conn = await ds.OpenConnectionAsync(ct);
         await using var tx = await conn.BeginTransactionAsync(ct);
@@ -429,6 +438,7 @@ public sealed class DiscoveryScanHandler(NpgsqlDataSource ds, IHostPinger pinger
             return (id, false, true, null);
         }
 
+        if (!createIfNew) { await tx.RollbackAsync(ct); return (null, false, false, null); }
         var (category, osFamily) = Classify(openPorts);
         if (Zentriq.Inventory.DeviceTypes.CategoryFor(fp.DeviceType) is { } fc)
         {
@@ -462,6 +472,23 @@ public sealed class DiscoveryScanHandler(NpgsqlDataSource ds, IHostPinger pinger
             return (newId, true, false, null);
         }
     }
+
+    /// <summary>
+    /// The address did not answer: devices recorded at it without an active agent are marked, so they are not counted for
+    /// the license until they answer again. Returns the number of devices marked.
+    /// </summary>
+    private async Task<int> MarkUnreachableAsync(IPAddress ip, CancellationToken ct)
+    {
+        await using var cmd = ds.CreateCommand("""
+            UPDATE zentriq.assets SET unreachable_since = now()
+             WHERE status = 'active' AND primary_ip = @ip
+               AND NOT EXISTS (SELECT 1 FROM zentriq.agent_registrations r WHERE r.asset_id = assets.id AND r.status = 'active')
+            """);
+        cmd.Parameters.Add(new NpgsqlParameter("ip", NpgsqlDbType.Inet) { Value = ip });
+        return await cmd.ExecuteNonQueryAsync(ct);
+    }
+
+    private static TimeSpan Max(TimeSpan a, TimeSpan b) => a > b ? a : b;
 
     private static void AddFingerprint(NpgsqlCommand cmd, Zentriq.Inventory.Fingerprint fp)
     {

@@ -86,6 +86,9 @@ body { font-family: "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, R
 .dropdown-item:hover { background: rgba(10, 115, 133, .1); color: var(--zq-accent); }
 
 /* Things Zentriq does not use */
+/* Compact device sessions: Desktop, Files (and Terminal when allowed) plus General; Zentriq has the device's events,
+   software, details, scripts and console itself. */
+#MainDevEvents, #MainDevApps, #MainDevRegistry, #MainDevInfo, #MainDevAmt, #MainDevConsole, #MainDevPlugins { display: none !important; }
 #connectbutton1rspan, #connectbutton1hspan, #autoconnectbutton1 { display: none !important; }
 
 /* Sign-in / message / download pages */

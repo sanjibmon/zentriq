@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { api } from '../../api/client';
 import { useAuth } from '../../app/auth';
 import { Link, useRouter } from '../../app/router';
+import { useSticky } from '../../app/sticky';
 import { useApi } from '../../app/useApi';
 import { useColumns } from '../../components/columns';
 import { useConfirm } from '../../components/Confirm';
@@ -145,16 +146,16 @@ type Paged<T> = { items: T[]; total: number };
 
 function Resources() {
   const { query } = useRouter();
-  const [q, setQ] = useState(query.get('q') ?? '');
-  const [search, setSearch] = useState(query.get('q') ?? '');
-  const [provider, setProvider] = useState(query.get('provider') ?? '');
-  const [kind, setKind] = useState(query.get('kind') ?? '');
-  const [state, setState] = useState(query.get('state') ?? '');
-  const [linked, setLinked] = useState(query.get('linked') ?? '');
-  const [findings, setFindings] = useState(query.get('findings') === '1');
+  const [q, setQ] = useSticky('CloudPage.Resources.q', query.get('q') ?? '');
+  const [search, setSearch] = useSticky('CloudPage.Resources.search', query.get('q') ?? '');
+  const [provider, setProvider] = useSticky('CloudPage.Resources.provider', query.get('provider') ?? '');
+  const [kind, setKind] = useSticky('CloudPage.Resources.kind', query.get('kind') ?? '');
+  const [state, setState] = useSticky('CloudPage.Resources.state', query.get('state') ?? '');
+  const [linked, setLinked] = useSticky('CloudPage.Resources.linked', query.get('linked') ?? '');
+  const [findings, setFindings] = useSticky('CloudPage.Resources.findings', query.get('findings') === '1');
   const [deleted, setDeleted] = useState(false);
-  const [accountId, setAccountId] = useState(query.get('account') ?? '');
-  const [sort, setSort] = useState('name');
+  const [accountId, setAccountId] = useSticky('CloudPage.Resources.accountId', query.get('account') ?? '');
+  const [sort, setSort] = useSticky('CloudPage.Resources.sort', 'name');
   const [page, setPage] = useState(1);
   const pageSize = 50;
   const data = useApi(() => api.get<Paged<CloudResource>>('/cloud/resources', {
@@ -210,6 +211,7 @@ function Resources() {
       </form>
       <ErrorBox error={data.error} />
       <Panel flush>
+        {data.data && <Pager top page={page} pageSize={pageSize} total={data.data.total} onPage={setPage} />}
         <DataTable rows={data.data?.items ?? []} columns={columns} empty={data.loading ? 'Loading…' : 'No resources match. Add a connection, or wait for its first sync.'} />
         {data.data && <Pager page={page} pageSize={pageSize} total={data.data.total} onPage={setPage} />}
       </Panel>
@@ -268,12 +270,12 @@ function Findings({ tick, onMsg }: { tick: number; onMsg: (m: string, tone?: 'in
   const { query } = useRouter();
   const { can } = useAuth();
   const canIgnore = can('cloud.manage');
-  const [status, setStatus] = useState('open');
-  const [severity, setSeverity] = useState('');
-  const [provider, setProvider] = useState('');
-  const [rule, setRule] = useState(query.get('rule') ?? '');
-  const [q, setQ] = useState('');
-  const [search, setSearch] = useState('');
+  const [status, setStatus] = useSticky('CloudPage.Findings.status', 'open');
+  const [severity, setSeverity] = useSticky('CloudPage.Findings.severity', '');
+  const [provider, setProvider] = useSticky('CloudPage.Findings.provider', '');
+  const [rule, setRule] = useSticky('CloudPage.Findings.rule', query.get('rule') ?? '');
+  const [q, setQ] = useSticky('CloudPage.Findings.q', '');
+  const [search, setSearch] = useSticky('CloudPage.Findings.search', '');
   const [local, setLocal] = useState(0);
   const data = useApi(() => api.get<CloudFinding[]>('/cloud/findings', { status, severity, provider, rule, q: search }), [status, severity, provider, rule, search, tick, local]);
   const meta = useApi(() => api.get<{ rules: { id: string; label: string }[] }>('/cloud/meta'), []);
@@ -400,9 +402,9 @@ function Accounts({ tick, onMsg, onAdd }: { tick: number; onMsg: (m: string, ton
 // ---- changes -------------------------------------------------------------------------------------------------------
 
 function Changes() {
-  const [days, setDays] = useState(30);
+  const [days, setDays] = useSticky('CloudPage.Changes.days', 30);
   const [change, setChange] = useState('');
-  const [kind, setKind] = useState('');
+  const [kind, setKind] = useSticky('CloudPage.Changes.kind', '');
   const data = useApi(() => api.get<CloudChange[]>('/cloud/changes', { days, change, kind }), [days, change, kind]);
   return (
     <>

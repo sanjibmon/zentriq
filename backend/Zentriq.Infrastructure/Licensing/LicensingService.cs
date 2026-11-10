@@ -100,7 +100,9 @@ public sealed class LicensingService(
     /// <summary>
     /// IT devices that count: status 'active', not merged, seen within licensing.billable_seen_within_days, not planned /
     /// on order / in stock (Asset Lifecycle), and not a virtual machine of a cloud or virtualization connection (those count
-    /// as cloud instances). Grouped by device type.
+    /// as cloud instances). Devices without an agent count only while reachable (not when the last scan of their address
+    /// got no answer), and a scanned address that is another adapter of an inventoried device does not count twice.
+    /// Grouped by device type.
     /// </summary>
     public async Task<Dictionary<string, int>> CountBillableAsync(NpgsqlConnection? conn, NpgsqlTransaction? tx, CancellationToken ct = default)
     {
@@ -118,6 +120,16 @@ public sealed class LicensingService(
                AND NOT EXISTS (SELECT 1 FROM zentriq.asset_lifecycle l WHERE l.asset_id = assets.id AND l.stage IN ('planned','on_order','in_stock'))
                -- A virtual machine from a cloud / virtualization connection counts as a cloud instance instead
                AND NOT EXISTS (SELECT 1 FROM zentriq.cloud_resources c WHERE c.asset_id = assets.id AND c.kind = 'vm' AND c.deleted_at IS NULL)
+               -- Reachable devices only: a device without an agent whose address did not answer the last scan does not count
+               AND NOT (unreachable_since IS NOT NULL AND unreachable_since > last_seen_at
+                        AND NOT EXISTS (SELECT 1 FROM zentriq.agent_registrations r WHERE r.asset_id = assets.id AND r.status = 'active'))
+               -- A record found by a scan at an address that is another adapter of an inventoried device is that device (merged soon)
+               AND NOT (inventory_status <> 'success' AND primary_ip IS NOT NULL AND EXISTS (
+                        SELECT 1 FROM zentriq.assets o JOIN zentriq.asset_inventory_documents d ON d.asset_id = o.id
+                         WHERE o.id <> assets.id AND o.status = 'active' AND o.merged_into IS NULL AND o.inventory_status = 'success'
+                           AND jsonb_typeof(d.document -> 'network') = 'array'
+                           AND EXISTS (SELECT 1 FROM jsonb_array_elements(d.document -> 'network') n
+                                        WHERE jsonb_typeof(n -> 'ipv4') = 'array' AND n -> 'ipv4' ? host(assets.primary_ip))))
              GROUP BY 1
             """;
         await using var cmd = conn is null ? dataSource.CreateCommand(sql) : new NpgsqlCommand(sql, conn, tx);

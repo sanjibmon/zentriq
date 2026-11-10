@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import type { Paged } from '../../api/types';
 import { Link, useRouter } from '../../app/router';
+import { useSticky } from '../../app/sticky';
 import { useApi } from '../../app/useApi';
 import { DataTable, ErrorBox, fmt, PageHead, Pager, Panel, Pill } from '../../components/ui';
 import { Icon } from '../../components/Icon';
@@ -23,10 +24,10 @@ const OP: Record<string, string> = { start: 'Start service', stop: 'Stop service
 export function ActivityPage() {
   const { query } = useRouter();
   const assetId = query.get('assetId') ?? '';
-  const [kind, setKind] = useState(query.get('kind') ?? '');
-  const [status, setStatus] = useState('');
-  const [q, setQ] = useState('');
-  const [search, setSearch] = useState('');
+  const [kind, setKind] = useSticky('ActivityPage.ActivityPage.kind', query.get('kind') ?? '');
+  const [status, setStatus] = useSticky('ActivityPage.ActivityPage.status', '');
+  const [q, setQ] = useSticky('ActivityPage.ActivityPage.q', '');
+  const [search, setSearch] = useSticky('ActivityPage.ActivityPage.search', '');
   const [page, setPage] = useState(1);
   const [csv, setCsv] = useState(false);
   const data = useApi(() => api.get<Paged<ActivityRow>>('/activity', { kind, status, q: search, assetId, page, pageSize: 50 }), [kind, status, search, assetId, page]);
@@ -68,6 +69,7 @@ export function ActivityPage() {
       </form>
       <ErrorBox error={data.error} />
       <Panel flush>
+        {data.data && <Pager top page={page} pageSize={50} total={data.data.total} onPage={setPage} />}
         <DataTable rows={rows} empty={data.loading ? 'Loading…' : 'No device actions yet. Start, stop or restart a service from an asset, or uninstall software from Software Inventory.'} columns={[
           { key: 't', label: 'Requested', render: (r) => <span title={fmt.date(r.requestedAt)}>{fmt.date(r.requestedAt)}</span> },
           { key: 'h', label: 'Device', render: (r) => <Link to={`/assets/${r.assetId}`}><b>{r.hostname ?? r.ip ?? '—'}</b></Link> },

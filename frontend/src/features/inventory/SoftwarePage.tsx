@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import type { Paged, SoftwareInstall, SoftwareRow } from '../../api/types';
 import { Link } from '../../app/router';
+import { useSticky } from '../../app/sticky';
 import { useAuth } from '../../app/auth';
 import { useConfirm } from '../../components/Confirm';
 import { useApi } from '../../app/useApi';
@@ -13,12 +14,12 @@ import { useLocations } from '../locations/Locations';
 
 export function SoftwarePage() {
   const initialQ = new URLSearchParams(window.location.search).get('q') ?? '';
-  const [q, setQ] = useState(initialQ);
-  const [search, setSearch] = useState(initialQ);
+  const [q, setQ] = useSticky('SoftwarePage.SoftwarePage.q', initialQ);
+  const [search, setSearch] = useSticky('SoftwarePage.SoftwarePage.search', initialQ);
   const [page, setPage] = useState(1);
-  const [department, setDepartment] = useState('');
-  const [location, setLocation] = useState('');
-  const [os, setOs] = useState('');
+  const [department, setDepartment] = useSticky('SoftwarePage.SoftwarePage.department', '');
+  const [location, setLocation] = useSticky('SoftwarePage.SoftwarePage.location', '');
+  const [os, setOs] = useSticky('SoftwarePage.SoftwarePage.os', '');
   const deps = useDepartments();
   const locs = useLocations();
   const [selected, setSelected] = useState<string | null>(null);
@@ -96,6 +97,7 @@ export function SoftwarePage() {
       <ErrorBox error={data.error} />
       <div className="grid-2" style={{ gridTemplateColumns: selected ? 'minmax(0,2fr) minmax(0,3fr)' : '1fr' }}>
         <Panel flush>
+          {data.data && <Pager top page={page} pageSize={pageSize} total={data.data.total} onPage={setPage} />}
           <ChoosableTable tableId="software" rows={(data.data?.items ?? []).map((r) => ({ ...r, id: r.name }))} empty={data.loading ? 'Loading…' : 'No software inventory yet. Install agents or run a scan with credentials.'} columns={[
             { key: 'n', label: 'Product', render: (r) => <button className="linkish" onClick={() => setSelected(r.name)}><b>{r.name}</b></button> },
             { key: 'p', label: 'Publisher', render: (r) => r.publisher ?? '—' },

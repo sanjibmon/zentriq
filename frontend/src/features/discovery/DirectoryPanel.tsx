@@ -96,6 +96,7 @@ export function DirectoryPanel({ onScan }: { onScan: (connectionId: string) => v
             <input className="in" style={{ maxWidth: 260 }} placeholder="Search name, login, e-mail, DN…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
           </div>
           <ErrorBox error={objects.error} />
+          {objects.data && <Pager top page={page} pageSize={50} total={objects.data.total} onPage={setPage} />}
           <ObjectsTable type={type} rows={objects.data?.items ?? []} loading={objects.loading} />
           {objects.data && <Pager page={page} pageSize={50} total={objects.data.total} onPage={setPage} />}
         </Panel>

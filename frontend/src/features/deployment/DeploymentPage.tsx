@@ -3,6 +3,7 @@ import { SelfServiceTab } from './SelfServiceTab';
 import { api } from '../../api/client';
 import { useAuth } from '../../app/auth';
 import { Link, useRouter } from '../../app/router';
+import { useSticky } from '../../app/sticky';
 import { useApi } from '../../app/useApi';
 import { useConfirm } from '../../components/Confirm';
 import { Icon } from '../../components/Icon';
@@ -144,8 +145,8 @@ function OverviewTab({ summary, canManage, changed, failed, onTab }: Ctx & { sum
 // ---- approved and blocked software -------------------------------------------------------------------------------
 
 function RulesTab({ tick, canManage, groups, changed, failed }: Ctx) {
-  const [q, setQ] = useState('');
-  const [search, setSearch] = useState('');
+  const [q, setQ] = useSticky('DeploymentPage.RulesTab.q', '');
+  const [search, setSearch] = useSticky('DeploymentPage.RulesTab.search', '');
   const [action, setAction] = useState('');
   const [groupId, setGroupId] = useState('');
   const [local, setLocal] = useState(0);
@@ -223,9 +224,9 @@ function TestDialog({ onClose }: { onClose: () => void }) {
 // ---- standard catalogue --------------------------------------------------------------------------------------
 
 function CatalogTab({ tick, canManage, groups, changed, failed }: Ctx) {
-  const [q, setQ] = useState('');
-  const [category, setCategory] = useState('');
-  const [platform, setPlatform] = useState('');
+  const [q, setQ] = useSticky('DeploymentPage.CatalogTab.q', '');
+  const [category, setCategory] = useSticky('DeploymentPage.CatalogTab.category', '');
+  const [platform, setPlatform] = useSticky('DeploymentPage.CatalogTab.platform', '');
   const [local, setLocal] = useState(0);
   const cat = useApi(() => api.get<Catalog>('/deployment/catalog'), [tick, local]);
   const [sel, setSel] = useState<string[]>([]);
@@ -319,10 +320,10 @@ function OwnEntryDialog({ onClose, onSaved, categories }: { onClose: () => void;
 // ---- software found on devices -------------------------------------------------------------------------------
 
 function InventoryTab({ tick, canManage, groups, changed, failed }: Ctx) {
-  const [q, setQ] = useState('');
-  const [search, setSearch] = useState('');
-  const [status, setStatus] = useState('unapproved');
-  const [platform, setPlatform] = useState('');
+  const [q, setQ] = useSticky('DeploymentPage.InventoryTab.q', '');
+  const [search, setSearch] = useSticky('DeploymentPage.InventoryTab.search', '');
+  const [status, setStatus] = useSticky('DeploymentPage.InventoryTab.status', 'unapproved');
+  const [platform, setPlatform] = useSticky('DeploymentPage.InventoryTab.platform', '');
   const [local, setLocal] = useState(0);
   const rows = useApi(() => api.get<InventoryRow[]>('/deployment/inventory', { q: search, status, platform }), [search, status, platform, tick, local]);
   const [sel, setSel] = useState<string[]>([]);
@@ -427,7 +428,7 @@ function InventoryDevicesDialog({ item, canManage, groups, onClose, onChanged, f
 // ---- requests and events -------------------------------------------------------------------------------------
 
 function RequestsTab({ tick, canManage, groups, changed, failed }: Ctx) {
-  const [status, setStatus] = useState('pending');
+  const [status, setStatus] = useSticky('DeploymentPage.RequestsTab.status', 'pending');
   const [local, setLocal] = useState(0);
   const reqs = useApi(() => api.get<AppRequest[]>('/deployment/requests', { status }), [status, tick, local]);
   const [deciding, setDeciding] = useState<AppRequest | null>(null);
@@ -467,11 +468,11 @@ function RequestsTab({ tick, canManage, groups, changed, failed }: Ctx) {
 }
 
 function EventsTab({ tick, canManage, groups, changed, initialKind }: Ctx & { initialKind: string }) {
-  const [kind, setKind] = useState(initialKind);
+  const [kind, setKind] = useSticky('DeploymentPage.EventsTab.kind', initialKind);
   const [showing, setShowing] = useState<AppEvent | null>(null);
-  const [q, setQ] = useState('');
-  const [search, setSearch] = useState('');
-  const [days, setDays] = useState(7);
+  const [q, setQ] = useSticky('DeploymentPage.EventsTab.q', '');
+  const [search, setSearch] = useSticky('DeploymentPage.EventsTab.search', '');
+  const [days, setDays] = useSticky('DeploymentPage.EventsTab.days', 7);
   const events = useApi(() => api.get<AppEvent[]>('/deployment/events', { kind, q: search, days }), [kind, search, days, tick]);
   const [approving, setApproving] = useState<AppEvent | null>(null);
   const tone = (k: string) => (k === 'blocked' || k === 'remove-failed' ? 'crit' : k === 'audited' || k === 'detected' ? 'warn' : k === 'removed' ? 'ok' : 'info');
@@ -657,7 +658,7 @@ function JobDevices({ id, tick }: { id: string; tick: number }) {
 
 function DevicesTab({ tick }: Ctx) {
   const list = useApi(() => api.get<DeviceRow[]>('/deployment/devices'), [tick]);
-  const [q, setQ] = useState('');
+  const [q, setQ] = useSticky('DeploymentPage.DevicesTab.q', '');
   const rows = (list.data ?? []).filter((d) => !q.trim() || `${d.hostname} ${d.department} ${d.location}`.toLowerCase().includes(q.trim().toLowerCase())).map((d) => ({ ...d, id: d.agentId }));
   const remote = (s: string | null) => s === 'on' ? <Pill tone="ok">Protected</Pill> : s === 'missing' ? <Pill tone="crit">Removed — reinstalling</Pill> : s === 'off' ? <Pill tone="warn">Not protected</Pill> : <span className="muted">Not installed</span>;
   return (

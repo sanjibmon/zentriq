@@ -74,6 +74,8 @@ function Routes() {
   if (hwMatch) return <AssetDetailPage id={hwMatch[1]!} section={{ path: '/hardware', label: 'All hardware', tab: 'hardware' }} />;
   const swMatch = /^\/software\/devices\/([0-9a-f-]{36})$/i.exec(path);
   if (swMatch) return <AssetDetailPage id={swMatch[1]!} section={{ path: '/software', label: 'All software', tab: 'software' }} />;
+  const netMatch = /^\/network\/devices\/([0-9a-f-]{36})$/i.exec(path);
+  if (netMatch) return <AssetDetailPage key={netMatch[1]} id={netMatch[1]!} section={{ path: '/network', label: 'All network devices', tab: 'network' }} />;
   if (path === '/software') return <SoftwarePage />;
   if (path === '/hardware') return <HardwarePage />;
   if (path === '/accessories') return <AccessoriesPage />;

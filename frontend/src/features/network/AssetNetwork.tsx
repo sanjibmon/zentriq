@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { api } from '../../api/client';
-import { Link } from '../../app/router';
+import { Link, useRouter } from '../../app/router';
 import { useApi } from '../../app/useApi';
 import { DataTable, fmt, Panel, Pill } from '../../components/ui';
 import { ConnectedCell, ManagementPill, TrafficCell } from './NetworkPage';
@@ -19,6 +19,10 @@ function KV({ items }: { items: [string, ReactNode][] }) {
  * for switches, routers, firewalls and access points, their ports, neighbours, VLANs and modules.
  */
 export function AssetNetwork({ assetId }: { assetId: string }) {
+  // Opened from Network Inventory, neighbours open there too; from IT Asset Inventory, in the inventory.
+  const { path } = useRouter();
+  const base = path.startsWith('/network') ? '/network/devices/' : '/assets/';
+  const tail = path.startsWith('/network') ? '' : '?tab=network';
   const data = useApi(() => api.get<AssetNetworkData>(`/assets/${assetId}/network`), [assetId]);
   const [all, setAll] = useState(false);
   const n = data.data;
@@ -33,7 +37,7 @@ export function AssetNetwork({ assetId }: { assetId: string }) {
         <Panel title="Connected to" sub="Switch port where this device's MAC address was learned">
           {n.connectedTo.map((c) => (
             <div key={`${c.assetId}:${c.ifIndex}:${c.mac}`} style={{ marginBottom: 4 }}>
-              <Link to={`/assets/${c.assetId}?tab=network`}><b>{c.deviceName}</b></Link> port <b className="mono">{c.port ?? c.ifIndex}</b>
+              <Link to={`${base}${c.assetId}${tail}`}><b>{c.deviceName}</b></Link> port <b className="mono">{c.port ?? c.ifIndex}</b>
               {c.vlan ? <span className="faint"> · VLAN {c.vlan}</span> : null} <span className="faint mono"> · {c.mac}</span>
               {c.unmanagedSuspect && <> <Pill tone="warn">through an unmanaged switch</Pill></>}
             </div>
@@ -64,7 +68,7 @@ export function AssetNetwork({ assetId }: { assetId: string }) {
               <Panel title="Neighbours" sub="LLDP / CDP" flush>
                 <DataTable rows={n.neighbors.map((x, i) => ({ ...x, id: i }))} columns={[
                   { key: 'l', label: 'Port', render: (x) => <span className="mono">{x.localPort ?? '—'}</span> },
-                  { key: 'r', label: 'Neighbour', className: 'wrap', render: (x) => <>{x.remoteAssetId ? <Link to={`/assets/${x.remoteAssetId}?tab=network`}>{x.remoteName}</Link> : x.remoteName ?? '—'}
+                  { key: 'r', label: 'Neighbour', className: 'wrap', render: (x) => <>{x.remoteAssetId ? <Link to={`${base}${x.remoteAssetId}${tail}`}>{x.remoteName}</Link> : x.remoteName ?? '—'}
                     {x.remotePlatform && <div className="faint" style={{ fontSize: 11.5 }}>{x.remotePlatform}</div>}</> },
                   { key: 'p', label: 'Their port', render: (x) => <span className="mono">{x.remotePort ?? '—'}</span> },
                   { key: 'a', label: 'Address', render: (x) => <span className="mono">{x.remoteAddress ?? '—'}</span> },

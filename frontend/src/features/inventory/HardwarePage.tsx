@@ -3,6 +3,7 @@ import { api } from '../../api/client';
 import type { HardwareRow, Paged } from '../../api/types';
 import { useAuth } from '../../app/auth';
 import { Link } from '../../app/router';
+import { useSticky } from '../../app/sticky';
 import { useApi } from '../../app/useApi';
 import { ChangesTab } from './Changes';
 import { useColumns } from '../../components/columns';
@@ -20,13 +21,13 @@ export function HardwarePage() {
   const { can } = useAuth();
   const params = new URLSearchParams(window.location.search);
   const initialQ = params.get('q') ?? '';
-  const [q, setQ] = useState(initialQ);
-  const [search, setSearch] = useState(initialQ);
-  const [department, setDepartment] = useState(params.get('department') ?? '');
-  const [location, setLocation] = useState(params.get('location') ?? '');
-  const [type, setType] = useState('');
-  const [vendor, setVendor] = useState('');
-  const [os, setOs] = useState('');
+  const [q, setQ] = useSticky('HardwarePage.HardwarePage.q', initialQ);
+  const [search, setSearch] = useSticky('HardwarePage.HardwarePage.search', initialQ);
+  const [department, setDepartment] = useSticky('HardwarePage.HardwarePage.department', params.get('department') ?? '');
+  const [location, setLocation] = useSticky('HardwarePage.HardwarePage.location', params.get('location') ?? '');
+  const [type, setType] = useSticky('HardwarePage.HardwarePage.type', '');
+  const [vendor, setVendor] = useSticky('HardwarePage.HardwarePage.vendor', '');
+  const [os, setOs] = useSticky('HardwarePage.HardwarePage.os', '');
   const [page, setPage] = useState(1);
   const [picked, setPicked] = useState<string[]>([]);
   const [assign, setAssign] = useState(false);
@@ -106,6 +107,7 @@ export function HardwarePage() {
       </form>
       <ErrorBox error={data.error} />
       <Panel flush>
+        {data.data && <Pager top page={page} pageSize={pageSize} total={data.data.total} onPage={(p) => { setPage(p); setPicked([]); }} />}
         <DataTable rows={rows} empty={data.loading ? 'Loading…' : 'No hardware inventory matches. Install agents or run an inventory scan.'} columns={columns} />
         {data.data && <Pager page={page} pageSize={pageSize} total={data.data.total} onPage={(p) => { setPage(p); setPicked([]); }} />}
       </Panel>

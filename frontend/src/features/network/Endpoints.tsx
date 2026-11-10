@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { api } from '../../api/client';
 import { useAuth } from '../../app/auth';
 import { Link, useRouter } from '../../app/router';
+import { useSticky } from '../../app/sticky';
 import { useApi } from '../../app/useApi';
 import { ChoosableTable } from '../../components/columns';
 import { Icon } from '../../components/Icon';
@@ -39,9 +40,9 @@ export function EndpointsTab() {
   const { can } = useAuth();
   const { query } = useRouter();
   const canManage = can('assets.manage');
-  const [filter, setFilter] = useState(query.get('filter') ?? '');
-  const [q, setQ] = useState(query.get('q') ?? '');
-  const [search, setSearch] = useState(query.get('q') ?? '');
+  const [filter, setFilter] = useSticky('Endpoints.EndpointsTab.filter', query.get('filter') ?? '');
+  const [q, setQ] = useSticky('Endpoints.EndpointsTab.q', query.get('q') ?? '');
+  const [search, setSearch] = useSticky('Endpoints.EndpointsTab.search', query.get('q') ?? '');
   const [tick, setTick] = useState(0);
   const [picked, setPicked] = useState<string[]>([]);
   const [ack, setAck] = useState(false);
@@ -74,13 +75,13 @@ export function EndpointsTab() {
         <Panel flush title="Connected Devices" sub={`${rows.length.toLocaleString()} shown · every MAC address on an access port`}>
           <ChoosableTable tableId="network.endpoints" rows={rows} empty={data.loading ? 'Loading…' : 'No devices found on switch ports yet. They come from the MAC address tables of switches collected over SNMP.'} columns={[
             ...(canManage ? [{ key: 'x', label: '', fixed: true, render: (e: Endpoint) => <input type="checkbox" checked={picked.includes(e.mac)} onChange={() => toggle(e.mac)} aria-label={`Select ${e.mac}`} disabled={!e.unknown && !e.acknowledged} /> }] : []),
-            { key: 'd', label: 'Device', render: (e) => e.assetId ? <Link to={`/assets/${e.assetId}?tab=network`}><b>{e.assetName ?? e.ip ?? e.mac}</b></Link>
+            { key: 'd', label: 'Device', render: (e) => e.assetId ? <Link to={`/network/devices/${e.assetId}`}><b>{e.assetName ?? e.ip ?? e.mac}</b></Link>
                 : <><b>{e.acknowledged ? (e.note ?? 'Known device') : 'Unknown device'}</b>{e.acknowledged ? <span className="faint"> · marked by {e.ackBy}</span> : null}</> },
             { key: 'mac', label: 'MAC Address', render: (e) => <span className="mono">{e.mac}</span> },
             { key: 'ip', label: 'IP Address', render: (e) => <><span className="mono">{e.ip ?? '—'}</span>{e.prevIp && e.ipChangedAt && <div className="faint" style={{ fontSize: 11.5 }}>was {e.prevIp}</div>}</> },
             { key: 'v', label: 'Vendor', className: 'wrap', render: (e) => e.vendor ?? <span className="faint">Not registered</span> },
             { key: 'k', label: 'Type', render: (e) => kindLabel(e) },
-            { key: 'sw', label: 'Switch · Port', render: (e) => <>{e.switchId ? <Link to={`/assets/${e.switchId}?tab=network`}>{e.switchName}</Link> : e.switchName} <span className="mono">{e.port}</span>
+            { key: 'sw', label: 'Switch · Port', render: (e) => <>{e.switchId ? <Link to={`/network/devices/${e.switchId}`}>{e.switchName}</Link> : e.switchName} <span className="mono">{e.port}</span>
                 {e.behindUnmanaged && <div><Pill tone="warn">Behind unmanaged switch</Pill></div>}
                 {e.movedAt && e.prevPort && <div className="faint" style={{ fontSize: 11.5 }}>moved {fmt.ago(e.movedAt)} from {e.prevSwitchName} {e.prevPort}</div>}</> },
             { key: 'vl', label: 'VLAN', render: (e) => e.vlan ?? '—' },
@@ -184,7 +185,7 @@ export function IpamTab() {
           <DataTable rows={(conflicts.data ?? []).map((c) => ({ ...c, id: c.ip }))} columns={[
             { key: 'ip', label: 'IP Address', render: (c) => <b className="mono">{c.ip}</b> },
             { key: 'd', label: 'Devices Using It', className: 'wrap', render: (c) => <div className="kv-list">{c.devices.map((d) => (
-              <div key={d.mac}><span className="mono">{d.mac}</span> {d.assetId ? <Link to={`/assets/${d.assetId}`}>{d.assetName}</Link> : <span className="faint">{d.vendor ?? 'unknown vendor'}</span>}
+              <div key={d.mac}><span className="mono">{d.mac}</span> {d.assetId ? <Link to={`/network/devices/${d.assetId}`}>{d.assetName}</Link> : <span className="faint">{d.vendor ?? 'unknown vendor'}</span>}
                 {d.port && d.port.trim() && <span className="faint"> · {d.port}</span>}</div>))}</div> },
             { key: 's', label: 'Seen By', className: 'wrap', render: (c) => <span className="faint">{c.seenBy.join(', ')}</span> },
           ]} />
@@ -216,7 +217,7 @@ function UseBar({ used, size }: { used: number; size: number }) {
 }
 
 function SubnetView({ cidr, onBack }: { cidr: string; onBack: () => void }) {
-  const [show, setShow] = useState<'all' | 'used' | 'free' | 'unknown' | 'conflict'>('all');
+  const [show, setShow] = useSticky<'all' | 'used' | 'free' | 'unknown' | 'conflict'>('Endpoints.SubnetView.show', 'all');
   const data = useApi(() => api.get<{ cidr: string; rows: IpRow[] }>('/network/subnets/ips', { cidr, all: true }), [cidr]);
   const all = data.data?.rows ?? [];
   const rows = all.filter((r) => show === 'all' || (show === 'used' && r.used) || (show === 'free' && !r.used) || (show === 'unknown' && r.used && !r.assetId) || (show === 'conflict' && r.conflict))
@@ -237,10 +238,10 @@ function SubnetView({ cidr, onBack }: { cidr: string; onBack: () => void }) {
         <DataTable rows={rows} empty={data.loading ? 'Loading…' : 'No addresses.'} columns={[
           { key: 'ip', label: 'IP Address', render: (r) => <b className="mono">{r.ip}</b> },
           { key: 's', label: 'Status', render: (r) => r.conflict ? <Pill tone="crit">Conflict</Pill> : !r.used ? <span className="faint">Free</span> : r.assetId ? <Pill tone="ok">In Use</Pill> : <Pill tone="warn">In Use · Unknown</Pill> },
-          { key: 'd', label: 'Device', render: (r) => r.assetId ? <Link to={`/assets/${r.assetId}`}>{r.assetName}</Link> : r.used ? <span className="faint">{r.kind ? KIND[r.kind] ?? r.kind : 'Not in inventory'}</span> : null },
+          { key: 'd', label: 'Device', render: (r) => r.assetId ? <Link to={`/network/devices/${r.assetId}`}>{r.assetName}</Link> : r.used ? <span className="faint">{r.kind ? KIND[r.kind] ?? r.kind : 'Not in inventory'}</span> : null },
           { key: 'm', label: 'MAC Address', className: 'wrap', render: (r) => <span className="mono">{(r.macs ?? []).join(', ')}</span> },
           { key: 'v', label: 'Vendor', className: 'wrap', render: (r) => r.vendor ?? '' },
-          { key: 'p', label: 'Switch · Port', render: (r) => r.switchName ? <>{r.switchId ? <Link to={`/assets/${r.switchId}?tab=network`}>{r.switchName}</Link> : r.switchName} <span className="mono">{r.port}</span>{r.vlan ? <span className="faint"> · VLAN {r.vlan}</span> : null}</> : '' },
+          { key: 'p', label: 'Switch · Port', render: (r) => r.switchName ? <>{r.switchId ? <Link to={`/network/devices/${r.switchId}`}>{r.switchName}</Link> : r.switchName} <span className="mono">{r.port}</span>{r.vlan ? <span className="faint"> · VLAN {r.vlan}</span> : null}</> : '' },
           { key: 'src', label: 'Seen In', render: (r) => (r.sources ?? []).map((x) => SOURCE_LABEL[x] ?? x).join(', ') },
           { key: 'l', label: 'Last Seen', render: (r) => (r.lastSeen ? fmt.ago(r.lastSeen) : '') },
         ]} />

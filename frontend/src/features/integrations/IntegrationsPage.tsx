@@ -416,6 +416,7 @@ function DeliveryLog() {
           <option value="">All</option><option value="sent">Sent</option><option value="failed">Failed</option><option value="queued">Waiting / retrying</option><option value="suppressed">Throttled</option>
         </select>}>
         <ErrorBox error={d.error} />
+        {d.data && <Pager top page={page} pageSize={50} total={d.data.total} onPage={setPage} />}
         <DataTable rows={d.data?.items ?? []} empty={d.loading ? 'Loading…' : 'Nothing sent yet.'} columns={[
           { key: 'w', label: 'When', render: (x) => <span title={fmt.date(x.createdAt)}>{fmt.ago(x.createdAt)}</span> },
           { key: 'e', label: 'Event', className: 'wrap', render: (x) => <>{x.title}<div className="faint" style={{ fontSize: 11 }}>{x.eventType}{x.rule ? ` · rule ${x.rule}` : ''}</div></> },

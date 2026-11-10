@@ -23,7 +23,17 @@ public static class DuplicateAssets
         var members = new Dictionary<Guid, Member>();
         var edges = new List<(Guid A, Guid B, string Reason)>();
         await using (var cmd = new NpgsqlCommand("""
-            WITH a AS (
+            -- Addresses of the adapters of inventoried devices (agent or credentialed scan), when only one device has the
+            -- address (shared virtual addresses such as 172.17.0.1 or 192.168.56.1 are left out).
+            WITH ipown AS (
+                SELECT v AS ip, (array_agg(DISTINCT x.id))[1] AS owner
+                  FROM zentriq.assets x
+                  JOIN zentriq.asset_inventory_documents d ON d.asset_id = x.id
+                 CROSS JOIN LATERAL jsonb_array_elements(CASE WHEN jsonb_typeof(d.document -> 'network') = 'array' THEN d.document -> 'network' ELSE '[]' END) n
+                 CROSS JOIN LATERAL jsonb_array_elements_text(CASE WHEN jsonb_typeof(n -> 'ipv4') = 'array' THEN n -> 'ipv4' ELSE '[]' END) v
+                 WHERE x.status = 'active' AND x.inventory_status = 'success' AND v NOT LIKE '127.%' AND v NOT LIKE '169.254.%'
+                 GROUP BY v HAVING count(DISTINCT x.id) = 1),
+            a AS (
                 SELECT x.id, x.hostname, host(x.primary_ip) AS ip, x.serial_number, x.mac_address, x.source, x.inventory_status, x.last_seen_at, x.first_seen_at, x.device_type,
                        NULLIF(lower(split_part(COALESCE(NULLIF(btrim(x.hostname), ''), x.fqdn), '.', 1)), '') AS h,
                        CASE WHEN length(btrim(x.serial_number)) >= 5
@@ -36,18 +46,23 @@ public static class DuplicateAssets
                             THEN x.mac_address END AS mac,
                        EXISTS (SELECT 1 FROM zentriq.agent_registrations r WHERE r.asset_id = x.id AND r.status = 'active') AS has_agent,
                        EXISTS (SELECT 1 FROM zentriq.agent_registrations r WHERE r.asset_id = x.id AND r.status = 'active'
-                                  AND r.last_checkin_at > now() - interval '3 days') AS live_agent
+                                  AND r.last_checkin_at > now() - interval '3 days') AS live_agent,
+                       -- A record found only by its address (a scan) whose address is a second adapter of an inventoried device
+                       CASE WHEN x.inventory_status <> 'success' THEN (SELECT o.owner FROM ipown o WHERE o.ip = host(x.primary_ip)) END AS ip_owner
                   FROM zentriq.assets x WHERE x.status = 'active')
             SELECT x.id, y.id,
                    CASE WHEN x.sn IS NOT NULL AND x.sn = y.sn THEN 'same serial number ' || x.sn
                         WHEN x.mac IS NOT NULL AND x.mac = y.mac THEN 'same network adapter ' || upper(x.mac::text)
+                        WHEN x.ip_owner = y.id THEN 'address ' || x.ip || ' is another adapter of ' || COALESCE(y.hostname, y.ip)
+                        WHEN y.ip_owner = x.id THEN 'address ' || y.ip || ' is another adapter of ' || COALESCE(x.hostname, x.ip)
                         ELSE 'same name ' || x.h END,
                    x.hostname, x.ip, x.serial_number, x.mac_address::text, x.source, x.inventory_status, x.last_seen_at, x.first_seen_at, x.device_type, x.has_agent,
                    y.hostname, y.ip, y.serial_number, y.mac_address::text, y.source, y.inventory_status, y.last_seen_at, y.first_seen_at, y.device_type, y.has_agent
               FROM a x JOIN a y ON x.id < y.id
                AND ((x.h IS NOT NULL AND x.h = y.h AND NOT (x.h = ANY(@generic)))
                     OR (x.sn IS NOT NULL AND x.sn = y.sn)
-                    OR (x.mac IS NOT NULL AND x.mac = y.mac))
+                    OR (x.mac IS NOT NULL AND x.mac = y.mac)
+                    OR x.ip_owner = y.id OR y.ip_owner = x.id)
              -- Two different serial numbers, or two agents both checking in, are two devices that share a name.
              WHERE NOT (x.sn IS NOT NULL AND y.sn IS NOT NULL AND x.sn <> y.sn)
                AND NOT (x.live_agent AND y.live_agent)

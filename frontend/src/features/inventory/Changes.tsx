@@ -47,6 +47,7 @@ export function ChangesView({ kind, assetId, title }: { kind?: 'hardware' | 'sof
       <select className="in" value={days} onChange={(e) => { setDays(Number(e.target.value)); setPage(1); }} aria-label="Period"><option value={1}>Last 24 hours</option><option value={7}>Last 7 days</option><option value={30}>Last 30 days</option><option value={90}>Last 90 days</option><option value={365}>Last year</option></select>
     </div>}>
       <ErrorBox error={data.error} />
+      {data.data && data.data.total > 50 && <Pager top page={page} pageSize={50} total={data.data.total} onPage={setPage} />}
       <DataTable rows={data.data?.items ?? []} empty={data.loading ? 'Loading…' : 'No changes found. Changes are recorded from the second inventory of a device onwards.'} columns={[
         { key: 'w', label: 'Detected', render: (c) => <span title={fmt.date(c.detectedAt)}>{fmt.date(c.detectedAt)}</span> },
         ...(!assetId ? [{ key: 'h', label: 'Device', render: (c: ChangeRow) => <><Link to={`/assets/${c.assetId}?tab=changes`}>{c.hostname ?? c.assetId}</Link>{c.department && <div className="faint" style={{ fontSize: 11.5 }}>{c.department}</div>}</> }] : []),

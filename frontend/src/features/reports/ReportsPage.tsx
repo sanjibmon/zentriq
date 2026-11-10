@@ -120,6 +120,7 @@ function History() {
       {err && <Callout tone="crit" icon="alert">{err}</Callout>}
       <ErrorBox error={runs.error} />
       <Panel flush sub="Scheduled and on-demand deliveries. Files are kept for 30 days.">
+        {runs.data && <Pager top page={page} pageSize={pageSize} total={runs.data.total} onPage={setPage} />}
         <DataTable rows={runs.data?.items ?? []} empty={runs.loading ? 'Loading…' : 'No report has been delivered yet.'} columns={[
           { key: 't', label: 'Started', render: (r) => fmt.date(r.startedAt) },
           { key: 'n', label: 'Report', className: 'wrap', render: (r) => r.reportId ? <Link to={`/reports/${r.reportId}`}>{r.reportName}</Link> : r.reportName },

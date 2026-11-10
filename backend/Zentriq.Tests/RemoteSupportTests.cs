@@ -70,8 +70,9 @@ public sealed class RemoteSupportTests
         Assert.Equal("zq-11111111222233334444555555555555", RemoteSupportService.MeshUserName(id));
         Assert.Equal("abc$def", new MeshNode("node//abc$def", "PC", null, null, true, null, 4, null).UrlId);
         // Technicians: desktop and files always, chat; terminal only when allowed; never Intel AMT.
-        Assert.Equal(8u | 16384u | 2048u, MeshRights.Technician(terminal: true));
-        Assert.Equal(8u | 16384u | 2048u | 512u, MeshRights.Technician(terminal: false));
+        Assert.Equal(8u | 16384u | 2048u | 8192u | 4194304u | 8388608u, MeshRights.Technician(terminal: true));
+        Assert.Equal(53, RemoteSupportService.CompactHide);
+        Assert.Equal(8u | 16384u | 2048u | 8192u | 4194304u | 8388608u | 512u, MeshRights.Technician(terminal: false));
         Assert.Equal(MeshRights.Consent(true, true, true), MeshRights.QuickConsent);
     }
 

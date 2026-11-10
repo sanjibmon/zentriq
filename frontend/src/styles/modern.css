@@ -695,3 +695,30 @@ input[type=file].in { height: auto; padding: 7px 10px; }
 .fgrid > div.ff { display: grid; grid-row: span 3; grid-template-rows: subgrid; row-gap: 6px; align-content: start; margin-bottom: 16px; }
 .fgrid > div.ff > .fcheck { align-self: center; }
 .fgrid > span:empty { grid-row: span 3; }
+
+/* Build 119: the menu as modules that open and close (one at a time).
+   Module headings are larger than the pages under them; pages keep their boxes and sit indented under the heading. */
+.nav { padding: 6px 10px 16px; }
+.nav-sec { margin: 2px 0; }
+.nav-sec + .nav-sec { border-top: 1px solid rgba(255, 255, 255, .07); padding-top: 2px; }
+.nav .nav-head, .nav a.nav-mod {
+  display: flex; align-items: center; gap: 11px; width: 100%; height: 44px; margin: 2px 0; padding: 0 10px;
+  border: 0; border-radius: 10px; background: transparent; box-shadow: none;
+  color: #F4F9FB; font: inherit; font-size: 15px; font-weight: 700; letter-spacing: .005em; text-align: left; cursor: pointer;
+}
+.nav .nav-head svg, .nav a.nav-mod svg { width: 19px; height: 19px; color: #7FD3DE; opacity: 1; }
+.nav .nav-head:hover, .nav a.nav-mod:hover { background: rgba(255, 255, 255, .06); }
+.nav .nav-head:focus-visible { outline: 2px solid #4FC3D3; outline-offset: 1px; }
+.nav .nav-head > span:first-of-type { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav .nav-head .nav-lock { margin-left: 0; }
+.nav .nav-head .nav-chev { width: 14px; height: 14px; color: #A9C0CE; transition: transform .15s; }
+.nav-sec.open > .nav-head .nav-chev { transform: rotate(90deg); }
+.nav .nav-head.here:not([aria-expanded=true]) { background: rgba(56, 179, 196, .14); }
+.nav a.nav-mod.active { background: rgba(56, 179, 196, .22); box-shadow: inset 3px 0 0 #4FC3D3; }
+.nav-items { margin: 0 0 8px 19px; padding-left: 10px; border-left: 1px solid rgba(255, 255, 255, .12); }
+.nav-items a { height: 34px; margin: 4px 0; font-size: 13.5px; font-weight: 500; gap: 10px; }
+.nav-items a svg { width: 16px; height: 16px; }
+.collapsed .nav-items { margin: 0; padding: 0; border: 0; }
+.collapsed .nav-sec + .nav-sec { border-top-color: rgba(255, 255, 255, .1); }
+/* Page navigation above lists too */
+.pager-top { border-top: 0; border-bottom: 1px solid var(--line); }

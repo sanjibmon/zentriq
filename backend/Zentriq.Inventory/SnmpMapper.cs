@@ -44,9 +44,41 @@ public static class SnmpMapper
     public const string PrtSuppliesMaxCapacity = "1.3.6.1.2.1.43.11.1.1.8";
     public const string PrtSuppliesLevel = "1.3.6.1.2.1.43.11.1.1.9";
     public const string HrPrinterStatus = "1.3.6.1.2.1.25.3.5.1.1";
+    public const string PrtGeneralPrinterName = "1.3.6.1.2.1.43.5.1.1.16";      // Printer-MIB v2 prtGeneralPrinterName (model)
+    public const string PrtInterpreterDescription = "1.3.6.1.2.1.43.15.1.1.5";  // page description languages (PCL, PostScript…)
+    /// <summary>
+    /// Device OIDs (sysObjectID) of makers that build printers only, or of their printer families: such a device is a
+    /// printer even when it does not answer the Printer-MIB (common with SNMPv1 and older firmware).
+    /// </summary>
+    public static readonly string[] PrinterObjectIds =
+    [
+        "1.3.6.1.4.1.11.2.3.9",   // HP JetDirect / LaserJet / OfficeJet / PageWide
+        "1.3.6.1.4.1.367.",       // Ricoh (also Savin, Lanier, Gestetner, nashuatec)
+        "1.3.6.1.4.1.1602.",      // Canon
+        "1.3.6.1.4.1.2435.",      // Brother
+        "1.3.6.1.4.1.1347.",      // Kyocera
+        "1.3.6.1.4.1.253.",       // Xerox
+        "1.3.6.1.4.1.297.",       // Fuji Xerox / FUJIFILM Business Innovation
+        "1.3.6.1.4.1.18334.",     // Konica Minolta (also Develop / ineo)
+        "1.3.6.1.4.1.1248.",      // Epson
+        "1.3.6.1.4.1.641.",       // Lexmark
+        "1.3.6.1.4.1.2385.",      // Sharp
+        "1.3.6.1.4.1.1129.",      // Toshiba TEC (e-STUDIO)
+        "1.3.6.1.4.1.2001.",      // OKI
+        "1.3.6.1.4.1.10642.",     // Zebra
+        "1.3.6.1.4.1.236.11.5",   // Samsung printers
+        "1.3.6.1.4.1.40093.",     // Pantum
+        "1.3.6.1.4.1.674.10898",  // Dell printers
+        "1.3.6.1.4.1.24807.",     // Riso
+        "1.3.6.1.4.1.6168.",      // TSC label printers
+        "1.3.6.1.4.1.683.",       // Intermec / Honeywell label printers
+    ];
+
+    public static bool IsPrinterObjectId(string? oid) =>
+        oid is not null && PrinterObjectIds.Any(p => oid.StartsWith(p, StringComparison.Ordinal) || oid + "." == p);
     public static readonly string[] WalkColumns = { EntPhysicalClass, EntPhysicalSoftwareRev, EntPhysicalSerialNum, EntPhysicalMfgName, EntPhysicalModelName, EntPhysicalFirmwareRev,
         IfDescr, IfPhysAddress, IfSpeed, IfType, IfOperStatus, IfAlias, IpAdEntAddr, PrtGeneralSerial, PrtMarkerLifeCount, PrtSuppliesDescription, PrtSuppliesMaxCapacity, PrtSuppliesLevel,
-        HrPrinterStatus, HrDeviceDescr };
+        HrPrinterStatus, HrDeviceDescr, PrtGeneralPrinterName, PrtInterpreterDescription };
 
     private static readonly Dictionary<string, string> Enterprises = new()
     {
@@ -61,6 +93,8 @@ public static class SnmpMapper
         ["3097"] = "WatchGuard", ["7244"] = "Barracuda", ["890"] = "Zyxel", ["6574"] = "Synology", ["24681"] = "QNAP", ["39165"] = "Hikvision",
         ["1588"] = "Brocade", ["3076"] = "Cisco (Altiga)", ["2604"] = "Sophos (Cyberoam)", ["17713"] = "Cambium", ["4413"] = "Broadcom", ["3808"] = "CyberPower",
         ["1991"] = "Brocade (Foundry)", ["13464"] = "Grandstream", ["37459"] = "Yealink", ["13885"] = "Polycom",
+        ["297"] = "FUJIFILM (Fuji Xerox)", ["1129"] = "Toshiba", ["2001"] = "OKI", ["10642"] = "Zebra", ["236"] = "Samsung", ["40093"] = "Pantum",
+        ["24807"] = "Riso", ["6168"] = "TSC", ["683"] = "Honeywell (Intermec)",
     };
 
     public static InventoryDocument Map(IReadOnlyDictionary<string, string> v, string ip, string collectorVersion)
@@ -85,7 +119,10 @@ public static class SnmpMapper
         doc.Os.Version = Ent(EntPhysicalSoftwareRev);
 
         var lower = (descr ?? "").ToLowerInvariant();
-        var hasPrinterMib = v.Keys.Any(k => k.StartsWith(PrtGeneralSerial, StringComparison.Ordinal) || k.StartsWith(PrtMarkerLifeCount, StringComparison.Ordinal) || k.StartsWith(HrPrinterStatus, StringComparison.Ordinal));
+        var hasPrinterMib = v.Keys.Any(k => k.StartsWith(PrtGeneralSerial, StringComparison.Ordinal) || k.StartsWith(PrtMarkerLifeCount, StringComparison.Ordinal) || k.StartsWith(HrPrinterStatus, StringComparison.Ordinal)
+                                         || k.StartsWith(PrtGeneralPrinterName, StringComparison.Ordinal) || k.StartsWith(PrtSuppliesDescription, StringComparison.Ordinal))
+                            // A printer maker's device OID: a printer even without the Printer-MIB (SNMPv1, older firmware)
+                            || IsPrinterObjectId(oid);
         var isUps = v.ContainsKey(UpsIdentModel);
         var isHostOs = oid is not null && (oid.StartsWith("1.3.6.1.4.1.8072", StringComparison.Ordinal) || oid.StartsWith("1.3.6.1.4.1.311", StringComparison.Ordinal))
                        && !hasPrinterMib && !lower.Contains("pfsense") && !lower.Contains("opnsense");
@@ -113,7 +150,8 @@ public static class SnmpMapper
 
         if (hasPrinterMib)
         {
-            // Model: the printer's own description (hrDeviceDescr of the printer device) when ENTITY-MIB has none.
+            // Model: the printer's name (Printer-MIB v2), else its own description (hrDeviceDescr of the printer device) when ENTITY-MIB has none.
+            doc.Device.Model ??= WindowsCollector.Clean(FirstUnder(v, PrtGeneralPrinterName));
             doc.Device.Model ??= WindowsCollector.Clean(v.Where(kv => kv.Key.StartsWith(HrDeviceDescr + ".", StringComparison.Ordinal)).Select(kv => kv.Value)
                 .FirstOrDefault(x => !string.IsNullOrWhiteSpace(x) && x.IndexOf("network", StringComparison.OrdinalIgnoreCase) < 0));
             var p = new PrinterInfo();

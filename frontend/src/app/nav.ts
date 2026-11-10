@@ -55,6 +55,12 @@ export const NAV: [string, NavItem[]][] = [
 
 export const ALL_NAV = NAV.flatMap(([, items]) => items);
 
+/** Icon of each module heading in the menu. */
+export const GROUP_ICON: Record<string, IconName> = {
+  'Overview': 'dashboard', 'Discovery & Inventory': 'search', 'Remote Support': 'remote',
+  'Infrastructure': 'cloud', 'Secure & Remediate': 'shield', 'Insight & Admin': 'report',
+};
+
 /** Product section of each navigation group (installed by Standard / Advanced setup, enabled by the edition). */
 export const SECTION_OF_GROUP: Record<string, string> = {
   'Overview': 'overview', 'Discovery & Inventory': 'discover', 'Remote Support': 'remote',

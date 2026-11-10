@@ -3,6 +3,7 @@ import { api } from '../../api/client';
 import type { Paged } from '../../api/types';
 import { useAuth } from '../../app/auth';
 import { Link, useRouter } from '../../app/router';
+import { useSticky } from '../../app/sticky';
 import { useApi } from '../../app/useApi';
 import { CategoryChart, ChartKindPicker, TrendArea, useChartKind, type ChartKind, type Slice } from '../../components/charts';
 import { Icon } from '../../components/Icon';
@@ -163,21 +164,21 @@ export function RiskBar({ v }: { v: number }) {
 function Findings({ onCve }: { onCve: (c: string) => void }) {
   const { query } = useRouter();
   const { can } = useAuth();
-  const [status, setStatus] = useState(query.get('status') ?? 'active');
-  const [source, setSource] = useState(query.get('source') ?? '');
-  const [assignee, setAssignee] = useState(query.get('assignee') ?? '');
+  const [status, setStatus] = useSticky('VulnerabilitiesPage.Findings.status', query.get('status') ?? 'active');
+  const [source, setSource] = useSticky('VulnerabilitiesPage.Findings.source', query.get('source') ?? '');
+  const [assignee, setAssignee] = useSticky('VulnerabilitiesPage.Findings.assignee', query.get('assignee') ?? '');
   const vendor = query.get('vendor');
   const product = query.get('product');
   const [open, setOpen] = useState<number | null>(null);
   const [wf, setWf] = useState<'assign' | 'ticket' | 'note' | null>(null);
-  const [priority, setPriority] = useState(query.get('priority') ?? '');
-  const [severity, setSeverity] = useState(query.get('severity') ?? '');
-  const [kev, setKev] = useState(query.get('kev') === 'true');
-  const [overdue, setOverdue] = useState(query.get('overdue') === 'true');
+  const [priority, setPriority] = useSticky('VulnerabilitiesPage.Findings.priority', query.get('priority') ?? '');
+  const [severity, setSeverity] = useSticky('VulnerabilitiesPage.Findings.severity', query.get('severity') ?? '');
+  const [kev, setKev] = useSticky('VulnerabilitiesPage.Findings.kev', query.get('kev') === 'true');
+  const [overdue, setOverdue] = useSticky('VulnerabilitiesPage.Findings.overdue', query.get('overdue') === 'true');
   const assetId = query.get('assetId');
-  const [q, setQ] = useState(query.get('q') ?? '');
-  const [search, setSearch] = useState(q);
-  const [sort, setSort] = useState(query.get('sort') ?? 'risk');
+  const [q, setQ] = useSticky('VulnerabilitiesPage.Findings.q', query.get('q') ?? '');
+  const [search, setSearch] = useSticky('VulnerabilitiesPage.Findings.search', q);
+  const [sort, setSort] = useSticky('VulnerabilitiesPage.Findings.sort', query.get('sort') ?? 'risk');
   const [page, setPage] = useState(1);
   const [picked, setPicked] = useState<number[]>([]);
   const [exc, setExc] = useState<'accepted' | 'false_positive' | 'open' | null>(null);
@@ -268,6 +269,7 @@ function Findings({ onCve }: { onCve: (c: string) => void }) {
         <button className="btn sm" onClick={() => setPicked([])}>Clear</button>
       </div>}
       <Panel flush>
+        {data.data && <Pager top page={page} pageSize={pageSize} total={data.data.total} onPage={setPage} />}
         <DataTable rows={items} empty={data.loading ? 'Loading…' : status === 'open' ? 'No open findings match.' : 'No findings match.'} columns={[
           ...(canPick ? [{
             key: 'sel', label: <input type="checkbox" className="row-sel" aria-label="Select all on this page" checked={items.length > 0 && items.filter((f) => f.status !== 'fixed').every((f) => picked.includes(f.id))}
@@ -308,7 +310,7 @@ function Findings({ onCve }: { onCve: (c: string) => void }) {
 
 /** Open findings grouped by the action that closes them, ranked by priority and the risk removed. */
 function RemediationPlan() {
-  const [source, setSource] = useState('');
+  const [source, setSource] = useSticky('VulnerabilitiesPage.RemediationPlan.source', '');
   const plan = useApi(() => api.get<{ items: Remediation[]; total: number }>('/vulnerabilities/remediations', { source: source || undefined }), [source]);
   const items = plan.data?.items ?? [];
   const maxRisk = Math.max(1, ...items.map((x) => x.riskReduction));
@@ -355,9 +357,9 @@ function RemediationPlan() {
 
 function Products() {
   const { can } = useAuth();
-  const [q, setQ] = useState('');
-  const [search, setSearch] = useState('');
-  const [status, setStatus] = useState('');
+  const [q, setQ] = useSticky('VulnerabilitiesPage.Products.q', '');
+  const [search, setSearch] = useSticky('VulnerabilitiesPage.Products.search', '');
+  const [status, setStatus] = useSticky('VulnerabilitiesPage.Products.status', '');
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<ProductMapping | null>(null);
   const pageSize = 50;
@@ -375,6 +377,7 @@ function Products() {
       </form>
       <ErrorBox error={data.error} />
       <Panel flush>
+        {data.data && <Pager top page={page} pageSize={pageSize} total={data.data.total} onPage={setPage} />}
         <DataTable rows={data.data?.items ?? []} empty={data.loading ? 'Loading…' : 'No installed software yet.'} columns={[
           { key: 's', label: 'Installed software', className: 'wrap', render: (m) => <><b>{m.software}</b>{m.publisher && <div className="faint" style={{ fontSize: 11.5 }}>{m.publisher}</div>}</> },
           { key: 'm', label: 'NVD product', render: (m) => m.vendor ? <span className="mono">{m.vendor}:{m.product}</span> : <span className="muted">—</span> },

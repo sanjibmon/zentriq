@@ -4,7 +4,9 @@ using System.Net.Sockets;
 
 namespace Zentriq.Worker.Handlers;
 
-public sealed record ProbeResult(bool Alive, int[] OpenPorts, int DurationMs, string? Note, string? Mac = null);
+/// <param name="RefusedOnly">Only refused connections answered (no open port, no ARP or ping answer): routers and firewalls
+/// often answer like this for addresses where no device exists.</param>
+public sealed record ProbeResult(bool Alive, int[] OpenPorts, int DurationMs, string? Note, string? Mac = null, bool RefusedOnly = false);
 
 public interface IHostPinger
 {
@@ -27,6 +29,7 @@ public sealed class TcpHostPinger : IHostPinger
         var open = ports.Where((_, i) => results[i] == PortState.Open).ToArray();
         var alive = results.Any(r => r is PortState.Open or PortState.Refused);
         var note = open.Length == 0 && alive ? "Host refused connections on probed ports" : null;
+        var refusedOnly = alive && open.Length == 0;
         string? mac = null;
         if (!alive)
         {
@@ -42,7 +45,8 @@ public sealed class TcpHostPinger : IHostPinger
                        "Install the Zentriq Agent on it (Intune, Configuration Manager, Group Policy or manually), or allow WinRM (TCP 5985) from the Zentriq server.";
             }
         }
-        return new ProbeResult(alive, open, (int)sw.ElapsedMilliseconds, note, mac);
+        if (refusedOnly && OperatingSystem.IsWindows() && ArpLookup(ip) is { } arpMac) { mac = arpMac; refusedOnly = false; }   // a real adapter answered
+        return new ProbeResult(alive, open, (int)sw.ElapsedMilliseconds, note, mac, refusedOnly);
     }
 
     private static async Task<bool> PingAsync(IPAddress ip, TimeSpan timeout)

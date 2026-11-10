@@ -202,6 +202,7 @@ function History({ onRestore, admin }: { onRestore: (file: string) => void; admi
     <>
       <ErrorBox error={runs.error} />
       <Panel flush sub="Every backup with its copies. Files stay on this server as long as the retention keeps them.">
+        {runs.data && <Pager top page={page} pageSize={pageSize} total={runs.data.total} onPage={setPage} />}
         <DataTable rows={runs.data?.items ?? []} empty={runs.loading ? 'Loading…' : 'No backups yet.'} columns={[
           { key: 't', label: 'Started', render: (r) => <>{fmt.date(r.startedAt)}<div className="faint" style={{ fontSize: 11.5 }}>{TRIGGERS[r.trigger]}{r.requestedBy ? ` · ${r.requestedBy}` : ''}</div></> },
           { key: 's', label: 'Result', render: (r) => <span title={r.error ?? ''}><Pill tone={r.status === 'succeeded' ? 'ok' : r.status === 'partial' ? 'warn' : r.status === 'running' ? 'info' : 'crit'}>

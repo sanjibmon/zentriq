@@ -3,6 +3,7 @@ import { api } from '../../api/client';
 import type { Paged } from '../../api/types';
 import { useAuth } from '../../app/auth';
 import { Link, useRouter } from '../../app/router';
+import { useSticky } from '../../app/sticky';
 import { useApi } from '../../app/useApi';
 import { CategoryChart, HBars } from '../../components/charts';
 import { useConfirm } from '../../components/Confirm';
@@ -141,7 +142,7 @@ function ScoreTrend({ points }: { points: SecOverview['trend'] }) {
 
 function Checks({ baselineId, onRule }: { baselineId: string | null; onRule: (id: string) => void }) {
   const r = useApi(() => api.get<{ baselineId: string | null; rules: SecRule[] }>('/security/rules', { baselineId }), [baselineId]);
-  const [cat, setCat] = useState('');
+  const [cat, setCat] = useSticky('SecurityPage.Checks.cat', '');
   const [onlyFailing, setOnlyFailing] = useState(false);
   if (r.error) return <ErrorBox error={r.error} />;
   if (!r.data) return <p className="muted">Loading…</p>;
@@ -280,9 +281,9 @@ function ExceptionDialog({ ruleId, assetIds, label, baselineId, onClose, onSaved
 // ---- Devices -----------------------------------------------------------------------------------------
 
 function Devices({ baselineId }: { baselineId: string | null }) {
-  const [q, setQ] = useState('');
-  const [search, setSearch] = useState('');
-  const [sort, setSort] = useState('worst');
+  const [q, setQ] = useSticky('SecurityPage.Devices.q', '');
+  const [search, setSearch] = useSticky('SecurityPage.Devices.search', '');
+  const [sort, setSort] = useSticky('SecurityPage.Devices.sort', 'worst');
   const [page, setPage] = useState(1);
   useEffect(() => { const t = setTimeout(() => { setSearch(q); setPage(1); }, 300); return () => clearTimeout(t); }, [q]);
   const d = useApi(() => api.get<Paged<DeviceScore>>('/security/devices', { baselineId, q: search, sort, page, pageSize: 50 }), [baselineId, search, sort, page]);
@@ -292,6 +293,7 @@ function Devices({ baselineId }: { baselineId: string | null }) {
       <select className="in" value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort"><option value="worst">Lowest score first</option><option value="best">Highest score first</option><option value="failed">Most failed</option><option value="host">Hostname</option></select>
     </div>}>
       <ErrorBox error={d.error} />
+      {d.data && <Pager top page={page} pageSize={50} total={d.data.total} onPage={setPage} />}
       <DataTable rows={(d.data?.items ?? []).map((x) => ({ ...x, id: x.assetId }))} empty={d.loading ? 'Loading…' : 'No Windows or Linux devices assessed yet.'} columns={[
         { key: 'h', label: 'Device', render: (x) => <Link to={`/assets/${x.assetId}?tab=security`}>{x.hostname ?? x.assetId}</Link> },
         { key: 'o', label: 'Operating system', render: (x) => x.os ?? '—' },

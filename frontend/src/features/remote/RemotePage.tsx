@@ -71,13 +71,12 @@ function SessionButtons({ online, allowTerminal, onOpen, primary = 'Remote deskt
     <div className="rs-actions">
       <button className="btn sm primary" disabled={!online} title={why} onClick={() => onOpen('desktop')}><Icon name="monitor" size={13} /> {primary}</button>
       <button className="btn sm" disabled={!online} title={why} onClick={() => onOpen('files')}><Icon name="folder" size={13} /> Files</button>
-      <span className="rs-more">
+      {allowTerminal && <span className="rs-more">
         <button className="btn sm icon-only" disabled={!online} aria-label="More session options" aria-expanded={menu} onClick={(e) => { e.stopPropagation(); setMenu(!menu); }}><Icon name="more" size={14} /></button>
         {menu && <div className="rs-menu" role="menu">
-          <button role="menuitem" onClick={() => onOpen('device')}><Icon name="chat" size={13} /> Chat &amp; device details</button>
-          {allowTerminal && <button role="menuitem" onClick={() => onOpen('terminal')}><Icon name="terminal" size={13} /> Terminal</button>}
+          <button role="menuitem" onClick={() => onOpen('terminal')}><Icon name="terminal" size={13} /> Terminal</button>
         </div>}
-      </span>
+      </span>}
     </div>
   );
 }
@@ -345,6 +344,7 @@ function Sessions() {
   return (
     <Panel flush title="Session history" sub="Every remote session opened from Zentriq (also in the activity log). Recorded sessions can be played back.">
       <ErrorBox error={d.error} />
+      {d.data && <Pager top page={page} pageSize={50} total={d.data.total} onPage={setPage} />}
       <DataTable rows={d.data?.items ?? []} empty={d.loading ? 'Loading…' : 'No remote sessions yet.'} columns={[
         { key: 't', label: 'When', render: (s) => <span title={fmt.date(s.at)}>{fmt.date(s.at)}</span> },
         { key: 'u', label: 'Technician', render: (s) => s.user },

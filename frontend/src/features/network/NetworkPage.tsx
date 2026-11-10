@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { api } from '../../api/client';
 import { Link, useRouter } from '../../app/router';
+import { useSticky } from '../../app/sticky';
 import { useApi } from '../../app/useApi';
 import { CategoryChart, ChartKindPicker, useChartKind } from '../../components/charts';
 import { Callout, DataTable, ErrorBox, fmt, Kpis, Loading, PageHead, Panel, Pill } from '../../components/ui';
@@ -115,10 +116,10 @@ function Meter({ value }: { value: number }) {
 
 function DevicesTab({ summary }: { summary: NetworkSummary | null }) {
   const { query } = useRouter();
-  const [type, setType] = useState(query.get('type') ?? '');
-  const [mgmt, setMgmt] = useState(query.get('management') ?? '');
-  const [q, setQ] = useState('');
-  const [search, setSearch] = useState('');
+  const [type, setType] = useSticky('NetworkPage.DevicesTab.type', query.get('type') ?? '');
+  const [mgmt, setMgmt] = useSticky('NetworkPage.DevicesTab.mgmt', query.get('management') ?? '');
+  const [q, setQ] = useSticky('NetworkPage.DevicesTab.q', '');
+  const [search, setSearch] = useSticky('NetworkPage.DevicesTab.search', '');
   const data = useApi(() => api.get<NetworkDevice[]>('/network/devices', { type, management: mgmt, q: search }), [type, mgmt, search]);
   const rows = data.data ?? [];
   // Chart type per tile (share bar, bar, column, pie), remembered in this browser.
@@ -155,7 +156,7 @@ function DevicesTab({ summary }: { summary: NetworkSummary | null }) {
       <ErrorBox error={data.error} />
       <Panel flush>
         <ChoosableTable tableId="network.devices" rows={rows} empty={data.loading ? 'Loading…' : 'No network devices match.'} columns={[
-          { key: 'n', label: 'Device', render: (d) => <Link to={`/assets/${d.id}?tab=network`}><b>{d.hostname ?? d.ip}</b></Link> },
+          { key: 'n', label: 'Device', render: (d) => <Link to={`/network/devices/${d.id}`}><b>{d.hostname ?? d.ip}</b></Link> },
           { key: 'ip', label: 'IP address', render: (d) => d.ip ? <span className="mono">{d.ip}</span> : '—' },
           { key: 't', label: 'Type', render: (d) => <>{typeName(d.deviceType)}{d.stackMembers && d.stackMembers > 1 ? <div className="faint" style={{ fontSize: 11.5 }}>stack of {d.stackMembers}</div> : null}</> },
           { key: 'm', label: 'Manufacturer / model', className: 'wrap', render: (d) => [d.manufacturer, d.model].filter(Boolean).join(' ') || '—' },
@@ -181,9 +182,9 @@ function DevicesTab({ summary }: { summary: NetworkSummary | null }) {
 
 export function ConnectedCell({ p }: { p: Pick<NetworkPort, 'connected' | 'neighbor' | 'neighborAssetId' | 'macCount' | 'uplink' | 'unmanagedSuspect' | 'matches'> }) {
   const parts: ReactNode[] = [];
-  if (p.neighbor) parts.push(<div key="n">{p.neighborAssetId ? <Link to={`/assets/${p.neighborAssetId}?tab=network`}>{p.neighbor}</Link> : p.neighbor} <span className="faint">(neighbour)</span></div>);
+  if (p.neighbor) parts.push(<div key="n">{p.neighborAssetId ? <Link to={`/network/devices/${p.neighborAssetId}`}>{p.neighbor}</Link> : p.neighbor} <span className="faint">(neighbour)</span></div>);
   if (!p.uplink || !p.neighbor) for (const c of p.connected.slice(0, p.uplink ? 2 : 4))
-    parts.push(<div key={c.mac}><Link to={`/assets/${c.assetId}`}>{c.name ?? c.ip ?? c.mac}</Link>{c.ip && c.name !== c.ip ? <span className="faint mono"> {c.ip}</span> : null}</div>);
+    parts.push(<div key={c.mac}><Link to={`/network/devices/${c.assetId}`}>{c.name ?? c.ip ?? c.mac}</Link>{c.ip && c.name !== c.ip ? <span className="faint mono"> {c.ip}</span> : null}</div>);
   for (const m of (p.matches ?? []).slice(0, 3)) parts.push(<div key={'m' + m.mac} className="mono" style={{ fontSize: 12 }}><mark>{m.mac}</mark>{m.ip ? ` ${m.ip}` : ''}</div>);
   const known = p.connected.length;
   if (p.macCount > known) parts.push(<div key="c" className="faint" style={{ fontSize: 11.5 }}>{p.macCount} device{p.macCount === 1 ? '' : 's'} learned{known ? `, ${known} in inventory` : ''}</div>);
@@ -239,9 +240,9 @@ const PORT_FILTERS: [string, string][] = [
 
 export function PortsTab({ assetId }: { assetId?: string }) {
   const { query } = useRouter();
-  const [q, setQ] = useState(query.get('q') ?? '');
-  const [search, setSearch] = useState(query.get('q') ?? '');
-  const [filter, setFilter] = useState(query.get('filter') ?? '');
+  const [q, setQ] = useSticky('NetworkPage.PortsTab.q', query.get('q') ?? '');
+  const [search, setSearch] = useSticky('NetworkPage.PortsTab.search', query.get('q') ?? '');
+  const [filter, setFilter] = useSticky('NetworkPage.PortsTab.filter', query.get('filter') ?? '');
   const data = useApi(() => api.get<NetworkPort[]>('/network/ports', { assetId, q: search, filter }), [assetId, search, filter]);
   const rows = useMemo(() => (data.data ?? []).map((p) => ({ ...p, id: `${p.assetId}:${p.ifIndex}` })), [data.data]);
   return (
@@ -256,7 +257,7 @@ export function PortsTab({ assetId }: { assetId?: string }) {
       <ErrorBox error={data.error} />
       <Panel flush>
         <ChoosableTable tableId="network.ports" rows={rows} empty={data.loading ? 'Loading…' : search || filter ? 'No ports match.' : 'No port data yet. Ports are collected from switches and routers over SNMP.'} columns={[
-          ...(assetId ? [] : [{ key: 'd', label: 'Switch', render: (p: NetworkPort) => <Link to={`/assets/${p.assetId}?tab=network`}><b>{p.deviceName}</b></Link> }]),
+          ...(assetId ? [] : [{ key: 'd', label: 'Switch', render: (p: NetworkPort) => <Link to={`/network/devices/${p.assetId}`}><b>{p.deviceName}</b></Link> }]),
           { key: 'p', label: 'Port', render: (p) => <><b className="mono">{p.name ?? p.ifIndex}</b>{(p.alias || (p.description && p.description !== p.name)) && <div className="faint" style={{ fontSize: 11.5 }}>{p.alias || p.description}</div>}</> },
           { key: 's', label: 'Status', render: (p) => { const [l, t] = portState(p); return <Pill tone={t}>{l}</Pill>; } },
           { key: 'v', label: 'Speed', render: (p) => <>{p.oper === 'up' ? speedLabel(p.speedMbps) : '—'}{p.oper === 'up' && p.duplex && p.duplex !== 'full' ? <span className="faint"> {p.duplex}</span> : null}</> },
@@ -291,9 +292,9 @@ function TopologyTab() {
       {view === 'map' ? <Panel><TopologyMap links={data.data} /></Panel> : (
         <Panel flush>
           <DataTable rows={rows} columns={[
-            { key: 'd', label: 'Device', render: (l) => <Link to={`/assets/${l.assetId}?tab=network`}><b>{l.deviceName}</b></Link> },
+            { key: 'd', label: 'Device', render: (l) => <Link to={`/network/devices/${l.assetId}`}><b>{l.deviceName}</b></Link> },
             { key: 'lp', label: 'Local port', render: (l) => <span className="mono">{l.localPort ?? '—'}</span> },
-            { key: 'r', label: 'Neighbour', className: 'wrap', render: (l) => <>{l.remoteAssetId ? <Link to={`/assets/${l.remoteAssetId}?tab=network`}>{l.remoteAssetName ?? l.remoteName}</Link> : (l.remoteName ?? l.remoteChassisId ?? '—')}
+            { key: 'r', label: 'Neighbour', className: 'wrap', render: (l) => <>{l.remoteAssetId ? <Link to={`/network/devices/${l.remoteAssetId}`}>{l.remoteAssetName ?? l.remoteName}</Link> : (l.remoteName ?? l.remoteChassisId ?? '—')}
               {!l.remoteAssetId && <Pill tone="warn">Not in inventory</Pill>}{l.remotePlatform && <div className="faint" style={{ fontSize: 11.5 }}>{l.remotePlatform}</div>}</> },
             { key: 'rp', label: 'Neighbour port', render: (l) => <span className="mono">{l.remotePort ?? '—'}</span> },
             { key: 'a', label: 'Address', render: (l) => <span className="mono">{l.remoteAddress ?? '—'}</span> },
@@ -334,16 +335,16 @@ function UnmanagedTab() {
     <>
       <Panel flush title={`Suspected unmanaged switches (${inferred.length})`} sub="Two or more devices behind one access port, with no neighbour and no trunk">
         <DataTable rows={inferred.map((u) => ({ ...u, id: `${u.assetId}:${u.ifIndex}` }))} empty="None found. Every access port has at most one device." columns={[
-          { key: 'd', label: 'Managed switch · port', render: (u) => <><Link to={`/assets/${u.assetId}?tab=network`}><b>{u.deviceName}</b></Link> <span className="mono">{u.port}</span>{u.alias && <div className="faint" style={{ fontSize: 11.5 }}>{u.alias}</div>}</> },
+          { key: 'd', label: 'Managed switch · port', render: (u) => <><Link to={`/network/devices/${u.assetId}`}><b>{u.deviceName}</b></Link> <span className="mono">{u.port}</span>{u.alias && <div className="faint" style={{ fontSize: 11.5 }}>{u.alias}</div>}</> },
           { key: 'v', label: 'VLAN', render: (u) => u.vlan ?? '—' },
           { key: 'n', label: 'Devices behind', render: (u) => <Pill tone="warn">{u.macCount}</Pill> },
-          { key: 'k', label: 'Known devices', className: 'wrap', render: (u) => u.connected.length ? u.connected.map((c) => <div key={c.mac}><Link to={`/assets/${c.assetId}`}>{c.name ?? c.ip}</Link> <span className="faint">{c.type ? typeName(c.type) : ''}</span></div>) : <span className="faint">none in inventory</span> },
+          { key: 'k', label: 'Known devices', className: 'wrap', render: (u) => u.connected.length ? u.connected.map((c) => <div key={c.mac}><Link to={`/network/devices/${c.assetId}`}>{c.name ?? c.ip}</Link> <span className="faint">{c.type ? typeName(c.type) : ''}</span></div>) : <span className="faint">none in inventory</span> },
           { key: 'm', label: 'MAC addresses', className: 'wrap', render: (u) => <span className="mono" style={{ fontSize: 11.5 }}>{(u.macs ?? []).slice(0, 8).map((m) => m.ip ? `${m.mac} (${m.ip})` : m.mac).join(', ')}{(u.macs?.length ?? 0) > 8 ? ' …' : ''}</span> },
         ]} />
       </Panel>
       <Panel flush title={`Switches without SNMP management (${notManageable.length})`} sub="Discovered, but ports and connections could not be read">
         <DataTable rows={notManageable} empty="All discovered switches are managed over SNMP." columns={[
-          { key: 'n', label: 'Device', render: (d) => <><Link to={`/assets/${d.id}`}><b>{d.hostname ?? d.ip}</b></Link><div className="faint mono" style={{ fontSize: 11.5 }}>{d.ip}</div></> },
+          { key: 'n', label: 'Device', render: (d) => <><Link to={`/network/devices/${d.id}`}><b>{d.hostname ?? d.ip}</b></Link><div className="faint mono" style={{ fontSize: 11.5 }}>{d.ip}</div></> },
           { key: 'm', label: 'Manufacturer / model', className: 'wrap', render: (d) => [d.manufacturer, d.model].filter(Boolean).join(' ') || '—' },
           { key: 'g', label: 'Management', render: (d) => <ManagementPill m={d.management} /> },
           { key: 'h', label: 'What to do', className: 'wrap', render: (d) => <span className="faint" style={{ fontSize: 12 }}>{d.management === 'web'

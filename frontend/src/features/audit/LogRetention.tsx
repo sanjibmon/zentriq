@@ -139,6 +139,7 @@ export function LogRetention() {
       <Panel flush title="Exported logs" sub="Each archive is a zip with audit.csv, activity.csv and a manifest with row counts and SHA-256 checksums."
         right={<button className="btn" onClick={() => setExporting(true)}><Icon name="down" size={14} /> Export now</button>}>
         <ErrorBox error={archives.error} />
+        {archives.data && archives.data.total > 20 && <Pager top page={page} pageSize={20} total={archives.data.total} onPage={setPage} />}
         <DataTable rows={archives.data?.items ?? []} empty={archives.loading ? 'Loading…' : 'No log exports yet.'} columns={[
           { key: 'p', label: 'Period', render: (a) => <><b>{fmt.day(a.from)} – {fmt.day(new Date(new Date(a.to).getTime() - 1000).toISOString())}</b><div className="faint" style={{ fontSize: 11.5 }}>{[a.includeAudit && 'Audit', a.includeActivity && 'Activity'].filter(Boolean).join(' + ')}</div></> },
           { key: 't', label: 'Made', render: (a) => <>{TRIGGER[a.trigger]}<div className="faint" style={{ fontSize: 11.5 }}>{fmt.date(a.createdAt)}</div>{a.requestedBy && a.trigger === 'manual' && <div className="faint" style={{ fontSize: 11.5 }}>{a.requestedBy}</div>}</> },

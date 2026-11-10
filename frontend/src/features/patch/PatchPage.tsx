@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import { useAuth } from '../../app/auth';
 import { Link, useRouter } from '../../app/router';
+import { useSticky } from '../../app/sticky';
 import { useApi } from '../../app/useApi';
 import { useConfirm } from '../../components/Confirm';
 import { Check, Choices, Field, Fields, Section } from '../../components/Form';
@@ -142,13 +143,13 @@ function OverviewTab({ s, canDeploy, changed, failed, deploy }: Ctx & { s: Summa
 // ---- missing updates ------------------------------------------------------------------------------------------------
 
 function UpdatesTab({ tick, canApprove, canDeploy, changed, failed, deploy }: Ctx) {
-  const [q, setQ] = useState('');
-  const [search, setSearch] = useState('');
-  const [platform, setPlatform] = useState('');
-  const [classification, setClassification] = useState('');
-  const [severity, setSeverity] = useState('');
-  const [approval, setApproval] = useState('');
-  const [state, setState] = useState('missing');
+  const [q, setQ] = useSticky('PatchPage.UpdatesTab.q', '');
+  const [search, setSearch] = useSticky('PatchPage.UpdatesTab.search', '');
+  const [platform, setPlatform] = useSticky('PatchPage.UpdatesTab.platform', '');
+  const [classification, setClassification] = useSticky('PatchPage.UpdatesTab.classification', '');
+  const [severity, setSeverity] = useSticky('PatchPage.UpdatesTab.severity', '');
+  const [approval, setApproval] = useSticky('PatchPage.UpdatesTab.approval', '');
+  const [state, setState] = useSticky('PatchPage.UpdatesTab.state', 'missing');
   const [sel, setSel] = useState<string[]>([]);
   const [open, setOpen] = useState<Patch | null>(null);
   const list = useApi(() => api.get<Patch[]>('/patches', { q: search, platform, classification, severity, approval, state }), [tick, search, platform, classification, severity, approval, state]);
@@ -228,9 +229,9 @@ function PatchDevicesDialog({ patch, canDeploy, onClose, onDeploy }: { patch: Pa
 // ---- devices --------------------------------------------------------------------------------------------------------
 
 function DevicesTab({ tick, canDeploy, changed, failed, deploy, openId }: Ctx & { openId: string | null }) {
-  const [q, setQ] = useState('');
-  const [search, setSearch] = useState('');
-  const [state, setState] = useState('');
+  const [q, setQ] = useSticky('PatchPage.DevicesTab.q', '');
+  const [search, setSearch] = useSticky('PatchPage.DevicesTab.search', '');
+  const [state, setState] = useSticky('PatchPage.DevicesTab.state', '');
   const [open, setOpen] = useState<string | null>(openId);
   const list = useApi(() => api.get<DeviceRow[]>('/patches/devices', { q: search, state }), [tick, search, state]);
   const rows = list.data ?? [];

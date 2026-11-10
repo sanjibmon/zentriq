@@ -3,6 +3,7 @@ import { api } from '../../api/client';
 import type { Paged } from '../../api/types';
 import { useAuth } from '../../app/auth';
 import { Link, useRouter } from '../../app/router';
+import { useSticky } from '../../app/sticky';
 import { useApi } from '../../app/useApi';
 import { useColumns } from '../../components/columns';
 import { useConfirm } from '../../components/Confirm';
@@ -90,10 +91,10 @@ export function AccessoriesPage() {
 
 function StockTab({ tick, canEdit, categories, onMove, lowFirst }: { tick: number; canEdit: boolean; categories: string[]; onMove: (k: MovementKind, p: MovementPreset) => void; lowFirst: boolean }) {
   const locs = useLocations();
-  const [q, setQ] = useState('');
-  const [search, setSearch] = useState('');
-  const [locationId, setLocationId] = useState('');
-  const [category, setCategory] = useState('');
+  const [q, setQ] = useSticky('AccessoriesPage.StockTab.q', '');
+  const [search, setSearch] = useSticky('AccessoriesPage.StockTab.search', '');
+  const [locationId, setLocationId] = useSticky('AccessoriesPage.StockTab.locationId', '');
+  const [category, setCategory] = useSticky('AccessoriesPage.StockTab.category', '');
   const [low, setLow] = useState(lowFirst);
   const stock = useApi(() => api.get<StockRow[]>('/accessories/stock', { q: search, locationId, category, low }), [search, locationId, category, low, tick]);
   const rows = stock.data ?? [];
@@ -150,9 +151,9 @@ function StockTab({ tick, canEdit, categories, onMove, lowFirst }: { tick: numbe
 
 function IssuedTab({ tick, canEdit, onReturn }: { tick: number; canEdit: boolean; onReturn: (h: Holding) => void }) {
   const deps = useDepartments();
-  const [q, setQ] = useState('');
-  const [search, setSearch] = useState('');
-  const [departmentId, setDepartmentId] = useState('');
+  const [q, setQ] = useSticky('AccessoriesPage.IssuedTab.q', '');
+  const [search, setSearch] = useSticky('AccessoriesPage.IssuedTab.search', '');
+  const [departmentId, setDepartmentId] = useSticky('AccessoriesPage.IssuedTab.departmentId', '');
   const [returnable, setReturnable] = useState(false);
   const list = useApi(() => api.get<Holding[]>('/accessories/holdings', { q: search, departmentId, returnableOnly: returnable }), [search, departmentId, returnable, tick]);
   const rows = list.data ?? [];
@@ -193,12 +194,12 @@ function IssuedTab({ tick, canEdit, onReturn }: { tick: number; canEdit: boolean
 function MovementsTab({ tick }: { tick: number }) {
   const locs = useLocations();
   const deps = useDepartments();
-  const [q, setQ] = useState('');
-  const [search, setSearch] = useState('');
-  const [kind, setKind] = useState('');
-  const [locationId, setLocationId] = useState('');
-  const [departmentId, setDepartmentId] = useState('');
-  const [days, setDays] = useState('90');
+  const [q, setQ] = useSticky('AccessoriesPage.MovementsTab.q', '');
+  const [search, setSearch] = useSticky('AccessoriesPage.MovementsTab.search', '');
+  const [kind, setKind] = useSticky('AccessoriesPage.MovementsTab.kind', '');
+  const [locationId, setLocationId] = useSticky('AccessoriesPage.MovementsTab.locationId', '');
+  const [departmentId, setDepartmentId] = useSticky('AccessoriesPage.MovementsTab.departmentId', '');
+  const [days, setDays] = useSticky('AccessoriesPage.MovementsTab.days', '90');
   const [page, setPage] = useState(1);
   const pageSize = 50;
   const list = useApi(() => api.get<Paged<MovementRow>>('/accessories/movements', { q: search, kind, locationId, departmentId, days, page, pageSize }), [search, kind, locationId, departmentId, days, page, tick]);
@@ -247,6 +248,7 @@ function MovementsTab({ tick }: { tick: number }) {
       </form>
       <ErrorBox error={list.error} />
       <Panel flush>
+        {list.data && <Pager top page={page} pageSize={pageSize} total={list.data.total} onPage={setPage} />}
         <DataTable rows={list.data?.items ?? []} columns={columns} empty={list.loading ? 'Loading…' : 'No movements in this period.'} />
         {list.data && <Pager page={page} pageSize={pageSize} total={list.data.total} onPage={setPage} />}
       </Panel>
@@ -261,7 +263,7 @@ function CatalogueTab({ items, loading, canEdit, onEdit, onChanged, onError }: {
   items: AccessoryItem[]; loading: boolean; canEdit: boolean; onEdit: (i: AccessoryItem) => void; onChanged: (m: string) => void; onError: (m: string) => void;
 }) {
   const confirm = useConfirm();
-  const [q, setQ] = useState('');
+  const [q, setQ] = useSticky('AccessoriesPage.CatalogueTab.q', '');
   const [showInactive, setShowInactive] = useState(false);
   const f = q.trim().toLowerCase();
   const rows = items.filter((i) => (showInactive || i.active) && (!f || [i.name, i.category, i.brand, i.model, i.sku].some((x) => x?.toLowerCase().includes(f))));

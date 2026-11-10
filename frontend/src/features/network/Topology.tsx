@@ -85,7 +85,7 @@ export function TopologyMap({ links }: { links: NetworkLink[] }) {
         {nodes.map((n) => (
           <g key={n.key} transform={`translate(${n.x},${n.y})`} className={n.assetId ? 'node link' : 'node'}
             onMouseEnter={() => setHover(n.key)} onMouseLeave={() => setHover(null)}
-            onClick={() => n.assetId && navigate(`/assets/${n.assetId}?tab=network`)}>
+            onClick={() => n.assetId && navigate(`/network/devices/${n.assetId}`)}>
             <title>{`${n.label}${n.assetId ? '' : ' — not in inventory'} · ${n.degree} link(s)`}</title>
             <rect x={-15} y={-11} width={30} height={22} rx={4} fill={KIND_COLOR[n.kind] ?? KIND_COLOR.other} opacity={n.assetId ? 1 : 0.45}
               strokeDasharray={n.managed ? undefined : '3 2'} />

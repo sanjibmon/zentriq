@@ -207,21 +207,28 @@ export function DataTable<T extends { id: string | number }>({ columns, rows, em
   );
 }
 
-export function Pager({ page, pageSize, total, onPage }: { page: number; pageSize: number; total: number; onPage: (p: number) => void }) {
+/**
+ * Page navigation. Lists show it above and below the table; the one above (<c>top</c>) appears only when there is more than
+ * one page.
+ */
+export function Pager({ page, pageSize, total, onPage, top }: { page: number; pageSize: number; total: number; onPage: (p: number) => void; top?: boolean }) {
   const pages = Math.max(1, Math.ceil(total / pageSize));
+  if (top && pages <= 1) return null;
   const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const to = Math.min(total, page * pageSize);
   return (
-    <div className="pager">
+    <div className={`pager${top ? ' pager-top' : ''}`} role="navigation" aria-label={top ? 'Pages (top)' : 'Pages'}>
       <span className="muted">
-        {from}–{to} of {total.toLocaleString()}
+        {from.toLocaleString()}–{to.toLocaleString()} of {total.toLocaleString()}{pages > 1 && <> · page {page} of {pages.toLocaleString()}</>}
       </span>
+      {pages > 2 && <button className="btn sm" disabled={page <= 1} onClick={() => onPage(1)} aria-label="First page">First</button>}
       <button className="btn sm" disabled={page <= 1} onClick={() => onPage(page - 1)}>
         Previous
       </button>
       <button className="btn sm" disabled={page >= pages} onClick={() => onPage(page + 1)}>
         Next
       </button>
+      {pages > 2 && <button className="btn sm" disabled={page >= pages} onClick={() => onPage(pages)} aria-label="Last page">Last</button>}
     </div>
   );
 }

@@ -41,6 +41,10 @@ public static class DeviceFingerprint
         new Rule("mfp", "Kyocera", "taskalfa", "ecosys m"),
         new Rule("mfp", "Ricoh", "ricoh mp", "ricoh im"),
         new Rule("mfp", "HP", "laserjet mfp", "officejet pro", "pagewide mfp", "color laserjet flow", "laserjet pro mfp"),
+        new Rule("mfp", "Toshiba", "e-studio", "topaccess"),
+        new Rule("mfp", "FUJIFILM (Fuji Xerox)", "apeosport", "apeos ", "docucentre", "docuprint"),
+        new Rule("mfp", "Konica Minolta", "pagescope", "develop ineo", " ineo "),
+        new Rule("mfp", "Sharp", "sharp mx-", "sharp bp-", "sharp ar-"),
         new Rule("mfp", null, " mfp", "multifunction", "multi-function"),
         // Printers
         new Rule("printer", "HP", "laserjet", "officejet", "deskjet", "pagewide", "designjet", "hp color", "jetdirect"),
@@ -54,7 +58,26 @@ public static class DeviceFingerprint
         new Rule("printer", "Sharp", "sharp mx"),
         new Rule("printer", "OKI", "oki data", "okidata"),
         new Rule("printer", "Zebra", "zebra", "zt410", "zt230"),
-        new Rule("printer", null, "printer", "print server", "airprint"),
+        new Rule("printer", "HP", "hp ethernet multi-environment", "hp ews", "hp embedded web server"),
+        new Rule("printer", null, "embedded web server"),
+        new Rule("printer", "Ricoh", "web image monitor", "aficio", "savin", "lanier", "gestetner", "nashuatec"),
+        new Rule("printer", "Canon", "remote ui", "imagerunner", "i-sensys", "pixma", "maxify"),
+        new Rule("printer", "Xerox", "centreware", "versalink", "altalink"),
+        new Rule("printer", "Kyocera", "command center rx", "utax", "triumph-adler"),
+        new Rule("printer", "Samsung", "syncthru", "samsung xpress", "samsung clp", "samsung clx", "samsung ml-", "samsung m2"),
+        new Rule("printer", "Epson", "epsonnet"),
+        new Rule("printer", "Pantum", "pantum"),
+        new Rule("printer", "Dell", "dell color laser", "dell laser", "dell mfp", "dell printer"),
+        new Rule("printer", "Toshiba", "toshiba tec"),
+        new Rule("printer", "Konica Minolta", "konica", "minolta"),
+        new Rule("printer", "Sharp", "sharp"),
+        new Rule("printer", "Riso", "riso comcolor", "risograph"),
+        new Rule("printer", "Olivetti", "olivetti"),
+        new Rule("printer", "Sindoh", "sindoh"),
+        new Rule("printer", "Honeywell", "intermec", "honeywell pc4", "honeywell pm"),
+        new Rule("printer", "TSC", "tsc te", "tsc tt", "tsc printer"),
+        new Rule("printer", null, "sato cl", "citizen cl", "bixolon", "star micronics", "label printer", "receipt printer"),
+        new Rule("printer", null, "printer", "print server", "airprint", "ipp everywhere", "jetdirect", " pcl ", "postscript"),
         // Firewalls (before routers and switches)
         new Rule("firewall", "Fortinet", "fortigate", "fortios", "fortinet"),
         new Rule("firewall", "Palo Alto Networks", "palo alto", "pan-os", "globalprotect"),
@@ -138,7 +161,7 @@ public static class DeviceFingerprint
     {
         bool Has(int p) => open.Contains(p);
         Fingerprint F(string type, string why, string? maker = null) => new() { DeviceType = type, Manufacturer = maker, Evidence = { why } };
-        if (Has(9100) || Has(515) || Has(631)) return F("printer", "printing port open (" + string.Join(", ", new[] { 9100, 515, 631 }.Where(Has)) + ")");
+        if (Has(9100) || Has(9101) || Has(9102) || Has(515) || Has(631)) return F("printer", "printing port open (" + string.Join(", ", new[] { 9100, 9101, 9102, 515, 631 }.Where(Has)) + ")");
         if (Has(8291)) return F("router", "MikroTik Winbox port 8291 open", "MikroTik");
         if (Has(554) && !Has(445)) return F("ip_camera", "video streaming port 554 (RTSP) open");
         if ((Has(5060) || Has(5061)) && !Has(445)) return F("ip_phone", "SIP port open");

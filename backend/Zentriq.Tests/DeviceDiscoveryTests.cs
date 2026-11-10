@@ -20,6 +20,13 @@ public sealed class DeviceRecognitionTests
     [InlineData("KYOCERA TASKalfa 3253ci", "mfp", "Kyocera")]
     [InlineData("EPSON WF-C5790 Series", "printer", "Epson")]
     [InlineData("fi-7160 Network Scanner", "scanner", "Fujitsu / Ricoh")]
+    [InlineData("Web Image Monitor", "printer", "Ricoh")]
+    [InlineData("TOSHIBA e-STUDIO2510AC TopAccess", "mfp", "Toshiba")]
+    [InlineData("SyncThru Web Service", "printer", "Samsung")]
+    [InlineData("CentreWare Internet Services", "printer", "Xerox")]
+    [InlineData("Brother HL-L2350DW series", "printer", "Brother")]
+    [InlineData("Pantum P3300DW", "printer", "Pantum")]
+    [InlineData("ApeosPort C3070", "mfp", "FUJIFILM (Fuji Xerox)")]
     [InlineData("FortiGate-60F | FortiGate", "firewall", "Fortinet")]
     [InlineData("pfSense - Login", "firewall", "Netgate")]
     [InlineData("SonicWall - Authentication", "firewall", "SonicWall")]
@@ -132,6 +139,26 @@ public sealed class DeviceRecognitionTests
         Assert.Equal("idle", d.Printer.Status);
         Assert.Equal(12, d.Printer.Supplies.Single(s => s.Name.StartsWith("Black")).LevelPercent);
         Assert.Null(d.Ports);
+    }
+
+    [Fact]
+    public void Printer_makers_are_recognised_without_the_printer_mib()
+    {
+        // An SNMPv1 printer that answers only the system group: its device OID (Ricoh) is enough.
+        var p = Base("RICOH Aficio SP 3510SF 1.04 / RICOH Network Printer C model", "1.3.6.1.4.1.367.1.1", "PRN-RECEPTION");
+        var d = SnmpMapper.Map(p, "10.0.0.51", "1");
+        Assert.Equal("printer", d.Device.Category);
+        Assert.Equal("Ricoh", d.Device.Manufacturer);
+        // The printer's name from Printer-MIB v2 is the model.
+        var k = Base("KYOCERA Document Solutions Printing System", "1.3.6.1.4.1.1347.41", "PRN-ACCOUNTS");
+        k[SnmpMapper.PrtGeneralPrinterName + ".1"] = "ECOSYS P2040dn";
+        var dk = SnmpMapper.Map(k, "10.0.0.52", "1");
+        Assert.Equal("printer", dk.Device.Category);
+        Assert.Equal("ECOSYS P2040dn", dk.Device.Model);
+        // A switch from a maker that also builds printers is still a switch.
+        Assert.False(SnmpMapper.IsPrinterObjectId("1.3.6.1.4.1.11.2.3.7.11.181"));   // HP ProCurve
+        Assert.True(SnmpMapper.IsPrinterObjectId("1.3.6.1.4.1.11.2.3.9.1"));          // HP JetDirect
+        Assert.Equal("printer", DeviceFingerprint.FromPorts([80, 9101])!.DeviceType);
     }
 
     [Fact]
