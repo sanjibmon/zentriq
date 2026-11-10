@@ -20,13 +20,13 @@ export function ExperiencePage() {
   const [rating, setRating] = useSticky('ExperiencePage.rating', query.get('rating') ?? '');
   const [issue, setIssue] = useSticky('ExperiencePage.issue', query.get('issue') ?? '');
   const [q, setQ] = useSticky('ExperiencePage.q', '');
-  const [page, setPage] = useState(0);
+  const [page, setPage] = useState(1);
   const summary = useApi(() => api.get<ExperienceSummary>('/experience/summary'), []);
   const list = useApi(() => api.get<ExperienceRow[]>('/experience/devices', { rating: rating || null, issue: issue || null, q: q || null }), [rating, issue, q]);
   const s = summary.data;
   const rows = (list.data ?? []).map((r) => ({ ...r, id: r.assetId }));
-  const shown = rows.slice(page * PAGE, page * PAGE + PAGE);
-  const set = (f: () => void) => { f(); setPage(0); };
+  const shown = rows.slice((page - 1) * PAGE, page * PAGE);
+  const set = (f: () => void) => { f(); setPage(1); };
   return (
     <>
       <PageHead title="Device Experience" icon="gauge" desc="How well each device works for the people who use it: start-up time, crashes, blue screens, resources, disk and battery over the last 7 days." />

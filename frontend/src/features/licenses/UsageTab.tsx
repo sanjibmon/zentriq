@@ -14,7 +14,7 @@ export function UsageTab({ canManage }: { canManage: boolean }) {
   const { navigate } = useRouter();
   const [days, setDays] = useSticky('UsageTab.days', 30);
   const [q, setQ] = useSticky('UsageTab.q', '');
-  const [page, setPage] = useState(0);
+  const [page, setPage] = useState(1);
   const [open, setOpen] = useState<UsageApp | null>(null);
   const data = useApi(() => api.get<UsageSummary>('/sam/usage', { days, q: q || null }), [days, q]);
   const d = data.data;
@@ -23,7 +23,7 @@ export function UsageTab({ canManage }: { canManage: boolean }) {
   const noRules = (d?.products ?? []).filter((p) => !p.rules).length;
   const unused = products.reduce((a, p) => a + p.unused, 0);
   const saving = products.reduce((a, p) => a + (p.unitCost ? p.unitCost * p.unused : 0), 0);
-  const shown = apps.slice(page * PAGE, page * PAGE + PAGE);
+  const shown = apps.slice((page - 1) * PAGE, page * PAGE);
   return (
     <>
       {d && !d.metering && <Callout tone="warn" icon="alert">Software metering is off. {canManage ? <Link to="/modules/licenses?tab=settings">Turn it on in Settings</Link> : 'An administrator can turn it on in Settings'} — devices then report the programs they run.</Callout>}
@@ -46,8 +46,8 @@ export function UsageTab({ canManage }: { canManage: boolean }) {
           ]} />
       </Panel>
       <div className="toolbar-row">
-        <input className="in grow" placeholder="Search programs, products, publishers…" value={q} onChange={(e) => { setQ(e.target.value); setPage(0); }} aria-label="Search" />
-        <select className="in" value={days} onChange={(e) => { setDays(Number(e.target.value)); setPage(0); }} aria-label="Period">
+        <input className="in grow" placeholder="Search programs, products, publishers…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} aria-label="Search" />
+        <select className="in" value={days} onChange={(e) => { setDays(Number(e.target.value)); setPage(1); }} aria-label="Period">
           <option value={7}>Last 7 days</option><option value={30}>Last 30 days</option><option value={90}>Last 90 days</option><option value={365}>Last 12 months</option>
         </select>
       </div>

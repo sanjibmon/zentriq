@@ -151,7 +151,7 @@ public sealed class ExperienceRecorder
                             try { d = _describe(p.Path); } catch (Exception) { d = (null, null, null); }
                             _described[p.Path] = d;
                         }
-                        item = new UsageItem { Day = day, Path = p.Path, Exe = Path.GetFileName(p.Path), Product = d.Product, Publisher = d.Publisher, Version = d.Version, User = user };
+                        item = new UsageItem { Day = day, Path = p.Path, Exe = FileName(p.Path), Product = d.Product, Publisher = d.Publisher, Version = d.Version, User = user };
                         _store.Usage.Add(item);
                     }
                     if (counted.Add(key)) item.Minutes++;           // several windows / processes of one program: one minute
@@ -238,13 +238,16 @@ public sealed class ExperienceRecorder
         Day = u.Day, Path = u.Path, Exe = u.Exe, Product = u.Product, Publisher = u.Publisher, Version = u.Version, User = u.User, Minutes = u.Minutes, Launches = u.Launches,
     };
 
+    /// <summary>The file name of a Windows or Linux path, whatever system this runs on.</summary>
+    public static string FileName(string path) => path.Substring(path.LastIndexOfAny(new[] { '\\', '/' }) + 1);
+
     /// <summary>Programs that are part of the operating system or of Zentriq are not metered.</summary>
     public static bool Metered(string path, string? windowsDir, string? agentDir)
     {
         if (string.IsNullOrEmpty(path)) return false;
         if (!string.IsNullOrEmpty(windowsDir) && path.StartsWith(windowsDir!.TrimEnd('\\') + "\\", StringComparison.OrdinalIgnoreCase)) return false;
         if (!string.IsNullOrEmpty(agentDir) && path.StartsWith(agentDir!.TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase)) return false;
-        if (path.StartsWith("/")) return !LinuxSystemPrefixes.Any(p => path.StartsWith(p, StringComparison.Ordinal)) && !LinuxSystemNames.Contains(System.IO.Path.GetFileName(path));
+        if (path.StartsWith("/")) return !LinuxSystemPrefixes.Any(p => path.StartsWith(p, StringComparison.Ordinal)) && !LinuxSystemNames.Contains(FileName(path));
         return true;
     }
 
