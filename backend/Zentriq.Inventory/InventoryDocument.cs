@@ -37,6 +37,10 @@ public sealed class InventoryDocument
     [JsonPropertyName("licenses")] public List<LicenseItem>? Licenses { get; set; }
     /// <summary>Host names from the DNS client cache (web applications in use). Not stored: the server keeps only known web applications.</summary>
     [JsonPropertyName("webHosts")] public List<string>? WebHosts { get; set; }
+    /// <summary>Software metering of the last days (agents from build 120). Stored in its own tables, not in the document.</summary>
+    [JsonPropertyName("usage")] public UsageReport? Usage { get; set; }
+    /// <summary>Device Experience of the last days (agents from build 120). Stored in its own tables, not in the document.</summary>
+    [JsonPropertyName("experience")] public ExperienceReport? Experience { get; set; }
 }
 
 /// <summary>A licensed product on the device (Windows / Office activation from SoftwareLicensingProduct).</summary>

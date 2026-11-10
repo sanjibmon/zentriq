@@ -71,6 +71,15 @@ public sealed class InventoryStore(LicensingService licensing)
             try { await Zentriq.Infrastructure.WebApps.WebAppUsage.RecordAsync(conn, tx, assetId.Value, webHosts, doc.Users.LoggedOn, ct); }
             catch (PostgresException) { await tx.RollbackAsync("webapps", ct); }
         }
+        // Software metering and Device Experience (agents from build 120): own tables, never part of the stored document.
+        if (doc.Usage is not null || doc.Experience is not null)
+        {
+            await tx.SaveAsync("experience", ct);
+            try { await Zentriq.Infrastructure.Experience.ExperienceStore.RecordAsync(conn, tx, assetId.Value, doc, ct); }
+            catch (PostgresException) { await tx.RollbackAsync("experience", ct); }
+            doc.Usage = null;
+            doc.Experience = null;
+        }
         await UpsertDocumentAsync(conn, tx, assetId.Value, doc, ct);
         await AddIdentifiersAsync(conn, tx, assetId.Value, doc, hints, ct);
         // Manufacturer / model / serial entered by hand earlier for this machine (agent or OS reinstalled, device re-created).

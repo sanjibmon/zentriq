@@ -50,6 +50,34 @@ public static class LicenseEvaluator
             }
         }
 
+        // ---- installations nobody uses (software metering) ----------------------------------------------------------
+        if (settings.Metering)
+        {
+            await using var cmd = new NpgsqlCommand($$"""
+                WITH p AS (SELECT * FROM zentriq.sam_products WHERE kind = 'installed' AND needs_license AND cardinality(exe_patterns) > 0),
+                {{LicenseCompliance.InstallsCte}},
+                {{LicenseCompliance.UsageCte}}
+                SELECT p.id, p.name, count(*),
+                       (SELECT avg(l.unit_cost) FROM zentriq.sam_licenses l WHERE l.product_id = p.id AND l.status = 'active' AND l.unit_cost IS NOT NULL)
+                  FROM inst i JOIN p ON p.id = i.product_id
+                  LEFT JOIN used_by u ON u.product_id = p.id AND u.asset_id = i.asset_id
+                  JOIN zentriq.software_usage_devices m ON m.asset_id = i.asset_id
+                 WHERE {{LicenseCompliance.UsageState}} = 'unused'
+                 GROUP BY p.id, p.name
+                """, conn) { CommandTimeout = 120 };
+            cmd.Parameters.AddWithValue("days", settings.UnusedDays);
+            await using var r = await cmd.ExecuteReaderAsync(ct);
+            while (await r.ReadAsync(ct))
+            {
+                var (id, name, n) = (r.GetGuid(0), r.GetString(1), r.GetInt64(2));
+                var cost = r.IsDBNull(3) ? (decimal?)null : r.GetDecimal(3) * n;
+                alerts.Add(new Alert($"idle:{id}", "unused", "info",
+                    $"{name}: {N(n)} installation(s) not used for {settings.UnusedDays} days",
+                    (cost is { } c ? $"Possible saving: {c:N2}. " : "") + "Uninstall them from the product page (Unused) to reclaim the licences.",
+                    $"/modules/licenses/products/{id}", ProductId: id));
+            }
+        }
+
         // ---- subscriptions and terms ending, maintenance ending ---------------------------------------------------
         await using (var cmd = new NpgsqlCommand("""
             SELECT l.id, l.product_id, p.name, l.name, l.license_type, l.end_date, l.maintenance_end, l.auto_renew, l.notify_days, l.quantity, l.vendor

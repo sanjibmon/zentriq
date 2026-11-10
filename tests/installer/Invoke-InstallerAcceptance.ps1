@@ -119,7 +119,7 @@ Remove-Item $answer -Force   # contains the administrator password
 
 if (-not $installed) {
     foreach ($t in 'T02 PostgreSQL provisioning', 'T03 Database migration', 'T04 Administrator sign-in', 'T05 API and worker services', 'T06 Trial initialization',
-                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection', 'T68 Live agent connection', 'T69 Locations and IT accessories', 'T70 Manual hardware details', 'T71 Standard and Advanced installation', 'T72 Asset lifecycle', 'T73 Cloud and infrastructure', 'T74 Own asset tags, people and bulk upload', 'T75 Backup and restore', 'T76 Roles and groups', 'T77 Log retention and export', 'T78 Agent stop and disable protection', 'T79 Automatic agent update', 'T80 Agent check-in and diagnosis commands', 'T81 Licensing plans and online activation', 'T82 Software Deployment policy', 'T83 Application control on Windows', 'T84 Push deployment', 'T85 Remote support agent tamper protection', 'T86 Software licenses', 'T87 Web apps and accounts', 'T88 Network connected devices', 'T89 Warranty lookup', 'T90 Session recording', 'T91 Directory sign-in', 'T92 Patch management', 'T93 Scripts and remediation', 'T94 Tray icon and self-service') {
+                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection', 'T68 Live agent connection', 'T69 Locations and IT accessories', 'T70 Manual hardware details', 'T71 Standard and Advanced installation', 'T72 Asset lifecycle', 'T73 Cloud and infrastructure', 'T74 Own asset tags, people and bulk upload', 'T75 Backup and restore', 'T76 Roles and groups', 'T77 Log retention and export', 'T78 Agent stop and disable protection', 'T79 Automatic agent update', 'T80 Agent check-in and diagnosis commands', 'T81 Licensing plans and online activation', 'T82 Software Deployment policy', 'T83 Application control on Windows', 'T84 Push deployment', 'T85 Remote support agent tamper protection', 'T86 Software licenses', 'T87 Web apps and accounts', 'T88 Network connected devices', 'T89 Warranty lookup', 'T90 Session recording', 'T91 Directory sign-in', 'T92 Patch management', 'T93 Scripts and remediation', 'T94 Tray icon and self-service', 'T95 Software metering and device experience') {
         Record $t.Substring(0, 3) $t.Substring(4) 'BLOCKED' 'installation failed'
     }
 } else {
@@ -1257,6 +1257,53 @@ if (-not $installed) {
             }
             Remove-Item $marker1, $marker2 -ErrorAction SilentlyContinue
             "tray running for $($owner.Domain)\$($owner.User); Software Center: installed without approval and after approval; help request #$($h.number) in Remote Support and closed; device $($info.computer), agent $($info.agentVersion)"
+        } | Out-Null
+
+        # ---- T95: software metering and Device Experience ----
+        Check 'T95' 'Software metering and Device Experience: programs run by the signed-in user are metered, a licensed product shows its installation as used, the device gets an experience score; metering can be turned off' {
+            $s = Login
+            # A program outside the Windows folder, running on the signed-in user's desktop (this session).
+            $app = Join-Path $OutDir 'zq-meter-app.exe'
+            Copy-Item (Join-Path $env:windir 'System32\cmd.exe') $app -Force
+            $proc = Start-Process $app -ArgumentList '/k', 'title Zentriq metering test' -PassThru
+            try {
+                # Two samples (one a minute), then a fresh inventory.
+                Start-Sleep 150
+                Api POST '/assets/collect' @{ assetIds = @($script:agentAsset) } -Session $s | Out-Null
+                $use = Dep-Wait { $u = Api GET "/sam/usage/device/$($script:agentAsset)" -Session $s; $x = @($u.programs) | Where-Object exe -eq 'zq-meter-app.exe'; if ($x -and $x.minutes -ge 1) { $u } } 240 'the metered program in the console'
+                $prog = @($use.programs) | Where-Object exe -eq 'zq-meter-app.exe'
+                Assert ($use.meteredSince -and $prog.users -and $prog.daysUsed -eq 1) "device usage: $($use | ConvertTo-Json -Compress -Depth 4)"
+                Assert (-not (@($use.programs) | Where-Object { $_.exe -in 'svchost.exe', 'explorer.exe', 'ZentriqAgent.exe' })) 'Windows or agent programs were metered'
+                # A licensed product with that program: its installation on this device is used.
+                $installed = (Api GET "/assets/$($script:agentAsset)/inventory" -Session $s).software | Where-Object { $_.name -and $_.name.Length -ge 4 } | Select-Object -First 1
+                $prod = Api POST '/sam/products' @{ name = 'CI Metered Product'; kind = 'installed'; metric = 'device'; namePatterns = @($installed.name); exePatterns = @('zq-meter-app.exe') } -Session $s
+                $inst = @(Api GET "/sam/products/$($prod.id)/installations" -Session $s | ForEach-Object { $_ }) | Where-Object assetId -eq $script:agentAsset
+                Assert ($inst -and $inst.usage -eq 'used' -and $inst.lastUsed) "installation: $($inst | ConvertTo-Json -Compress)"
+                $sum = Api GET '/sam/usage?days=7' -Session $s
+                $row = @($sum.apps) | Where-Object exe -eq 'zq-meter-app.exe'
+                Assert ($row -and $row.productId -eq $prod.id -and $sum.meteredDevices -ge 1) "usage summary: $($row | ConvertTo-Json -Compress)"
+                $p1 = @($sum.products) | Where-Object id -eq $prod.id
+                Assert ($p1.used -eq 1 -and $p1.unused -eq 0) "product usage: $($p1 | ConvertTo-Json -Compress)"
+                # Device Experience: a score with what the agent reported.
+                $exp = Dep-Wait { $e = Api GET "/experience/devices/$($script:agentAsset)" -Session $s; if ($e.current) { $e } } 60 'the experience score'
+                Assert ($exp.current.score -ge 0 -and $exp.current.score -le 100 -and $exp.current.rating -in 'good', 'fair', 'poor' -and $exp.current.systemFree -gt 0) "experience: $($exp.current | ConvertTo-Json -Compress -Depth 4)"
+                Assert (@($exp.days).Count -ge 1 -and $exp.days[0].samples -ge 2) "resource samples: $($exp.days | ConvertTo-Json -Compress)"
+                $fleet = Api GET '/experience/summary' -Session $s
+                Assert ($fleet.devices -ge 1 -and $fleet.score -ge 0) "fleet: $($fleet | ConvertTo-Json -Compress -Depth 2)"
+                $list = @(Api GET '/experience/devices' -Session $s | ForEach-Object { $_ }) | Where-Object assetId -eq $script:agentAsset
+                Assert $list 'the device is not in the Device Experience list'
+                # Metering off: the agent stops metering and forgets its totals; on again.
+                $set = Api GET '/sam/settings' -Session $s
+                Api PUT '/sam/settings' @{ metering = $false } -Session $s | Out-Null
+                Api POST '/assets/collect' @{ assetIds = @($script:agentAsset) } -Session $s | Out-Null
+                Dep-Wait { (Get-ItemProperty 'HKLM:\SOFTWARE\Zentriq\Agent' -Name Metering -ErrorAction SilentlyContinue).Metering -eq 0 } 120 'metering turned off on the device' | Out-Null
+                Api PUT '/sam/settings' @{ metering = $true } -Session $s | Out-Null
+                Api POST '/assets/collect' @{ assetIds = @($script:agentAsset) } -Session $s | Out-Null
+                Dep-Wait { (Get-ItemProperty 'HKLM:\SOFTWARE\Zentriq\Agent' -Name Metering -ErrorAction SilentlyContinue).Metering -eq 1 } 120 'metering turned on again' | Out-Null
+                Api DELETE "/sam/products/$($prod.id)" -Session $s | Out-Null
+                $boot = @($exp.events) | Where-Object kind -eq 'boot' | Select-Object -First 1
+                "metered zq-meter-app.exe: $($prog.minutes) min, user $(@($prog.users)[0]); product installation used; score $($exp.current.score) ($($exp.current.rating)), $($exp.days[0].samples) samples, $(@($exp.events).Count) event(s)$(if ($boot) { ", start $([math]::Round($boot.ms / 1000)) s" }); metering off and on again on the device"
+            } finally { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue; Remove-Item $app -ErrorAction SilentlyContinue }
         } | Out-Null
     }
 

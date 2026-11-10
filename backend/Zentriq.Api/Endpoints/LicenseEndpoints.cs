@@ -17,7 +17,7 @@ namespace Zentriq.Api.Endpoints;
 public static class LicenseEndpoints
 {
     public sealed record ProductBody(string? Name, string? Publisher, string? Category, string[]? NamePatterns, string[]? ExcludePatterns, string[]? PublisherPatterns,
-        string? Metric, string? Kind, bool? NeedsLicense, Guid? WebAppId, string[]? CloudSkus, string? CatalogKey, string? Notes);
+        string? Metric, string? Kind, bool? NeedsLicense, Guid? WebAppId, string[]? CloudSkus, string? CatalogKey, string? Notes, string[]? ExePatterns = null);
     public sealed record PreviewBody(string[]? NamePatterns, string[]? ExcludePatterns, string[]? PublisherPatterns);
     public sealed record LicenseBody(Guid? ProductId, string? Name, string? LicenseType, string? Metric, int? Quantity, bool? Unlimited, string? Edition, string? Version,
         bool? DowngradeRights, string? Vendor, string? Reseller, string? PoNumber, string? InvoiceNumber, string? ContractNumber, DateOnly? PurchaseDate,
@@ -26,7 +26,7 @@ public static class LicenseEndpoints
     public sealed record RenewBody(DateOnly? EndDate, int? Quantity, decimal? TotalCost, string? Note);
     public sealed record AllocateBody(Guid[]? AssetIds, string[]? Users, string? Note);
     public sealed record ConnectionBody(string? Name, string? TenantId, string? ClientId, string? ClientSecret, bool? Enabled, bool? SyncApps);
-    public sealed record SettingsBody(string[]? NotifyEmails, bool? NotifyInApp, int? ExpiryDays, int? UnusedPercent, int? InactiveDays, bool? WebDiscovery);
+    public sealed record SettingsBody(string[]? NotifyEmails, bool? NotifyInApp, int? ExpiryDays, int? UnusedPercent, int? InactiveDays, bool? WebDiscovery, bool? Metering = null, int? UnusedDays = null);
     public sealed record FromCatalogBody(string[]? Keys);
 
     private static readonly string[] Metrics = ["device", "user", "core", "concurrent", "site"];
@@ -113,6 +113,8 @@ public static class LicenseEndpoints
             if (body.UnusedPercent is { } u) { if (u is < 5 or > 90) return Validation.Problem("unusedPercent", "Choose 5 to 90 %."); s.UnusedPercent = u; }
             if (body.InactiveDays is { } i) { if (i is < 7 or > 730) return Validation.Problem("inactiveDays", "Choose 7 to 730 days."); s.InactiveDays = i; }
             s.WebDiscovery = body.WebDiscovery ?? s.WebDiscovery;
+            s.Metering = body.Metering ?? s.Metering;
+            if (body.UnusedDays is { } ud) { if (ud is < 14 or > 365) return Validation.Problem("unusedDays", "Choose 14 to 365 days."); s.UnusedDays = ud; }
             await s.SaveAsync(ds, rc.UserId, ct);
             await rc.AuditAsync("licenses.settings", null, detail: s);
             return Results.Ok(s);
@@ -147,7 +149,7 @@ public static class LicenseEndpoints
                 SELECT jsonb_build_object(
                   'product', (SELECT jsonb_build_object('id', p.id, 'name', p.name, 'publisher', p.publisher, 'category', p.category, 'namePatterns', p.name_patterns,
                         'excludePatterns', p.exclude_patterns, 'publisherPatterns', p.publisher_patterns, 'metric', p.metric, 'kind', p.kind, 'needsLicense', p.needs_license,
-                        'webAppId', p.webapp_id, 'webAppName', w.name, 'cloudSkus', p.cloud_skus, 'catalogKey', p.catalog_key, 'notes', p.notes, 'createdBy', p.created_by,
+                        'webAppId', p.webapp_id, 'webAppName', w.name, 'cloudSkus', p.cloud_skus, 'catalogKey', p.catalog_key, 'exePatterns', p.exe_patterns, 'notes', p.notes, 'createdBy', p.created_by,
                         'createdAt', p.created_at, 'updatedAt', p.updated_at)
                         FROM zentriq.sam_products p LEFT JOIN zentriq.webapps w ON w.id = p.webapp_id WHERE p.id = @id),
                   'licenses', (SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY t."status", t."endDate" NULLS LAST), '[]') FROM ({{LicenseSelect}} WHERE l.product_id = @id) t),
@@ -166,27 +168,120 @@ public static class LicenseEndpoints
                         ORDER BY s.first_at DESC), '[]') FROM zentriq.sam_alerts s WHERE s.product_id = @id AND s.resolved_at IS NULL AND NOT s.dismissed)
                 )::text
                 """.Replace("{{LicenseSelect}}", LicenseSelect), c => c.Parameters.AddWithValue("id", id), ct);
-            return Results.Ok(new { compliance = row, detail = JsonDocument.Parse(json ?? "{}").RootElement });
+            return Results.Ok(new { compliance = row, detail = JsonDocument.Parse(json ?? "{}").RootElement, unusedDays = settings.UnusedDays });
         });
 
         g.MapGet("/products/{id:guid}/installations", async (Guid id, NpgsqlDataSource ds, CancellationToken ct) =>
         {
+            var settings = await LicenseSettings.LoadAsync(ds, ct);
             await using var conn = await ds.OpenConnectionAsync(ct);
             var json = await ScalarAsync(conn, $$"""
                 WITH p AS (SELECT * FROM zentriq.sam_products WHERE id = @id),
                 {{LicenseCompliance.InstallsCte}}
+                ,{{LicenseCompliance.UsageCte}}
                 SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY lower(t."hostname")), '[]')::text FROM (
                   SELECT a.id AS "assetId", COALESCE(a.hostname, host(a.primary_ip)) AS "hostname", i.software AS "software", i.version AS "version",
                          d.document #>> '{users,loggedOn}' AS "user", a.os_name AS "os", dep.name AS "department", a.last_seen_at AS "lastSeen",
                          h.cpu_cores AS "cores",
-                         (SELECT l.name FROM zentriq.sam_allocations x JOIN zentriq.sam_licenses l ON l.id = x.license_id WHERE x.asset_id = a.id AND l.product_id = @id LIMIT 1) AS "allocatedTo"
-                    FROM inst i JOIN zentriq.assets a ON a.id = i.asset_id
+                         (SELECT l.name FROM zentriq.sam_allocations x JOIN zentriq.sam_licenses l ON l.id = x.license_id WHERE x.asset_id = a.id AND l.product_id = @id LIMIT 1) AS "allocatedTo",
+                         u.last_used AS "lastUsed", COALESCE(u.minutes, 0) AS "minutesRecent", u.users AS "usedBy", m.since AS "meteredSince",
+                         {{LicenseCompliance.UsageState}} AS "usage",
+                         EXISTS (SELECT 1 FROM zentriq.agent_registrations r WHERE r.asset_id = a.id AND r.status = 'active' AND 'software-uninstall' = ANY (r.capabilities)) AS "canUninstall"
+                    FROM inst i JOIN zentriq.assets a ON a.id = i.asset_id CROSS JOIN p
                     LEFT JOIN zentriq.asset_inventory_documents d ON d.asset_id = a.id
                     LEFT JOIN zentriq.hardware_inventory h ON h.asset_id = a.id
                     LEFT JOIN zentriq.departments dep ON dep.id = a.department_id
+                    LEFT JOIN used_by u ON u.product_id = p.id AND u.asset_id = a.id
+                    LEFT JOIN zentriq.software_usage_devices m ON m.asset_id = a.id
                    LIMIT 5000) t
-                """, c => c.Parameters.AddWithValue("id", id), ct);
+                """, c => { c.Parameters.AddWithValue("id", id); c.Parameters.AddWithValue("days", settings.UnusedDays); }, ct);
             return Results.Text(json ?? "[]", "application/json");
+        });
+
+
+        // ---- software metering (build 120) -------------------------------------------------------------------------
+        g.MapGet("/usage", async (NpgsqlDataSource ds, int? days, string? q, CancellationToken ct) =>
+        {
+            var settings = await LicenseSettings.LoadAsync(ds, ct);
+            var window = Math.Clamp(days ?? 30, 1, 400);
+            await using var conn = await ds.OpenConnectionAsync(ct);
+            var json = await ScalarAsync(conn, $$"""
+                WITH p AS (SELECT * FROM zentriq.sam_products WHERE kind = 'installed'),
+                {{LicenseCompliance.InstallsCte}},
+                {{LicenseCompliance.UsageCte}},
+                per AS (
+                  SELECT p.id, p.name, p.publisher, cardinality(p.exe_patterns) > 0 AS rules, {{LicenseCompliance.UsageState}} AS state
+                    FROM inst i JOIN p ON p.id = i.product_id
+                    LEFT JOIN used_by u ON u.product_id = p.id AND u.asset_id = i.asset_id
+                    LEFT JOIN zentriq.software_usage_devices m ON m.asset_id = i.asset_id),
+                apps AS (
+                  SELECT lower(u.exe) AS key, min(u.exe) AS exe, mode() WITHIN GROUP (ORDER BY u.product) AS product, mode() WITHIN GROUP (ORDER BY u.publisher) AS publisher,
+                         count(DISTINCT u.asset_id) AS devices, count(DISTINCT lower(u.user_name)) FILTER (WHERE u.user_name <> '') AS users,
+                         sum(u.minutes) AS minutes, sum(u.launches) AS launches, max(u.day) AS last_used
+                    FROM zentriq.software_usage u JOIN zentriq.assets a ON a.id = u.asset_id AND a.status = 'active'
+                   WHERE u.day > current_date - @w
+                     AND (@q::text IS NULL OR u.exe ILIKE '%' || @q || '%' OR u.product ILIKE '%' || @q || '%' OR u.publisher ILIKE '%' || @q || '%')
+                   GROUP BY 1 ORDER BY sum(u.minutes) DESC LIMIT 1000)
+                SELECT jsonb_build_object(
+                  'metering', @metering, 'unusedDays', @days, 'days', @w,
+                  'meteredDevices', (SELECT count(*) FROM zentriq.software_usage_devices m JOIN zentriq.assets a ON a.id = m.asset_id AND a.status = 'active'
+                        WHERE m.reported_at > now() - interval '14 days'),
+                  'apps', (SELECT COALESCE(jsonb_agg(jsonb_build_object('exe', x.exe, 'product', x.product, 'publisher', x.publisher, 'devices', x.devices, 'users', x.users,
+                        'minutes', x.minutes, 'launches', x.launches, 'lastUsed', x.last_used,
+                        'productId', (SELECT p.id FROM p WHERE x.exe ILIKE ANY (zentriq.sam_like(p.exe_patterns)) ORDER BY p.name LIMIT 1),
+                        'productName', (SELECT p.name FROM p WHERE x.exe ILIKE ANY (zentriq.sam_like(p.exe_patterns)) ORDER BY p.name LIMIT 1))
+                        ORDER BY x.minutes DESC), '[]') FROM apps x),
+                  'products', (SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY t."unused" DESC, t."name"), '[]') FROM (
+                        SELECT per.id AS "id", per.name AS "name", per.publisher AS "publisher", bool_or(per.rules) AS "rules", count(*) AS "installed",
+                               count(*) FILTER (WHERE state = 'used') AS "used", count(*) FILTER (WHERE state = 'unused') AS "unused",
+                               count(*) FILTER (WHERE state = 'new') AS "recent", count(*) FILTER (WHERE state = 'not_metered') AS "notMetered",
+                               (SELECT avg(l.unit_cost) FROM zentriq.sam_licenses l WHERE l.product_id = per.id AND l.status = 'active' AND l.unit_cost IS NOT NULL) AS "unitCost"
+                          FROM per GROUP BY per.id, per.name, per.publisher) t)
+                )::text
+                """, c =>
+            {
+                c.Parameters.AddWithValue("w", window);
+                c.Parameters.AddWithValue("days", settings.UnusedDays);
+                c.Parameters.AddWithValue("metering", settings.Metering);
+                c.Parameters.Add(new NpgsqlParameter("q", NpgsqlDbType.Text) { Value = string.IsNullOrWhiteSpace(q) ? DBNull.Value : q.Trim() });
+            }, ct);
+            return Results.Text(json ?? "{}", "application/json");
+        });
+
+        // Who used one program, on which devices.
+        g.MapGet("/usage/program", async (NpgsqlDataSource ds, string? exe, int? days, CancellationToken ct) =>
+        {
+            if (string.IsNullOrWhiteSpace(exe) || exe.Length > 260) return Validation.Problem("exe", "Choose a program.");
+            var window = Math.Clamp(days ?? 30, 1, 400);
+            await using var conn = await ds.OpenConnectionAsync(ct);
+            var json = await ScalarAsync(conn, """
+                SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY t."minutes" DESC), '[]')::text FROM (
+                  SELECT a.id AS "assetId", COALESCE(a.hostname, host(a.primary_ip)) AS "hostname", NULLIF(u.user_name, '') AS "user",
+                         sum(u.minutes) AS "minutes", sum(u.launches) AS "launches", count(DISTINCT u.day) AS "daysUsed", max(u.day) AS "lastUsed",
+                         max(u.version) AS "version", min(u.path) AS "path"
+                    FROM zentriq.software_usage u JOIN zentriq.assets a ON a.id = u.asset_id AND a.status = 'active'
+                   WHERE lower(u.exe) = lower(@e) AND u.day > current_date - @w
+                   GROUP BY a.id, a.hostname, a.primary_ip, u.user_name LIMIT 5000) t
+                """, c => { c.Parameters.AddWithValue("e", exe.Trim()); c.Parameters.AddWithValue("w", window); }, ct);
+            return Results.Text(json ?? "[]", "application/json");
+        });
+
+        // Programs used on one device (device page).
+        g.MapGet("/usage/device/{assetId:guid}", async (Guid assetId, NpgsqlDataSource ds, int? days, CancellationToken ct) =>
+        {
+            var window = Math.Clamp(days ?? 30, 1, 400);
+            await using var conn = await ds.OpenConnectionAsync(ct);
+            var json = await ScalarAsync(conn, """
+                SELECT jsonb_build_object(
+                  'meteredSince', (SELECT since FROM zentriq.software_usage_devices WHERE asset_id = @a),
+                  'programs', (SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY t."minutes" DESC), '[]') FROM (
+                    SELECT min(u.exe) AS "exe", mode() WITHIN GROUP (ORDER BY u.product) AS "product", mode() WITHIN GROUP (ORDER BY u.publisher) AS "publisher",
+                           max(u.version) AS "version", sum(u.minutes) AS "minutes", sum(u.launches) AS "launches", count(DISTINCT u.day) AS "daysUsed",
+                           max(u.day) AS "lastUsed", array_agg(DISTINCT NULLIF(u.user_name, '')) FILTER (WHERE u.user_name <> '') AS "users"
+                      FROM zentriq.software_usage u WHERE u.asset_id = @a AND u.day > current_date - @w
+                     GROUP BY lower(u.exe) LIMIT 2000) t))::text
+                """, c => { c.Parameters.AddWithValue("a", assetId); c.Parameters.AddWithValue("w", window); }, ct);
+            return Results.Text(json ?? "{}", "application/json");
         });
 
         g.MapPost("/products/preview", async (PreviewBody body, NpgsqlDataSource ds, CancellationToken ct) =>
@@ -232,7 +327,7 @@ public static class LicenseEndpoints
 
             var suggestions = LicenseCatalog.Standard.Products
                 .Where(e => !keys.Contains("catalog:" + e.Key) && !existing.Contains(e.Name))
-                .Select(e => new { e.Key, e.Name, e.Publisher, e.Category, e.Metric, e.License, e.NamePatterns, e.ExcludePatterns, e.PublisherPatterns, e.Notes,
+                .Select(e => new { e.Key, e.Name, e.Publisher, e.Category, e.Metric, e.License, e.NamePatterns, e.ExcludePatterns, e.PublisherPatterns, e.ExePatterns, e.Notes,
                     matches = titles.Where(t => LicenseCatalog.Matches(e, t.Name, t.Publisher)).Take(10).Select(t => new { t.Name, t.Devices }).ToList(),
                     devices = titles.Where(t => LicenseCatalog.Matches(e, t.Name, t.Publisher)).Sum(t => t.Devices) })
                 .Where(x => x.devices > 0).OrderByDescending(x => x.devices).ToList();
@@ -252,8 +347,8 @@ public static class LicenseEndpoints
             foreach (var e in entries)
             {
                 await using var cmd = ds.CreateCommand("""
-                    INSERT INTO zentriq.sam_products (name, publisher, category, name_patterns, exclude_patterns, publisher_patterns, metric, catalog_key, notes, created_by)
-                    VALUES (@n, @p, @c, @np, @xp, @pp, @m, @k, @no, @by) ON CONFLICT DO NOTHING
+                    INSERT INTO zentriq.sam_products (name, publisher, category, name_patterns, exclude_patterns, publisher_patterns, metric, catalog_key, notes, created_by, exe_patterns)
+                    VALUES (@n, @p, @c, @np, @xp, @pp, @m, @k, @no, @by, @ep) ON CONFLICT DO NOTHING
                     """);
                 cmd.Parameters.AddWithValue("n", e.Name);
                 cmd.Parameters.Add(T("p", e.Publisher));
@@ -265,6 +360,7 @@ public static class LicenseEndpoints
                 cmd.Parameters.AddWithValue("k", "catalog:" + e.Key);
                 cmd.Parameters.Add(T("no", e.Notes));
                 cmd.Parameters.Add(T("by", rc.UserName));
+                cmd.Parameters.AddWithValue("ep", e.ExePatterns.ToArray());
                 added += await cmd.ExecuteNonQueryAsync(ct);
             }
             await rc.AuditAsync("licenses.product_add_catalog", $"{added} product(s)", detail: new { keys = entries.Select(e => e.Key) });
@@ -276,8 +372,8 @@ public static class LicenseEndpoints
             var err = ValidateProduct(body);
             if (err is not null) return err;
             await using var cmd = ds.CreateCommand("""
-                INSERT INTO zentriq.sam_products (name, publisher, category, name_patterns, exclude_patterns, publisher_patterns, metric, kind, needs_license, webapp_id, cloud_skus, catalog_key, notes, created_by)
-                VALUES (@n, @p, @c, @np, @xp, @pp, @m, @k, @nl, @w, @cs, @ck, @no, @by) RETURNING id
+                INSERT INTO zentriq.sam_products (name, publisher, category, name_patterns, exclude_patterns, publisher_patterns, metric, kind, needs_license, webapp_id, cloud_skus, catalog_key, notes, created_by, exe_patterns)
+                VALUES (@n, @p, @c, @np, @xp, @pp, @m, @k, @nl, @w, @cs, @ck, @no, @by, @ep) RETURNING id
                 """);
             BindProduct(cmd, body);
             cmd.Parameters.Add(T("ck", body.CatalogKey));
@@ -297,7 +393,7 @@ public static class LicenseEndpoints
             if (err is not null) return err;
             await using var cmd = ds.CreateCommand("""
                 UPDATE zentriq.sam_products SET name = @n, publisher = @p, category = @c, name_patterns = @np, exclude_patterns = @xp, publisher_patterns = @pp,
-                       metric = @m, kind = @k, needs_license = @nl, webapp_id = @w, cloud_skus = @cs, notes = @no, updated_at = now()
+                       metric = @m, kind = @k, needs_license = @nl, webapp_id = @w, cloud_skus = @cs, notes = @no, exe_patterns = @ep, updated_at = now()
                  WHERE id = @id
                 """);
             BindProduct(cmd, body);
@@ -787,6 +883,8 @@ public static class LicenseEndpoints
         if (kind == "installed" && Clean(b.NamePatterns).Length == 0) return Validation.Problem("namePatterns", "Enter at least one name the software installs under (wildcards * and ? are allowed).");
         if (Clean(b.NamePatterns).Length > 30 || Clean(b.ExcludePatterns).Length > 30 || Clean(b.PublisherPatterns).Length > 30) return Validation.Problem("namePatterns", "Use at most 30 patterns.");
         if (Clean(b.NamePatterns).Any(p => p.Trim('*', '?').Length < 2)) return Validation.Problem("namePatterns", "A pattern needs at least two letters besides wildcards.");
+        if (Clean(b.ExePatterns).Length > 30) return Validation.Problem("exePatterns", "Use at most 30 programs.");
+        if (Clean(b.ExePatterns).Any(p => p.Contains('/') || p.Contains('\\') || p.Trim('*', '?').Length < 2)) return Validation.Problem("exePatterns", "Enter program file names such as winword.exe (wildcards * and ? are allowed), without folders.");
         return null;
     }
 
@@ -804,6 +902,7 @@ public static class LicenseEndpoints
         cmd.Parameters.Add(new NpgsqlParameter("w", NpgsqlDbType.Uuid) { Value = (object?)b.WebAppId ?? DBNull.Value });
         cmd.Parameters.AddWithValue("cs", Clean(b.CloudSkus));
         cmd.Parameters.Add(T("no", Trim(b.Notes, 4000)));
+        cmd.Parameters.AddWithValue("ep", Clean(b.ExePatterns).Select(e => e.ToLowerInvariant()).Distinct().ToArray());
     }
 
     private static IResult? ValidateConnection(ConnectionBody b, bool create)

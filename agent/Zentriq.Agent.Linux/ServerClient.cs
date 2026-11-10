@@ -51,6 +51,7 @@ internal sealed class CheckinResponse
     [JsonPropertyName("actions")] public List<AgentAction>? Actions { get; set; }
     [JsonPropertyName("uninstallCode")] public UninstallCodeInfo? UninstallCode { get; set; }
     [JsonPropertyName("appControl")] public AppControlInfo? AppControl { get; set; }
+    [JsonPropertyName("metering")] public bool? Metering { get; set; }
 }
 
 internal sealed class AppControlInfo

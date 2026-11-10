@@ -33,7 +33,7 @@ export interface License {
 }
 
 export interface Product {
-  id: string; name: string; publisher: string | null; category: string; namePatterns: string[]; excludePatterns: string[]; publisherPatterns: string[]; metric: Metric;
+  id: string; name: string; publisher: string | null; category: string; namePatterns: string[]; excludePatterns: string[]; publisherPatterns: string[]; exePatterns?: string[]; metric: Metric;
   kind: 'installed' | 'cloud'; needsLicense: boolean; webAppId: string | null; webAppName: string | null; cloudSkus: string[]; catalogKey: string | null; notes: string | null;
   createdBy: string | null; createdAt: string; updatedAt: string;
 }
@@ -55,9 +55,11 @@ export interface ProductDetail {
     product: Product; licenses: License[]; versions: { version: string; devices: number }[]; cloud: CloudSku[];
     alerts: { id: number; kind: string; severity: Alert['severity']; title: string; detail: string | null; firstAt: string }[];
   };
+  unusedDays?: number;
 }
 
-export interface Installation { assetId: string; hostname: string; software: string; version: string | null; user: string | null; os: string | null; department: string | null; lastSeen: string | null; cores: number | null; allocatedTo: string | null }
+export interface Installation { assetId: string; hostname: string; software: string; version: string | null; user: string | null; os: string | null; department: string | null; lastSeen: string | null; cores: number | null; allocatedTo: string | null;
+  lastUsed?: string | null; minutesRecent?: number; usedBy?: string[] | null; meteredSince?: string | null; usage?: UsageState; canUninstall?: boolean }
 
 export interface Connection {
   id: string; name: string; provider: 'm365'; tenantId: string; clientId: string; hasSecret: boolean; enabled: boolean; syncApps: boolean;
@@ -71,7 +73,7 @@ export interface Activation {
   partialKey: string | null; graceMinutes: number | null; description: string | null; activated: boolean; collectedAt: string;
 }
 
-export interface Settings { notifyEmails: string[]; notifyInApp: boolean; expiryDays: number; unusedPercent: number; inactiveDays: number; webDiscovery: boolean }
+export interface Settings { notifyEmails: string[]; notifyInApp: boolean; expiryDays: number; unusedPercent: number; inactiveDays: number; webDiscovery: boolean; metering: boolean; unusedDays: number }
 
 export interface Suggestion {
   key: string; name: string; publisher: string | null; category: string; metric: Metric; license: string; namePatterns: string[]; excludePatterns: string[];
@@ -99,3 +101,21 @@ export const money = (v: number | null | undefined, currency?: string | null) =>
 
 export const consumptionLabel = (c: Compliance) =>
   c.kind === 'cloud' ? 'assigned' : c.metric === 'user' ? 'users' : c.metric === 'core' ? 'cores' : c.metric === 'concurrent' ? 'installed (use not measured)' : 'installed';
+
+/** Use of an installation (software metering, build 120). */
+export type UsageState = 'used' | 'unused' | 'new' | 'not_metered' | 'no_rules';
+export const USAGE_LABEL: Record<UsageState, string> = { used: 'Used', unused: 'Unused', new: 'Metering for less than the period', not_metered: 'Not metered', no_rules: 'No programs set' };
+export const USAGE_TONE: Record<UsageState, '' | 'ok' | 'warn' | 'crit' | 'info'> = { used: 'ok', unused: 'warn', new: '', not_metered: '', no_rules: '' };
+
+export interface UsageApp { exe: string; product: string | null; publisher: string | null; devices: number; users: number; minutes: number; launches: number; lastUsed: string; productId: string | null; productName: string | null }
+export interface UsageProduct { id: string; name: string; publisher: string | null; rules: boolean; installed: number; used: number; unused: number; recent: number; notMetered: number; unitCost: number | null }
+export interface UsageSummary { metering: boolean; unusedDays: number; days: number; meteredDevices: number; apps: UsageApp[]; products: UsageProduct[] }
+export interface ProgramUse { assetId: string; hostname: string; user: string | null; minutes: number; launches: number; daysUsed: number; lastUsed: string; version: string | null; path: string }
+
+/** Minutes as "3 h 20 min". */
+export function hours(min: number | null | undefined): string {
+  const m = Math.round(min ?? 0);
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60);
+  return h >= 100 ? `${h.toLocaleString()} h` : `${h} h ${m % 60} min`;
+}

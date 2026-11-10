@@ -17,6 +17,9 @@ import { AppDialog } from '../features/webapps/WebAppsPage';
 import { DecideDialog, DeployDialog, GroupDialog, PackageDialog, RuleDialog } from '../features/deployment/DeploymentDialogs';
 import { OfferDialog } from '../features/deployment/SelfServiceTab';
 import { AssetForm } from '../features/nonit/NonItDialogs';
+import { ExperiencePage } from '../features/experience/ExperiencePage';
+import { DeviceExperience } from '../features/experience/DeviceExperience';
+import { UsageTab } from '../features/licenses/UsageTab';
 import '../styles/zentriq.css';
 import '../styles/app.css';
 import '../styles/modern.css';
@@ -50,12 +53,19 @@ const DIALOGS: Record<string, () => ReactNode> = {
   'non-it-asset': () => <AssetForm asset={null} categories={[]} groups={[]} departments={[]} fields={[]} onClose={no} onSaved={no} onListsChanged={no} />,
 };
 
+/** Whole pages, with sample data answered by the screenshot script. */
+const PAGES: Record<string, () => ReactNode> = {
+  'experience': () => <ExperiencePage />,
+  'device-experience': () => <><PageHead title="LT-0042" /><DeviceExperience assetId="00000000-0000-0000-0000-000000000042" /></>,
+  'license-usage': () => <><PageHead title="Software Licenses" /><UsageTab canManage /></>,
+};
+
 function View() {
   const { me } = useAuth();
   const d = new URLSearchParams(window.location.search).get('d') ?? 'shell';
   if (!me) return <p>Signing in…</p>;
   const page = <><PageHead title="IT Asset Inventory" /><Panel title="Devices"><p className="muted">Gallery page.</p></Panel></>;
-  return <Shell>{page}{DIALOGS[d]?.()}</Shell>;
+  return <Shell>{PAGES[d]?.() ?? page}{DIALOGS[d]?.()}</Shell>;
 }
 
 export const GALLERY = Object.keys(DIALOGS);

@@ -19,6 +19,8 @@ public sealed class LicenseCatalog
         [JsonPropertyName("namePatterns")] public List<string> NamePatterns { get; set; } = [];
         [JsonPropertyName("excludePatterns")] public List<string> ExcludePatterns { get; set; } = [];
         [JsonPropertyName("publisherPatterns")] public List<string> PublisherPatterns { get; set; } = [];
+        /// <summary>Programs that count as using the product (software metering), file names in lower case.</summary>
+        [JsonPropertyName("exePatterns")] public List<string> ExePatterns { get; set; } = [];
         [JsonPropertyName("notes")] public string? Notes { get; set; }
     }
 

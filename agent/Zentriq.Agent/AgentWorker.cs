@@ -76,6 +76,7 @@ internal sealed class AgentWorker
                 if (resp.Actions is { Count: > 0 }) RunActions(client, resp.Actions, ct);
                 else AgentUpdater.CleanUp();
                 AppControlAgent.Sync(client, resp.AppControl, ct);
+                Experience.SetMetering(resp.Metering);
 
                 state.LastError = null;
                 var due = forceInventory || resp.InventoryDue || state.LastInventoryUtc is null || state.LastInventoryUtc < DateTime.UtcNow.AddMinutes(-state.InventoryMinutes);
@@ -503,6 +504,7 @@ internal sealed class AgentWorker
         try
         {
             var doc = WindowsCollector.Collect(new LocalWmiSource(), new LocalRegistrySource(), "agent", Program.Version, includeServices: true);
+            Experience.AddTo(doc);
             summary = $"{doc.Device.Hostname}, {doc.Os.Name}, {doc.Software.Count} software, {doc.Patches.Count} updates, {doc.Errors.Count} section error(s)";
             foreach (var e in doc.Errors) Log.Warn("Inventory section: " + e);
             return ServerClient.Compress(doc);

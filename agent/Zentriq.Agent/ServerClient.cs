@@ -52,6 +52,8 @@ internal sealed class CheckinResponse
     [JsonPropertyName("uninstallCode")] public UninstallCodeInfo? UninstallCode { get; set; }
     /// <summary>Application control: the current policy revision (the agent fetches its policy when it differs).</summary>
     [JsonPropertyName("appControl")] public AppControlInfo? AppControl { get; set; }
+    /// <summary>Software metering on or off (null: unchanged).</summary>
+    [JsonPropertyName("metering")] public bool? Metering { get; set; }
 }
 
 internal sealed class AppControlInfo

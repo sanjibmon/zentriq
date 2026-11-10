@@ -15,6 +15,7 @@ import { AssetVulnerabilities } from '../vulnerabilities/AssetVulnerabilities';
 import { DeviceTypeField, useDeleteDevices } from '../assets/DeviceManagement';
 import { AssetNetwork } from '../network/AssetNetwork';
 import { LifecyclePanel } from '../lifecycle/LifecyclePanel';
+import { DeviceExperience } from '../experience/DeviceExperience';
 import { HardwareIdentityDialog, hardwareIdentityRows } from './HardwareIdentity';
 import { Callout, DataTable, ErrorBox, fmt, Loading, PageHead, Panel, Pill, statusTone } from '../../components/ui';
 
@@ -30,7 +31,7 @@ function KV({ items }: { items: [string, ReactNode][] }) {
   );
 }
 
-type Tab = 'overview' | 'lifecycle' | 'hardware' | 'software' | 'network' | 'updates' | 'security' | 'services' | 'vulnerabilities' | 'changes';
+type Tab = 'overview' | 'lifecycle' | 'hardware' | 'software' | 'experience' | 'network' | 'updates' | 'security' | 'services' | 'vulnerabilities' | 'changes';
 
 /** Where the device was opened from: its details stay in that section (IT Asset, Hardware or Software Inventory). */
 export interface DetailSection { path: string; label: string; tab?: 'hardware' | 'software' | 'network' }
@@ -41,7 +42,7 @@ export function AssetDetailPage({ id, section = ASSETS_SECTION }: { id: string; 
   const inv = useApi(() => api.get<AssetInventory>(`/assets/${id}/inventory`), [id]);
   const { query, navigate } = useRouter();
   const deleteDevices = useDeleteDevices();
-  const [tab, setTab] = useState<Tab>((['overview', 'lifecycle', 'hardware', 'software', 'network', 'updates', 'security', 'services', 'vulnerabilities', 'changes'] as Tab[]).find((t) => t === query.get('tab')) ?? section.tab ?? 'overview');
+  const [tab, setTab] = useState<Tab>((['overview', 'lifecycle', 'hardware', 'software', 'experience', 'network', 'updates', 'security', 'services', 'vulnerabilities', 'changes'] as Tab[]).find((t) => t === query.get('tab')) ?? section.tab ?? 'overview');
   const [filter, setFilter] = useState('');
   const { can, me } = useAuth();
   const control = useApi(() => (can('assets.control') ? api.get<ControlInfo>(`/assets/${id}/control`) : Promise.resolve(null)), [id]);
@@ -69,7 +70,8 @@ export function AssetDetailPage({ id, section = ASSETS_SECTION }: { id: string; 
   if (!a) return <Loading />;
   const lifecycleOn = (!!me?.license.sections?.find((x) => x.id === 'infrastructure' && x.installed && (x.enabled || !me.license.featuresEnabled)) || !me?.license.sections) && can('lifecycle.view');
   const tabs: [Tab, string, number?][] = [
-    ['overview', 'Overview'], ...(lifecycleOn ? [['lifecycle', 'Lifecycle'] as [Tab, string]] : []), ['hardware', 'Hardware'], ['software', 'Software', sw.length], ['network', 'Network', d?.network.length],
+    ['overview', 'Overview'], ...(lifecycleOn ? [['lifecycle', 'Lifecycle'] as [Tab, string]] : []), ['hardware', 'Hardware'], ['software', 'Software', sw.length],
+    ...(d?.os.family === 'windows' || d?.os.family === 'linux' ? [['experience', 'Experience'] as [Tab, string]] : []), ['network', 'Network', d?.network.length],
     ['updates', 'Updates', d?.patches.length], ['security', 'Security'], ['services', 'Services', d?.services.length],
     ...(can('vuln.view') ? [['vulnerabilities', 'Vulnerabilities'] as [Tab, string]] : []),
     ['changes', 'Changes'],
@@ -216,6 +218,7 @@ export function AssetDetailPage({ id, section = ASSETS_SECTION }: { id: string; 
         </Panel>
       )}
 
+      {tab === 'experience' && <DeviceExperience assetId={id} />}
       {tab === 'network' && <AssetNetwork assetId={id} />}
       {tab === 'network' && (a.category !== 'network_device' || (d?.network.length ?? 0) > 0) && (
         <Panel flush title="Network adapters">

@@ -407,6 +407,8 @@ public static partial class AgentEndpoints
                 uninstallCode = CodeForAgents(await LoadCodeForAllAsync(ds, ct), settings.UninstallProtection),
                 // Application control: the agent fetches its policy (/app-control/policy) when the revision differs from its own.
                 appControl = caps.Contains("app-control") ? new { revision = (await Zentriq.Infrastructure.Deployment.AppControlStore.LoadSettingsAsync(ds, ct)).Revision } : null,
+                // Software metering on or off (Software License Management settings); agents from build 120.
+                metering = (await Zentriq.Infrastructure.Licenses.LicenseSettings.LoadAsync(ds, ct)).Metering,
             });
         }).AllowAnonymous();
 

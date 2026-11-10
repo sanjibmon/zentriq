@@ -11,6 +11,7 @@ import { AgentsPage } from '../features/agents/AgentsPage';
 import { SoftwarePage } from '../features/inventory/SoftwarePage';
 import { HardwarePage } from '../features/inventory/HardwarePage';
 import { NetworkPage } from '../features/network/NetworkPage';
+import { ExperiencePage } from '../features/experience/ExperiencePage';
 import { NonItPage } from '../features/nonit/NonItPage';
 import { AssetDetailPage } from '../features/inventory/AssetDetailPage';
 import { AccessoriesPage } from '../features/accessories/AccessoriesPage';
@@ -88,6 +89,7 @@ function Routes() {
   const cloudMatch = /^\/cloud\/resources\/([0-9a-f-]{36})$/i.exec(path);
   if (cloudMatch) return <CloudResourcePage key={cloudMatch[1]} id={cloudMatch[1]!} />;
   if (path === '/network') return <NetworkPage />;
+  if (path === '/experience') return <ExperiencePage />;
   if (path === '/non-it') return <NonItPage />;
   if (path === '/agents') return <AgentsPage />;
   if (path === '/activity') return <ActivityPage />;

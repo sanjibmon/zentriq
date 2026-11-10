@@ -23,6 +23,7 @@ export const NAV: [string, NavItem[]][] = [
     { id: 'accessories', label: 'IT Accessories', icon: 'headset', path: '/accessories', ready: true, permission: 'accessories.view' },
     { id: 'software', label: 'Software Inventory', icon: 'apps', path: '/software', ready: true, permission: 'assets.view' },
     { id: 'network', label: 'Network Inventory', icon: 'network', path: '/network', ready: true, permission: 'assets.view' },
+    { id: 'experience', label: 'Device Experience', icon: 'gauge', path: '/experience', ready: true, permission: 'assets.view' },
     { id: 'agents', label: 'Agents', icon: 'host', path: '/agents', ready: true, permission: 'assets.view' },
     { id: 'activity', label: 'Activity Log', icon: 'activity', path: '/activity', ready: true, permission: 'activity.view' },
   ]],

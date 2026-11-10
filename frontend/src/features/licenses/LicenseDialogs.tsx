@@ -19,7 +19,7 @@ export function ProductDialog({ product, isNew, onClose, onSaved }: { product: P
     name: product?.name ?? '', publisher: product?.publisher ?? '', category: product?.category ?? 'Other', kind: product?.kind ?? 'installed',
     metric: (product?.metric ?? 'device') as Metric, needsLicense: product?.needsLicense ?? true,
     names: (product?.namePatterns ?? []).join('\n'), excludes: (product?.excludePatterns ?? []).join('\n'), publishers: (product?.publisherPatterns ?? []).join('\n'),
-    skus: (product?.cloudSkus ?? []).join('\n'), webAppId: product?.webAppId ?? '', notes: product?.notes ?? '',
+    skus: (product?.cloudSkus ?? []).join('\n'), webAppId: product?.webAppId ?? '', notes: product?.notes ?? '', exes: (product?.exePatterns ?? []).join('\n'),
   });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -28,7 +28,7 @@ export function ProductDialog({ product, isNew, onClose, onSaved }: { product: P
   const body = () => ({
     name: f.name, publisher: f.publisher || null, category: f.category || 'Other', kind: f.kind, metric: f.metric, needsLicense: f.needsLicense,
     namePatterns: lines(f.names), excludePatterns: lines(f.excludes), publisherPatterns: lines(f.publishers), cloudSkus: lines(f.skus),
-    webAppId: f.webAppId || null, notes: f.notes || null,
+    webAppId: f.webAppId || null, notes: f.notes || null, exePatterns: f.kind === 'installed' ? lines(f.exes) : [],
   });
   async function test() {
     setErr(null);
@@ -70,6 +70,7 @@ export function ProductDialog({ product, isNew, onClose, onSaved }: { product: P
             <Field label="Installed as"><textarea className="in mono" rows={4} value={f.names} onChange={(e) => setF({ ...f, names: e.target.value })} placeholder={'Microsoft Visio*\nMicrosoft Office Visio*'} /></Field>
             <Field label="But not" optional><textarea className="in mono" rows={4} value={f.excludes} onChange={(e) => setF({ ...f, excludes: e.target.value })} placeholder="*Viewer*" /></Field>
             <Field label="From publisher" optional><textarea className="in mono" rows={2} value={f.publishers} onChange={(e) => setF({ ...f, publishers: e.target.value })} placeholder="Microsoft*" /></Field>
+            <Field label="Used when running" optional hint="Program files that count as using it (software metering), one per line."><textarea className="in mono" rows={2} value={f.exes} onChange={(e) => setF({ ...f, exes: e.target.value })} placeholder={'visio.exe'} /></Field>
             <div className="ff"><span className="ff-l">&nbsp;</span><div><button type="button" className="btn" onClick={() => void test()}>Test Against Inventory</button></div></div>
           </Fields>
         </Section> : <Section title="How It Is Counted">

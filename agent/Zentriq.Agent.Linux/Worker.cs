@@ -76,6 +76,7 @@ internal sealed class AgentWorker
                 if (resp.Actions is { Count: > 0 }) RunActions(client, resp.Actions, ct);
                 else AgentUpdater.CleanUp();
                 AppControlAgent.Sync(client, resp.AppControl, ct);
+                Experience.SetMetering(resp.Metering);
 
                 state.LastError = null;
                 var due = forceInventory || resp.InventoryDue || state.LastInventoryUtc is null || state.LastInventoryUtc < DateTime.UtcNow.AddMinutes(-state.InventoryMinutes);
@@ -477,6 +478,7 @@ internal sealed class AgentWorker
     public static InventoryDocument CollectDocument(out string summary)
     {
         var doc = LinuxCollector.Collect();
+        Experience.AddTo(doc);
         summary = $"{doc.Device.Hostname}, {doc.Os.Name} ({doc.Os.EditionId}, {doc.Os.InstallationType}), {doc.Software.Count} packages, {doc.Errors.Count} section error(s)";
         foreach (var e in doc.Errors) Log.Warn("Inventory section: " + e);
         return doc;

@@ -18,6 +18,10 @@ public sealed class LicenseSettings
     [JsonPropertyName("inactiveDays")] public int InactiveDays { get; set; } = 90;
     /// <summary>Find web applications in use from the devices' DNS cache (Windows agent and WinRM inventory).</summary>
     [JsonPropertyName("webDiscovery")] public bool WebDiscovery { get; set; } = true;
+    /// <summary>Software metering: agents record which programs run, for whom and how long (build 120).</summary>
+    [JsonPropertyName("metering")] public bool Metering { get; set; } = true;
+    /// <summary>An installation without use for this many days is unused (reclaim candidate).</summary>
+    [JsonPropertyName("unusedDays")] public int UnusedDays { get; set; } = 90;
 
     public const string Key = "licenses.settings";
 
@@ -95,6 +99,22 @@ public static class LicenseCompliance
                AND NOT (s.name ILIKE ANY (zentriq.sam_like(p.exclude_patterns)))
                AND (cardinality(p.publisher_patterns) = 0 OR s.publisher ILIKE ANY (zentriq.sam_like(p.publisher_patterns)))
              GROUP BY 1, 2)
+        """;
+
+    /// <summary>Last use of each product on each device (programs matching the product's exe patterns); needs @days.</summary>
+    public const string UsageCte = """
+        used_by AS (
+            SELECT p.id AS product_id, u.asset_id, max(u.day) AS last_used,
+                   sum(u.minutes) FILTER (WHERE u.day > current_date - @days) AS minutes,
+                   array_agg(DISTINCT u.user_name) FILTER (WHERE u.user_name <> '' AND u.day > current_date - @days) AS users
+              FROM p JOIN zentriq.software_usage u ON cardinality(p.exe_patterns) > 0 AND u.exe ILIKE ANY (zentriq.sam_like(p.exe_patterns))
+             GROUP BY 1, 2)
+        """;
+
+    /// <summary>no_rules | not_metered | used | new (metered for less than the period) | unused; needs p, u (used_by), m (software_usage_devices).</summary>
+    public const string UsageState = """
+        CASE WHEN cardinality(p.exe_patterns) = 0 THEN 'no_rules' WHEN m.asset_id IS NULL THEN 'not_metered'
+             WHEN u.last_used > current_date - @days THEN 'used' WHEN m.since > current_date - @days THEN 'new' ELSE 'unused' END
         """;
 
     private const string Sql = $$"""

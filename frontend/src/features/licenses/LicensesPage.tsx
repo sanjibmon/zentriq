@@ -8,15 +8,16 @@ import { useConfirm } from '../../components/Confirm';
 import { Icon } from '../../components/Icon';
 import { Callout, DataTable, ErrorBox, fmt, Kpis, PageHead, Panel, Pill } from '../../components/ui';
 import { errText } from '../deployment/types';
+import { UsageTab } from './UsageTab';
 import { AllocateDialog, ConnectionDialog, LicenseDialog, ProductDialog, RenewDialog } from './LicenseDialogs';
 import {
   ACTIVATION_LABEL, consumptionLabel, METRIC_LABEL, money, SEVERITY_TONE, STATUS_LABEL, TYPE_LABEL, type Activation, type Alert, type CloudSku, type CloudUser,
   type Compliance, type Connection, type License, type Settings, type Suggestion, type Summary,
 } from './types';
 
-type Tab = 'overview' | 'products' | 'licenses' | 'cloud' | 'activation' | 'discover' | 'alerts' | 'settings';
+type Tab = 'overview' | 'products' | 'licenses' | 'usage' | 'cloud' | 'activation' | 'discover' | 'alerts' | 'settings';
 const TABS: [Tab, string][] = [
-  ['overview', 'Overview'], ['products', 'Software Products'], ['licenses', 'Licences'], ['cloud', 'Cloud Licences'], ['activation', 'Windows & Office Activation'],
+  ['overview', 'Overview'], ['products', 'Software Products'], ['licenses', 'Licences'], ['usage', 'Software Usage'], ['cloud', 'Cloud Licences'], ['activation', 'Windows & Office Activation'],
   ['discover', 'Discover'], ['alerts', 'Alerts'], ['settings', 'Settings'],
 ];
 
@@ -64,6 +65,7 @@ export function LicensesPage() {
       {tab === 'overview' && s && <OverviewTab s={s} />}
       {tab === 'products' && <ProductsTab key={query.get('status') ?? ''} {...ctx} initialStatus={query.get('status') ?? ''} />}
       {tab === 'licenses' && <LicensesTab key={(query.get('filter') ?? '') + (licenseRoute ?? '')} {...ctx} initialFilter={query.get('filter') ?? ''} openId={licenseRoute} openAdd={query.get('add') === '1'} />}
+      {tab === 'usage' && <UsageTab canManage={canManage} />}
       {tab === 'cloud' && <CloudTab {...ctx} />}
       {tab === 'activation' && <ActivationTab key={query.get('filter') ?? ''} initialFilter={query.get('filter') ?? ''} />}
       {tab === 'discover' && <DiscoverTab {...ctx} />}
@@ -456,7 +458,7 @@ function SettingsForm({ initial, canManage, changed, failed }: { initial: Settin
     setBusy(true);
     try {
       await api.put('/sam/settings', { notifyEmails: f.emails.split(/[\n,;]/).map((x) => x.trim()).filter(Boolean), notifyInApp: f.notifyInApp, expiryDays: f.expiryDays,
-        unusedPercent: f.unusedPercent, inactiveDays: f.inactiveDays, webDiscovery: f.webDiscovery });
+        unusedPercent: f.unusedPercent, inactiveDays: f.inactiveDays, webDiscovery: f.webDiscovery, metering: f.metering, unusedDays: f.unusedDays });
       changed('Settings saved.');
     } catch (e) { failed(e); } finally { setBusy(false); }
   }
@@ -478,6 +480,9 @@ function SettingsForm({ initial, canManage, changed, failed }: { initial: Settin
           <label>Accounts and cloud licences are inactive after (days)<input className="in" type="number" min={7} max={730} value={f.inactiveDays} disabled={!canManage} onChange={(e) => setF({ ...f, inactiveDays: Number(e.target.value) })} /></label>
           <label className="row-check"><input type="checkbox" checked={f.webDiscovery} disabled={!canManage} onChange={(e) => setF({ ...f, webDiscovery: e.target.checked })} /> Find Web Apps in Use on Devices</label>
           <small className="faint" style={{ marginTop: -6 }}>Windows devices report the host names in their DNS cache with the inventory; only names of known web apps are kept.</small>
+          <label className="row-check"><input type="checkbox" checked={f.metering} disabled={!canManage} onChange={(e) => setF({ ...f, metering: e.target.checked })} /> Software Metering</label>
+          <small className="faint" style={{ marginTop: -6 }}>Devices with the Zentriq Agent record which programs run, for which user and for how long (no window titles, documents or keystrokes). Turning it off removes the totals kept on the devices.</small>
+          <label>An installation is unused after (days without use)<input className="in" type="number" min={14} max={365} value={f.unusedDays} disabled={!canManage} onChange={(e) => setF({ ...f, unusedDays: Number(e.target.value) })} /></label>
           {canManage && <div><button className="btn primary" disabled={busy} onClick={() => void save()}>{busy ? 'Saving…' : 'Save'}</button></div>}
         </div>
       </Panel>

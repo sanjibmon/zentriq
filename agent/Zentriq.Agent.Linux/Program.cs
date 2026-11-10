@@ -307,6 +307,7 @@ internal static class AgentService
         NetworkChange.NetworkAddressChanged += (_, _) => { Presence.Retry.Set(); ServerWake.Set(); };
         var presence = new Thread(() => Presence.Loop(ct)) { IsBackground = true, Name = "presence" };
         presence.Start();
+        new Thread(() => { try { Experience.Loop(ct); } catch (Exception ex) { Log.Error("Software metering and device experience stopped", ex); } }) { IsBackground = true, Name = "experience" }.Start();
         var worker = new AgentWorker();
         // A short random delay so a fleet restarting together does not arrive at once.
         if (WaitHandle.WaitAny([ct.WaitHandle, ServerWake], TimeSpan.FromSeconds(Random.Shared.Next(5, 30))) == 0) { presence.Join(TimeSpan.FromSeconds(5)); return; }
