@@ -17,13 +17,13 @@ const server = createServer(async (req, res) => {
   } catch { res.writeHead(404); res.end(); }
 }).listen(4175);
 
-const modules = ['inventory', 'discovery', 'remote', 'deploy', 'patch', 'vuln', 'reports', 'lifecycle', 'accessories', 'nonit', 'network', 'licenses', 'webapps', 'cloud', 'security'];
+const modules = ['securitypack', 'inventory', 'discovery', 'remote', 'deploy', 'patch', 'vuln', 'reports', 'lifecycle', 'accessories', 'nonit', 'network', 'licenses', 'webapps', 'cloud', 'security'];
 const me = {
   id: 'u1', email: 'admin@example.com', displayName: 'Admin', mfaEnabled: true, roles: [{ id: 'admin', name: 'Administrator' }],
   permissions: ['assets.view', 'assets.manage', 'settings.manage', 'users.manage', 'audit.view', 'patch.view', 'patch.approve', 'patch.deploy', 'scripts.view',
     'scripts.manage', 'scripts.run', 'deploy.view', 'deploy.manage', 'remote.use', 'remote.manage', 'lifecycle.view', 'lifecycle.manage', 'accessories.view',
     'accessories.manage', 'nonit.view', 'nonit.manage', 'licenses.view', 'licenses.manage', 'webapps.view', 'webapps.manage', 'discovery.view', 'discovery.manage',
-    'reports.view', 'vuln.view', 'network.view', 'cloud.view', 'security.view', 'activity.view', 'dashboard.view'],
+    'reports.view', 'privilege.view', 'privilege.manage', 'bitlocker.view', 'bitlocker.manage', 'bitlocker.recover', 'devicecontrol.view', 'devicecontrol.manage', 'vuln.view', 'network.view', 'cloud.view', 'security.view', 'activity.view', 'dashboard.view'],
   license: {
     mode: 'trial', summary: 'Trial', expiresAt: null, daysRemaining: 30, featuresEnabled: true, modules, edition: 'trial',
     sections: ['inventory', 'remote', 'secure', 'insight'].map((id) => ({ id, title: id, installed: true, enabled: true, standard: id !== 'remote' && id !== 'secure' })),
@@ -36,7 +36,22 @@ const issue = (kind, severity, text, points) => ({ kind, severity, text, points 
 const dev = (i, score, rating, issues, extra = {}) => ({ assetId: `00000000-0000-0000-0000-0000000000${10 + i}`, hostname: `LT-${1040 + i}`, os: 'Windows 11 Pro', department: ['Finance', 'Sales', 'Engineering'][i % 3],
   user: `CORP\\user${i}`, score, rating, bootMs: 18000 + i * 9000, logonMs: 9000, crashes: i % 4, hangs: i % 2, bugchecks: i === 0 ? 2 : 0, shutdowns: i === 0 ? 1 : 0, serviceFailures: 0,
   cpuHigh: 3, memHigh: 12, systemFree: 40 - i * 4, battery: 88, uptimeDays: 3 + i, issues, computedAt: new Date().toISOString(), ...extra });
+const now = new Date().toISOString();
 const samples = {
+  '/api/v1/security-pack/privilege': { kpis: { devices: 248, reporting: 241, toRemove: 37, devicesWithExtraAdmins: 29, removed: 0, elevations: 112, refused: 9, pending: 3, grants: 2, rules: 14 },
+    policies: [{ groupId: null, groupName: null, updatedBy: 'admin@example.com', updatedAt: now, settings: { mode: 'audit', allowedAdmins: ['CORP\\Workstation Admins', 'CORP\\it-*'], elevation: true, requests: true, maxAdminMinutes: 240 } },
+      { groupId: 'g1', groupName: 'Developers', updatedBy: 'admin@example.com', updatedAt: now, settings: { mode: 'enforce', allowedAdmins: [], elevation: true, requests: true, maxAdminMinutes: 480 } }] },
+  '/api/v1/security-pack/bitlocker': { kpis: { devices: 248, reporting: 236, protected: 214, encrypting: 6, unprotected: 16, noTpm: 4, errors: 2, keys: 231, withoutKey: 1 },
+    policies: [{ groupId: null, groupName: null, updatedBy: 'admin@example.com', updatedAt: now, settings: { mode: 'enforce', method: 'XtsAes256', usedSpaceOnly: true, fixedDrives: false, rotateAfterView: true } }] },
+  '/api/v1/security-pack/bitlocker/volumes': [
+    { assetId: 'a1', hostname: 'LT-1040', volume: 'C:', kind: 'os', protection: 'on', status: 'encrypted', percent: 100, method: 'XTS-AES 256', protectors: ['TPM', 'Recovery password'], tpm: 'ready', error: null, reportedAt: now, department: 'Finance', keys: 1 },
+    { assetId: 'a2', hostname: 'LT-1041', volume: 'C:', kind: 'os', protection: 'off', status: 'encrypting', percent: 42, method: 'XTS-AES 256', protectors: ['TPM', 'Recovery password'], tpm: 'ready', error: null, reportedAt: now, department: 'Sales', keys: 1 },
+    { assetId: 'a3', hostname: 'PC-0207', volume: 'C:', kind: 'os', protection: 'off', status: 'decrypted', percent: 0, method: null, protectors: [], tpm: 'absent', error: 'No TPM: the system drive is encrypted only with a TPM.', reportedAt: now, department: 'Engineering', keys: 0 }],
+  '/api/v1/security-pack/usb': { kpis: { devices: 248, usbDevices: 63, blocked: 12, readonly: 4, files: 318, filesBytes: 7340032000, allowed: 5 },
+    policies: [{ groupId: null, groupName: null, updatedBy: 'admin@example.com', updatedAt: now, settings: { mode: 'readonly', auditFiles: true, message: 'USB drives are read-only. Ask IT for an approved encrypted drive.' } }] },
+  '/api/v1/security-pack/usb/events': [
+    { id: 1, at: now, assetId: 'a1', hostname: 'LT-1040', user: 'CORP\\ana', kind: 'file_written', deviceId: 'VID_0781&PID_5581\\4C530001231122108455', deviceName: 'SanDisk Ultra USB Device', path: 'E:\\Q3\\Budget 2027.xlsx', size: 284211, detail: null },
+    { id: 2, at: now, assetId: 'a2', hostname: 'LT-1041', user: 'CORP\\raj', kind: 'blocked', deviceId: 'VID_0951&PID_1666\\E0D55EA574F6F3C0B9E1', deviceName: 'Kingston DataTraveler 3.0', path: null, size: null, detail: null }],
   '/api/v1/experience/summary': { devices: 248, score: 84, good: 196, fair: 37, poor: 15, bootMs: 31000, crashes: 64, hangs: 22, bugchecks: 5, bugcheckDevices: 3,
     trend: Array.from({ length: 30 }, (_, i) => ({ day: day(29 - i), score: 80 + Math.round(4 * Math.sin(i / 4)) + (i > 20 ? 2 : 0), devices: 240 })),
     issues: [{ kind: 'crash', devices: 41 }, { kind: 'boot', devices: 33 }, { kind: 'memory', devices: 19 }, { kind: 'disk', devices: 12 }, { kind: 'uptime', devices: 9 }, { kind: 'bugcheck', devices: 3 }],
@@ -74,11 +89,11 @@ await page.route('**/api/**', (route) => {
   return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
 });
 const names = ['shell', 'add-device', 'add-accessory', 'add-it-assets', 'patch-policy', 'patch-deploy', 'new-script', 'new-schedule', 'license-product', 'license',
-  'web-app', 'deploy-rule', 'deploy-package', 'deploy-group', 'non-it-asset', 'deploy-job', 'deploy-offer', 'deploy-decide', 'experience', 'device-experience', 'license-usage'];
+  'web-app', 'deploy-rule', 'deploy-package', 'deploy-group', 'non-it-asset', 'deploy-job', 'deploy-offer', 'deploy-decide', 'experience', 'device-experience', 'license-usage', 'privilege', 'bitlocker', 'usb'];
 for (const n of names) {
   await page.goto(`http://127.0.0.1:4175/?d=${n}`);
   await page.waitForTimeout(700);
-  await page.screenshot({ path: join(out, `${n}.png`), fullPage: ['experience', 'device-experience', 'license-usage'].includes(n) });
+  await page.screenshot({ path: join(out, `${n}.png`), fullPage: ['experience', 'device-experience', 'license-usage', 'privilege', 'bitlocker', 'usb'].includes(n) });
   const card = page.locator('.modal-card').first();
   if (await card.count()) {
     // The whole window, also the part below the fold.

@@ -50,13 +50,18 @@ export function Shell({ children }: { children: ReactNode }) {
             const locked = !!sec && lic.featuresEnabled && !sec.enabled;
             const shown = items.filter((i) => (!i.permission || can(i.permission)) && (i.admin || !sec || sec.installed));
             if (shown.length === 0) return null;
-            const link = (i: (typeof shown)[number], mod = false) => (
-              <Link key={i.id} to={i.path} className={`${mod ? 'nav-mod ' : ''}${active(i.path) ? 'active' : ''}${locked && !i.admin ? ' locked' : ''}`} title={locked && !i.admin ? `${i.label} — requires the Advanced edition` : i.label}>
-                <Icon name={mod ? GROUP_ICON[group] ?? i.icon : i.icon} />
-                <span>{i.label}</span>
-                {locked && !i.admin && <Icon name="lock" size={12} className="nav-lock-ico" />}
-              </Link>
-            );
+            const addOn = (i: (typeof shown)[number]) => !!i.module && lic.featuresEnabled && !lic.modules.includes('*') && !lic.modules.includes(i.module);
+            const groupAddOn = shown.length > 0 && shown.every(addOn);
+            const link = (i: (typeof shown)[number], mod = false) => {
+              const off = (locked && !i.admin) || addOn(i);
+              return (
+                <Link key={i.id} to={i.path} className={`${mod ? 'nav-mod ' : ''}${active(i.path) ? 'active' : ''}${off ? ' locked' : ''}`} title={addOn(i) ? `${i.label} — a separately licensed add-on` : locked && !i.admin ? `${i.label} — requires the Advanced edition` : i.label}>
+                  <Icon name={mod ? GROUP_ICON[group] ?? i.icon : i.icon} />
+                  <span>{i.label}</span>
+                  {off && <Icon name="lock" size={12} className="nav-lock-ico" />}
+                </Link>
+              );
+            };
             // A module with one page is a link of its own; the menu collapsed to icons shows every page.
             if (shown.length === 1 && !collapsed) return <div key={group} className="nav-sec">{link(shown[0]!, true)}</div>;
             const isOpen = collapsed || open === group;
@@ -66,7 +71,7 @@ export function Shell({ children }: { children: ReactNode }) {
                 {!collapsed && <button type="button" className={`nav-head${here ? ' here' : ''}`} aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : group)}>
                   <Icon name={GROUP_ICON[group] ?? 'apps'} />
                   <span>{group}</span>
-                  {locked && <span className="nav-lock" title="Not included in your license">Advanced</span>}
+                  {locked ? <span className="nav-lock" title="Not included in your license">Advanced</span> : groupAddOn && <span className="nav-lock" title="A separately licensed add-on">Add-on</span>}
                   <Icon name="chev" size={14} className="nav-chev" />
                 </button>}
                 {isOpen && <div className="nav-items">{shown.map((i) => link(i))}</div>}

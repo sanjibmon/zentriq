@@ -58,6 +58,15 @@ public static class Permissions
     public const string LicensesManage = "licenses.manage";
     public const string WebAppsView = "webapps.view";
     public const string WebAppsManage = "webapps.manage";
+    // Security Pack (build 121)
+    public const string PrivilegeView = "privilege.view";
+    public const string PrivilegeManage = "privilege.manage";
+    public const string BitLockerView = "bitlocker.view";
+    public const string BitLockerManage = "bitlocker.manage";
+    /// <summary>Show BitLocker recovery keys (every view is audited with its reason).</summary>
+    public const string BitLockerRecover = "bitlocker.recover";
+    public const string DeviceControlView = "devicecontrol.view";
+    public const string DeviceControlManage = "devicecontrol.manage";
 
     /// <summary>Policy: may see at least one asset area (departments and locations are shared by all of them).</summary>
     public const string AnyAssetView = "any:assets.view";
@@ -74,7 +83,8 @@ public static class Permissions
         SecurityView, SecurityManage, IntegrationsManage, RemoteManage, DashboardView, ReportsView, ActivityView, NonItView, NonItManage,
         AccessoriesView, AccessoriesManage, LifecycleView, LifecycleManage, CloudView, CloudManage, DeployView, DeployManage,
         LicensesView, LicensesManage, WebAppsView, WebAppsManage, RemoteRecordings,
-        PatchView, ScriptsView, ScriptsManage, ScriptsRun
+        PatchView, ScriptsView, ScriptsManage, ScriptsRun,
+        PrivilegeView, PrivilegeManage, BitLockerView, BitLockerManage, BitLockerRecover, DeviceControlView, DeviceControlManage
     ];
 }
 
@@ -97,12 +107,18 @@ public static class Modules
     public const string Licenses = "licenses";
     /// <summary>Web Apps &amp; Accounts (SaaS applications, accounts and usage).</summary>
     public const string WebApps = "webapps";
+    /// <summary>Security Pack (build 121): endpoint privilege management, BitLocker management, USB device control. A
+    /// separately licensed add-on: never part of an edition, only of a license that lists it (and of the trial).</summary>
+    public const string SecurityPack = "securitypack";
 
     public static readonly IReadOnlyList<string> All =
     [
         Inventory, Discovery, Dashboards, Reports, Patch, Vulnerability, Configuration, Deployment, Remote, Cloud,
-        Lifecycle, Integrations, Licenses, WebApps
+        Lifecycle, Integrations, Licenses, WebApps, SecurityPack
     ];
+
+    /// <summary>Add-ons: licensed on their own, never included by an edition.</summary>
+    public static readonly IReadOnlyList<string> AddOns = [SecurityPack];
 }
 
 /// <summary>
@@ -136,7 +152,7 @@ public static class ProductSections
         [Discover] = [Modules.Inventory, Modules.Discovery],
         [Remote] = [Modules.Remote],
         [Infrastructure] = [Modules.Cloud, Modules.Lifecycle],
-        [Secure] = [Modules.Patch, Modules.Vulnerability, Modules.Configuration, Modules.Deployment, Modules.Licenses, Modules.WebApps],
+        [Secure] = [Modules.Patch, Modules.Vulnerability, Modules.Configuration, Modules.Deployment, Modules.Licenses, Modules.WebApps, Modules.SecurityPack],
         [Insight] = [Modules.Reports, Modules.Integrations],
     };
 
@@ -167,8 +183,8 @@ public static class Editions
 
     public static IReadOnlyList<string> ModulesOf(string? edition) => edition?.Trim().ToLowerInvariant() switch
     {
-        Standard => ProductSections.ModulesFor(ProductSections.Standard),
-        Advanced => ProductSections.ModulesFor(ProductSections.All),
+        Standard => ProductSections.ModulesFor(ProductSections.Standard).Except(Modules.AddOns).ToList(),
+        Advanced => ProductSections.ModulesFor(ProductSections.All).Except(Modules.AddOns).ToList(),
         _ => [],
     };
 

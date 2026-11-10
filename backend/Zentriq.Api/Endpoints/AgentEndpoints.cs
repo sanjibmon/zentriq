@@ -89,6 +89,7 @@ public static partial class AgentEndpoints
         MapAgentDeploymentEndpoints(g);
         MapAgentPatchScriptEndpoints(g);
         MapAgentTrayEndpoints(g);
+        MapAgentSecurityPackEndpoints(g);
 
         // Short enrollment codes carry no server key pins: before sending the code, the agent asks the server to prove that
         // it knows the code, bound to the key it serves (see AgentCodes.EnrollProof).
@@ -409,6 +410,8 @@ public static partial class AgentEndpoints
                 appControl = caps.Contains("app-control") ? new { revision = (await Zentriq.Infrastructure.Deployment.AppControlStore.LoadSettingsAsync(ds, ct)).Revision } : null,
                 // Software metering on or off (Software License Management settings); agents from build 120.
                 metering = (await Zentriq.Infrastructure.Licenses.LicenseSettings.LoadAsync(ds, ct)).Metering,
+                // Security Pack: the agent fetches its policy (/security-pack/policy) when the revision differs from its own.
+                securityPack = caps.Contains("security-pack") ? new { revision = await SecurityPackRevisionAsync(ds, ct) } : null,
             });
         }).AllowAnonymous();
 
@@ -1196,7 +1199,15 @@ public static partial class AgentEndpoints
         OR EXISTS (SELECT 1 FROM zentriq.agent_registrations ar WHERE ar.id = @id AND 'app-control' = ANY(COALESCE(ar.capabilities, ARRAY[]::text[]))
                    AND COALESCE(ar.app_policy_revision, -1) <> COALESCE((SELECT (v.value ->> 'revision')::bigint FROM zentriq.system_settings v WHERE v.key = 'appcontrol.settings'), 0))
         OR EXISTS (SELECT 1 FROM zentriq.system_settings s WHERE s.key = @rk)
+        OR EXISTS (SELECT 1 FROM zentriq.agent_registrations ar WHERE ar.id = @id AND 'security-pack' = ANY(COALESCE(ar.capabilities, ARRAY[]::text[]))
+                   AND COALESCE(ar.secpack_revision, -1) <> COALESCE((SELECT (v.value ->> 'revision')::bigint FROM zentriq.system_settings v WHERE v.key = 'securitypack.revision'), 1))
         """;
+
+    private static async Task<long> SecurityPackRevisionAsync(NpgsqlDataSource ds, CancellationToken ct)
+    {
+        await using var conn = await ds.OpenConnectionAsync(ct);
+        return await Zentriq.Infrastructure.SecurityPack.SecurityPackStore.RevisionAsync(conn, ct);
+    }
 
     /// <summary>
     /// A presence request arrived: the agent is online now; its last contact is now. If it had been offline, the gap

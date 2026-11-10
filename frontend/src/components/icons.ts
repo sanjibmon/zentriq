@@ -1,5 +1,9 @@
 // Icon paths from the Zentriq prototype (24x24, stroke icons).
 export const ICONS = {
+  "elevate": "<path d=\"M12 3l7 3v5.5c0 4.2-2.9 7.9-7 9-4.1-1.1-7-4.8-7-9V6z\"/><path d=\"M12 15.5V8.5M9 11.5l3-3 3 3\"/>",
+  "disklock": "<rect x=\"3\" y=\"4\" width=\"18\" height=\"10\" rx=\"2\"/><circle cx=\"7\" cy=\"9\" r=\"1\"/><rect x=\"12.5\" y=\"15.5\" width=\"7\" height=\"5.5\" rx=\"1\"/><path d=\"M14 15.5v-1.5a2 2 0 0 1 4 0v1.5\"/>",
+  "usb": "<path d=\"M12 21V5M12 5l-2.5 3M12 5l2.5 3\"/><path d=\"M12 15l-4-2.5V10\"/><circle cx=\"8\" cy=\"9\" r=\"1.3\"/><path d=\"M12 13l4-2V8.5\"/><rect x=\"14.8\" y=\"6.3\" width=\"2.4\" height=\"2.2\"/><circle cx=\"12\" cy=\"20\" r=\"1.5\"/>",
+  "shieldlock": "<path d=\"M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z\"/><rect x=\"9\" y=\"11\" width=\"6\" height=\"5\" rx=\"1\"/><path d=\"M10.3 11V9.6a1.7 1.7 0 0 1 3.4 0V11\"/>",
   "gauge": "<path d=\"M4 17a8 8 0 1 1 16 0\"/><path d=\"M12 17l4-5\"/><circle cx=\"12\" cy=\"17\" r=\"1.3\"/><path d=\"M6.5 11.5l1 .6M12 8v1.2M17.5 11.5l-1 .6\"/>",
   "calendar": "<rect x=\"3.5\" y=\"5\" width=\"17\" height=\"15.5\" rx=\"2\"/><path d=\"M3.5 10h17M8 3v4M16 3v4\"/>",
   "archive": "<rect x=\"3\" y=\"4\" width=\"18\" height=\"5\" rx=\"1\"/><path d=\"M5 9v9.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V9\"/><path d=\"M10 13h4\"/>",

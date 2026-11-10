@@ -171,6 +171,14 @@ internal static class TrayHost
                     "help" => Server(HttpMethod.Post, "tray/help", new Dictionary<string, object?> { ["user"] = user, ["message"] = S("message"), ["contact"] = S("contact") }),
                     "helpList" => Server(HttpMethod.Get, "tray/help?user=" + Uri.EscapeDataString(user ?? ""), null),
                     "info" => Info(user),
+                    "epm" => EpmStatus(user, S("since")),
+                    "elevate" => SecurityPackAgent.Elevate((int)session, user, S("path"), S("arguments")),
+                    "requestElevation" => RequestElevation(user, S("path"), S("reason")),
+                    "requestAdmin" => Server(HttpMethod.Post, "security-pack/requests", new Dictionary<string, object?>
+                    {
+                        ["kind"] = "admin", ["user"] = user, ["minutes"] = int.TryParse(S("minutes"), out var mins) ? mins : 60, ["reason"] = S("reason"),
+                    }),
+                    "epmRequests" => Server(HttpMethod.Get, "security-pack/requests?user=" + Uri.EscapeDataString(user ?? ""), null),
                     "checkin" => CheckIn(),
                     _ => throw new InvalidOperationException("Unknown request."),
                 };
@@ -197,6 +205,24 @@ internal static class TrayHost
         var text = client.SendJsonAsync(method, path, body, CancellationToken.None).GetAwaiter().GetResult();
         using var doc = JsonDocument.Parse(string.IsNullOrWhiteSpace(text) ? "null" : text);
         return doc.RootElement.Clone();
+    }
+
+    private static object EpmStatus(string? user, string? since)
+    {
+        var d = SecurityPackAgent.Status(user);
+        var from = long.TryParse(since, out var t) ? new DateTime(t, DateTimeKind.Utc) : DateTime.UtcNow.AddMinutes(-2);
+        d["notices"] = SecurityPackAgent.NoticesFor(user, from);
+        d["now"] = DateTime.UtcNow.Ticks.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        return d;
+    }
+
+    private static object RequestElevation(string? user, string? path, string? reason)
+    {
+        var facts = SecurityPackAgent.Describe(path);
+        facts["kind"] = "elevate";
+        facts["user"] = user;
+        facts["reason"] = reason;
+        return Server(HttpMethod.Post, "security-pack/requests", facts);
     }
 
     private static object CheckIn()
@@ -292,7 +318,7 @@ internal static class TrayApp
     }
 
     /// <summary>One tray window on its own (<c>--tray-window store|help|info</c>): for support and for the acceptance test.</summary>
-    public static int Window(string? which)
+    public static int Window(string? which, string? path = null)
     {
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
@@ -303,7 +329,7 @@ internal static class TrayApp
             TrayContext.Support = Str(c, "supportText") ?? "";
         }
         catch (Exception) { }
-        using Form form = which switch { "help" => new HelpForm(), "info" => new InfoForm(), _ => new SoftwareCenterForm(null) };
+        using Form form = which switch { "help" => new HelpForm(), "info" => new InfoForm(), "elevate" => new ElevateForm(path), "admin" => new AdminForm(), _ => new SoftwareCenterForm(null) };
         Application.Run(form);
         return 0;
     }
@@ -373,7 +399,11 @@ internal static class TrayApp
     private sealed class TrayContext : ApplicationContext
     {
         private readonly NotifyIcon _icon;
-        private readonly ToolStripMenuItem _store, _help;
+        private readonly ToolStripMenuItem _store, _help, _elevate, _admin;
+        private readonly System.Windows.Forms.Timer _epm = new System.Windows.Forms.Timer { Interval = 30 * 1000 };
+        private string? _since;
+        private ElevateForm? _elevateForm;
+        private AdminForm? _adminForm;
         private readonly System.Windows.Forms.Timer _refresh = new System.Windows.Forms.Timer { Interval = 10 * 60 * 1000 };
         private SoftwareCenterForm? _storeForm;
         private HelpForm? _helpForm;
@@ -385,12 +415,14 @@ internal static class TrayApp
         {
             _store = new ToolStripMenuItem("Software Center", null, (_, _) => ShowStore()) { Font = new Font("Segoe UI", 9.75f, FontStyle.Bold) };
             _help = new ToolStripMenuItem("Get Remote Help", null, (_, _) => ShowHelp());
+            _elevate = new ToolStripMenuItem("Run as Administrator…", null, (_, _) => Open(ref _elevateForm, () => new ElevateForm(null))) { Visible = false };
+            _admin = new ToolStripMenuItem("Administrator Rights…", null, (_, _) => Open(ref _adminForm, () => new AdminForm())) { Visible = false };
             var menu = new ContextMenuStrip { Font = new Font("Segoe UI", 9.75f), ShowImageMargin = false };
             menu.Items.Add(new ToolStripLabel("Zentriq — IT Support") { ForeColor = Muted, Font = new Font("Segoe UI", 8.75f) });
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.AddRange(new ToolStripItem[]
             {
-                _store, _help, new ToolStripSeparator(),
+                _store, _help, _elevate, _admin, new ToolStripSeparator(),
                 new ToolStripMenuItem("Device Information", null, (_, _) => ShowInfo()),
                 new ToolStripMenuItem("Check In Now", null, (_, _) => CheckIn()),
             });
@@ -399,6 +431,37 @@ internal static class TrayApp
             _refresh.Tick += (_, _) => LoadConfig();
             _refresh.Start();
             LoadConfig();
+            _epm.Tick += (_, _) => Epm();
+            _epm.Start();
+            Epm();
+        }
+
+        /// <summary>Security Pack: the menu entries and the messages for this user (administrator rights, USB drives).</summary>
+        private void Epm()
+        {
+            new Thread(() =>
+            {
+                try
+                {
+                    var r = Call(new Dictionary<string, object?> { ["op"] = "epm", ["since"] = _since }, 20000);
+                    _since = Str(r, "now") ?? _since;
+                    var notices = r.TryGetProperty("notices", out var n) && n.ValueKind == JsonValueKind.Array ? n.EnumerateArray().Select(x => x.GetString() ?? "").Where(x => x.Length > 0).ToList() : new List<string>();
+                    BeginInvokeUi(() =>
+                    {
+                        _elevate.Visible = Bool(r, "elevation", false);
+                        _admin.Visible = Bool(r, "adminRequests", false);
+                        foreach (var t in notices.Take(3)) Balloon("Zentriq", t);
+                    });
+                }
+                catch (Exception) { }
+            }) { IsBackground = true }.Start();
+        }
+
+        private void BeginInvokeUi(Action a)
+        {
+            var strip = _icon.ContextMenuStrip;
+            if (strip is not null && strip.IsHandleCreated) strip.BeginInvoke(a);
+            else if (strip is not null) { strip.CreateControl(); var _ = strip.Handle; strip.BeginInvoke(a); }
         }
 
         private void LoadConfig()
@@ -446,6 +509,7 @@ internal static class TrayApp
             _icon.Visible = false;
             _icon.Dispose();
             _refresh.Dispose();
+            _epm.Dispose();
             base.ExitThreadCore();
         }
     }
@@ -763,6 +827,178 @@ internal static class TrayApp
                 }
             }
             catch (Exception ex) { _table.Controls.Add(new Label { Text = "The Zentriq Agent did not answer: " + ex.Message, AutoSize = true, ForeColor = Color.Firebrick }); }
+        }
+    }
+
+    // ---- Security Pack: run as administrator, administrator rights for a while --------------------------------------
+
+    private sealed class ElevateForm : TrayForm
+    {
+        private readonly TextBox _path = new TextBox { Font = new Font("Segoe UI", 10f) };
+        private readonly TextBox _args = new TextBox { Font = new Font("Segoe UI", 10f) };
+        private readonly TextBox _reason = new TextBox { Multiline = true, Font = new Font("Segoe UI", 10f), Visible = false };
+        private readonly Label _result = new Label { AutoSize = false, ForeColor = Ink, Font = new Font("Segoe UI Semibold", 9.75f) };
+        private readonly Button _run = Primary("Run as Administrator", 180);
+        private readonly Button _ask = Secondary("Ask IT to Approve", 160);
+        private readonly bool _auto;
+
+        public ElevateForm(string? path) : base("Run as Administrator", "Programs your IT team approved start with administrator rights — no password needed", new Size(620, 400))
+        {
+            _auto = !string.IsNullOrEmpty(path);
+            var content = new Panel { Dock = DockStyle.Fill, BackColor = Color.White };
+            Label L(string text, int top) => new Label { Text = text, AutoSize = true, Location = new Point(0, top), Font = new Font("Segoe UI Semibold", 9.75f), ForeColor = Ink };
+            content.Controls.Add(L("Program or installer (.exe, .msi)", 4));
+            _path.Location = new Point(0, 28); _path.Text = path ?? "";
+            var browse = Secondary("Browse…", 96); browse.Height = 30; browse.Location = new Point(0, 26);
+            browse.Click += (_, _) =>
+            {
+                using var d = new OpenFileDialog { Filter = "Programs and installers (*.exe;*.msi)|*.exe;*.msi", CheckFileExists = true };
+                if (d.ShowDialog(this) == DialogResult.OK) _path.Text = d.FileName;
+            };
+            content.Controls.Add(L("Arguments (optional)", 70));
+            _args.Location = new Point(0, 94);
+            _run.Location = new Point(0, 138); _run.Click += (_, _) => Run();
+            _result.Location = new Point(0, 182); _result.Size = new Size(560, 44);
+            _reason.Location = new Point(0, 230); _reason.Size = new Size(560, 54);
+            _ask.Location = new Point(0, 292); _ask.Visible = false; _ask.Click += (_, _) => Ask();
+            content.Controls.AddRange(new Control[] { _path, browse, _args, _run, _result, _reason, _ask });
+            content.Resize += (_, _) =>
+            {
+                var w = Math.Max(200, content.ClientSize.Width - 2);
+                _path.Width = w - 106; browse.Left = w - 96; _args.Width = w; _result.Width = w; _reason.Width = w;
+            };
+            Body.Controls.Add(content);
+            Shown += (_, _) => { if (_auto) Run(); };
+        }
+
+        private void Run()
+        {
+            var path = _path.Text.Trim();
+            if (path.Length == 0) { _result.Text = "Choose a program."; return; }
+            _run.Enabled = false; _result.ForeColor = Ink; _result.Text = "Checking…";
+            new Thread(() =>
+            {
+                string text; var state = "failed"; var canAsk = false;
+                try
+                {
+                    var r = Call(new Dictionary<string, object?> { ["op"] = "elevate", ["path"] = path, ["arguments"] = _args.Text.Trim() });
+                    state = Str(r, "state") ?? "failed"; text = Str(r, "message") ?? state; canAsk = state == "not_approved" && Bool(r, "requests", false);
+                }
+                catch (Exception ex) { text = ex.Message; }
+                BeginInvoke(new Action(() =>
+                {
+                    _run.Enabled = true;
+                    _result.ForeColor = state == "started" ? Color.SeaGreen : state == "not_approved" ? Color.DarkGoldenrod : Color.Firebrick;
+                    _result.Text = text + (canAsk ? " Say why you need it:" : "");
+                    _reason.Visible = _ask.Visible = canAsk;
+                    if (state == "started" && _auto) { var t = new System.Windows.Forms.Timer { Interval = 2500 }; t.Tick += (_, _) => { t.Dispose(); Close(); }; t.Start(); }
+                }));
+            }) { IsBackground = true }.Start();
+        }
+
+        private void Ask()
+        {
+            if (_reason.Text.Trim().Length < 3) { _result.Text = "Say why you need it."; return; }
+            _ask.Enabled = false;
+            new Thread(() =>
+            {
+                string text;
+                try { Call(new Dictionary<string, object?> { ["op"] = "requestElevation", ["path"] = _path.Text.Trim(), ["reason"] = _reason.Text.Trim() }); text = "Sent to IT. You get a message here when it is decided; then run it again."; }
+                catch (Exception ex) { text = ex.Message; }
+                BeginInvoke(new Action(() => { _result.ForeColor = Ink; _result.Text = text; _reason.Visible = false; _ask.Visible = false; _ask.Enabled = true; }));
+            }) { IsBackground = true }.Start();
+        }
+    }
+
+    private sealed class AdminForm : TrayForm
+    {
+        private readonly ComboBox _minutes = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 10f), Width = 180 };
+        private readonly TextBox _reason = new TextBox { Multiline = true, Font = new Font("Segoe UI", 10f) };
+        private readonly Label _state = new Label { AutoSize = false, ForeColor = Ink, Font = new Font("Segoe UI Semibold", 9.75f) };
+        private readonly ListView _list = new ListView { View = View.Details, FullRowSelect = true, HeaderStyle = ColumnHeaderStyle.Nonclickable, BorderStyle = BorderStyle.FixedSingle };
+        private readonly Button _send = Primary("Request", 120);
+
+        public AdminForm() : base("Administrator Rights", "Ask IT for administrator rights on this computer for a while", new Size(620, 520))
+        {
+            var content = new Panel { Dock = DockStyle.Fill, BackColor = Color.White };
+            Label L(string text, int top) => new Label { Text = text, AutoSize = true, Location = new Point(0, top), Font = new Font("Segoe UI Semibold", 9.75f), ForeColor = Ink };
+            _state.Location = new Point(0, 0); _state.Size = new Size(560, 40);
+            content.Controls.Add(L("For how long", 44));
+            _minutes.Location = new Point(0, 68);
+            content.Controls.Add(L("Why do you need them?", 108));
+            _reason.Location = new Point(0, 132); _reason.Size = new Size(560, 70);
+            _send.Location = new Point(0, 214); _send.Click += (_, _) => Send();
+            content.Controls.Add(L("Your requests", 262));
+            _list.Location = new Point(0, 286); _list.Size = new Size(560, 120);
+            _list.Columns.Add("Requested", 150); _list.Columns.Add("For", 160); _list.Columns.Add("Status", 220);
+            content.Controls.AddRange(new Control[] { _state, _minutes, _reason, _send, _list });
+            content.Resize += (_, _) =>
+            {
+                var w = Math.Max(200, content.ClientSize.Width - 2);
+                _state.Width = w; _reason.Width = w;
+                _list.Size = new Size(w, Math.Max(80, content.ClientSize.Height - _list.Top - 2));
+            };
+            Body.Controls.Add(content);
+            Shown += (_, _) => Load();
+        }
+
+        private void Load()
+        {
+            new Thread(() =>
+            {
+                try
+                {
+                    var s = Call(new Dictionary<string, object?> { ["op"] = "epm" }, 20000);
+                    var max = s.TryGetProperty("maxAdminMinutes", out var m) && m.TryGetInt32(out var mm) ? mm : 240;
+                    var until = Str(s, "adminUntil");
+                    var list = Call(new Dictionary<string, object?> { ["op"] = "epmRequests" });
+                    BeginInvoke(new Action(() =>
+                    {
+                        _minutes.Items.Clear();
+                        foreach (var x in new[] { 15, 30, 60, 120, 240, 480, 1440 }.Where(x => x <= max)) _minutes.Items.Add(new Choice(x));
+                        if (_minutes.Items.Count > 0) _minutes.SelectedIndex = Math.Min(2, _minutes.Items.Count - 1);
+                        _state.Text = until is null ? "You are a standard user on this computer." : $"You are an administrator on this computer until {until}.";
+                        _state.ForeColor = until is null ? Ink : Color.SeaGreen;
+                        _list.Items.Clear();
+                        if (list.ValueKind == JsonValueKind.Array)
+                            foreach (var r in list.EnumerateArray().Where(r => Str(r, "kind") == "admin"))
+                            {
+                                var at = DateTimeOffset.TryParse(Str(r, "createdAt"), out var t) ? t.ToLocalTime().ToString("g") : "";
+                                var mins = r.TryGetProperty("minutes", out var mv) && mv.TryGetInt32(out var mi) ? new Choice(mi).ToString() : "";
+                                var st = Str(r, "status") switch { "pending" => "Waiting for IT", "approved" => Str(r, "decision") ?? "Approved", "denied" => "Not approved" + (Str(r, "decision") is { } d && d != "Not approved" ? ": " + d : ""), var o => o ?? "" };
+                                _list.Items.Add(new ListViewItem(new[] { at, mins, st }));
+                            }
+                    }));
+                }
+                catch (Exception ex) { BeginInvoke(new Action(() => _state.Text = "The Zentriq Agent did not answer: " + ex.Message)); }
+            }) { IsBackground = true }.Start();
+        }
+
+        private void Send()
+        {
+            if (_reason.Text.Trim().Length < 3) { _state.ForeColor = Color.Firebrick; _state.Text = "Say why you need administrator rights."; return; }
+            var minutes = (_minutes.SelectedItem as Choice)?.Minutes ?? 60;
+            _send.Enabled = false;
+            new Thread(() =>
+            {
+                string? error = null;
+                try { Call(new Dictionary<string, object?> { ["op"] = "requestAdmin", ["minutes"] = minutes.ToString(System.Globalization.CultureInfo.InvariantCulture), ["reason"] = _reason.Text.Trim() }); }
+                catch (Exception ex) { error = ex.Message; }
+                BeginInvoke(new Action(() =>
+                {
+                    _send.Enabled = true;
+                    if (error is not null) { _state.ForeColor = Color.Firebrick; _state.Text = error; return; }
+                    _reason.Text = "";
+                    Load();
+                }));
+            }) { IsBackground = true }.Start();
+        }
+
+        private sealed class Choice
+        {
+            public Choice(int minutes) { Minutes = minutes; }
+            public int Minutes { get; }
+            public override string ToString() => Minutes < 60 ? $"{Minutes} minutes" : Minutes == 60 ? "1 hour" : Minutes == 1440 ? "1 day" : $"{Minutes / 60} hours";
         }
     }
 }

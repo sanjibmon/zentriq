@@ -206,6 +206,7 @@ api.MapCloudEndpoints();
 api.MapDeploymentEndpoints();
 api.MapLicenseEndpoints();
 api.MapExperienceEndpoints();
+api.MapSecurityPackEndpoints();
 api.MapWebAppEndpoints();
 api.MapPatchEndpoints();
 api.MapScriptEndpoints();

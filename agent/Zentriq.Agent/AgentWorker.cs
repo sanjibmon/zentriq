@@ -77,6 +77,7 @@ internal sealed class AgentWorker
                 else AgentUpdater.CleanUp();
                 AppControlAgent.Sync(client, resp.AppControl, ct);
                 Experience.SetMetering(resp.Metering);
+                SecurityPackAgent.Sync(client, resp.SecurityPack, ct);
 
                 state.LastError = null;
                 var due = forceInventory || resp.InventoryDue || state.LastInventoryUtc is null || state.LastInventoryUtc < DateTime.UtcNow.AddMinutes(-state.InventoryMinutes);

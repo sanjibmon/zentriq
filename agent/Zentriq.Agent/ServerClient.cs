@@ -54,6 +54,8 @@ internal sealed class CheckinResponse
     [JsonPropertyName("appControl")] public AppControlInfo? AppControl { get; set; }
     /// <summary>Software metering on or off (null: unchanged).</summary>
     [JsonPropertyName("metering")] public bool? Metering { get; set; }
+    /// <summary>Security Pack: the current policy revision (the agent fetches its policy when it differs).</summary>
+    [JsonPropertyName("securityPack")] public SecurityPackInfo? SecurityPack { get; set; }
 }
 
 internal sealed class AppControlInfo
@@ -188,7 +190,7 @@ internal sealed class ServerClient : IDisposable
         {
             ["agentVersion"] = Program.Version, ["hostname"] = hostname, ["osName"] = osName, ["lastError"] = lastError,
             ["capabilities"] = new[] { "service-control", "software-uninstall", "self-update", "remote-support", "schedule", "uninstall-protection", "presence", "tamper-protection",
-                "app-control", "software-deploy", "patch-management", "scripts" },
+                "app-control", "software-deploy", "patch-management", "scripts", "security-pack" },
             ["offlineSince"] = offlineSince?.ToString("o"), ["uninstallProtected"] = uninstallProtected,
             ["events"] = events is { Count: > 0 } ? events : null,
             ["tamperProtection"] = TamperGuard.ReportedState(),

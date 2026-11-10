@@ -10,6 +10,8 @@ export interface NavItem {
   permission?: string;
   /** Administration pages (licensing, users, settings, audit): always available, whatever is installed or licensed. */
   admin?: boolean;
+  /** A separately licensed add-on module (shown locked, with "Add-on", without it). */
+  module?: string;
 }
 
 // Same groups, labels and icons as the Zentriq prototype navigation.
@@ -43,6 +45,11 @@ export const NAV: [string, NavItem[]][] = [
     { id: 'licenses', label: 'Software Licenses', icon: 'key', path: '/modules/licenses', ready: true, permission: 'licenses.view' },
     { id: 'webapps', label: 'Web Apps & Accounts', icon: 'globe', path: '/modules/webapps', ready: true, permission: 'webapps.view' },
   ]],
+  ['Security Pack', [
+    { id: 'privilege', label: 'Endpoint Privilege', icon: 'elevate', path: '/security-pack/privilege', ready: true, permission: 'privilege.view', module: 'securitypack' },
+    { id: 'bitlocker', label: 'BitLocker', icon: 'disklock', path: '/security-pack/bitlocker', ready: true, permission: 'bitlocker.view', module: 'securitypack' },
+    { id: 'usb', label: 'USB Device Control', icon: 'usb', path: '/security-pack/usb', ready: true, permission: 'devicecontrol.view', module: 'securitypack' },
+  ]],
   ['Insight & Admin', [
     { id: 'reports', label: 'Reports & Analytics', icon: 'report', path: '/reports', ready: true, permission: 'reports.view' },
     { id: 'integrations', label: 'Integrations & Automation', icon: 'plug', path: '/integrations', ready: true, permission: 'integrations.manage' },
@@ -59,13 +66,13 @@ export const ALL_NAV = NAV.flatMap(([, items]) => items);
 /** Icon of each module heading in the menu. */
 export const GROUP_ICON: Record<string, IconName> = {
   'Overview': 'dashboard', 'Discovery & Inventory': 'search', 'Remote Support': 'remote',
-  'Infrastructure': 'cloud', 'Secure & Remediate': 'shield', 'Insight & Admin': 'report',
+  'Infrastructure': 'cloud', 'Secure & Remediate': 'shield', 'Security Pack': 'shieldlock', 'Insight & Admin': 'report',
 };
 
 /** Product section of each navigation group (installed by Standard / Advanced setup, enabled by the edition). */
 export const SECTION_OF_GROUP: Record<string, string> = {
   'Overview': 'overview', 'Discovery & Inventory': 'discover', 'Remote Support': 'remote',
-  'Infrastructure': 'infrastructure', 'Secure & Remediate': 'secure', 'Insight & Admin': 'insight',
+  'Infrastructure': 'infrastructure', 'Secure & Remediate': 'secure', 'Security Pack': 'secure', 'Insight & Admin': 'insight',
 };
 
 /** The navigation item and section a path belongs to (longest matching path wins). */

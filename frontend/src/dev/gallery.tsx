@@ -20,6 +20,9 @@ import { AssetForm } from '../features/nonit/NonItDialogs';
 import { ExperiencePage } from '../features/experience/ExperiencePage';
 import { DeviceExperience } from '../features/experience/DeviceExperience';
 import { UsageTab } from '../features/licenses/UsageTab';
+import { PrivilegePage } from '../features/securitypack/PrivilegePage';
+import { BitLockerPage } from '../features/securitypack/BitLockerPage';
+import { UsbPage } from '../features/securitypack/UsbPage';
 import '../styles/zentriq.css';
 import '../styles/app.css';
 import '../styles/modern.css';
@@ -58,6 +61,9 @@ const PAGES: Record<string, () => ReactNode> = {
   'experience': () => <ExperiencePage />,
   'device-experience': () => <><PageHead title="LT-0042" /><DeviceExperience assetId="00000000-0000-0000-0000-000000000042" /></>,
   'license-usage': () => <><PageHead title="Software Licenses" /><UsageTab canManage /></>,
+  'privilege': () => <PrivilegePage />,
+  'bitlocker': () => <BitLockerPage />,
+  'usb': () => <UsbPage />,
 };
 
 function View() {
