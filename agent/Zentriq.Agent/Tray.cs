@@ -648,7 +648,7 @@ internal static class TrayApp
             var content = new Panel { Dock = DockStyle.Fill, BackColor = Color.White };
             Label L(string text, int top) => new Label { Text = text, AutoSize = true, Location = new Point(0, top), Font = new Font("Segoe UI Semibold", 9.75f), ForeColor = Ink };
             content.Controls.Add(L("What is the problem?", y));
-            _message.Location = new Point(0, y + 24); _message.Size = new Size(560, 120); _message.Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top;
+            _message.Location = new Point(0, y + 24); _message.Size = new Size(560, 120);
             content.Controls.Add(_message);
             y += 158;
             content.Controls.Add(L("How can we reach you? (phone or extension, optional)", y));
@@ -666,9 +666,16 @@ internal static class TrayApp
             }
             content.Controls.Add(L("Your requests", y));
             _history.Location = new Point(0, y + 24); _history.Size = new Size(560, 120);
-            _history.Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top | AnchorStyles.Bottom;
             _history.Columns.Add("Number", 80); _history.Columns.Add("Problem", 280); _history.Columns.Add("Status", 90); _history.Columns.Add("Sent", 100);
             content.Controls.Add(_history);
+            // Sized from the panel itself: anchors are measured against the panel's size before docking and overflowed.
+            content.Resize += (_, _) =>
+            {
+                var w = Math.Max(200, content.ClientSize.Width - 2);
+                _message.Width = w;
+                _history.Size = new Size(w, Math.Max(80, content.ClientSize.Height - _history.Top - 2));
+                _history.Columns[1].Width = Math.Max(120, w - 80 - 90 - 110 - 4);
+            };
             Body.Controls.Add(content);
             AcceptButton = null;
             Shown += (_, _) => { _message.Focus(); LoadHistory(); };
