@@ -53,7 +53,7 @@ export function Shell({ children }: { children: ReactNode }) {
             const link = (i: (typeof shown)[number], mod = false) => (
               <Link key={i.id} to={i.path} className={`${mod ? 'nav-mod ' : ''}${active(i.path) ? 'active' : ''}${locked && !i.admin ? ' locked' : ''}`} title={locked && !i.admin ? `${i.label} — requires the Advanced edition` : i.label}>
                 <Icon name={mod ? GROUP_ICON[group] ?? i.icon : i.icon} />
-                <span>{mod ? group : i.label}</span>
+                <span>{i.label}</span>
                 {locked && !i.admin && <Icon name="lock" size={12} className="nav-lock-ico" />}
               </Link>
             );

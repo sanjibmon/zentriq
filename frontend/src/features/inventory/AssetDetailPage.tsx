@@ -33,7 +33,7 @@ function KV({ items }: { items: [string, ReactNode][] }) {
 type Tab = 'overview' | 'lifecycle' | 'hardware' | 'software' | 'network' | 'updates' | 'security' | 'services' | 'vulnerabilities' | 'changes';
 
 /** Where the device was opened from: its details stay in that section (IT Asset, Hardware or Software Inventory). */
-export interface DetailSection { path: string; label: string; tab?: 'hardware' | 'software' }
+export interface DetailSection { path: string; label: string; tab?: 'hardware' | 'software' | 'network' }
 const ASSETS_SECTION: DetailSection = { path: '/assets', label: 'All assets' };
 
 export function AssetDetailPage({ id, section = ASSETS_SECTION }: { id: string; section?: DetailSection }) {

@@ -722,3 +722,6 @@ input[type=file].in { height: auto; padding: 7px 10px; }
 .collapsed .nav-sec + .nav-sec { border-top-color: rgba(255, 255, 255, .1); }
 /* Page navigation above lists too */
 .pager-top { border-top: 0; border-bottom: 1px solid var(--line); }
+/* Room for the full module names */
+@media (min-width: 900px) { .app:not(.collapsed) { grid-template-columns: 268px minmax(0, 1fr); } }
+.nav .nav-head, .nav a.nav-mod { font-size: 14.5px; gap: 10px; letter-spacing: 0; }
