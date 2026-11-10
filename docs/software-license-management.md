@@ -68,6 +68,33 @@ Automation*). An alert resolves itself when the problem is gone (for example aft
 The **dashboard** shows a highlight strip with the products under-licensed or unlicensed, licences expired or ending,
 Microsoft 365 problems and devices not activated.
 
+## Software metering (build 120)
+
+Devices with the Zentriq Agent 1.1.1.120 or later (Windows and Linux) record **which programs run, for which user and
+for how long**, so licences of software nobody uses can be reclaimed.
+
+* **What is recorded**: once a minute, the programs running in signed-in users' sessions — the program file and the
+  user only, never window titles, documents or keystrokes. Per program, user and day the agent keeps the minutes the
+  program was running (several windows count once) and how often it was started. Programs of Windows (the Windows
+  folder), of Zentriq and, on Linux, of system accounts and the shell are not recorded. The totals of the last 8
+  days are sent with every inventory; the device keeps 35 days, the server 400 days.
+* **Which program is which product**: each software product has the program files that count as using it
+  (*Used when running*, e.g. `winword.exe`, wildcards allowed). Products from the licence catalogue come with them
+  (Office, Visio, Project, Acrobat, AutoCAD, Revit, SOLIDWORKS, MATLAB, JetBrains IDEs and about 30 more); add them to
+  your own products under *Edit Product*.
+* **Used / unused**: an installation is *Used* when one of its programs ran in the last 90 days (*Settings*, 14–365),
+  *Unused* when not, although the device has been metering for longer than that, and *Too early to tell* otherwise
+  (metering started recently, or the agent is older).
+* **Software Usage** tab: the licensed products with installations used and unused and the possible saving (unused ×
+  average licence cost), and every program used in the period (devices, users, time running, launches, last use; click
+  for the devices and users).
+* **Product page**: *Unused Installations* tile, *Last Used* and *Use* per installation, a filter, and **Uninstall from
+  N Unused** (permission *software.uninstall*; the agent removes the software as for *Software Inventory*).
+* **Device page › Experience**: the programs used on the device in the last 30 days.
+* **Alert** (information): "Product: N installation(s) not used for 90 days", with the possible saving.
+* **Settings › Software Metering**: on by default; turning it off tells every agent at its next check-in to stop and
+  to delete the totals it keeps.
+
 ## Microsoft 365 / Entra ID
 
 *Cloud Licences › Connect*: an app registration with the Microsoft Graph **application** permissions
@@ -92,6 +119,7 @@ Microsoft 365, end date = next renewal or expiry). Free and self-service licence
 | `GET /api/v1/sam/cloud`, `/sam/cloud/users`, `POST/PUT/DELETE /sam/cloud/connections…`, `POST …/{id}/sync` | Microsoft 365 |
 | `GET /api/v1/sam/activation` | Windows / Office activation |
 | `GET /api/v1/sam/alerts`, `POST /sam/alerts/{id}/dismiss`, `POST /sam/evaluate`, `GET/PUT /sam/settings` | Alerts, settings |
+| `GET /api/v1/sam/usage?days=`, `/sam/usage/program?exe=`, `/sam/usage/device/{assetId}` | Software metering |
 
 ## Tests
 
@@ -99,4 +127,5 @@ Unit tests (licence position per metric, wildcards and the licence catalogue, ac
 (position, alerts opened, resolved by a renewal and re-opened when a licence ends, activation, in-app notification,
 Microsoft 365 sync with licences, renewal dates, users and products, more assigned than bought) and the Windows
 acceptance test T86 (activation reported by the agent, shortfall and expiry alerts, renewal). First released in
-build 1.1.1.112. Results: [test report](test-report.md).
+build 1.1.1.112; software metering in build 1.1.1.120 (unit tests of the agent's recorder, PostgreSQL test of used,
+unused and recent installations, acceptance test T95). Results: [test report](test-report.md).
