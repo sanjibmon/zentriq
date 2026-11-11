@@ -65,6 +65,20 @@ internal static class UsbControl
         catch (Exception) { }
     }
 
+    /// <summary>Drive letters of a disk from the Storage provider (as Get-Partition).</summary>
+    private static IEnumerable<string> StorageLetters(int diskNumber)
+    {
+        var letters = new List<string>();
+        try
+        {
+            using var s = new ManagementObjectSearcher(@"root\Microsoft\Windows\Storage", $"SELECT DriveLetter FROM MSFT_Partition WHERE DiskNumber = {diskNumber}");
+            foreach (ManagementObject o in s.Get())
+                using (o) if (o["DriveLetter"] is char c && char.IsLetter(c)) letters.Add(c + ":"); else if (o["DriveLetter"] is ushort u && char.IsLetter((char)u)) letters.Add((char)u + ":");
+        }
+        catch (ManagementException) { }
+        return letters;
+    }
+
     private static List<Disk> Disks()
     {
         var test = TestModels();
@@ -102,6 +116,7 @@ internal static class UsbControl
                         }
                 }
                 catch (ManagementException) { }
+                if (d.Letters.Count == 0 && d.Index >= 0) d.Letters.AddRange(StorageLetters(d.Index));   // GPT partitions are not always associated
                 list.Add(d);
             }
         }
@@ -224,6 +239,7 @@ internal static class UsbControl
     /// <summary>Records files written, renamed and deleted on the USB drives with full access.</summary>
     private static void Watch(List<Disk> disks, Action<UsbEvent> record)
     {
+        foreach (var d in disks.Where(d => d.Letters.Count == 0)) Log.Info($"USB device control: {d.Name} has no drive letter; its files are not recorded.");
         var wanted = disks.SelectMany(d => d.Letters.Select(l => (Letter: l, Disk: d))).ToList();
         foreach (var l in Watchers.Keys.ToList().Where(l => !wanted.Any(w => string.Equals(w.Letter, l, StringComparison.OrdinalIgnoreCase))))
         {
@@ -247,6 +263,7 @@ internal static class UsbControl
                 w.Deleted += (_, e) => record(new UsbEvent { At = DateTimeOffset.Now, Kind = "file_deleted", User = ConsoleUser(), DeviceId = deviceId, DeviceName = disk.Name, Path = e.FullPath });
                 w.EnableRaisingEvents = true;
                 Watchers[letter] = w;
+                Log.Info($"USB device control: recording files written to {letter} ({disk.Name}).");
             }
             catch (Exception ex) { Log.Warn($"USB device control: cannot watch {letter}: {ex.Message}"); }
         }

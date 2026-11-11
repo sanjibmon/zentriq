@@ -367,12 +367,18 @@ public static partial class AgentEndpoints
                            sent_at = CASE WHEN kind = 'patch' AND operation = 'scan' THEN NULL ELSE sent_at END,
                            detail = CASE WHEN kind = 'patch' AND operation = 'scan' THEN 'Interrupted by a restart of the agent; scanning again.'
                                          ELSE 'Interrupted: the agent or the device restarted while this was running. It may have run in part.' END
-                     WHERE agent_id = @a AND kind IN ('patch','script') AND status = 'running'
-                       AND NOT (id::text = ANY(@ids)) AND COALESCE(sent_at, requested_at) < now() - interval '1 minute'
+                     WHERE agent_id = @a AND kind IN ('patch','script') AND NOT (id::text = ANY(@ids))
+                       AND (status = 'running' AND COALESCE(sent_at, requested_at) < now() - interval '1 minute'
+                            -- handed out but never confirmed started (the agent stopped right after the check-in)
+                            OR status = 'sent' AND sent_at < now() - interval '2 minutes')
+                    RETURNING id, kind, operation, status
                     """);
                 lost.Parameters.AddWithValue("a", agent.Id);
                 lost.Parameters.AddWithValue("ids", running);
-                await lost.ExecuteNonQueryAsync(ct);
+                await using (var lr = await lost.ExecuteReaderAsync(ct))
+                    while (await lr.ReadAsync(ct))
+                        lf.CreateLogger("Zentriq.Agents").LogInformation("Agent {AgentId}: action {ActionId} ({Kind} {Operation}) was interrupted by a restart of the agent; now {Status}",
+                            agent.Id, lr.GetGuid(0), lr.GetString(1), lr.GetString(2), lr.GetString(3));
             }
             if (kinds.Count > 0)
             {

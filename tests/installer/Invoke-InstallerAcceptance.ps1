@@ -1096,7 +1096,12 @@ if (-not $installed) {
                 Stop-Service wuauserv -Force -ErrorAction SilentlyContinue
                 Set-Service wuauserv -StartupType Disabled
                 try {
-                    Dep-Wait { $l = Last-Scan; if ($l.status -in 'succeeded', 'failed') { $l } } 600 'the running scan to end after Windows Update stopped' | Out-Null
+                    try { Dep-Wait { $l = Last-Scan; if ($l.status -in 'succeeded', 'failed') { $l } } 600 'the running scan to end after Windows Update stopped' | Out-Null }
+                    catch {
+                        $acts = @((Api GET "/patches/devices/$($script:agentAsset)" -Session $s).actions | Where-Object operation -eq 'scan' | Select-Object -First 4 | ForEach-Object { "$($_.status) requested $($_.requestedAt) sent $($_.sentAt): $($_.detail)" }) -join ' | '
+                        $wua = (Get-Content "$env:ProgramData\Zentriq\Agent\logs\agent.log" -ErrorAction SilentlyContinue | Select-String 'Patch management|scan scan|interrupted' | Select-Object -Last 6 | ForEach-Object { $_.Line }) -join ' | '
+                        throw "$($_.Exception.Message); scans: $acts; agent: $wua"
+                    }
                     $again = Api POST '/patches/scan' @{ assetIds = @($script:agentAsset) } -Session $s
                     Assert ($again.requested -eq 1) "second scan request: $($again | ConvertTo-Json -Compress)"
                     $done = Dep-Wait { $x = Api GET "/patches/devices/$($script:agentAsset)" -Session $s; $l = @($x.actions | Where-Object operation -eq 'scan') | Select-Object -First 1
