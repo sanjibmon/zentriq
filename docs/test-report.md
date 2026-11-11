@@ -1,6 +1,39 @@
 # Test report
 
-Latest: GitHub Actions run 43023450337, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
+Latest: GitHub Actions run 43084157690 (attempt 2), workflow `windows-release`, on a GitHub-hosted **Windows Server 2022
+Datacenter 10.0.20348** VM plus an Ubuntu job for the Linux agent. Release: `v1.1.1-build.129` (pre-release,
+**unsigned**), package version **1.1.1.129**, commit `3259a52`. Results: unit + PostgreSQL integration tests **464 PASS**
+(466, 2 skipped); installer acceptance **89 passed, 0 failed** (10 not run: need hardware, a domain, a reboot or old
+Windows); upgrade suites **14/14** (schema 41); Linux agent on 11 distributions **11/11**.
+
+New in build 129: the Security Pack is part of the **Advanced** edition (no longer a separate add-on); the privilege
+management, BitLocker and USB control pages have no tagline or intro boxes; the side menu has no dividing lines between
+or inside modules, module icons on tiles, the open module as a gradient card and the active page as a highlighted pill.
+
+Run 43066420069 (build 128) was not released: T92 failed — the patch scan kept running after Windows Update was disabled
+because the service stayed *stop pending*, so the watchdog (which waited for *stopped and disabled*) never fired, and the
+test's diagnostics read a field that does not exist. Fixed: the watchdog ends the scan as soon as the service is
+disabled; the diagnostics print whatever fields the actions have. The first attempt of run 43084157690 passed every test
+but GitHub's artifact service failed the upload (HTML error page), so publishing was skipped; the failed job was re-run
+on the same commit, so the installers were rebuilt (Linux packages unchanged).
+
+| File | SHA256 |
+|---|---|
+| Zentriq-Setup-x64.exe | `9578f14b8b9e5c4080dee28852331da04ba5adfa66598207a3bfd2086abd8b70` |
+| Zentriq.msi | `0d1fab359ae8f0a862b8d497e2ceb669f3126f0a9773f9e4fc8026edaf902297` |
+| ZentriqAgent-x64.msi | `bc49d5ca4dba3262fd1de41aa8367a2976ba6d96dc475b0b7ba469b2b995e653` |
+| zentriq-agent-linux-x64.deb | `dc3ac125606e845519960ab6d0532182bb03a842c8303bd8d55d47b21231c2ab` |
+| zentriq-agent-linux-x64.rpm | `edc241bf332a88bc6acc5ca169b070022e0fefafad3072d02f33497ca984c38c` |
+| zentriq-agent-linux-x64.tar.gz | `adf1f66eab86115e597a640252a80fef4e56570eaf54537d29d4f81c05dffcaa` |
+| zentriq-agent-linux-arm64.deb | `ca091768dea4a8f0cfa94b1e3ae5e438aa27f39e5861d9f4e1f1233fe48e70a3` |
+| zentriq-agent-linux-arm64.rpm | `1ee1a6d9eb175c4be817d4d29e730092b64e76ddbf8ca2e17b6619b5e8cc52a6` |
+| zentriq-agent-linux-arm64.tar.gz | `78c10a946c4c7c6641056db7716873dfe4e2b38941f65aa16d703a759cb53562` |
+| Zentriq-1.1.1-msi-offline-kit.zip | `960a6b55e8b64aa81c8fe875393228cde8f393ee1eec90c343f21eb438330f67` |
+| Zentriq-1.1.1-docs.zip | `fa4508628d10a80e463a3392a3710c36dd4606c4b48320bde3e3cceb9c1c2eb4` |
+
+## Build 127 (Release 4)
+
+GitHub Actions run 43023450337, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
 10.0.20348** VM plus an Ubuntu job for the Linux agent. Release: `v1.1.1-build.127` (pre-release, **unsigned**), package
 version **1.1.1.127**, commit `175a853`. Results: unit + PostgreSQL integration tests **464 PASS** (466, 2 skipped);
 installer acceptance **89 passed, 0 failed** (10 not run: need hardware, a domain, a reboot or old Windows); upgrade
