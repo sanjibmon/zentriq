@@ -93,6 +93,9 @@ Also in the Audit Log (`privilege.*`).
 * **Files**: with *Record files*, each file written, renamed or deleted on a USB drive with access is recorded (path,
   size, user, time) — never the content.
 * The user sees the policy's message in the tray when a drive is blocked or made read-only.
+* Blocking turns the USB device off; where Windows would need a restart for that, the disk is also taken offline so its
+  drives disappear at once (both are undone when the policy no longer blocks it).
+* The disk Windows runs from (boot, system or the Windows drive, e.g. Windows To Go) is never made read-only or blocked.
 
 ## Agent and API
 

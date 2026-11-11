@@ -1495,12 +1495,16 @@ if (-not $installed) {
         Check 'T98' 'USB device control (a virtual disk treated as USB storage): devices and file copies recorded, read-only and blocked by policy, an allowed device keeps full access, the drive given back when the policy is off' {
             $s = Login
             $d = New-TestDisk 'ZQUSB'
-            Set-ItemProperty 'HKLM:\SOFTWARE\Zentriq\Agent' -Name UsbTestModels -Value $d.Model
+            Set-ItemProperty 'HKLM:\SOFTWARE\Zentriq\Agent' -Name UsbTestDevices -Value $d.Pnp
             try {
                 Api PUT '/security-pack/usb/policy' @{ mode = 'audit'; auditFiles = $true; message = 'CI: USB drives are controlled.' } -Session $s | Out-Null
                 Wake-Agent $s
                 # The drive in USB Devices: the agent has the policy and watches the drive.
                 $dev = Dep-Wait { @(Api GET '/security-pack/usb/devices' -Session $s | ForEach-Object { $_ }) | Where-Object { $_.assetId -eq $script:agentAsset -and $_.deviceId -eq $d.Pnp } } 180 'the drive in USB Devices'
+                # Only the test drive: the runner's own (virtual) system and data disks are never treated as USB storage.
+                $others = @(Api GET '/security-pack/usb/devices' -Session $s | ForEach-Object { $_ }) | Where-Object { $_.assetId -eq $script:agentAsset -and $_.deviceId -ne $d.Pnp }
+                Assert (-not $others) "other disks treated as USB storage: $(@($others | ForEach-Object { $_.deviceId }) -join ', ')"
+                Assert ((Get-Disk | Where-Object { $_.Number -ne $d.Number -and ($_.IsReadOnly -or $_.IsOffline) }).Count -eq 0) 'another disk was made read-only or offline'
                 Start-Sleep 4
                 'quarterly figures' | Set-Content "$($d.Letter)\ci-copy.txt"
                 $ev = Dep-Wait { @(Api GET "/security-pack/usb/events?kind=files&assetId=$($script:agentAsset)" -Session $s | ForEach-Object { $_ }) | Where-Object { $_.path -like '*ci-copy.txt' } } 180 'the file copy in the console'
@@ -1528,7 +1532,7 @@ if (-not $installed) {
                 "file copy recorded ($($ev[0].size) bytes by $($ev[0].user)); read-only refused writing; allowed by ID writable again; blocked (device off); given back when the policy was turned off"
             } finally {
                 try { Api PUT '/security-pack/usb/policy' @{ mode = 'off' } -Session $s | Out-Null } catch { }
-                Remove-ItemProperty 'HKLM:\SOFTWARE\Zentriq\Agent' -Name UsbTestModels -ErrorAction SilentlyContinue
+                Remove-ItemProperty 'HKLM:\SOFTWARE\Zentriq\Agent' -Name UsbTestDevices -ErrorAction SilentlyContinue
                 Remove-TestDisk $d
             }
         } | Out-Null

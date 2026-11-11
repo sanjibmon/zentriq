@@ -36,11 +36,27 @@ internal static class UsbControl
     private static string StateFile => Path.Combine(Folder, "usb-state.txt");
     private static string _lastKey = "";
 
-    /// <summary>Disk models treated as USB storage (for tests with virtual disks; HKLM\SOFTWARE\Zentriq\Agent\UsbTestModels).</summary>
-    private static string[] TestModels()
+    /// <summary>Disks (exact device instance IDs) treated as USB storage, for tests with virtual disks
+    /// (HKLM\SOFTWARE\Zentriq\Agent\UsbTestDevices, separated by ";").</summary>
+    private static string[] TestDevices()
     {
-        try { using var k = Registry.LocalMachine.OpenSubKey(AgentState.KeyPath); return (k?.GetValue("UsbTestModels") as string ?? "").Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries).Select(x => x.Trim()).ToArray(); }
+        try { using var k = Registry.LocalMachine.OpenSubKey(AgentState.KeyPath); return (k?.GetValue("UsbTestDevices") as string ?? "").Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries).Select(x => x.Trim()).ToArray(); }
         catch (Exception) { return Array.Empty<string>(); }
+    }
+
+    /// <summary>The disk Windows runs from (boot, system or the Windows drive) is never restricted.</summary>
+    private static bool IsSystemDisk(Disk d)
+    {
+        var sys = (Environment.GetEnvironmentVariable("SystemDrive") ?? "C:").TrimEnd('\\');
+        if (d.Letters.Any(l => string.Equals(l, sys, StringComparison.OrdinalIgnoreCase))) return true;
+        if (d.Index < 0) return false;
+        try
+        {
+            using var s = new ManagementObjectSearcher(@"root\Microsoft\Windows\Storage", $"SELECT IsBoot, IsSystem FROM MSFT_Disk WHERE Number = {d.Index}");
+            foreach (ManagementObject o in s.Get()) using (o) if (o["IsBoot"] is true || o["IsSystem"] is true) return true;
+        }
+        catch (ManagementException) { }
+        return false;
     }
 
     /// <summary>Drives this agent made read-only or blocked (they are given back when the policy no longer restricts them).</summary>
@@ -81,7 +97,7 @@ internal static class UsbControl
 
     private static List<Disk> Disks()
     {
-        var test = TestModels();
+        var test = TestDevices();
         var list = new List<Disk>();
         using var s = new ManagementObjectSearcher("SELECT Index, Model, PNPDeviceID, InterfaceType, DeviceID FROM Win32_DiskDrive");
         foreach (ManagementObject o in s.Get())
@@ -89,8 +105,9 @@ internal static class UsbControl
             using (o)
             {
                 var model = o["Model"] as string ?? "";
-                var usb = string.Equals(o["InterfaceType"] as string, "USB", StringComparison.OrdinalIgnoreCase) || test.Any(t => model.IndexOf(t, StringComparison.OrdinalIgnoreCase) >= 0);
-                if (!usb || o["PNPDeviceID"] is not string pnp) continue;
+                if (o["PNPDeviceID"] is not string pnp) continue;
+                var usb = string.Equals(o["InterfaceType"] as string, "USB", StringComparison.OrdinalIgnoreCase) || test.Any(t => string.Equals(t, pnp, StringComparison.OrdinalIgnoreCase));
+                if (!usb) continue;
                 var d = new Disk { InstanceId = pnp, Name = model, Index = o["Index"] is uint ix ? (int)ix : -1 };
                 // USBSTOR\DISK&VEN_…\SERIAL&0 → the USB device USB\VID_xxxx&PID_yyyy\SERIAL
                 var last = pnp.Substring(pnp.LastIndexOf('\\') + 1);
@@ -117,6 +134,7 @@ internal static class UsbControl
                 }
                 catch (ManagementException) { }
                 if (d.Letters.Count == 0 && d.Index >= 0) d.Letters.AddRange(StorageLetters(d.Index));   // GPT partitions are not always associated
+                if (IsSystemDisk(d)) continue;   // e.g. Windows installed on a USB disk (Windows To Go)
                 list.Add(d);
             }
         }
@@ -193,10 +211,25 @@ internal static class UsbControl
     private static bool SetAccess(Disk d, string want, string had, out string detail)
     {
         detail = "";
-        if (want == "blocked") return Pnp("/disable-device", d.InstanceId, out detail);
+        if (want == "blocked")
+        {
+            // Turning the device off is immediate for USB storage; where Windows wants a restart for it (a mounted
+            // fixed disk), the disk is also taken offline so its drives disappear at once.
+            var off = Pnp("/disable-device", d.InstanceId, out detail);
+            if (off && !NeedsRestart(detail)) return true;
+            var offline = DiskOnline(d.Index, false, out var dp);
+            detail = (detail + " " + dp).Trim();
+            return offline;
+        }
         if (want == "readonly") return Diskpart(d.Index, true, out detail);
         if (had == "readonly") return Diskpart(d.Index, false, out detail);
-        if (had == "blocked") return Pnp("/enable-device", d.InstanceId, out detail);
+        if (had == "blocked")
+        {
+            var on = Pnp("/enable-device", d.InstanceId, out detail);
+            var online = DiskOnline(d.Index, true, out var dp);   // harmless when it was not taken offline
+            detail = (detail + " " + dp).Trim();
+            return on || online;
+        }
         return true;
     }
 
@@ -205,6 +238,21 @@ internal static class UsbControl
         var r = Run(Path.Combine(Environment.SystemDirectory, "pnputil.exe"), $"{verb} \"{instanceId}\"", 60);
         detail = r.Output.Trim();
         return r.Code == 0;
+    }
+
+    private static bool NeedsRestart(string output) =>
+        output.IndexOf("restart", StringComparison.OrdinalIgnoreCase) >= 0 || output.IndexOf("reboot", StringComparison.OrdinalIgnoreCase) >= 0;
+
+    private static bool DiskOnline(int index, bool online, out string detail)
+    {
+        if (index < 0) { detail = "Disk number unknown."; return false; }
+        var script = Path.Combine(Folder, "usb-diskpart.txt");
+        Directory.CreateDirectory(Folder);
+        File.WriteAllText(script, $"select disk {index}\r\n{(online ? "online" : "offline")} disk\r\n");
+        var r = Run(Path.Combine(Environment.SystemDirectory, "diskpart.exe"), $"/s \"{script}\"", 120);
+        detail = Regex.Replace(r.Output, @"\s+", " ").Trim();
+        if (detail.Length > 300) detail = detail.Substring(detail.Length - 300);
+        return r.Code == 0 && (detail.IndexOf("successfully", StringComparison.OrdinalIgnoreCase) >= 0 || detail.IndexOf(online ? "already online" : "already offline", StringComparison.OrdinalIgnoreCase) >= 0);
     }
 
     private static bool Diskpart(int index, bool readOnly, out string detail)
