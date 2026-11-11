@@ -1296,10 +1296,11 @@ if (-not $installed) {
                 $set = Api GET '/sam/settings' -Session $s
                 Api PUT '/sam/settings' @{ metering = $false } -Session $s | Out-Null
                 Api POST '/assets/collect' @{ assetIds = @($script:agentAsset) } -Session $s | Out-Null
-                Dep-Wait { (Get-ItemProperty 'HKLM:\SOFTWARE\Zentriq\Agent' -Name Metering -ErrorAction SilentlyContinue).Metering -eq 0 } 120 'metering turned off on the device' | Out-Null
+                function Reg-Metering { $v = Get-ItemProperty 'HKLM:\SOFTWARE\Zentriq\Agent' -ErrorAction SilentlyContinue; if ($v -and ($v.PSObject.Properties.Name -contains 'Metering')) { [int]$v.Metering } else { -1 } }
+                Dep-Wait { (Reg-Metering) -eq 0 } 120 'metering turned off on the device' | Out-Null
                 Api PUT '/sam/settings' @{ metering = $true } -Session $s | Out-Null
                 Api POST '/assets/collect' @{ assetIds = @($script:agentAsset) } -Session $s | Out-Null
-                Dep-Wait { (Get-ItemProperty 'HKLM:\SOFTWARE\Zentriq\Agent' -Name Metering -ErrorAction SilentlyContinue).Metering -eq 1 } 120 'metering turned on again' | Out-Null
+                Dep-Wait { (Reg-Metering) -eq 1 } 120 'metering turned on again' | Out-Null
                 Api DELETE "/sam/products/$($prod.id)" -Session $s | Out-Null
                 $boot = @($exp.events) | Where-Object kind -eq 'boot' | Select-Object -First 1
                 "metered zq-meter-app.exe: $($prog.minutes) min, user $(@($prog.users)[0]); product installation used; score $($exp.current.score) ($($exp.current.rating)), $($exp.days[0].samples) samples, $(@($exp.events).Count) event(s)$(if ($boot) { ", start $([math]::Round($boot.ms / 1000)) s" }); metering off and on again on the device"
@@ -1307,32 +1308,45 @@ if (-not $installed) {
         } | Out-Null
 
         # Information only (no result): what this Windows offers for the Security Pack of the next build.
-        try {
-            $probe = [System.Collections.Generic.List[string]]::new()
-            $probe.Add("os: $((Get-CimInstance Win32_OperatingSystem).Caption) $([Environment]::OSVersion.Version)")
-            $probe.Add("manage-bde: $(Test-Path (Join-Path $env:windir 'System32\manage-bde.exe'))")
-            try { $v = @(Get-CimInstance -Namespace 'root\cimv2\Security\MicrosoftVolumeEncryption' -ClassName Win32_EncryptableVolume -ErrorAction Stop); $probe.Add("Win32_EncryptableVolume: $($v.Count) volume(s): $(($v | ForEach-Object { "$($_.DriveLetter) protection=$($_.ProtectionStatus)" }) -join '; ')") } catch { $probe.Add("Win32_EncryptableVolume: $($_.Exception.Message)") }
-            try { $f = Get-WindowsFeature BitLocker -ErrorAction Stop; $probe.Add("feature BitLocker: $($f.InstallState)") } catch { $probe.Add("feature BitLocker: $($_.Exception.Message)") }
-            try { $t = Get-CimInstance -Namespace 'root\cimv2\Security\MicrosoftTpm' -ClassName Win32_Tpm -ErrorAction Stop; $probe.Add("TPM: present=$([bool]$t) enabled=$($t.IsEnabled_InitialValue) version=$($t.SpecVersion)") } catch { $probe.Add("TPM: $($_.Exception.Message)") }
-            $probe.Add("pnputil disable-device: $((& pnputil.exe /? 2>&1 | Out-String) -match 'disable-device')")
-            $probe.Add("Storage module Set-Disk: $([bool](Get-Command Set-Disk -ErrorAction SilentlyContinue)); New-VHD: $([bool](Get-Command New-VHD -ErrorAction SilentlyContinue)); Mount-DiskImage: $([bool](Get-Command Mount-DiskImage -ErrorAction SilentlyContinue))")
-            $vhd = Join-Path $OutDir 'zq-probe.vhdx'
-            "create vdisk file=`"$vhd`" maximum=64 type=expandable`r`nattach vdisk`r`ncreate partition primary`r`nformat fs=ntfs quick label=ZQPROBE`r`nassign`r`n" | Set-Content (Join-Path $OutDir 'zq-probe.dp') -Encoding ascii
+        $probe = [System.Collections.Generic.List[string]]::new()
+        function Probe([string] $Name, [scriptblock] $Do) { try { $probe.Add("${Name}: $(& $Do)") } catch { $probe.Add("${Name}: error $($_.Exception.Message)") } }
+        Probe 'os' { "$((Get-CimInstance Win32_OperatingSystem).Caption) $([Environment]::OSVersion.Version)" }
+        Probe 'manage-bde' { Test-Path (Join-Path $env:windir 'System32\manage-bde.exe') }
+        Probe 'Win32_EncryptableVolume' { $v = @(Get-CimInstance -Namespace 'root\cimv2\Security\MicrosoftVolumeEncryption' -ClassName Win32_EncryptableVolume -ErrorAction Stop); "$($v.Count) volume(s): $(($v | ForEach-Object { "$($_.DriveLetter) type=$($_.VolumeType) protection=$($_.ProtectionStatus)" }) -join '; ')" }
+        Probe 'feature BitLocker' { (Get-WindowsFeature BitLocker -ErrorAction Stop).InstallState }
+        Probe 'TPM' { $t = Get-CimInstance -Namespace 'root\cimv2\Security\MicrosoftTpm' -ClassName Win32_Tpm -ErrorAction Stop; if ($t) { "enabled=$($t.IsEnabled_InitialValue) version=$($t.SpecVersion)" } else { 'none' } }
+        Probe 'pnputil disable-device' { (& pnputil.exe /? 2>&1 | Out-String) -match 'disable-device' }
+        Probe 'cmdlets' { "Set-Disk $([bool](Get-Command Set-Disk -ErrorAction SilentlyContinue)), New-VHD $([bool](Get-Command New-VHD -ErrorAction SilentlyContinue)), Get-PnpDevice $([bool](Get-Command Get-PnpDevice -ErrorAction SilentlyContinue))" }
+        $vhd = Join-Path $OutDir 'zq-probe.vhdx'
+        Probe 'vdisk' {
+            "create vdisk file=`"$vhd`" maximum=512 type=expandable`r`nattach vdisk`r`ncreate partition primary`r`nformat fs=ntfs quick label=ZQPROBE`r`nassign`r`n" | Set-Content (Join-Path $OutDir 'zq-probe.dp') -Encoding ascii
             $dp = & diskpart.exe /s (Join-Path $OutDir 'zq-probe.dp') 2>&1 | Out-String
             $vol = Get-Volume -FileSystemLabel ZQPROBE -ErrorAction SilentlyContinue
-            $disk = if ($vol) { Get-Partition -DriveLetter $vol.DriveLetter | Get-Disk } else { $null }
-            $probe.Add("vdisk: $(if ($vol) { "drive $($vol.DriveLetter): bus $($disk.BusType), $($disk.FriendlyName), removable=$($vol.DriveType)" } else { 'not created: ' + ($dp -replace '\s+', ' ').Substring(0, [Math]::Min(300, $dp.Length)) })")
-            if ($vol) {
-                $bde = & manage-bde.exe -status "$($vol.DriveLetter):" 2>&1 | Out-String
-                $probe.Add("manage-bde status of the vdisk: $(($bde -replace '\s+', ' ').Substring(0, [Math]::Min(400, $bde.Length)))")
-                $pnp = Get-PnpDevice -ErrorAction SilentlyContinue | Where-Object { $_.FriendlyName -eq $disk.FriendlyName } | Select-Object -First 1
-                $probe.Add("vdisk device: $($pnp.InstanceId) class $($pnp.Class)")
-                "select vdisk file=`"$vhd`"`r`ndetach vdisk`r`n" | Set-Content (Join-Path $OutDir 'zq-probe2.dp') -Encoding ascii
-                & diskpart.exe /s (Join-Path $OutDir 'zq-probe2.dp') 2>&1 | Out-Null
-            }
-            Remove-Item $vhd, (Join-Path $OutDir 'zq-probe*.dp') -ErrorAction SilentlyContinue
-            $probe | Set-Content (Join-Path $OutDir 'security-pack-probe.txt')
-        } catch { "probe failed: $($_.Exception.Message)" | Set-Content (Join-Path $OutDir 'security-pack-probe.txt') }
+            if (-not $vol) { return 'not created: ' + ($dp -replace '\s+', ' ') }
+            $disk = Get-Partition -DriveLetter $vol.DriveLetter | Get-Disk
+            $wmi = Get-CimInstance Win32_DiskDrive | Where-Object Index -eq $disk.Number
+            "drive $($vol.DriveLetter): bus $($disk.BusType), model '$($wmi.Model)', interface $($wmi.InterfaceType), pnp $($wmi.PNPDeviceID), number $($disk.Number)"
+        }
+        Probe 'vdisk BitLocker' { $vol = Get-Volume -FileSystemLabel ZQPROBE -ErrorAction Stop; ((& manage-bde.exe -status "$($vol.DriveLetter):" 2>&1 | Out-String) -replace '\s+', ' ').Trim() }
+        Probe 'vdisk BitLocker on' { $vol = Get-Volume -FileSystemLabel ZQPROBE -ErrorAction Stop; ((& manage-bde.exe -on "$($vol.DriveLetter):" -RecoveryPassword -UsedSpaceOnly 2>&1 | Out-String) -replace '\s+', ' ').Trim() }
+        Probe 'vdisk read-only' {
+            $vol = Get-Volume -FileSystemLabel ZQPROBE -ErrorAction Stop; $n = (Get-Partition -DriveLetter $vol.DriveLetter | Get-Disk).Number
+            "select disk $n`r`nattributes disk set readonly`r`noffline disk`r`nonline disk`r`n" | Set-Content (Join-Path $OutDir 'zq-probe3.dp') -Encoding ascii
+            $o = & diskpart.exe /s (Join-Path $OutDir 'zq-probe3.dp') 2>&1 | Out-String
+            $w = try { 'x' | Set-Content "$($vol.DriveLetter):\w.txt" -ErrorAction Stop; 'writable' } catch { 'write refused' }
+            "$w; $(($o -replace '\s+', ' ').Trim())"
+        }
+        Probe 'vdisk disable' {
+            $vol = Get-Volume -FileSystemLabel ZQPROBE -ErrorAction Stop; $n = (Get-Partition -DriveLetter $vol.DriveLetter | Get-Disk).Number
+            $pnp = (Get-CimInstance Win32_DiskDrive | Where-Object Index -eq $n).PNPDeviceID
+            $o = & pnputil.exe /disable-device "$pnp" 2>&1 | Out-String
+            $gone = -not (Get-Volume -FileSystemLabel ZQPROBE -ErrorAction SilentlyContinue)
+            $e = & pnputil.exe /enable-device "$pnp" 2>&1 | Out-String
+            "exit $LASTEXITCODE gone=$gone; $(($o -replace '\s+', ' ').Trim()) / $(($e -replace '\s+', ' ').Trim())"
+        }
+        try { "select vdisk file=`"$vhd`"`r`ndetach vdisk`r`n" | Set-Content (Join-Path $OutDir 'zq-probe2.dp') -Encoding ascii; & diskpart.exe /s (Join-Path $OutDir 'zq-probe2.dp') 2>&1 | Out-Null } catch { }
+        Remove-Item $vhd, (Join-Path $OutDir 'zq-probe*.dp') -ErrorAction SilentlyContinue
+        $probe | Set-Content (Join-Path $OutDir 'security-pack-probe.txt')
     }
 
 
