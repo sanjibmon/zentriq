@@ -280,8 +280,14 @@ public static partial class AgentEndpoints
                        -- Agents with a live connection are online exactly while it is open (see /presence).
                        online_until = CASE WHEN 'presence' = ANY(COALESCE(@cap, ARRAY[]::text[])) THEN online_until
                                            ELSE now() + make_interval(mins => checkin_minutes * 2 + 5) END,
-                       last_outage_from = CASE WHEN @off::timestamptz < now() THEN @off ELSE last_outage_from END,
-                       last_outage_to = CASE WHEN @off::timestamptz < now() THEN now() ELSE last_outage_to END,
+                       -- The outage: as the agent reports it, or (live connection) from when it went offline until now
+                       last_outage_from = CASE WHEN @off::timestamptz < now() THEN @off
+                                               WHEN 'presence' = ANY(COALESCE(@cap, capabilities)) AND online_until < now() AND last_checkin_at IS NOT NULL
+                                                    THEN LEAST(last_checkin_at, online_until)
+                                               ELSE last_outage_from END,
+                       last_outage_to = CASE WHEN @off::timestamptz < now() THEN now()
+                                             WHEN 'presence' = ANY(COALESCE(@cap, capabilities)) AND online_until < now() AND last_checkin_at IS NOT NULL THEN now()
+                                             ELSE last_outage_to END,
                        uninstall_protected = COALESCE(@up, uninstall_protected),
                        tamper_state = COALESCE(@ts, tamper_state), tamper_until = CASE WHEN @ts::text IS NULL THEN tamper_until ELSE @tu END,
                        platform = COALESCE(@pf, platform),
@@ -1224,7 +1230,9 @@ public static partial class AgentEndpoints
     {
         await using var cmd = ds.CreateCommand($"""
             UPDATE zentriq.agent_registrations r
-               SET last_outage_from = CASE WHEN r.online_until < now() AND r.last_checkin_at IS NOT NULL THEN r.last_checkin_at ELSE r.last_outage_from END,
+               SET last_outage_from = CASE WHEN r.online_until < now() AND r.last_checkin_at IS NOT NULL
+                                           -- since it went offline (a check-in right after the restart does not shorten the gap)
+                                           THEN LEAST(r.last_checkin_at, r.online_until) ELSE r.last_outage_from END,
                    last_outage_to   = CASE WHEN r.online_until < now() AND r.last_checkin_at IS NOT NULL THEN now() ELSE r.last_outage_to END,
                    online_until = now() + make_interval(secs => @grace), last_checkin_at = now(), last_ip = COALESCE(@ip, r.last_ip)
               FROM (SELECT online_until AS before FROM zentriq.agent_registrations WHERE id = @id) o
