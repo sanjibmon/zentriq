@@ -28,7 +28,7 @@ for c in "${cases[@]}"; do
   n=$((n+1)); id=$(printf 'A%02d' $n)
   echo "==== $id $label"
   case "$format" in
-    deb) agent_install='apt-get update -qq >/dev/null && apt-get install -y -qq /pkg/zentriq-agent-linux-x64.deb >/tmp/i.log 2>&1 || { cat /tmp/i.log; exit 1; }' ;;
+    deb) agent_install='(getent hosts archive.ubuntu.com >/dev/null || ! [ -e /etc/lsb-release ] || sed -i -E "s#http://(archive|security)\.ubuntu\.com#http://azure.archive.ubuntu.com#g" /etc/apt/sources.list /etc/apt/sources.list.d/*.sources 2>/dev/null; true) && apt-get update -qq >/dev/null && apt-get install -y -qq /pkg/zentriq-agent-linux-x64.deb >/tmp/i.log 2>&1 || { cat /tmp/i.log; exit 1; }' ;;
     rpm) agent_install='if command -v zypper >/dev/null; then zypper --non-interactive install --allow-unsigned-rpm /pkg/zentriq-agent-linux-x64.rpm >/tmp/i.log 2>&1; else dnf install -y -q /pkg/zentriq-agent-linux-x64.rpm >/tmp/i.log 2>&1; fi || { cat /tmp/i.log; exit 1; }' ;;
   esac
   if [ "$install" = "dpkg-i" ]; then
