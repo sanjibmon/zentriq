@@ -60,7 +60,7 @@ export function Policies<S extends { mode: string }>({ area, policies, canManage
     try { await api.del(`/security-pack/${area}/policy/${groupId}`); changed('Policy removed.'); } catch (e) { failed(e); }
   }
   return (
-    <Panel flush title="Policies" sub="One for all devices; a device group can have its own (when a device is in several groups, the strictest applies)"
+    <Panel flush title="Policies"
       right={canManage && free.length > 0 && <button className="btn" onClick={() => setPick(true)}>Add Policy for a Device Group</button>}>
       <DataTable rows={rows} empty="No policy." columns={[
         { key: 'g', label: 'Devices', render: (r) => <b>{r.label}</b> },

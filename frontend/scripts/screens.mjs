@@ -93,6 +93,7 @@ const names = ['shell', 'add-device', 'add-accessory', 'add-it-assets', 'patch-p
 for (const n of names) {
   await page.goto(`http://127.0.0.1:4175/?d=${n}`);
   await page.waitForTimeout(700);
+  if (n === 'shell') { await page.locator('.nav-head', { hasText: 'Discovery' }).first().click(); await page.waitForTimeout(400); }   // an open module
   await page.screenshot({ path: join(out, `${n}.png`), fullPage: ['experience', 'device-experience', 'license-usage', 'privilege', 'bitlocker', 'usb'].includes(n) });
   const card = page.locator('.modal-card').first();
   if (await card.count()) {

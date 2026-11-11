@@ -735,7 +735,7 @@ input[type=file].in { height: auto; padding: 7px 10px; }
 .nav-sec + .nav-sec { border-top: 0; padding-top: 0; }
 .nav-sec.open { background: linear-gradient(180deg, rgba(255, 255, 255, .065), rgba(255, 255, 255, .025)); padding-bottom: 6px; }
 .nav .nav-head > svg:first-child, .nav a.nav-mod > svg:first-child {
-  width: 28px; height: 28px; padding: 6px; flex: none; border-radius: 9px; box-sizing: border-box;
+  width: 26px; height: 26px; padding: 5px; flex: none; border-radius: 8px; box-sizing: border-box;
   background: rgba(79, 195, 211, .13); color: #7FD3DE; transition: background .18s, color .18s, box-shadow .18s;
 }
 .nav-sec.open > .nav-head > svg:first-child, .nav .nav-head.here > svg:first-child, .nav a.nav-mod.active > svg:first-child {
@@ -761,3 +761,5 @@ input[type=file].in { height: auto; padding: 7px 10px; }
 .collapsed .nav-sec.open { background: transparent; padding: 0; }
 .collapsed .nav-items { padding: 0; }
 .collapsed .nav-sec + .nav-sec { border-top: 0; }
+/* Room for the module names next to their icon tiles */
+@media (min-width: 900px) { .app:not(.collapsed) { grid-template-columns: 288px minmax(0, 1fr); } }

@@ -75,8 +75,6 @@ function PolicyTab({ policies, canManage, changed, failed }: { policies: AreaPol
   const [edit, setEdit] = useState<{ p: AreaPolicy<Settings> | null; groupId: string | null } | null>(null);
   return (
     <>
-      <Callout icon="info">Start with <b>Audit</b>: devices report which administrators would be removed (tab Local Administrators). Then allow the accounts that must stay and switch to <b>Enforce</b>.
-        The built-in Administrator account, Domain Admins and Enterprise Admins always stay. On a computer without a domain whose built-in Administrator is disabled, nothing is removed until the policy allows an account.</Callout>
       <Policies area="privilege" policies={policies} canManage={canManage} modeLabel={MODE} modeTone={(x) => (x === 'enforce' ? 'ok' : x === 'audit' ? 'warn' : '')}
         describe={(s) => <>{s.elevation ? 'Run as administrator with Zentriq' : 'No elevation'} · {s.requests ? `requests on, up to ${ago(s.maxAdminMinutes)}` : 'no requests'}{s.allowedAdmins.length > 0 && <> · stay administrators: <span className="mono">{s.allowedAdmins.join(', ')}</span></>}</>}
         edit={(p, groupId) => setEdit({ p, groupId })} changed={changed} failed={failed} />

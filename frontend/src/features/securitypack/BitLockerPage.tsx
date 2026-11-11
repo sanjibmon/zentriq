@@ -151,7 +151,6 @@ function PolicyTab({ policies, canManage, changed, failed }: { policies: AreaPol
   const [edit, setEdit] = useState<{ p: AreaPolicy<Settings> | null; groupId: string | null } | null>(null);
   return (
     <>
-      <Callout icon="info"><b>Report</b> collects the BitLocker status and keeps the recovery passwords that exist. <b>Enforce</b> also turns BitLocker on for the system drive (TPM and a recovery password, without a restart) and, if chosen, fixed data drives — devices without a usable TPM are listed with the reason.</Callout>
       <Policies area="bitlocker" policies={policies} canManage={canManage} modeLabel={MODE} modeTone={(x) => (x === 'enforce' ? 'ok' : x === 'report' ? 'info' : '')}
         describe={(s) => <>{METHOD[s.method] ?? s.method}{s.usedSpaceOnly ? ', used space only' : ', whole drive'}{s.fixedDrives ? ' · data drives too' : ''}{s.rotateAfterView ? ' · new password after it was shown' : ''}</>}
         edit={(p, groupId) => setEdit({ p, groupId })} changed={changed} failed={failed} />
