@@ -25,7 +25,7 @@ cases=(
 
 install_cmd() {  # format
   case "$1" in
-    deb) echo '(getent hosts archive.ubuntu.com >/dev/null || ! [ -e /etc/lsb-release ] || sed -i -E "s#http://(archive|security)\.ubuntu\.com#http://azure.archive.ubuntu.com#g" /etc/apt/sources.list /etc/apt/sources.list.d/*.sources 2>/dev/null; true) && apt-get update -qq >/dev/null && apt-get install -y -qq /pkg/zentriq-agent-linux-x64.deb >/tmp/install.log 2>&1 || { cat /tmp/install.log; exit 1; }' ;;
+    deb) echo 'apt-get update -qq >/dev/null && apt-get install -y -qq /pkg/zentriq-agent-linux-x64.deb >/tmp/install.log 2>&1 || { cat /tmp/install.log; exit 1; }' ;;
     rpm) echo 'if command -v dnf >/dev/null; then dnf install -y -q /pkg/zentriq-agent-linux-x64.rpm >/tmp/install.log 2>&1; elif command -v zypper >/dev/null; then zypper --non-interactive install --allow-unsigned-rpm /pkg/zentriq-agent-linux-x64.rpm >/tmp/install.log 2>&1; else yum install -y -q /pkg/zentriq-agent-linux-x64.rpm >/tmp/install.log 2>&1; fi || { cat /tmp/install.log; exit 1; }' ;;
     tar) echo '(command -v tar >/dev/null || (apt-get update -qq && apt-get install -y -qq tar gzip) >/dev/null) && mkdir -p /tmp/x && tar -xzf /pkg/zentriq-agent-linux-x64.tar.gz -C /tmp/x && /tmp/x/zentriq-agent/install.sh' ;;
   esac
