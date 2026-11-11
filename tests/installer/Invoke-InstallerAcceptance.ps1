@@ -1475,7 +1475,8 @@ if (-not $installed) {
                     if (-not $tpm) {
                         Api PUT '/security-pack/bitlocker/policy' @{ mode = 'enforce'; method = 'XtsAes128'; usedSpaceOnly = $true } -Session $s | Out-Null
                         Wake-Agent $s
-                        $os = Dep-Wait { @(Api GET '/security-pack/bitlocker/volumes?filter=os' -Session $s | ForEach-Object { $_ }) | Where-Object { $_.assetId -eq $script:agentAsset -and $_.error -match 'TPM' } } 180 'the reason on the system drive'
+                        $os = Dep-Wait { @(Api GET '/security-pack/bitlocker/volumes?filter=os' -Session $s | ForEach-Object { $_ }) | Where-Object { $_.assetId -eq $script:agentAsset -and $_.error } } 180 'the reason on the system drive'
+                        Assert ($os.error -match 'TPM' -and $os.protection -ne 'on') "system drive under enforce: $($os | ConvertTo-Json -Compress)"
                         $enforce = $os.error
                     }
                     "drive $($d.Letter): key $keyId kept encrypted, shown with a reason (audited), replaced by $new and retired; system drive under enforce: $enforce"
@@ -1493,12 +1494,12 @@ if (-not $installed) {
             try {
                 Api PUT '/security-pack/usb/policy' @{ mode = 'audit'; auditFiles = $true; message = 'CI: USB drives are controlled.' } -Session $s | Out-Null
                 Wake-Agent $s
-                Start-Sleep 12
+                # The drive in USB Devices: the agent has the policy and watches the drive.
+                $dev = Dep-Wait { @(Api GET '/security-pack/usb/devices' -Session $s | ForEach-Object { $_ }) | Where-Object { $_.assetId -eq $script:agentAsset -and $_.deviceId -eq $d.Pnp } } 180 'the drive in USB Devices'
+                Start-Sleep 4
                 'quarterly figures' | Set-Content "$($d.Letter)\ci-copy.txt"
-                Wake-Agent $s
                 $ev = Dep-Wait { @(Api GET "/security-pack/usb/events?kind=files&assetId=$($script:agentAsset)" -Session $s | ForEach-Object { $_ }) | Where-Object { $_.path -like '*ci-copy.txt' } } 180 'the file copy in the console'
                 Assert ($ev[0].size -gt 0) "file event: $($ev[0] | ConvertTo-Json -Compress)"
-                $dev = Dep-Wait { @(Api GET '/security-pack/usb/devices' -Session $s | ForEach-Object { $_ }) | Where-Object { $_.assetId -eq $script:agentAsset -and $_.deviceId -eq $d.Pnp } } 120 'the drive in USB Devices'
                 # Read-only: nothing can be written.
                 Api PUT '/security-pack/usb/policy' @{ mode = 'readonly'; auditFiles = $true } -Session $s | Out-Null
                 Wake-Agent $s

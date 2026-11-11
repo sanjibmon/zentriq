@@ -69,10 +69,11 @@ internal static class Presence
                     if (!r.Wake && DateTime.UtcNow - started < TimeSpan.FromSeconds(1) && WaitAny(ct, TimeSpan.FromSeconds(2))) return;
                     if (r.Wake)
                     {
+                        AgentService.CheckedIn.Reset();
                         AgentService.RequestServerWake();
-                        // The work stays pending until the check-in has taken it: give it time instead of asking again at once
-                        // (still well inside the online grace period).
-                        if (WaitAny(ct, TimeSpan.FromSeconds(15))) return;
+                        // The work stays pending until the check-in has taken it: wait for that check-in (at most 15 s) instead
+                        // of asking again at once, then listen again at once so work queued meanwhile is not missed.
+                        if (WaitHandle.WaitAny(new WaitHandle[] { ct.WaitHandle, AgentService.CheckedIn }, TimeSpan.FromSeconds(15)) == 0) return;
                     }
                 }
                 catch (OperationCanceledException) when (ct.IsCancellationRequested) { return; }

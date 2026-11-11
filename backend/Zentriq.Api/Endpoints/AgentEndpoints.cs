@@ -272,7 +272,7 @@ public static partial class AgentEndpoints
             if (agent is null) return error!;
             var settings = await LoadSettingsAsync(ds, ct);
             // An outage the agent reports after reconnecting (it could not reach the server since OfflineSince).
-            var outageFrom = req.OfflineSince is { } off && off < DateTimeOffset.UtcNow && off > DateTimeOffset.UtcNow.AddDays(-365) ? off : (DateTimeOffset?)null;
+            var outageFrom = req.OfflineSince is { } off && off < DateTimeOffset.UtcNow.AddSeconds(-2) && off > DateTimeOffset.UtcNow.AddDays(-365) ? off : (DateTimeOffset?)null;
             await using var cmd = ds.CreateCommand("""
                 UPDATE zentriq.agent_registrations
                    SET last_checkin_at = now(), last_ip = @ip, agent_version = COALESCE(@v, agent_version),
@@ -280,7 +280,8 @@ public static partial class AgentEndpoints
                        -- Agents with a live connection are online exactly while it is open (see /presence).
                        online_until = CASE WHEN 'presence' = ANY(COALESCE(@cap, ARRAY[]::text[])) THEN online_until
                                            ELSE now() + make_interval(mins => checkin_minutes * 2 + 5) END,
-                       last_outage_from = COALESCE(@off, last_outage_from), last_outage_to = CASE WHEN @off::timestamptz IS NULL THEN last_outage_to ELSE now() END,
+                       last_outage_from = CASE WHEN @off::timestamptz < now() THEN @off ELSE last_outage_from END,
+                       last_outage_to = CASE WHEN @off::timestamptz < now() THEN now() ELSE last_outage_to END,
                        uninstall_protected = COALESCE(@up, uninstall_protected),
                        tamper_state = COALESCE(@ts, tamper_state), tamper_until = CASE WHEN @ts::text IS NULL THEN tamper_until ELSE @tu END,
                        platform = COALESCE(@pf, platform),

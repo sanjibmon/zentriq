@@ -297,6 +297,8 @@ internal sealed partial class AgentService
     private Thread? _presence, _guard, _pipe;
 
     internal static void RequestServerWake() => ServerWake.Set();
+    /// <summary>Set after every check-in (the live connection listens again at once).</summary>
+    internal static readonly AutoResetEvent CheckedIn = new AutoResetEvent(false);
 
     /// <summary>Inventory at the next check-in (soon): software was installed or removed.</summary>
     internal static void RequestInventory() { Interlocked.Exchange(ref _forceInventory, 1); ServerWake.Set(); }
@@ -392,6 +394,7 @@ internal sealed partial class AgentService
             catch (Exception ex) { Log.Error("Unexpected error", ex); r = new AgentWorker.Outcome { NextRun = TimeSpan.FromMinutes(5) }; }
             Log.Info($"{r.Message} Next run in {(int)r.NextRun.TotalMinutes} min.");
             SetOutcome(r);
+            CheckedIn.Set();
             // Wait for the next run, or run early when the network changes / the device resumes (the network needs a
             // few seconds to settle first).
             // Work queued by the server runs at once (at most every 10 seconds).

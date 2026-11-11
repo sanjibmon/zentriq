@@ -118,10 +118,10 @@ internal static class BitLockerAgent
     {
         var conv = Call(v, "GetConversionStatus", null, out var cs) == 0 && cs?["ConversionStatus"] is uint c ? c : 99u;
         var protection = v["ProtectionStatus"] is uint ps ? ps : 2u;
-        // A protected volume keeps its encryption; it only needs a recovery password Zentriq can keep.
-        if (!HasProtector(v, 3)) { AddRecoveryPassword(v); log.Add($"{r.Volume}: recovery password added"); }
         if (conv == 1 || conv == 2)
         {
+            // A protected volume keeps its encryption; it only needs a recovery password Zentriq can keep.
+            if (!HasProtector(v, 3)) { AddRecoveryPassword(v); log.Add($"{r.Volume}: recovery password added"); }
             if (protection == 0 && conv == 1 && Call(v, "EnableKeyProtectors", null, out _) == 0) log.Add($"{r.Volume}: protection resumed");
             return;
         }
@@ -145,6 +145,8 @@ internal static class BitLockerAgent
                 if (ext?["VolumeKeyProtectorID"] is string id) Call(v, "EnableAutoUnlock", new Dictionary<string, object?> { ["VolumeKeyProtectorID"] = id }, out _);
             }
         }
+        // Protectors only once the drive can be encrypted (a system drive without a TPM is left untouched).
+        if (!HasProtector(v, 3)) { AddRecoveryPassword(v); log.Add($"{r.Volume}: recovery password added"); }
         var method = MethodCodes.TryGetValue(policy.Method, out var mc) ? mc : 7;
         var enc = Call(v, "Encrypt", new Dictionary<string, object?> { ["EncryptionMethod"] = (uint)method, ["EncryptionFlags"] = policy.UsedSpaceOnly ? 1u : 0u }, out _);
         if (enc != 0) throw new InvalidOperationException("Starting the encryption failed (" + Hr(enc) + ").");

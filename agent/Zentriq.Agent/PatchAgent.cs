@@ -197,7 +197,18 @@ internal static class PatchAgent
             var ps = Path.Combine(Environment.SystemDirectory, @"WindowsPowerShell\v1.0\powershell.exe");
             var args = $"-NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"{file}\"" + (idsFile is null ? "" : $" -IdsFile \"{idsFile}\"");
             Log.Info(idsFile is null ? "Patch management: scanning with the Windows Update Agent." : "Patch management: installing updates with the Windows Update Agent.");
-            var r = ScriptRunner.Start(ps, args, Root, timeout, Encoding.UTF8, ct);
+            // A Windows Update Agent call can hang after the service is stopped: end it when the service is disabled.
+            using var run = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            var unavailable = false;
+            using var watch = new Timer(_ => { if (WindowsUpdateDisabled()) { unavailable = true; try { run.Cancel(); } catch (ObjectDisposedException) { } } },
+                null, TimeSpan.FromSeconds(15), TimeSpan.FromSeconds(15));
+            var r = ScriptRunner.Start(ps, args, Root, timeout, Encoding.UTF8, run.Token);
+            watch.Dispose();
+            if (unavailable && !ct.IsCancellationRequested)
+            {
+                Log.Info("Patch management: the Windows Update service was stopped and disabled during the run; the Windows Update Agent was ended.");
+                return (null, Explain("0x80070422", null));
+            }
             Log.Info($"Patch management: the Windows Update Agent {(r.TimedOut ? "did not answer" : "answered")} after {r.Milliseconds / 1000} s (exit code {r.ExitCode}).");
             if (r.TimedOut) return (null, $"Windows Update did not answer within {timeout.TotalMinutes:0} minutes.");
             var json = r.Stdout.Trim();
@@ -217,6 +228,16 @@ internal static class PatchAgent
             return (report, null);
         }
         finally { try { File.Delete(file); } catch (IOException) { } }
+    }
+
+    private static bool WindowsUpdateDisabled()
+    {
+        try
+        {
+            using var sc = new System.ServiceProcess.ServiceController("wuauserv");
+            return sc.Status == System.ServiceProcess.ServiceControllerStatus.Stopped && sc.StartType == System.ServiceProcess.ServiceStartMode.Disabled;
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception) { return false; }
     }
 
     /// <summary>Common Windows Update Agent errors in words.</summary>

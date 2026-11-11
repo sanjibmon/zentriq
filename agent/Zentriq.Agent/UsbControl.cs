@@ -30,7 +30,8 @@ internal static class UsbControl
     private static readonly object Gate = new object();
     private static readonly Dictionary<string, string> Applied = new(StringComparer.OrdinalIgnoreCase);   // instance id -> full | readonly | blocked
     private static readonly Dictionary<string, FileSystemWatcher> Watchers = new(StringComparer.OrdinalIgnoreCase);
-    private static readonly Dictionary<string, DateTime> RecentWrites = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>Files being written: recorded once they have not changed for 2 seconds (with their final size).</summary>
+    private static readonly Dictionary<string, (DateTime Last, string DeviceId, string DeviceName, string? User)> Writing = new(StringComparer.OrdinalIgnoreCase);
     private static string Folder => Path.Combine(AgentPaths.Root, "SecurityPack");
     private static string StateFile => Path.Combine(Folder, "usb-state.txt");
     private static string _lastKey = "";
@@ -151,8 +152,26 @@ internal static class UsbControl
                 if (want == "blocked") continue;
                 if (Pnp("/enable-device", kv.Key, out var detail)) { Applied.Remove(kv.Key); SaveState(); record(new UsbEvent { At = DateTimeOffset.Now, Kind = "allowed", DeviceId = kv.Key, Detail = "Enabled again: " + detail }); }
             }
+            FlushWrites(record);
             if (changed) Watch(policy.Mode is "audit" or "readonly" or "block" && policy.AuditFiles ? disks.Where(d => Applied.TryGetValue(d.InstanceId, out var a) && a == "full").ToList() : new List<Disk>(), record);
             return devices;
+        }
+    }
+
+    /// <summary>Records the files whose writing has ended (no change for 2 seconds).</summary>
+    private static void FlushWrites(Action<UsbEvent> record)
+    {
+        List<KeyValuePair<string, (DateTime Last, string DeviceId, string DeviceName, string? User)>> done;
+        lock (Writing)
+        {
+            done = Writing.Where(kv => DateTime.UtcNow - kv.Value.Last >= TimeSpan.FromSeconds(2)).ToList();
+            foreach (var kv in done) Writing.Remove(kv.Key);
+        }
+        foreach (var kv in done)
+        {
+            long? size = null;
+            try { var f = new FileInfo(kv.Key); if (!f.Exists) continue; size = f.Length; } catch (Exception) { }
+            record(new UsbEvent { At = DateTimeOffset.Now, Kind = "file_written", User = kv.Value.User, DeviceId = kv.Value.DeviceId, DeviceName = kv.Value.DeviceName, Path = kv.Key, Size = size });
         }
     }
 
@@ -220,15 +239,7 @@ internal static class UsbControl
                 var deviceId = disk.VidPid is null ? disk.InstanceId : disk.VidPid + (disk.Serial is null ? "" : "\\" + disk.Serial);
                 void Written(string path)
                 {
-                    lock (RecentWrites)
-                    {
-                        if (RecentWrites.TryGetValue(path, out var at) && DateTime.UtcNow - at < TimeSpan.FromSeconds(10)) return;
-                        RecentWrites[path] = DateTime.UtcNow;
-                        if (RecentWrites.Count > 2000) RecentWrites.Clear();
-                    }
-                    long? size = null;
-                    try { var f = new FileInfo(path); if (f.Exists) size = f.Length; else return; } catch (Exception) { }
-                    record(new UsbEvent { At = DateTimeOffset.Now, Kind = "file_written", User = ConsoleUser(), DeviceId = deviceId, DeviceName = disk.Name, Path = path, Size = size });
+                    lock (Writing) { if (Writing.Count < 5000 || Writing.ContainsKey(path)) Writing[path] = (DateTime.UtcNow, deviceId, disk.Name, ConsoleUser()); }
                 }
                 w.Created += (_, e) => Written(e.FullPath);
                 w.Changed += (_, e) => Written(e.FullPath);
