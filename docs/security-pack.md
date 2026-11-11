@@ -1,6 +1,6 @@
 # Security Pack
 
-From build 1.1.1.122. The Security Pack is a **separately licensed add-on** for Windows devices with the Zentriq
+From build 1.1.1.127. The Security Pack is a **separately licensed add-on** for Windows devices with the Zentriq
 Agent: **endpoint privilege management**, **BitLocker management** and **USB device control**. Console: the menu
 module *Security Pack* (pages *Endpoint Privilege*, *BitLocker*, *USB Device Control*). Security Configuration is not
 changed: it still only reports.
@@ -99,7 +99,7 @@ Also in the Audit Log (`privilege.*`).
 
 ## Agent and API
 
-Windows agent 1.1.1.122 or later (capability `security-pack`); Linux agents are not affected. Agent API:
+Windows agent 1.1.1.127 or later (capability `security-pack`); Linux agents are not affected. Agent API:
 `GET /api/agent/v1/security-pack/policy`, `POST /security-pack/report`, `POST/GET /security-pack/requests`.
 Console API under `/api/v1/security-pack/{privilege|bitlocker|usb}`: overview, `PUT /policy`, `DELETE
 /policy/{groupId}`, `groups`; privilege: `admins`, `rules`, `requests`, `grants`, `events`; BitLocker: `volumes`,

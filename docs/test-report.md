@@ -1,6 +1,42 @@
 # Test report
 
-Latest: GitHub Actions run 42932627468, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
+Latest: GitHub Actions run 43023450337, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
+10.0.20348** VM plus an Ubuntu job for the Linux agent. Release: `v1.1.1-build.127` (pre-release, **unsigned**), package
+version **1.1.1.127**, commit `175a853`. Results: unit + PostgreSQL integration tests **464 PASS** (466, 2 skipped);
+installer acceptance **89 passed, 0 failed** (10 not run: need hardware, a domain, a reboot or old Windows); upgrade
+suites **14/14** (schema 41); Linux agent on 11 distributions **11/11**.
+
+New in build 127 (Release 4, Security Pack — separately licensed): endpoint privilege management (T96), BitLocker
+management (T97), USB device control (T98). See [Security Pack](security-pack.md).
+
+Runs 42954492328, 42968208381, 42982533057, 42995851817 and 43009387543 (builds 122–126) were not released; each stopped
+at failed acceptance tests, fixed before the next run:
+
+| Build | Failed | Fixed |
+|---|---|---|
+| 122 | T97, T98, T68, T92 | BitLocker added a recovery password to a decrypted system drive before the TPM check (and the reason did not reach the console); USB writes recorded at 0 bytes and before the agent had the policy; live connection deaf for 15 s after a wake; reversed outage; patch scan hung after Windows Update was disabled |
+| 123 | T98, T92 | USB drive letters of GPT disks (Storage provider); interrupted patch scans handed out but not confirmed were never requeued |
+| 124 | T98 | **The test model matched the runner's own virtual disks (including C:)**: test devices now by exact device ID, the disk Windows runs from is never restricted; block also takes a disk offline where turning the device off needs a restart |
+| 125 | T98 | Strict-mode error in the new safety check of the test |
+| 126 | T68 | Outage of zero length when a check-in arrived before the live connection reopened |
+
+| File | SHA256 |
+|---|---|
+| Zentriq-Setup-x64.exe | `55927377ee8ccf4f981a00c4e6a84d757de81d3ba73dc1d344903f4bf01f67eb` |
+| Zentriq.msi | `d0a063056b3ced3108e4dc37fe4c6d021667c94cf462d9562c52b13c5e839416` |
+| ZentriqAgent-x64.msi | `c1e5466de6a49a3c382f383346de51e1a91614579f5fcf3c60299456c446c66f` |
+| zentriq-agent-linux-x64.deb | `4cdef44bc41be5a62735925376da7e5832e08f1892e0e00db2afe6541af2218a` |
+| zentriq-agent-linux-x64.rpm | `6fa9c8e448583c3c4e1c8f7ec7ea4bb74ee01092768a7bed38e8266b6e3248e2` |
+| zentriq-agent-linux-x64.tar.gz | `ef5a5ff9128c709a0a61bd5da347edd2ebca4457f592c80b5d364c0741a31a16` |
+| zentriq-agent-linux-arm64.deb | `92cc4829d512a16dd3dc7363edaf4be26c532fe5457df92f0d03d3373c775038` |
+| zentriq-agent-linux-arm64.rpm | `9d8beae08f863923bc40b54fc33a89e7b4288722e45111483b918b73196784f4` |
+| zentriq-agent-linux-arm64.tar.gz | `512369aded786c89a3bf61678dec8c138062914144a8e92107470d32dca2829e` |
+| Zentriq-1.1.1-msi-offline-kit.zip | `3d9b335832d3ec200d09603e22cd8128dd52b2f838e01f1fccd0611eeaa02ca9` |
+| Zentriq-1.1.1-docs.zip | `25d2e6c8d2724806d576abe0bcb863e05d95eaf0f1c261f41e93c7bde2b6fb0d` |
+
+## Build 121 (Release 3)
+
+GitHub Actions run 42932627468, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
 10.0.20348** VM plus an Ubuntu job for the Linux agent. Release: `v1.1.1-build.121` (pre-release, **unsigned**), package
 version **1.1.1.121**, commit `0ce61b2`. Results: unit + PostgreSQL integration tests **459 PASS** (461, 2 skipped);
 installer acceptance **86 passed, 0 failed** (10 not run: need hardware, a domain, a reboot or old Windows); upgrade
