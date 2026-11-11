@@ -1421,6 +1421,111 @@ if (-not $installed) {
                 foreach ($u in 'zqextra', 'zqstd') { Remove-LocalUser -Name $u -ErrorAction SilentlyContinue }
             }
         } | Out-Null
+
+        # A virtual disk for the BitLocker and USB tests: attached, formatted, with a drive letter.
+        function New-TestDisk([string] $Label) {
+            $file = Join-Path $OutDir "$Label.vhdx"
+            Remove-Item $file -ErrorAction SilentlyContinue
+            "create vdisk file=`"$file`" maximum=512 type=expandable`r`nattach vdisk`r`ncreate partition primary`r`nformat fs=ntfs quick label=$Label`r`nassign`r`n" | Set-Content (Join-Path $OutDir "$Label.dp") -Encoding ascii
+            & diskpart.exe /s (Join-Path $OutDir "$Label.dp") 2>&1 | Out-Null
+            $vol = Dep-Wait { Get-Volume -FileSystemLabel $Label -ErrorAction SilentlyContinue } 60 "the virtual disk $Label"
+            $num = (Get-Partition -DriveLetter $vol.DriveLetter | Get-Disk).Number
+            [pscustomobject]@{ File = $file; Letter = "$($vol.DriveLetter):"; Number = $num; Pnp = (Get-CimInstance Win32_DiskDrive | Where-Object Index -eq $num).PNPDeviceID; Model = (Get-CimInstance Win32_DiskDrive | Where-Object Index -eq $num).Model }
+        }
+        function Remove-TestDisk($d) {
+            if (-not $d) { return }
+            try { & pnputil.exe /enable-device "$($d.Pnp)" 2>&1 | Out-Null } catch { }
+            "select vdisk file=`"$($d.File)`"`r`ndetach vdisk`r`n" | Set-Content (Join-Path $OutDir 'detach.dp') -Encoding ascii
+            & diskpart.exe /s (Join-Path $OutDir 'detach.dp') 2>&1 | Out-Null
+            Remove-Item $d.File -ErrorAction SilentlyContinue
+        }
+
+        $bitlockerHere = $null -ne (Get-CimInstance -Namespace 'root\cimv2\Security\MicrosoftVolumeEncryption' -ClassName Win32_EncryptableVolume -ErrorAction SilentlyContinue | Select-Object -First 1)
+        if (-not $bitlockerHere) {
+            Record 'T97' 'BitLocker management' 'NOT RUN' 'BitLocker is not installed on this Windows Server (adding the feature needs a restart); escrow, lookup and replacement are covered by the PostgreSQL test'
+        } else {
+            Check 'T97' 'BitLocker management: status reported, a recovery password kept encrypted on the server and shown with a reason (audited), replaced on request and the old one retired; enforce explains a missing TPM' {
+                $s = Login
+                $d = New-TestDisk 'ZQBDE'
+                try {
+                    $on = & manage-bde.exe -on $d.Letter -RecoveryPassword -UsedSpaceOnly 2>&1 | Out-String
+                    $prot = & manage-bde.exe -protectors -get $d.Letter -Type RecoveryPassword 2>&1 | Out-String
+                    $m = [regex]::Match($prot, '\{([0-9A-F-]{36})\}[\s\S]*?(\d{6}(?:-\d{6}){7})')
+                    Assert $m.Success "manage-bde: $on $prot"
+                    $keyId = $m.Groups[1].Value.ToUpperInvariant(); $password = $m.Groups[2].Value
+                    Api PUT '/security-pack/bitlocker/policy' @{ mode = 'report'; rotateAfterView = $true } -Session $s | Out-Null
+                    Wake-Agent $s
+                    $vol = Dep-Wait { @(Api GET '/security-pack/bitlocker/volumes?filter=' -Session $s | ForEach-Object { $_ }) | Where-Object { $_.assetId -eq $script:agentAsset -and $_.volume -eq $d.Letter -and $_.keys -ge 1 } } 180 'the BitLocker drive and its key in the console'
+                    Assert ($vol.kind -eq 'fixed' -and $vol.protectors -contains 'Recovery password') "volume: $($vol | ConvertTo-Json -Compress)"
+                    $key = @(Api GET "/security-pack/bitlocker/keys?q=$($keyId.Substring(0, 8))" -Session $s | ForEach-Object { $_ }) | Where-Object keyId -eq $keyId
+                    Assert $key "key $keyId not found by its first characters"
+                    $bad = Invoke-WebRequest "$base/api/v1/security-pack/bitlocker/keys/$($key.id)/reveal" -Method Post -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } -ContentType 'application/json' -Body '{"reason":""}' -SkipHttpErrorCheck
+                    Assert ($bad.StatusCode -eq 400) "reveal without a reason: $($bad.StatusCode)"
+                    $shown = Api POST "/security-pack/bitlocker/keys/$($key.id)/reveal" @{ reason = 'CI: ticket 4711, locked laptop' } -Session $s
+                    Assert ($shown.password -eq $password -and $shown.rotates) "revealed password differs: $($shown.keyId)"
+                    $aud = Api GET '/audit?action=bitlocker.key_view&pageSize=5' -Session $s
+                    Assert (@($aud.items | Where-Object { $_.target -match $keyId }).Count -ge 1) 'the view is not in the audit log'
+                    # Shown: the device replaces it and the old one is retired.
+                    Wake-Agent $s
+                    $new = Dep-Wait { $p = & manage-bde.exe -protectors -get $d.Letter -Type RecoveryPassword 2>&1 | Out-String; if ($p -notmatch $keyId -and $p -match '\{([0-9A-F-]{36})\}') { $Matches[1].ToUpperInvariant() } } 180 'the recovery password replaced on the device'
+                    Dep-Wait { $k = @(Api GET "/security-pack/bitlocker/keys?assetId=$($script:agentAsset)" -Session $s | ForEach-Object { $_ }); ($k | Where-Object { $_.keyId -eq $new -and -not $_.retiredAt }) -and ($k | Where-Object { $_.keyId -eq $keyId -and $_.retiredAt }) } 180 'the new key kept and the old one retired' | Out-Null
+                    # Enforce on the system drive without a TPM: not encrypted, with the reason (a runner with a TPM is not encrypted by the test).
+                    $tpm = $null -ne (Get-CimInstance -Namespace 'root\cimv2\Security\MicrosoftTpm' -ClassName Win32_Tpm -ErrorAction SilentlyContinue | Select-Object -First 1)
+                    $enforce = 'not checked (the runner has a TPM)'
+                    if (-not $tpm) {
+                        Api PUT '/security-pack/bitlocker/policy' @{ mode = 'enforce'; method = 'XtsAes128'; usedSpaceOnly = $true } -Session $s | Out-Null
+                        Wake-Agent $s
+                        $os = Dep-Wait { @(Api GET '/security-pack/bitlocker/volumes?filter=os' -Session $s | ForEach-Object { $_ }) | Where-Object { $_.assetId -eq $script:agentAsset -and $_.error -match 'TPM' } } 180 'the reason on the system drive'
+                        $enforce = $os.error
+                    }
+                    "drive $($d.Letter): key $keyId kept encrypted, shown with a reason (audited), replaced by $new and retired; system drive under enforce: $enforce"
+                } finally {
+                    try { Api PUT '/security-pack/bitlocker/policy' @{ mode = 'off' } -Session $s | Out-Null; Wake-Agent $s } catch { }
+                    Remove-TestDisk $d
+                }
+            } | Out-Null
+        }
+
+        Check 'T98' 'USB device control (a virtual disk treated as USB storage): devices and file copies recorded, read-only and blocked by policy, an allowed device keeps full access, the drive given back when the policy is off' {
+            $s = Login
+            $d = New-TestDisk 'ZQUSB'
+            Set-ItemProperty 'HKLM:\SOFTWARE\Zentriq\Agent' -Name UsbTestModels -Value $d.Model
+            try {
+                Api PUT '/security-pack/usb/policy' @{ mode = 'audit'; auditFiles = $true; message = 'CI: USB drives are controlled.' } -Session $s | Out-Null
+                Wake-Agent $s
+                Start-Sleep 12
+                'quarterly figures' | Set-Content "$($d.Letter)\ci-copy.txt"
+                Wake-Agent $s
+                $ev = Dep-Wait { @(Api GET "/security-pack/usb/events?kind=files&assetId=$($script:agentAsset)" -Session $s | ForEach-Object { $_ }) | Where-Object { $_.path -like '*ci-copy.txt' } } 180 'the file copy in the console'
+                Assert ($ev[0].size -gt 0) "file event: $($ev[0] | ConvertTo-Json -Compress)"
+                $dev = Dep-Wait { @(Api GET '/security-pack/usb/devices' -Session $s | ForEach-Object { $_ }) | Where-Object { $_.assetId -eq $script:agentAsset -and $_.deviceId -eq $d.Pnp } } 120 'the drive in USB Devices'
+                # Read-only: nothing can be written.
+                Api PUT '/security-pack/usb/policy' @{ mode = 'readonly'; auditFiles = $true } -Session $s | Out-Null
+                Wake-Agent $s
+                Dep-Wait { (Get-Disk -Number $d.Number).IsReadOnly } 120 'the drive made read-only' | Out-Null
+                $denied = try { 'x' | Set-Content "$($d.Letter)\ci-denied.txt" -ErrorAction Stop; $false } catch { $true }
+                Assert $denied 'writing to the read-only drive worked'
+                # Allowed by its ID: full access again.
+                $allow = Api POST '/security-pack/usb/allowed' @{ deviceId = $d.Pnp; name = 'CI drive'; access = 'full' } -Session $s
+                Wake-Agent $s
+                Dep-Wait { -not (Get-Disk -Number $d.Number).IsReadOnly } 120 'the allowed drive writable again' | Out-Null
+                # Blocked (exception removed): the device is turned off.
+                Api DELETE "/security-pack/usb/allowed/$($allow.id)" -Session $s | Out-Null
+                Api PUT '/security-pack/usb/policy' @{ mode = 'block'; auditFiles = $true } -Session $s | Out-Null
+                Wake-Agent $s
+                Dep-Wait { -not (Get-Volume -FileSystemLabel ZQUSB -ErrorAction SilentlyContinue) } 120 'the drive blocked' | Out-Null
+                Dep-Wait { @(Api GET "/security-pack/usb/events?kind=blocked&assetId=$($script:agentAsset)" -Session $s | ForEach-Object { $_ }) } 120 'the block in the console' | Out-Null
+                # Off: the agent gives the drive back.
+                Api PUT '/security-pack/usb/policy' @{ mode = 'off'; auditFiles = $false } -Session $s | Out-Null
+                Wake-Agent $s
+                Dep-Wait { Get-Volume -FileSystemLabel ZQUSB -ErrorAction SilentlyContinue } 120 'the drive back after the policy was turned off' | Out-Null
+                "file copy recorded ($($ev[0].size) bytes by $($ev[0].user)); read-only refused writing; allowed by ID writable again; blocked (device off); given back when the policy was turned off"
+            } finally {
+                try { Api PUT '/security-pack/usb/policy' @{ mode = 'off' } -Session $s | Out-Null } catch { }
+                Remove-ItemProperty 'HKLM:\SOFTWARE\Zentriq\Agent' -Name UsbTestModels -ErrorAction SilentlyContinue
+                Remove-TestDisk $d
+            }
+        } | Out-Null
     }
 
 
