@@ -107,8 +107,8 @@ public static class Modules
     public const string Licenses = "licenses";
     /// <summary>Web Apps &amp; Accounts (SaaS applications, accounts and usage).</summary>
     public const string WebApps = "webapps";
-    /// <summary>Security Pack (build 122): endpoint privilege management, BitLocker management, USB device control. A
-    /// separately licensed add-on: never part of an edition, only of a license that lists it (and of the trial).</summary>
+    /// <summary>Security Pack (build 127): endpoint privilege management, BitLocker management, USB device control. Part of
+    /// the Advanced edition (since build 128; before, a separately licensed add-on).</summary>
     public const string SecurityPack = "securitypack";
 
     public static readonly IReadOnlyList<string> All =
@@ -117,8 +117,8 @@ public static class Modules
         Lifecycle, Integrations, Licenses, WebApps, SecurityPack
     ];
 
-    /// <summary>Add-ons: licensed on their own, never included by an edition.</summary>
-    public static readonly IReadOnlyList<string> AddOns = [SecurityPack];
+    /// <summary>Add-ons: licensed on their own, never included by an edition (none at present).</summary>
+    public static readonly IReadOnlyList<string> AddOns = [];
 }
 
 /// <summary>

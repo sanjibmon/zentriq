@@ -23,9 +23,8 @@ export function useSecurityPack(): boolean {
 export function AddOnNotice() {
   return (
     <Callout tone="warn" icon="lock">
-      <b>The Security Pack is a separately licensed add-on</b> — endpoint privilege management, BitLocker management and USB device control for
-      Windows devices with the Zentriq Agent. Your license does not include it. Ask your Zentriq partner to add it; it arrives with the next license
-      check-in (<Link to="/licensing">Licensing</Link>). Security Configuration stays as it is: it only reports.
+      <b>Requires the Advanced edition.</b> Endpoint privilege management, BitLocker management and USB device control are part of the Advanced
+      edition. Your license does not include them; ask your Zentriq partner (<Link to="/licensing">Licensing</Link>).
     </Callout>
   );
 }

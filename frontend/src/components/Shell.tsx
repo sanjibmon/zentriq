@@ -55,7 +55,7 @@ export function Shell({ children }: { children: ReactNode }) {
             const link = (i: (typeof shown)[number], mod = false) => {
               const off = (locked && !i.admin) || addOn(i);
               return (
-                <Link key={i.id} to={i.path} className={`${mod ? 'nav-mod ' : ''}${active(i.path) ? 'active' : ''}${off ? ' locked' : ''}`} title={addOn(i) ? `${i.label} — a separately licensed add-on` : locked && !i.admin ? `${i.label} — requires the Advanced edition` : i.label}>
+                <Link key={i.id} to={i.path} className={`${mod ? 'nav-mod ' : ''}${active(i.path) ? 'active' : ''}${off ? ' locked' : ''}`} title={addOn(i) ? `${i.label} — not included in your license` : locked && !i.admin ? `${i.label} — requires the Advanced edition` : i.label}>
                   <Icon name={mod ? GROUP_ICON[group] ?? i.icon : i.icon} />
                   <span>{i.label}</span>
                   {off && <Icon name="lock" size={12} className="nav-lock-ico" />}
@@ -71,7 +71,7 @@ export function Shell({ children }: { children: ReactNode }) {
                 {!collapsed && <button type="button" className={`nav-head${here ? ' here' : ''}`} aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : group)}>
                   <Icon name={GROUP_ICON[group] ?? 'apps'} />
                   <span>{group}</span>
-                  {locked ? <span className="nav-lock" title="Not included in your license">Advanced</span> : groupAddOn && <span className="nav-lock" title="A separately licensed add-on">Add-on</span>}
+                  {locked ? <span className="nav-lock" title="Not included in your license">Advanced</span> : groupAddOn && <span className="nav-lock" title="Not included in your license">Advanced</span>}
                   <Icon name="chev" size={14} className="nav-chev" />
                 </button>}
                 {isOpen && <div className="nav-items">{shown.map((i) => link(i))}</div>}

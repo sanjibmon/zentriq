@@ -39,7 +39,7 @@ export function UsbPage() {
   const [allow, setAllow] = useState<Device | 'new' | null>(null);
   return (
     <>
-      <PageHead title="USB Device Control" icon="usb" desc="USB storage blocked or read-only, allowed devices by ID, and every file copied to a USB drive recorded — Security Pack." />
+      <PageHead title="USB Device Control" icon="usb" />
       {!licensed && <AddOnNotice />}
       {licensed && <>
         <ErrorBox error={data.error} />

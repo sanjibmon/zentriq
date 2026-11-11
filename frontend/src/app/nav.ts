@@ -10,7 +10,7 @@ export interface NavItem {
   permission?: string;
   /** Administration pages (licensing, users, settings, audit): always available, whatever is installed or licensed. */
   admin?: boolean;
-  /** A separately licensed add-on module (shown locked, with "Add-on", without it). */
+  /** The license module of the page (shown locked, with "Advanced", without it). */
   module?: string;
 }
 

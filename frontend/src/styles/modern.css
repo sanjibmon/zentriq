@@ -726,3 +726,38 @@ input[type=file].in { height: auto; padding: 7px 10px; }
 @media (min-width: 900px) { .app:not(.collapsed) { grid-template-columns: 272px minmax(0, 1fr); } }
 .nav .nav-head, .nav a.nav-mod { font-size: 14px; gap: 10px; letter-spacing: 0; padding: 0 8px; }
 .nav .nav-head .nav-chev { flex: none; margin-left: 2px; }
+
+/* Build 128: a cleaner, richer menu — no dividing lines between modules and no line beside the pages.
+   Each module icon sits on a tinted tile; the open module becomes a soft card holding its pages; the current page
+   is a glowing pill (no bar on its edge). */
+.nav { padding: 8px 6px 16px; }
+.nav-sec { margin: 3px 0; padding: 0 4px; border-radius: 14px; transition: background .18s; }
+.nav-sec + .nav-sec { border-top: 0; padding-top: 0; }
+.nav-sec.open { background: linear-gradient(180deg, rgba(255, 255, 255, .065), rgba(255, 255, 255, .025)); padding-bottom: 6px; }
+.nav .nav-head > svg:first-child, .nav a.nav-mod > svg:first-child {
+  width: 28px; height: 28px; padding: 6px; flex: none; border-radius: 9px; box-sizing: border-box;
+  background: rgba(79, 195, 211, .13); color: #7FD3DE; transition: background .18s, color .18s, box-shadow .18s;
+}
+.nav-sec.open > .nav-head > svg:first-child, .nav .nav-head.here > svg:first-child, .nav a.nav-mod.active > svg:first-child {
+  background: linear-gradient(135deg, #4FC3D3, #2A8FA3); color: #FFFFFF; box-shadow: 0 4px 12px -4px rgba(79, 195, 211, .7);
+}
+.nav .nav-head, .nav a.nav-mod { height: 46px; padding: 0 8px; gap: 10px; }
+.nav .nav-head:hover, .nav a.nav-mod:hover { background: rgba(255, 255, 255, .07); }
+.nav .nav-head.here:not([aria-expanded=true]) { background: transparent; }
+.nav-sec.open > .nav-head:hover { background: transparent; }
+.nav .nav-head .nav-chev { width: 20px; height: 20px; padding: 3px; border-radius: 999px; background: rgba(255, 255, 255, .06); box-sizing: border-box; }
+.nav a.nav-mod, .nav a.nav-mod.active { border: 0; box-shadow: none; }
+.nav a.nav-mod.active { background: rgba(56, 179, 196, .16); }
+.nav-items { margin: 0 0 2px 0; padding: 0 0 0 38px; border-left: 0; animation: nav-open .18s ease-out; }
+.nav-items a { border-color: rgba(255, 255, 255, .08); background: rgba(255, 255, 255, .025); }
+.nav-items a:hover { border-color: rgba(255, 255, 255, .2); background: rgba(255, 255, 255, .07); }
+.nav a.active, .nav-items a.active {
+  box-shadow: 0 6px 16px -8px rgba(56, 179, 196, .8);
+  background: linear-gradient(90deg, rgba(56, 179, 196, .42), rgba(56, 179, 196, .14));
+  border-color: rgba(79, 195, 211, .55);
+}
+@keyframes nav-open { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .nav-items { animation: none; } }
+.collapsed .nav-sec.open { background: transparent; padding: 0; }
+.collapsed .nav-items { padding: 0; }
+.collapsed .nav-sec + .nav-sec { border-top: 0; }

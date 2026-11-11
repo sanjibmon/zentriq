@@ -80,7 +80,7 @@ Data is **never** deleted, and sign-in, viewing data, backup, restore and licens
   (*Support expired*): renew support, or reinstall the earlier version. Each Zentriq build carries its release date
   (`ProductInfo.ReleaseDate`, set at build time) for this check.
 * **Editions**: Standard (Overview, Discover & inventory, Infrastructure, Insight & admin) or Advanced (everything,
-  including Remote support and Secure & remediate). A license can add single modules to its edition.
+  including Remote support, Secure & remediate and the Security Pack). A license can add single modules to its edition.
 
 ## Activation with the license file (normal case)
 

@@ -1,18 +1,19 @@
 # Security Pack
 
-From build 1.1.1.127. The Security Pack is a **separately licensed add-on** for Windows devices with the Zentriq
+From build 1.1.1.127; part of the **Advanced edition** from build 1.1.1.128. The Security Pack is for Windows devices with the Zentriq
 Agent: **endpoint privilege management**, **BitLocker management** and **USB device control**. Console: the menu
 module *Security Pack* (pages *Endpoint Privilege*, *BitLocker*, *USB Device Control*). Security Configuration is not
 changed: it still only reports.
 
 ## Licensing
 
-* Module `securitypack`. It is **not part of an edition** (Standard or Advanced): a license includes it only when it
-  lists the module (license server: *extra modules*). The trial includes it.
+* Module `securitypack`, part of the **Advanced edition** (from build 128; build 127 sold it as a separate add-on).
+  A Standard license includes it only when it lists it as an extra module (license server: *extra modules*). The trial
+  includes it.
 * It belongs to the *Secure & Remediate* section, so the server needs the Advanced installation (or Secure added with
   Setup › Update).
-* Without it the menu shows the pages locked with **Add-on**, the pages explain how to get it, the APIs answer 403, and
-  agents receive a policy with everything off (nothing is removed, blocked or encrypted).
+* Without it the menu shows the pages locked with **Advanced**, the pages say so, the APIs answer 403, and agents
+  receive a policy with everything off (nothing is removed, blocked or encrypted).
 * Permissions: `privilege.view`, `privilege.manage`, `bitlocker.view`, `bitlocker.manage`, `bitlocker.recover`
   (show recovery passwords), `devicecontrol.view`, `devicecontrol.manage`. The Administrator role has them.
 

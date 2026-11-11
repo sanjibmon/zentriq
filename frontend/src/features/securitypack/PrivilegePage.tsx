@@ -43,7 +43,7 @@ export function PrivilegePage() {
   const k = data.data?.kpis;
   return (
     <>
-      <PageHead title="Endpoint Privilege Management" icon="elevate" desc="Standard users without administrator rights: approved applications run as administrator, administrator rights for a while on request — Security Pack." />
+      <PageHead title="Endpoint Privilege Management" icon="elevate" />
       {!licensed && <AddOnNotice />}
       {licensed && <>
         <ErrorBox error={data.error} />
