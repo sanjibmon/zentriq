@@ -1,12 +1,50 @@
 # Test report
 
-Latest: GitHub Actions run 42868622076, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
-10.0.20348** VM plus an Ubuntu job for the Linux agent. Release: `v1.1.1-build.119` (pre-release, **unsigned**), package
-version **1.1.1.119**, commit `a5ab68e`. Results: unit + PostgreSQL integration tests **448 PASS** (450, 2 skipped);
-installer acceptance **85 passed, 0 failed** (10 not run: need hardware, a domain, a reboot or old Windows); upgrade
-suites **14/14** (schema 39); Linux agent on 11 distributions **11/11**.
+Latest: GitHub Actions run 42932627468, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022 Datacenter
+10.0.20348** VM plus an Ubuntu job for the Linux agent. Release: `v1.1.1-build.121` (pre-release, **unsigned**), package
+version **1.1.1.121**, commit `0ce61b2`. Results: unit + PostgreSQL integration tests **459 PASS** (461, 2 skipped);
+installer acceptance **86 passed, 0 failed** (10 not run: need hardware, a domain, a reboot or old Windows); upgrade
+suites **14/14** (schema 40); Linux agent on 11 distributions **11/11**. (Run 42920619424 for build 120 stopped at the
+last step of the new test T95 — a strict-mode error in the test script; fixed, no product change.)
+
+New in build 121 (Release 3):
+
+* **Software metering**: Windows and Linux agents record the programs run in users' sessions (minutes, launches, per
+  user and day); Software Licenses › Software Usage, used / unused installations per product with the possible saving,
+  Uninstall from unused devices, programs per device, alert for installations not used for 90 days; Settings: on/off,
+  days without use.
+* **Device Experience**: score 0–100 per device from start-up time, crashes and hangs, blue screens, unexpected
+  shutdowns, service failures, processor / memory pressure, disk space, battery and uptime; fleet page with trend,
+  problems, applications that crash most; device tab with events and resources.
+
+| ID | Test | Result |
+|---|---|---|
+| T95 | Software metering and Device Experience | **PASS** — zq-meter-app.exe metered (3 min, runneradmin); product installation used; score 100 (good), 10 samples; metering turned off and on again on the device |
+
+Tests added: `Release120Tests` (the agent's recorder, system programs not metered, the score, catalogue programs) and
+`Release120DbTests` (usage and experience stored with the inventory, sent twice without duplicates, used / unused /
+recent installations).
+
+| File | SHA256 |
+|---|---|
+| Zentriq-Setup-x64.exe | `2c2226250e8ba94da93a680481bf7a09322ca1f769b3c92d426f75ae1f8db8c1` |
+| Zentriq.msi | `660dd0eeecabfb798acedba887f00d50da5607511a71b48ab8c78dd439a87a0c` |
+| ZentriqAgent-x64.msi | `52391f9d2f1de1276a17d3adb3dc2eac8613c761ab6cab65c30d7f5ccf00fac9` |
+| zentriq-agent-linux-x64.deb | `85845001ee75b2f4d9a8541d77f21f4470ca096f3b4859abaa8365bb4e698b5d` |
+| zentriq-agent-linux-x64.rpm | `334c6c74d82dd342af2026b9030d3b3effda2ac2e59ae4bd4cf4031d927fb866` |
+| zentriq-agent-linux-x64.tar.gz | `30d8bbfa402d115967d47abe2d78a6ecd3c0f82d6012fdb24296909524cd2bbf` |
+| zentriq-agent-linux-arm64.deb | `01c41538c4ab9471eb35cd645e5d94720f0d2bc6b25da4eea75360b3f5b9e2dc` |
+| zentriq-agent-linux-arm64.rpm | `4d52795462b6dcfa6fc4f06bf1e81a6a561998b74037f08a05ebdb23c3860fd9` |
+| zentriq-agent-linux-arm64.tar.gz | `0ac45733402e6f4de7d26f7c24ce682954c35fbad68a2a97db1a0cab32022e79` |
+| Zentriq-1.1.1-msi-offline-kit.zip | `97d3e00d0ab69da58326ef64f75244845f9a19bea5376415b338d5817ea27649` |
+| Zentriq-1.1.1-docs.zip | `904f5844be20f51c3188c4794c835eeeafb3e9aea67fd844226228896cb9c50d` |
+
+## Build 119 (run 42868622076, commit `a5ab68e`)
+
+Results: 448 PASS (2 skipped); acceptance 85/0; upgrade 14/14; Linux 11/11.
 
 New in build 119:
+
 
 * Console menu: each module is a heading with an icon that opens and closes its pages (one module open at a time; the
   module of the current page opens by itself); pages stay in boxes, indented under the heading.

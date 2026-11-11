@@ -68,9 +68,9 @@ Automation*). An alert resolves itself when the problem is gone (for example aft
 The **dashboard** shows a highlight strip with the products under-licensed or unlicensed, licences expired or ending,
 Microsoft 365 problems and devices not activated.
 
-## Software metering (build 120)
+## Software metering (build 121)
 
-Devices with the Zentriq Agent 1.1.1.120 or later (Windows and Linux) record **which programs run, for which user and
+Devices with the Zentriq Agent 1.1.1.121 or later (Windows and Linux) record **which programs run, for which user and
 for how long**, so licences of software nobody uses can be reclaimed.
 
 * **What is recorded**: once a minute, the programs running in signed-in users' sessions — the program file and the
@@ -127,5 +127,5 @@ Unit tests (licence position per metric, wildcards and the licence catalogue, ac
 (position, alerts opened, resolved by a renewal and re-opened when a licence ends, activation, in-app notification,
 Microsoft 365 sync with licences, renewal dates, users and products, more assigned than bought) and the Windows
 acceptance test T86 (activation reported by the agent, shortfall and expiry alerts, renewal). First released in
-build 1.1.1.112; software metering in build 1.1.1.120 (unit tests of the agent's recorder, PostgreSQL test of used,
+build 1.1.1.112; software metering in build 1.1.1.121 (unit tests of the agent's recorder, PostgreSQL test of used,
 unused and recent installations, acceptance test T95). Results: [test report](test-report.md).
