@@ -1,6 +1,6 @@
 # Device Experience
 
-From build 1.1.1.120 every device with the Zentriq Agent (Windows and Linux) gets an **experience score** from 0 to
+From build 1.1.1.121 every device with the Zentriq Agent (Windows and Linux) gets an **experience score** from 0 to
 100: how well it works for the person who uses it. Console: *Discovery & Inventory › Device Experience*, and the
 *Experience* tab of each device. Permission: *assets.view*.
 
