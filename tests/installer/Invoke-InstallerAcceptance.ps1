@@ -119,7 +119,7 @@ Remove-Item $answer -Force   # contains the administrator password
 
 if (-not $installed) {
     foreach ($t in 'T02 PostgreSQL provisioning', 'T03 Database migration', 'T04 Administrator sign-in', 'T05 API and worker services', 'T06 Trial initialization',
-                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection', 'T68 Live agent connection', 'T69 Locations and IT accessories', 'T70 Manual hardware details', 'T71 Standard and Advanced installation', 'T72 Asset lifecycle', 'T73 Cloud and infrastructure', 'T74 Own asset tags, people and bulk upload', 'T75 Backup and restore', 'T76 Roles and groups', 'T77 Log retention and export', 'T78 Agent stop and disable protection', 'T79 Automatic agent update', 'T80 Agent check-in and diagnosis commands', 'T81 Licensing plans and online activation', 'T82 Software Deployment policy', 'T83 Application control on Windows', 'T84 Push deployment', 'T85 Remote support agent tamper protection', 'T86 Software licenses', 'T87 Web apps and accounts', 'T88 Network connected devices', 'T89 Warranty lookup', 'T90 Session recording', 'T91 Directory sign-in', 'T92 Patch management', 'T93 Scripts and remediation', 'T94 Tray icon and self-service', 'T95 Software metering and device experience') {
+                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection', 'T68 Live agent connection', 'T69 Locations and IT accessories', 'T70 Manual hardware details', 'T71 Standard and Advanced installation', 'T72 Asset lifecycle', 'T73 Cloud and infrastructure', 'T74 Own asset tags, people and bulk upload', 'T75 Backup and restore', 'T76 Roles and groups', 'T77 Log retention and export', 'T78 Agent stop and disable protection', 'T79 Automatic agent update', 'T80 Agent check-in and diagnosis commands', 'T81 Licensing plans and online activation', 'T82 Software Deployment policy', 'T83 Application control on Windows', 'T84 Push deployment', 'T85 Remote support agent tamper protection', 'T86 Software licenses', 'T87 Web apps and accounts', 'T88 Network connected devices', 'T89 Warranty lookup', 'T90 Session recording', 'T91 Directory sign-in', 'T92 Patch management', 'T93 Scripts and remediation', 'T94 Tray icon and self-service', 'T95 Software metering and device experience', 'T96 Endpoint privilege management', 'T97 BitLocker management', 'T98 USB device control') {
         Record $t.Substring(0, 3) $t.Substring(4) 'BLOCKED' 'installation failed'
     }
 } else {
@@ -1347,6 +1347,80 @@ if (-not $installed) {
         try { "select vdisk file=`"$vhd`"`r`ndetach vdisk`r`n" | Set-Content (Join-Path $OutDir 'zq-probe2.dp') -Encoding ascii; & diskpart.exe /s (Join-Path $OutDir 'zq-probe2.dp') 2>&1 | Out-Null } catch { }
         Remove-Item $vhd, (Join-Path $OutDir 'zq-probe*.dp') -ErrorAction SilentlyContinue
         $probe | Set-Content (Join-Path $OutDir 'security-pack-probe.txt')
+
+        # ---- Security Pack (build 121) ----
+        function Pipe-Call($Req) {
+            $p = New-Object System.IO.Pipes.NamedPipeClientStream('.', 'ZentriqAgentTray', [System.IO.Pipes.PipeDirection]::InOut)
+            $p.Connect(5000)
+            $w = New-Object System.IO.StreamWriter($p); $w.AutoFlush = $true
+            $r = New-Object System.IO.StreamReader($p)
+            $w.WriteLine(($Req | ConvertTo-Json -Compress))
+            $line = $r.ReadLine(); $p.Dispose()
+            $o = $line | ConvertFrom-Json
+            if (-not $o.ok) { throw "agent: $($o.error)" }
+            return $o.data
+        }
+        function Admin-Members { @(Get-LocalGroupMember -SID 'S-1-5-32-544' -ErrorAction SilentlyContinue | ForEach-Object { $_.Name }) }
+        function Wake-Agent($s) { Api POST '/assets/collect' @{ assetIds = @($script:agentAsset) } -Session $s | Out-Null }
+
+        Check 'T96' 'Endpoint privilege management: extra administrators removed in enforce mode (allowed ones kept), administrator rights for a while given and ended, a request approved, an approved application started as administrator, a not approved one refused' {
+            $s = Login
+            $pw = 'Zq-' + [guid]::NewGuid().ToString('N').Substring(0, 16) + '!a1'
+            $sec = ConvertTo-SecureString $pw -AsPlainText -Force
+            foreach ($u in 'zqextra', 'zqstd') { Remove-LocalUser -Name $u -ErrorAction SilentlyContinue; New-LocalUser -Name $u -Password $sec -AccountNeverExpires | Out-Null }
+            Add-LocalGroupMember -SID 'S-1-5-32-544' -Member 'zqextra'
+            # Everyone who is an administrator now (the runner's own accounts) stays; zqextra must go.
+            $keep = @(Admin-Members | Where-Object { $_ -notmatch '\\zqextra$' })
+            try {
+                Api PUT '/security-pack/privilege/policy' @{ mode = 'enforce'; allowedAdmins = $keep; elevation = $true; requests = $true; maxAdminMinutes = 240 } -Session $s | Out-Null
+                Wake-Agent $s
+                Dep-Wait { -not (Admin-Members | Where-Object { $_ -match '\\zqextra$' }) } 180 'zqextra removed from Administrators' | Out-Null
+                foreach ($k in $keep) { Assert ((Admin-Members) -contains $k) "$k was removed although allowed" }
+                $ev = Dep-Wait { @(Api GET "/security-pack/privilege/events?kind=member_removed&assetId=$($script:agentAsset)" -Session $s | ForEach-Object { $_ }) | Where-Object { $_.user -match 'zqextra' } } 120 'the removal in the console'
+                $adm = @(Api GET '/security-pack/privilege/admins' -Session $s | ForEach-Object { $_ }) | Where-Object assetId -eq $script:agentAsset
+                Assert ($adm.Count -ge 1 -and -not ($adm | Where-Object { $_.status -eq 'to_remove' })) "administrators in the console: $($adm | ConvertTo-Json -Compress)"
+
+                # Administrator rights for a while, given in the console and ended early.
+                $g = Api POST '/security-pack/privilege/grants' @{ assetId = $script:agentAsset; user = "$env:COMPUTERNAME\zqstd"; minutes = 15; reason = 'CI' } -Session $s
+                Wake-Agent $s
+                Dep-Wait { (Admin-Members) -match '\\zqstd$' } 180 'zqstd made administrator' | Out-Null
+                Api DELETE "/security-pack/privilege/grants/$($g.id)" -Session $s | Out-Null
+                Wake-Agent $s
+                Dep-Wait { -not ((Admin-Members) -match '\\zqstd$') } 180 'the rights of zqstd ended' | Out-Null
+
+                # A request from the signed-in user (tray), approved in the console.
+                $req = Pipe-Call @{ op = 'requestAdmin'; minutes = '30'; reason = 'CI: install a printer driver' }
+                $pending = @(Api GET '/security-pack/privilege/requests?status=pending' -Session $s | ForEach-Object { $_ }) | Where-Object id -eq $req.id
+                Assert ($pending -and $pending.kind -eq 'admin' -and $pending.minutes -eq 30 -and $pending.user) "request in the console: $($pending | ConvertTo-Json -Compress)"
+                $dec = Api POST "/security-pack/privilege/requests/$($req.id)" @{ approve = $true; minutes = 15 } -Session $s
+                Assert ($dec.decision -match '15 minutes') "decision: $($dec | ConvertTo-Json -Compress)"
+                $grant = @(Api GET '/security-pack/privilege/grants' -Session $s | ForEach-Object { $_ }) | Where-Object { $_.active -and $_.user -eq $pending.user } | Select-Object -First 1
+                Assert $grant 'no active grant after approval'
+                Api DELETE "/security-pack/privilege/grants/$($grant.id)" -Session $s | Out-Null
+
+                # Run as administrator: an approved program (by hash) starts elevated on the desktop; another is refused.
+                $ok = Join-Path $OutDir 'zq-elev.exe'; Copy-Item (Join-Path $env:windir 'System32\cmd.exe') $ok -Force
+                $no = Join-Path $OutDir 'zq-noelev.exe'; Copy-Item (Join-Path $env:windir 'System32\whoami.exe') $no -Force
+                $out = Join-Path $OutDir 'zq-elev.txt'; Remove-Item $out -ErrorAction SilentlyContinue
+                $hash = (Get-FileHash $ok -Algorithm SHA256).Hash.ToLowerInvariant()
+                $rule = Api POST '/security-pack/privilege/rules' @{ name = 'CI elevated shell'; kind = 'hash'; value = $hash } -Session $s
+                Wake-Agent $s
+                $res = Dep-Wait { $r = Pipe-Call @{ op = 'elevate'; path = $ok; arguments = "/c whoami /groups /fo csv > `"$out`"" }; if ($r.state -ne 'not_approved') { $r } } 120 'the approved program'
+                Assert ($res.state -eq 'started') "elevate: $($res | ConvertTo-Json -Compress)"
+                Dep-Wait { (Test-Path $out) -and (Get-Item $out).Length -gt 0 } 60 'the elevated program''s output' | Out-Null
+                $groups = Get-Content $out -Raw
+                Assert ($groups -match 'High Mandatory Level' -and $groups -match 'S-1-5-32-544') "elevated groups: $($groups.Substring(0, [Math]::Min(600, $groups.Length)))"
+                $ref = Pipe-Call @{ op = 'elevate'; path = $no }
+                Assert ($ref.state -eq 'not_approved' -and $ref.sha256) "not approved: $($ref | ConvertTo-Json -Compress)"
+                Dep-Wait { @(Api GET "/security-pack/privilege/events?assetId=$($script:agentAsset)" -Session $s | ForEach-Object { $_ }) | Where-Object { $_.kind -eq 'elevated' -and $_.path -like '*zq-elev.exe' } } 120 'the elevation in the console' | Out-Null
+                Assert (Test-Path 'Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Classes\exefile\shell\ZentriqElevate\command') 'Explorer command missing'
+                Api DELETE "/security-pack/privilege/rules/$($rule.id)" -Session $s | Out-Null
+                "zqextra removed ($($keep.Count) allowed administrator(s) kept); rights for a while given and ended; request approved for 15 min; zq-elev.exe started at High integrity with Administrators, zq-noelev.exe refused; Explorer command present"
+            } finally {
+                try { Api PUT '/security-pack/privilege/policy' @{ mode = 'off'; allowedAdmins = @(); elevation = $false; requests = $false } -Session $s | Out-Null; Wake-Agent $s } catch { }
+                foreach ($u in 'zqextra', 'zqstd') { Remove-LocalUser -Name $u -ErrorAction SilentlyContinue }
+            }
+        } | Out-Null
     }
 
 

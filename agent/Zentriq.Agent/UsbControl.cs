@@ -42,6 +42,12 @@ internal static class UsbControl
         catch (Exception) { return Array.Empty<string>(); }
     }
 
+    /// <summary>Drives this agent made read-only or blocked (they are given back when the policy no longer restricts them).</summary>
+    public static bool HasRestrictions
+    {
+        get { lock (Gate) { LoadState(); return Applied.Any(kv => kv.Value != "full"); } }
+    }
+
     private static void LoadState()
     {
         if (Applied.Count > 0 || !File.Exists(StateFile)) return;

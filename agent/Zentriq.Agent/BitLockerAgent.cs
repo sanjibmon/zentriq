@@ -68,7 +68,7 @@ internal static class BitLockerAgent
                 try
                 {
                     if (policy.Mode == "enforce" && (type == 0 || policy.FixedDrives)) Enforce(v, policy, type == 0, tpm, osProtected, r, log);
-                    if (policy.Mode == "enforce") Rotate(v, policy, r, log);
+                    if (policy.Mode != "off") Rotate(v, policy, r, log);
                     Read(v, r, keys);
                     if (type == 0) osProtected = r.Protection == "on" || r.Status == "encrypting";
                 }

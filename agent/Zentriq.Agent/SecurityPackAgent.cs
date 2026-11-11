@@ -132,10 +132,10 @@ internal static class SecurityPackAgent
             try
             {
                 var p = Policy;
-                if (p.Licensed && p.Usb.Mode != "off")
+                if ((p.Licensed && p.Usb.Mode != "off") || UsbControl.HasRestrictions)
                 {
                     var before = PendingCount();
-                    var devices = UsbControl.Check(p.Usb, Event, text => Notify(null, text));
+                    var devices = UsbControl.Check(p.Licensed ? p.Usb : new UsbPolicy(), Event, text => Notify(null, text));
                     lock (Gate) _usbDevices = devices;
                     if (PendingCount() > before) AgentService.RequestServerWake();
                 }
