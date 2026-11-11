@@ -1098,7 +1098,7 @@ if (-not $installed) {
                 try {
                     try { Dep-Wait { $l = Last-Scan; if ($l.status -in 'succeeded', 'failed') { $l } } 600 'the running scan to end after Windows Update stopped' | Out-Null }
                     catch {
-                        $acts = @((Api GET "/patches/devices/$($script:agentAsset)" -Session $s).actions | Where-Object operation -eq 'scan' | Select-Object -First 4 | ForEach-Object { "$($_.status) requested $($_.requestedAt) sent $($_.sentAt): $($_.detail)" }) -join ' | '
+                        $acts = @((Api GET "/patches/devices/$($script:agentAsset)" -Session $s).actions | Where-Object operation -eq 'scan' | Select-Object -First 4 | ForEach-Object { ($_.PSObject.Properties | ForEach-Object { "$($_.Name)=$($_.Value)" }) -join ', ' }) -join ' | '
                         $wua = (Get-Content "$env:ProgramData\Zentriq\Agent\logs\agent.log" -ErrorAction SilentlyContinue | Select-String 'Patch management|scan scan|interrupted' | Select-Object -Last 6 | ForEach-Object { $_.Line }) -join ' | '
                         throw "$($_.Exception.Message); scans: $acts; agent: $wua"
                     }

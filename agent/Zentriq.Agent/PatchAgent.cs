@@ -206,7 +206,7 @@ internal static class PatchAgent
             watch.Dispose();
             if (unavailable && !ct.IsCancellationRequested)
             {
-                Log.Info("Patch management: the Windows Update service was stopped and disabled during the run; the Windows Update Agent was ended.");
+                Log.Info("Patch management: the Windows Update service was disabled during the run; the Windows Update Agent was ended.");
                 return (null, Explain("0x80070422", null));
             }
             Log.Info($"Patch management: the Windows Update Agent {(r.TimedOut ? "did not answer" : "answered")} after {r.Milliseconds / 1000} s (exit code {r.ExitCode}).");
@@ -235,7 +235,9 @@ internal static class PatchAgent
         try
         {
             using var sc = new System.ServiceProcess.ServiceController("wuauserv");
-            return sc.Status == System.ServiceProcess.ServiceControllerStatus.Stopped && sc.StartType == System.ServiceProcess.ServiceStartMode.Disabled;
+            // Disabled is enough: a scan cannot finish then, and a stop of the service often stays pending while the Windows
+            // Update Agent waits (the scan would hang until the time limit).
+            return sc.StartType == System.ServiceProcess.ServiceStartMode.Disabled;
         }
         catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception) { return false; }
     }
