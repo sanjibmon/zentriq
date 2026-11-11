@@ -39,7 +39,7 @@ export function BitLockerPage() {
           { label: 'System Drives Protected', value: `${k.protected} / ${k.reporting}`, sub: `${k.encrypting} encrypting now` },
           { label: 'Not Protected', value: k.unprotected.toLocaleString(), sub: `${k.noTpm} without a usable TPM · ${k.errors} with errors` },
           { label: 'Recovery Keys', value: k.keys.toLocaleString(), sub: k.withoutKey > 0 ? `${k.withoutKey} protected drive(s) without a key here` : 'Every protected drive has one' },
-          { label: 'Devices', value: k.devices.toLocaleString(), sub: 'With the Zentriq Agent 1.1.1.121 or later' },
+          { label: 'Devices', value: k.devices.toLocaleString(), sub: 'With the Zentriq Agent 1.1.1.122 or later' },
         ]} />}
         {m.view}
         <div className="tabs" role="tablist">

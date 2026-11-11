@@ -7,7 +7,7 @@ using System.Text.RegularExpressions;
 namespace Zentriq.Inventory;
 
 /// <summary>
-/// The Security Pack policy for one device (build 121), sent by the server and kept by the Windows agent so it applies
+/// The Security Pack policy for one device (build 122), sent by the server and kept by the Windows agent so it applies
 /// offline too: endpoint privilege management, BitLocker, USB device control.
 /// </summary>
 public sealed class SecurityPackPolicy

@@ -58,7 +58,7 @@ public static class Permissions
     public const string LicensesManage = "licenses.manage";
     public const string WebAppsView = "webapps.view";
     public const string WebAppsManage = "webapps.manage";
-    // Security Pack (build 121)
+    // Security Pack (build 122)
     public const string PrivilegeView = "privilege.view";
     public const string PrivilegeManage = "privilege.manage";
     public const string BitLockerView = "bitlocker.view";
@@ -107,7 +107,7 @@ public static class Modules
     public const string Licenses = "licenses";
     /// <summary>Web Apps &amp; Accounts (SaaS applications, accounts and usage).</summary>
     public const string WebApps = "webapps";
-    /// <summary>Security Pack (build 121): endpoint privilege management, BitLocker management, USB device control. A
+    /// <summary>Security Pack (build 122): endpoint privilege management, BitLocker management, USB device control. A
     /// separately licensed add-on: never part of an edition, only of a license that lists it (and of the trial).</summary>
     public const string SecurityPack = "securitypack";
 

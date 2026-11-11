@@ -10,7 +10,7 @@ using Zentriq.Inventory;
 namespace Zentriq.Api.Endpoints;
 
 /// <summary>
-/// Security Pack (build 121), a separately licensed add-on for Windows devices with the Zentriq Agent: endpoint privilege
+/// Security Pack (build 122), a separately licensed add-on for Windows devices with the Zentriq Agent: endpoint privilege
 /// management, BitLocker management and USB device control. Separate from Security Configuration, which stays read-only.
 /// </summary>
 public static class SecurityPackEndpoints

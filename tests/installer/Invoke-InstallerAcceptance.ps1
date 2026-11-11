@@ -1348,7 +1348,7 @@ if (-not $installed) {
         Remove-Item $vhd, (Join-Path $OutDir 'zq-probe*.dp') -ErrorAction SilentlyContinue
         $probe | Set-Content (Join-Path $OutDir 'security-pack-probe.txt')
 
-        # ---- Security Pack (build 121) ----
+        # ---- Security Pack (build 122) ----
         function Pipe-Call($Req) {
             $p = New-Object System.IO.Pipes.NamedPipeClientStream('.', 'ZentriqAgentTray', [System.IO.Pipes.PipeDirection]::InOut)
             $p.Connect(5000)

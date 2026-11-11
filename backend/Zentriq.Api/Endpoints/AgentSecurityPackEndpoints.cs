@@ -10,7 +10,7 @@ using Zentriq.Inventory;
 namespace Zentriq.Api.Endpoints;
 
 /// <summary>
-/// Security Pack on Windows devices (build 121), for agents with the capability "security-pack":
+/// Security Pack on Windows devices (build 122), for agents with the capability "security-pack":
 ///   GET  /api/agent/v1/security-pack/policy     the device's policy (everything off without the Security Pack licence)
 ///   POST /api/agent/v1/security-pack/report     administrators, BitLocker status and recovery passwords, USB devices, events
 ///   POST /api/agent/v1/security-pack/requests   a user asks to run an application as administrator, or for administrator rights
