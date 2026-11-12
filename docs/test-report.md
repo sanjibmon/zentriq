@@ -1,6 +1,39 @@
 # Test report
 
-Latest: GitHub Actions run 43199242180, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022
+Latest: GitHub Actions run 43235973527, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022
+Datacenter 10.0.20348** VM **set to India Standard Time (UTC+05:30)** plus an Ubuntu job for the Linux agent. Release:
+`v1.1.1-build.135` (pre-release, **unsigned**), package version **1.1.1.135**, commit `0dd9b6e`. Results: unit +
+PostgreSQL integration tests **487 PASS** (489, 2 skipped); installer acceptance **91 passed, 0 failed** (10 not run:
+need hardware, a domain, a reboot or old Windows); upgrade suites **14/14** (schema 42); Linux agent on 11
+distributions **11/11**. No "Offset=05:30" error in any server log.
+
+New in build 135: on servers outside UTC, times reach PostgreSQL as UTC — Active Directory sync and the AD computer
+scan (lastLogonTimestamp, pwdLastSet: "Cannot write DateTimeOffset with Offset=05:30:00"), report and backup schedules,
+scheduled scripts, Hyper-V dates, and every time in API and agent JSON. The AD panel says how a sync went when it
+finishes. Emptying a search box shows all rows again without pressing Search (24 lists). MeshCentral 1.2.5 runs with
+patched `node-forge` 1.4.3, `compression` 1.8.2 and a bundled `image-size` 2.1.0: no high-severity findings left
+(9 moderate in `glob`/`minimatch`). The release acceptance suite now runs in India Standard Time.
+
+Run 43219999387 (build 134) was not released: T48 failed (90 passed, 1 failed) — saving a report schedule returned
+500 in India Standard Time (next run computed with the local offset). Fixed with the backup schedule's same pattern.
+
+| File | SHA256 |
+|---|---|
+| Zentriq-Setup-x64.exe | `7f6edc7a57920ab77a11e9095bcc4a236d63efcd3a2464ba2f399caafbf6b473` |
+| Zentriq.msi | `fad05fc08d19798ae868bff983200134686e45f8460bcd520afaafad2b4dc9cc` |
+| ZentriqAgent-x64.msi | `452a1d980b9d1396a54480dcb2b6b5ac23f42bdba1c8b13b0505fba86fb468f0` |
+| zentriq-agent-linux-x64.deb | `745097f6c118fca86009a38075fb17fd786c5d99525352a3f93e4bb8bc7002c6` |
+| zentriq-agent-linux-x64.rpm | `cb721aee4c9cb9d19f5e4ad2acadc63114f047826155345cf6dbbe31cbcd6390` |
+| zentriq-agent-linux-x64.tar.gz | `7aeb49b19ff2ea42f835e78eae2c6b38b9da3d73e16984bb3e7cd7ad650771ec` |
+| zentriq-agent-linux-arm64.deb | `9b5d8d47dbf68ad39d4d71202c76811955af5c57d4c1a0709c8e9ceae5fa0313` |
+| zentriq-agent-linux-arm64.rpm | `e7aa79546b5e39e7b2dfc5841f0e07e1fecd6e4ab1385b4f0d84e8b8be1d0b29` |
+| zentriq-agent-linux-arm64.tar.gz | `b2df355e8094b8156e438a313ab265dbb1849de5e3aa62565dac5190e0b0c84f` |
+| Zentriq-1.1.1-msi-offline-kit.zip | `0d2f2f054a24c29b900c14965f0b35d4198764498cf3f293390bf2a42bad2ae3` |
+| Zentriq-1.1.1-docs.zip | `6e1a9e39714765edc1f99487f4e76e755c1487d252f399bf39f54beec2232972` |
+
+## Build 133
+
+GitHub Actions run 43199242180, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022
 Datacenter 10.0.20348** VM plus an Ubuntu job for the Linux agent. Release: `v1.1.1-build.133` (pre-release,
 **unsigned**), package version **1.1.1.133**, commit `7fa7a73`. Results: unit + PostgreSQL integration tests **482 PASS**
 (484, 2 skipped); installer acceptance **91 passed, 0 failed** (10 not run: need hardware, a domain, a reboot or old
