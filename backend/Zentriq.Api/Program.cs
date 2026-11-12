@@ -1,3 +1,4 @@
+using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -61,6 +62,7 @@ builder.WebHost.ConfigureKestrel((ctx, k) =>
     k.ListenAnyIP(options.Https.Port, l => l.UseHttps(new Microsoft.AspNetCore.Server.Kestrel.Https.HttpsConnectionAdapterOptions
     {
         ServerCertificateSelector = (_, _) => holder.Current,
+        SslProtocols = ModernTls,
     }));
     if (options.Https.AgentPort > 0)
     {
@@ -69,6 +71,7 @@ builder.WebHost.ConfigureKestrel((ctx, k) =>
         k.ListenAnyIP(options.Https.AgentPort, l => l.UseHttps(new Microsoft.AspNetCore.Server.Kestrel.Https.HttpsConnectionAdapterOptions
         {
             ServerCertificateSelector = (_, _) => holder.Current,
+            SslProtocols = ModernTls,
             ClientCertificateMode = Microsoft.AspNetCore.Server.Kestrel.Https.ClientCertificateMode.AllowCertificate,
             ClientCertificateValidation = (_, _, _) => true,
             CheckCertificateRevocation = false,
@@ -221,4 +224,11 @@ app.MapFallbackToFile("index.html", consoleFiles);
 
 app.Run();
 
-public partial class Program;
+public partial class Program
+{
+    /// <summary>
+    /// Console and agent port: TLS 1.2 and 1.3 only, whatever Windows still allows (Windows Server 2016–2022 keep TLS 1.0
+    /// and 1.1 on unless an administrator turns them off). Agents and browsers have used TLS 1.2 for years.
+    /// </summary>
+    internal const SslProtocols ModernTls = SslProtocols.Tls12 | SslProtocols.Tls13;
+}

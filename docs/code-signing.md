@@ -43,6 +43,66 @@ are valid for at most 460 days, so plan a yearly renewal. Order the certificate 
    custom-action DLL, `Zentriq.msi`, the Burn engine and `Zentriq-Setup-x64.exe` with an RFC 3161 timestamp, then
    verifies every signature; `release-manifest.json` records `"signed": true`.
 
+## Turn on signing in the GitHub build (DigiCert KeyLocker)
+
+DigiCert delivers its code-signing certificates either on a USB token or in **DigiCert KeyLocker** (DigiCert's cloud
+HSM). KeyLocker works on GitHub's build servers; the key never leaves DigiCert's HSM.
+
+1. In **DigiCert ONE › KeyLocker** check that the code-signing certificate and its keypair are listed, and note the
+   certificate's **SHA-1 fingerprint**.
+2. In **DigiCert ONE › Admin profile** create an **API key** (shown once) and a **client authentication certificate**
+   (download the `.p12` and keep its password). Restrict the API key to signing if your account offers it.
+3. Base64-encode the `.p12` (PowerShell: `[Convert]::ToBase64String([IO.File]::ReadAllBytes('client.p12'))`).
+4. In GitHub, *Settings › Secrets and variables › Actions*, add these **repository secrets**:
+
+| Secret | Value |
+|---|---|
+| `SM_HOST` | the DigiCert ONE host shown in KeyLocker (e.g. `https://clientauth.one.digicert.com`) |
+| `SM_API_KEY` | the API key |
+| `SM_CLIENT_CERT_FILE_B64` | the base64 text of the client authentication `.p12` |
+| `SM_CLIENT_CERT_PASSWORD` | its password |
+| `SM_CODE_SIGNING_CERT_SHA1_HASH` | the code-signing certificate's SHA-1 fingerprint |
+
+5. Push to `main`. The build installs DigiCert KeyLocker Tools, registers the KeyLocker KSP, syncs the certificate into
+   the build user's certificate store (`smctl windows certsync`) and signs everything with `signtool /sha1 … /tr
+   http://timestamp.digicert.com`; `release-manifest.json` records `"signingMode": "keylocker"`. The client
+   authentication file is written to a temporary folder only for the build and removed at the end.
+
+When both Azure Key Vault and KeyLocker secrets are set, Azure Key Vault is used.
+
+## Signature details
+
+Set two **repository variables** (*Settings › Secrets and variables › Actions › Variables*) so the signature details
+show your company rather than a placeholder:
+
+| Variable | Value |
+|---|---|
+| `ZENTRIQ_SIGN_DESCRIPTION` | product name, e.g. `Zentriq` |
+| `ZENTRIQ_SIGN_URL` | your company web site (https) |
+
+Without `ZENTRIQ_SIGN_URL` a signed build prints a warning.
+
+## Protecting the signing secrets
+
+* Signing secrets are only as safe as the branch that can use them. Turn on **branch protection** for `main`
+  (pull requests, required checks, no force pushes) and restrict who can push.
+* Better still, move the signing secrets into a GitHub **Environment** named `release` with *required reviewers*, so a
+  signed release needs a person's approval.
+* Rotate the API key and client authentication certificate when someone with access leaves, and at each yearly
+  certificate renewal.
+
+## Agent updates check the publisher
+
+Once agents are signed, an agent accepts an update package only when it carries a valid signature of **the same
+publisher** as the running agent (in addition to the SHA-256 the server sends). Keep the same company name on the
+renewed certificate each year; a certificate issued to a different name stops automatic agent updates until the agent
+is reinstalled.
+
+## Linux agent packages
+
+The `.deb`, `.rpm` and `.tar.gz` packages are not signed with a GPG key; the one-line installer checks their SHA-256
+over the pinned server connection. Publishing them in a public repository would need a GPG signing key of your own.
+
 ## SmartScreen after signing
 
 Signing immediately fixes "Unknown publisher" in the UAC prompt. SmartScreen reputation is earned per certificate:

@@ -43,6 +43,13 @@ internal static class AgentUpdater
             return (false, null, "The downloaded package does not match the checksum from the server; update refused.");
         }
 
+        var publisher = PublisherMismatch(file);
+        if (publisher is not null)
+        {
+            try { File.Delete(file); } catch (IOException) { }
+            return (false, null, publisher);
+        }
+
         var log = Path.Combine(Log.Directory, "update-" + Safe(targetVersion) + ".log");
         var started = $"Installing version {targetVersion}; the agent restarts and reports the new version at its next check-in.";
         // Reported before msiexec runs: Windows Installer stops this service soon after it starts.
@@ -68,6 +75,38 @@ internal static class AgentUpdater
         }
         Log.Info($"Updating the agent {Program.Version} -> {targetVersion} (Windows Installer log: {log}).");
         return (true, "started", started);
+    }
+
+    /// <summary>
+    /// When this agent is Authenticode-signed, an update package must carry a valid signature of the same publisher
+    /// (certificate subject name), in addition to the checksum: a console that was taken over cannot push a package of
+    /// someone else. Unsigned agents (builds without a code-signing certificate) rely on the checksum alone.
+    /// </summary>
+    /// <returns>null when the package may be installed, otherwise why not.</returns>
+    internal static string? PublisherMismatch(string package)
+    {
+        var self = System.Reflection.Assembly.GetEntryAssembly()?.Location;
+        var mine = string.IsNullOrEmpty(self) ? null : Publisher(self!);
+        if (mine is null) return null;
+        var theirs = Publisher(package);
+        if (theirs is null) return $"The update package is not signed by {mine}, the publisher of this agent; update refused.";
+        return string.Equals(mine, theirs, StringComparison.OrdinalIgnoreCase)
+            ? null
+            : $"The update package is signed by {theirs}, not by {mine}, the publisher of this agent; update refused.";
+    }
+
+    /// <summary>Subject name of a valid Authenticode signature, or null when the file is unsigned or the signature is not valid.</summary>
+    private static string? Publisher(string path)
+    {
+        try
+        {
+            if (!Authenticode.Valid(path)) return null;
+            using var cert = new System.Security.Cryptography.X509Certificates.X509Certificate2(
+                System.Security.Cryptography.X509Certificates.X509Certificate.CreateFromSignedFile(path));
+            var name = cert.GetNameInfo(System.Security.Cryptography.X509Certificates.X509NameType.SimpleName, false);
+            return string.IsNullOrWhiteSpace(name) ? null : name;
+        }
+        catch (System.Security.Cryptography.CryptographicException) { return null; }
     }
 
     /// <summary>Removes downloaded packages of earlier updates (called once the agent runs the new version).</summary>

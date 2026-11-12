@@ -14,9 +14,9 @@
   application logs (central redaction). Wizard passwords go to `zentriqctl` over stdin, never on a command line or disk.
 * **Data folder ACLs** – inheritance from ProgramData removed; SYSTEM and Administrators full control; services get
   only the rights they need (e.g. API: read config/secrets, modify logs/exports/data-protection keys).
-* **HTTPS only** – Kestrel with TLS (OS-negotiated TLS 1.2/1.3), HSTS, security headers; customer certificate by
+* **HTTPS only** – Kestrel with **TLS 1.2 and 1.3 only** on the console and the agent port (TLS 1.0/1.1 refused even where Windows still allows them), HSTS, security headers; customer certificate by
   thumbprint or generated RSA-3072 self-signed certificate. The installer pins the exact certificate when verifying.
-* **Web security** – cookie sessions (HttpOnly, Secure, SameSite=Strict), anti-CSRF request header on state-changing
+* **Web security** – cookie sessions (HttpOnly, Secure, SameSite=Strict; end after 30 minutes without activity and 12 hours after signing in at the latest), anti-CSRF request header on state-changing
   calls, login rate limiting, server-side RBAC on every endpoint, parameterised SQL/EF Core only, request size limits,
   ProblemDetails errors without stack traces, full audit trail.
 * **Licensing** – ECDSA P-256 signatures, verification keys compiled in, private key never shipped; see licensing.md.
@@ -33,8 +33,9 @@
 * **Agents** – per-installation agent CA; each agent holds its own non-exportable key and a 1-year client certificate
   whose subject is set by the server. Enrollment codes are random 256-bit secrets stored only as SHA-256 hashes,
   time- and use-limited and revocable; enrollment is rate-limited. Revoked or superseded certificates are refused on
-  every request. Agents pin the server key (or require a publicly trusted certificate) and never listen on a port.
+  every request. Agents pin the server key (or require a publicly trusted certificate) and never listen on a port. Agent updates are checked against the SHA-256 from the server and, once agents are code-signed, must be signed by the same publisher as the running agent.
 
-Known gaps before production: code-signing certificate not yet configured; production license key not yet generated;
-external penetration test not yet performed; remote support, patch deployment and endpoint remediation modules are
-not implemented (the API reports them as unavailable).
+Before going live (see the go-live plan): configure the code-signing certificate (Azure Key Vault or DigiCert
+KeyLocker, docs/code-signing.md) and the signature details; generate the production license signing key offline and
+keep it off the build servers; protect the `main` branch and the signing secrets; have an external penetration test
+done; review the dependency audit in the quick build's logs (`npm-audit.log`).

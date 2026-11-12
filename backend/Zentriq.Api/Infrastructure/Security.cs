@@ -34,6 +34,10 @@ public static class SessionEvents
         OnRedirectToAccessDenied = ctx => { ctx.Response.StatusCode = StatusCodes.Status403Forbidden; return Task.CompletedTask; },
         OnValidatePrincipal = async ctx =>
         {
+            // Activity keeps a session alive (30 minutes sliding), but never longer than 12 hours after signing in.
+            var now = DateTimeOffset.UtcNow;
+            if (Zentriq.Application.Security.SessionLifetime.Expired(ctx.Properties.Items, now)) { Reject(); return; }
+            if (Zentriq.Application.Security.SessionLifetime.Stamp(ctx.Properties.Items, now)) ctx.ShouldRenew = true;
             var uid = ctx.Principal?.FindFirstValue(ZentriqClaims.UserId);
             var stamp = ctx.Principal?.FindFirstValue(ZentriqClaims.Stamp);
             if (!Guid.TryParse(uid, out var id) || !Guid.TryParse(stamp, out var st)) { Reject(); return; }

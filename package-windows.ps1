@@ -110,9 +110,35 @@ Write-Host "PostgreSQL installer: $pgFile; VC++ runtime build: $vcBuild"
 #   certstore : certificate in the Windows certificate store / USB token  -> -SignCertThumbprint (ZENTRIQ_SIGN_THUMBPRINT)
 #   akv       : certificate whose key lives in Azure Key Vault (cloud HSM) -> ZENTRIQ_AKV_URL, ZENTRIQ_AKV_CERT,
 #               AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET; signs with AzureSignTool (works in CI)
-$signMode = if ($env:ZENTRIQ_AKV_URL -and $env:ZENTRIQ_AKV_CERT) { 'akv' } elseif ($SignCertThumbprint) { 'certstore' } else { $null }
+#   keylocker : DigiCert KeyLocker (cloud HSM) -> SM_HOST, SM_API_KEY, SM_CLIENT_CERT_FILE_B64 (base64 of the client
+#               authentication .p12), SM_CLIENT_CERT_PASSWORD, SM_CODE_SIGNING_CERT_SHA1_HASH; installs DigiCert KeyLocker
+#               Tools, syncs the certificate into CurrentUser\My (key stays in the HSM, used through the KSP) and signs
+#               with signtool like 'certstore' (works in CI)
+$signMode = if ($env:ZENTRIQ_AKV_URL -and $env:ZENTRIQ_AKV_CERT) { 'akv' }
+            elseif ($env:SM_API_KEY -and $env:SM_CODE_SIGNING_CERT_SHA1_HASH) { 'keylocker' }
+            elseif ($SignCertThumbprint) { 'certstore' } else { $null }
 $signtool = $null
-if ($signMode -eq 'certstore') {
+if ($signMode -eq 'keylocker') {
+    foreach ($v in 'SM_HOST', 'SM_CLIENT_CERT_FILE_B64', 'SM_CLIENT_CERT_PASSWORD') { if (-not (Get-Item "env:$v" -ErrorAction SilentlyContinue)) { throw "$v must be set for DigiCert KeyLocker signing." } }
+    $smDir = Join-Path ([IO.Path]::GetTempPath()) ('zq-sm-' + [guid]::NewGuid().ToString('n'))
+    New-Item -ItemType Directory -Force -Path $smDir | Out-Null
+    $clientCert = Join-Path $smDir 'client.p12'
+    [IO.File]::WriteAllBytes($clientCert, [Convert]::FromBase64String($env:SM_CLIENT_CERT_FILE_B64))
+    $env:SM_CLIENT_CERT_FILE = $clientCert
+    $smMsi = Join-Path $smDir 'Keylockertools-windows-x64.msi'
+    Invoke-WebRequest 'https://one.digicert.com/signingmanager/api-ui/v1/releases/Keylockertools-windows-x64.msi/download' `
+        -Headers @{ 'x-api-key' = $env:SM_API_KEY } -OutFile $smMsi -UseBasicParsing
+    $p = Start-Process msiexec.exe -ArgumentList '/i', "`"$smMsi`"", '/qn', '/norestart' -Wait -PassThru
+    if ($p.ExitCode -ne 0) { throw "DigiCert KeyLocker Tools did not install (msiexec exit code $($p.ExitCode))." }
+    $smTools = Join-Path $env:ProgramFiles 'DigiCert\DigiCert Keylocker Tools'
+    $env:PATH = "$smTools;$env:PATH"
+    Invoke-Native { smctl windows ksp register }
+    Invoke-Native { smctl windows certsync }
+    $SignCertThumbprint = $env:SM_CODE_SIGNING_CERT_SHA1_HASH.Replace(' ', '').ToUpperInvariant()
+    if (-not (Test-Path "Cert:\CurrentUser\My\$SignCertThumbprint")) { throw "The KeyLocker certificate $SignCertThumbprint was not synced into CurrentUser\My (check SM_CODE_SIGNING_CERT_SHA1_HASH)." }
+    # The client authentication file is only needed by the KSP while signing; removed at the end of this script.
+}
+if ($signMode -in 'certstore', 'keylocker') {
     $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" -ErrorAction SilentlyContinue |
         Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
     if (-not $signtool) { throw 'signtool.exe not found (install the Windows SDK signing tools).' }
@@ -121,14 +147,16 @@ if ($signMode -eq 'certstore') {
     Invoke-Native { dotnet tool update --global AzureSignTool --version 7.0.1 }
 }
 if ($signMode) { Write-Host "Code signing: $signMode" } else { Write-Warning 'Code signing: not configured (artifacts will show "Unknown publisher").' }
-$signDescription = 'Zentriq'
-$signUrl = 'https://zentriq.example'
+# Shown in the signature details ("More information"): the product name and the publisher's real web site.
+$signDescription = if ($env:ZENTRIQ_SIGN_DESCRIPTION) { $env:ZENTRIQ_SIGN_DESCRIPTION } else { 'Zentriq' }
+$signUrl = if ($env:ZENTRIQ_SIGN_URL) { $env:ZENTRIQ_SIGN_URL } else { 'https://zentriq.example' }
+if ($signMode -and $signUrl -like '*.example*') { Write-Warning 'ZENTRIQ_SIGN_URL is not set: the signature details link to a placeholder address. Set it to the company web site.' }
 function Sign-Files([string[]] $Files) {
     if (-not $signMode -or $Files.Count -eq 0) { return }
     $batches = $Files | ForEach-Object -Begin { $i = 0 } -Process { [pscustomobject]@{ G = [math]::Floor($i++ / 40); F = $_ } } | Group-Object G
     foreach ($batch in $batches) {
         $f = @($batch.Group.F)
-        if ($signMode -eq 'certstore') {
+        if ($signMode -in 'certstore', 'keylocker') {
             Invoke-Native { & $signtool sign /sha1 $SignCertThumbprint /fd SHA256 /td SHA256 /tr $TimestampUrl /d $signDescription /du $signUrl @f }
         } else {
             Invoke-Native { AzureSignTool sign -kvu $env:ZENTRIQ_AKV_URL -kvc $env:ZENTRIQ_AKV_CERT -kvt $env:AZURE_TENANT_ID -kvi $env:AZURE_CLIENT_ID -kvs $env:AZURE_CLIENT_SECRET -tr $TimestampUrl -td sha256 -fd sha256 -d $signDescription -du $signUrl -v @f }
@@ -282,4 +310,5 @@ $manifest | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $release 'release-m
 
 Get-ChildItem $release | Format-Table Name, Length -AutoSize | Out-String | Write-Host
 if (-not $signMode) { Write-Warning 'Artifacts are NOT code-signed (Windows shows "Unknown publisher"). See docs/code-signing.md.' }
+if ($sm = Get-Variable smDir -ValueOnly -ErrorAction SilentlyContinue) { Remove-Item $sm -Recurse -Force -ErrorAction SilentlyContinue }
 Write-Host "Release written to $release" -ForegroundColor Green

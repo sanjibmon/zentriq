@@ -119,7 +119,7 @@ Remove-Item $answer -Force   # contains the administrator password
 
 if (-not $installed) {
     foreach ($t in 'T02 PostgreSQL provisioning', 'T03 Database migration', 'T04 Administrator sign-in', 'T05 API and worker services', 'T06 Trial initialization',
-                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection', 'T68 Live agent connection', 'T69 Locations and IT accessories', 'T70 Manual hardware details', 'T71 Standard and Advanced installation', 'T72 Asset lifecycle', 'T73 Cloud and infrastructure', 'T74 Own asset tags, people and bulk upload', 'T75 Backup and restore', 'T76 Roles and groups', 'T77 Log retention and export', 'T78 Agent stop and disable protection', 'T79 Automatic agent update', 'T80 Agent check-in and diagnosis commands', 'T81 Licensing plans and online activation', 'T82 Software Deployment policy', 'T83 Application control on Windows', 'T84 Push deployment', 'T85 Remote support agent tamper protection', 'T86 Software licenses', 'T87 Web apps and accounts', 'T88 Network connected devices', 'T89 Warranty lookup', 'T90 Session recording', 'T91 Directory sign-in', 'T92 Patch management', 'T93 Scripts and remediation', 'T94 Tray icon and self-service', 'T95 Software metering and device experience', 'T96 Endpoint privilege management', 'T97 BitLocker management', 'T98 USB device control', 'T99 Product keys and pick lists') {
+                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection', 'T68 Live agent connection', 'T69 Locations and IT accessories', 'T70 Manual hardware details', 'T71 Standard and Advanced installation', 'T72 Asset lifecycle', 'T73 Cloud and infrastructure', 'T74 Own asset tags, people and bulk upload', 'T75 Backup and restore', 'T76 Roles and groups', 'T77 Log retention and export', 'T78 Agent stop and disable protection', 'T79 Automatic agent update', 'T80 Agent check-in and diagnosis commands', 'T81 Licensing plans and online activation', 'T82 Software Deployment policy', 'T83 Application control on Windows', 'T84 Push deployment', 'T85 Remote support agent tamper protection', 'T86 Software licenses', 'T87 Web apps and accounts', 'T88 Network connected devices', 'T89 Warranty lookup', 'T90 Session recording', 'T91 Directory sign-in', 'T92 Patch management', 'T93 Scripts and remediation', 'T94 Tray icon and self-service', 'T95 Software metering and device experience', 'T96 Endpoint privilege management', 'T97 BitLocker management', 'T98 USB device control', 'T99 Product keys and pick lists', 'T100 Only TLS 1.2 and 1.3') {
         Record $t.Substring(0, 3) $t.Substring(4) 'BLOCKED' 'installation failed'
     }
 } else {
@@ -408,6 +408,31 @@ if (-not $installed) {
         $fw = Get-NetFirewallRule -DisplayName 'Zentriq Agent gateway*' -ErrorAction SilentlyContinue
         Assert $fw 'agent firewall rule missing'
         '/ 404, /api/v1 404, no cert 401, console port 404, firewall rule present'
+    } | Out-Null
+
+    # ---- T100: only TLS 1.2 and 1.3 on the console and agent ports (build 133) ----
+    Check 'T100' 'Only TLS 1.2 and 1.3: the console and the agent port refuse TLS 1.0 and 1.1 and accept TLS 1.2' {
+        $consolePort = if ($HttpsPort) { [int]$HttpsPort } else { 443 }
+        $out = foreach ($port in @($consolePort, 8444)) {
+            $try = {
+                param([int] $p, [Security.Authentication.SslProtocols] $proto)
+                $tcp = [Net.Sockets.TcpClient]::new('localhost', $p)
+                try {
+                    $ssl = [Net.Security.SslStream]::new($tcp.GetStream(), $false, { $true })
+                    try { $ssl.AuthenticateAsClient('localhost', $null, $proto, $false); return [string]$ssl.SslProtocol }
+                    catch { return $null }
+                    finally { $ssl.Dispose() }
+                } finally { $tcp.Dispose() }
+            }
+            foreach ($old in 'Tls', 'Tls11') {
+                $got = & $try $port ([Security.Authentication.SslProtocols]::$old)
+                Assert (-not $got) "port $port accepted $old ($got)"
+            }
+            $ok = & $try $port ([Security.Authentication.SslProtocols]::Tls12)
+            Assert ($ok -eq 'Tls12') "port ${port}: TLS 1.2 not accepted ($ok)"
+            "port $port refuses TLS 1.0/1.1, accepts TLS 1.2"
+        }
+        $out -join '; '
     } | Out-Null
 
     $scanUser = 'zqscan'

@@ -107,6 +107,19 @@ jobs:
           set -o pipefail
           npm install --no-audit --no-fund
           npm run build 2>&1 | tee build.log
+      - name: Dependency audit (web console and remote support engine)
+        if: always()
+        continue-on-error: true
+        run: |
+          {
+            echo "== web console (production dependencies) =="
+            (cd frontend && npm audit --omit=dev) || true
+            echo; echo "== remote support engine (MeshCentral) =="
+            if [ -d "$RUNNER_TEMP/mc" ]; then (cd "$RUNNER_TEMP/mc" && npm audit --omit=dev) || true; else echo "not installed in this run"; fi
+            echo; echo "== .NET packages (all projects, transitive) =="
+            dotnet list backend/Zentriq.slnx package --vulnerable --include-transitive || true
+          } > npm-audit.log 2>&1
+          tail -40 npm-audit.log
       - name: Console screenshots (shell and add / edit windows)
         if: always()
         continue-on-error: true
@@ -121,7 +134,7 @@ jobs:
         if: always()
         run: |
           d="$RUNNER_TEMP/logs"; mkdir -p "$d"
-          cp build.log test.log license-server-test.log mesh.log snmp.log linux-agent-build.log linux-agent-distros.log linux-agent-distros.md linux-app-control.log linux-app-control.md "$d/" 2>/dev/null || true
+          cp build.log test.log license-server-test.log mesh.log snmp.log linux-agent-build.log linux-agent-distros.log linux-agent-distros.md linux-app-control.log linux-app-control.md npm-audit.log "$d/" 2>/dev/null || true
           if [ -d "$RUNNER_TEMP/linux-agent/results" ]; then cp -r "$RUNNER_TEMP/linux-agent/results" "$d/linux-agent-results"; fi
           cp frontend/build.log "$d/console.log" 2>/dev/null || true
           if [ -d frontend/dist ]; then cp -r frontend/dist "$d/dist"; fi

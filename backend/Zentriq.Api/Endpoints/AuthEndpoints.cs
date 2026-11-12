@@ -257,7 +257,9 @@ public static class AuthEndpoints
     public static async Task SignInAsync(HttpContext http, ZentriqDbContext db, User user, CancellationToken ct, bool mfaPending = false)
     {
         var principal = await BuildPrincipalAsync(db, user, mfaPending, ct);
-        await http.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, new AuthenticationProperties { IsPersistent = false });
+        var props = new AuthenticationProperties { IsPersistent = false };
+        props.Items[SessionLifetime.Item] = SessionLifetime.Format(DateTimeOffset.UtcNow);
+        await http.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, props);
     }
 
     /// <summary>The session identity: the user, the roles given directly and through groups, and their permissions.</summary>
