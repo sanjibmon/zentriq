@@ -18,11 +18,14 @@ interface Settings { autoScan: boolean; scanHours: number; rebootDelayMinutes: n
 interface Summary {
   devices: number; scanned: number; upToDate: number; urgentDevices: number; rebootPending: number; scanFailed: number; notScanned: number; missingPatches: number;
   urgentPatches: number; failed: number; installing: number; installed30d: number; policies: number; olderAgents: number; settings: Settings;
+  /** Distinct missing updates: operating system, other Microsoft software, third-party applications (winget). */
+  missingByKind?: { os: number; microsoft: number; thirdparty: number };
 }
 interface Patch {
   id: string; platform: 'windows' | 'linux'; kb: string | null; title: string; classification: string; severity: string; product: string | null; package: string | null;
   version: string | null; releasedAt: string | null; size: number | null; reboot: boolean | null; cves: string[]; url: string | null; approval: 'none' | 'approved' | 'declined';
   approvedBy: string | null; approvedAt: string | null; firstSeenAt: string; missing: number; failed: number; pendingReboot: number; installed: number;
+  kind?: 'os' | 'microsoft' | 'thirdparty';
 }
 interface DeviceRow {
   id: string; device: string | null; os: string | null; platform: 'windows' | 'linux'; capable: boolean; lastSeenAt: string | null; scannedAt: string | null; scanOk: boolean | null;
@@ -49,7 +52,7 @@ interface Policy {
 
 export const CLASS_LABEL: Record<string, string> = {
   critical: 'Critical Updates', security: 'Security Updates', definition: 'Definition Updates', updates: 'Updates', 'update-rollup': 'Update Rollups',
-  'feature-pack': 'Feature Packs', 'service-pack': 'Service Packs', driver: 'Drivers', tools: 'Tools', upgrade: 'Upgrades', other: 'Other',
+  'feature-pack': 'Feature Packs', 'service-pack': 'Service Packs', driver: 'Drivers', tools: 'Tools', upgrade: 'Upgrades', application: 'Applications', other: 'Other',
 };
 const SEVERITY: Record<string, [Tone, string]> = { critical: ['crit', 'Critical'], important: ['warn', 'Important'], moderate: ['info', 'Moderate'], low: ['', 'Low'], unspecified: ['', '—'] };
 const STATE: Record<string, [Tone, string]> = { missing: ['warn', 'Missing'], failed: ['crit', 'Failed'], pending_reboot: ['info', 'Restart Pending'], installed: ['ok', 'Installed'] };
@@ -84,7 +87,7 @@ export function PatchPage() {
       {s && <Kpis items={[
         { label: 'Up To Date', value: `${s.upToDate} / ${s.scanned}`, sub: `${s.devices} device(s) with the agent`, to: '/modules/patch?tab=devices' },
         { label: 'Missing Critical / Security', value: s.urgentDevices.toLocaleString(), sub: `device(s) · ${s.urgentPatches} update(s)`, to: '/modules/patch?tab=updates' },
-        { label: 'Missing Updates', value: s.missingPatches.toLocaleString(), sub: 'Distinct updates', to: '/modules/patch?tab=updates' },
+        { label: 'Missing Updates', value: s.missingPatches.toLocaleString(), sub: s.missingByKind ? `${s.missingByKind.os} OS · ${s.missingByKind.microsoft + s.missingByKind.thirdparty} software` : 'Distinct updates', to: '/modules/patch?tab=updates' },
         { label: 'Restart Pending', value: s.rebootPending.toLocaleString(), sub: 'device(s)', to: '/modules/patch?tab=devices' },
         { label: 'Failed', value: s.failed.toLocaleString(), sub: `${s.scanFailed} scan(s) failed`, to: '/modules/patch?tab=devices' },
         { label: 'Installing', value: s.installing.toLocaleString(), sub: `${s.installed30d} installed (30 d)`, to: '/modules/patch?tab=deployments' },
@@ -95,7 +98,7 @@ export function PatchPage() {
       </div>
       <ErrorBox error={summary.error} />
       {tab === 'overview' && s && <OverviewTab s={s} {...ctx} />}
-      {tab === 'updates' && <UpdatesTab {...ctx} />}
+      {tab === 'updates' && <UpdatesTab {...ctx} counts={s?.missingByKind} />}
       {tab === 'devices' && <DevicesTab {...ctx} openId={query.get('device')} />}
       {tab === 'deployments' && <DeploymentsTab {...ctx} />}
       {tab === 'policies' && <PoliciesTab {...ctx} />}
@@ -142,7 +145,14 @@ function OverviewTab({ s, canDeploy, changed, failed, deploy }: Ctx & { s: Summa
 
 // ---- missing updates ------------------------------------------------------------------------------------------------
 
-function UpdatesTab({ tick, canApprove, canDeploy, changed, failed, deploy }: Ctx) {
+const KINDS: [string, string, string][] = [
+  ['os', 'Windows & OS Updates', 'Windows itself (cumulative, servicing stack, .NET Framework, Defender) and Linux packages'],
+  ['software', 'Software Updates', 'Other Microsoft software from Windows Update / WSUS (Office, SQL Server, Edge…) and third-party applications with a newer version in winget'],
+  ['', 'All', 'Every update'],
+];
+
+function UpdatesTab({ tick, canApprove, canDeploy, changed, failed, deploy, counts }: Ctx & { counts?: Summary['missingByKind'] }) {
+  const [kind, setKind] = useSticky('PatchPage.UpdatesTab.kind', 'os');
   const [q, setQ] = useSticky('PatchPage.UpdatesTab.q', '');
   const [search, setSearch] = useSticky('PatchPage.UpdatesTab.search', '');
   const [platform, setPlatform] = useSticky('PatchPage.UpdatesTab.platform', '');
@@ -152,7 +162,7 @@ function UpdatesTab({ tick, canApprove, canDeploy, changed, failed, deploy }: Ct
   const [state, setState] = useSticky('PatchPage.UpdatesTab.state', 'missing');
   const [sel, setSel] = useState<string[]>([]);
   const [open, setOpen] = useState<Patch | null>(null);
-  const list = useApi(() => api.get<Patch[]>('/patches', { q: search, platform, classification, severity, approval, state }), [tick, search, platform, classification, severity, approval, state]);
+  const list = useApi(() => api.get<Patch[]>('/patches', { q: search, platform, classification, severity, approval, state, kind }), [tick, search, platform, classification, severity, approval, state, kind]);
   const rows = list.data ?? [];
   const chosen = rows.filter((r) => sel.includes(r.id));
   async function approve(a: 'approved' | 'declined' | 'none') {
@@ -162,6 +172,13 @@ function UpdatesTab({ tick, canApprove, canDeploy, changed, failed, deploy }: Ct
   const mixed = new Set(chosen.map((c) => c.platform)).size > 1;
   return (
     <>
+      <div className="seg" role="tablist" aria-label="Kind of update" style={{ marginBottom: 10 }}>
+        {KINDS.map(([k, l, hint]) => {
+          const n = !counts ? null : k === 'os' ? counts.os : k === 'software' ? counts.microsoft + counts.thirdparty : counts.os + counts.microsoft + counts.thirdparty;
+          return <button key={k || 'all'} type="button" role="tab" aria-selected={kind === k} className={kind === k ? 'on' : ''} title={hint} onClick={() => { setKind(k); setSel([]); }}>{l}{n !== null && <span className="seg-n">{n}</span>}</button>;
+        })}
+      </div>
+      {kind === 'software' && <p className="muted" style={{ margin: '0 0 10px' }}>Microsoft software comes from each device's Windows Update or WSUS. Third-party applications are checked with winget (App Installer) on Windows 10/11 and Server 2025; devices without winget show why on the Devices tab.</p>}
       <form className="toolbar-row" onSubmit={(e) => { e.preventDefault(); setSearch(q); }}>
         <input className="in grow" placeholder="Search title, KB, package or CVE…" value={q} onChange={(e) => { setQ(e.target.value); if (!e.target.value.trim()) { setSearch(''); } }} aria-label="Search updates" />
         <select className="in" value={state} onChange={(e) => setState(e.target.value)} aria-label="State"><option value="missing">Missing on devices</option><option value="installed">Installed everywhere</option><option value="">All</option></select>
@@ -184,7 +201,7 @@ function UpdatesTab({ tick, canApprove, canDeploy, changed, failed, deploy }: Ct
           { key: 'sel', label: <input type="checkbox" aria-label="Select all" checked={rows.length > 0 && sel.length === rows.length} onChange={(e) => setSel(e.target.checked ? rows.map((r) => r.id) : [])} />, title: 'Select', fixed: true,
             render: (r) => <input type="checkbox" aria-label={`Select ${r.title}`} checked={sel.includes(r.id)} onChange={() => setSel(sel.includes(r.id) ? sel.filter((x) => x !== r.id) : [...sel, r.id])} /> },
           { key: 't', label: 'Update', className: 'wrap', render: (r) => <><b>{r.title}</b><div className="faint" style={{ fontSize: 11.5 }}>
-            {r.platform === 'linux' ? `Linux · ${r.product ?? 'repository'}` : [r.kb ? `KB${r.kb}` : null, r.product].filter(Boolean).join(' · ')}
+            {r.platform === 'linux' ? `Linux · ${r.product ?? 'repository'}` : r.kind === 'thirdparty' ? `Third-party · winget · ${r.package}` : [r.kb ? `KB${r.kb}` : null, r.product, r.kind === 'microsoft' ? 'Microsoft software' : null].filter(Boolean).join(' · ')}
             {r.cves.length > 0 && <> · {r.cves.slice(0, 3).join(', ')}{r.cves.length > 3 ? ` +${r.cves.length - 3}` : ''}</>}</div></> },
           { key: 'c', label: 'Classification', render: (r) => CLASS_LABEL[r.classification] ?? fmt.label(r.classification) },
           { key: 's', label: 'Severity', render: (r) => sev(r.severity) },

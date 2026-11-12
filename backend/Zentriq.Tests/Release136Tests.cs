@@ -30,7 +30,9 @@ public sealed class Release136Tests : IAsyncLifetime
         Assert.False(night.Allows(new DateTime(2026, 11, 21, 23, 0, 0)));   // Saturday 23:00
         Assert.NotNull(new SigninHours([], "08:00", "20:00").Validate());
         Assert.NotNull(new SigninHours([1], "8am", "20:00").Validate());
-        Assert.Equal(office, SigninHours.Parse(office.ToJson()));
+        var back = SigninHours.Parse(office.ToJson())!;
+        Assert.Equal(office.Days, back.Days);
+        Assert.Equal((office.From, office.To), (back.From, back.To));
     }
 
     [Fact]
@@ -58,6 +60,28 @@ public sealed class Release136Tests : IAsyncLifetime
         var b = new NpgsqlConnectionStringBuilder(ScopedDataSources.ConnectionStringFor("Host=db;Username=zentriq_app;Password=x;Maximum Pool Size=100", id));
         Assert.Contains($"zentriq.scope_user={id:D}", b.Options);
         Assert.Equal(10, b.MaxPoolSize);
+    }
+
+    [Fact]
+    public void Updates_are_sorted_into_operating_system_microsoft_software_and_third_party()
+    {
+        Assert.Equal("os", Zentriq.Infrastructure.Patches.PatchStore.KindOf("windows", "a1b2", "Windows 11"));
+        Assert.Equal("os", Zentriq.Infrastructure.Patches.PatchStore.KindOf("windows", "a1b2", "Microsoft Defender Antivirus"));
+        Assert.Equal("os", Zentriq.Infrastructure.Patches.PatchStore.KindOf("windows", "a1b2", ".NET Framework 4.8"));
+        Assert.Equal("microsoft", Zentriq.Infrastructure.Patches.PatchStore.KindOf("windows", "a1b2", "Microsoft 365 Apps/Office 2019/Office LTSC"));
+        Assert.Equal("microsoft", Zentriq.Infrastructure.Patches.PatchStore.KindOf("windows", "a1b2", "Microsoft SQL Server 2019"));
+        Assert.Equal("microsoft", Zentriq.Infrastructure.Patches.PatchStore.KindOf("windows", "a1b2", "Microsoft Edge"));
+        Assert.Equal("os", Zentriq.Infrastructure.Patches.PatchStore.KindOf("linux", "linux:openssl:3.0.2", "jammy-security"));
+        Assert.Equal("thirdparty", Zentriq.Infrastructure.Patches.PatchStore.KindOf("windows", "winget:Google.Chrome:131.0.6778.86", "Google Chrome"));
+
+        var u = Zentriq.Infrastructure.Patches.PatchStore.FromApp(new("Google.Chrome", "Google Chrome", "130.0.6723.117", "131.0.6778.86", "winget"));
+        Assert.NotNull(u);
+        Assert.Equal("winget:Google.Chrome:131.0.6778.86", Zentriq.Infrastructure.Patches.PatchStore.IdOf(u!, "windows"));
+        Assert.Equal("application", u!.Classification);
+        Assert.Contains("installed 130.0.6723.117", u.Title);
+        Assert.Null(Zentriq.Infrastructure.Patches.PatchStore.FromApp(new("Bad Id With Spaces", "x", "1", "2", "winget")));
+        Assert.Null(Zentriq.Infrastructure.Patches.PatchStore.FromApp(new("Vendor.App", "x", "1", "", "winget")));
+        Assert.Equal("winget:Google.Chrome:131.0.6778.86", Zentriq.Infrastructure.Patches.PatchStore.NormId("winget:Google.Chrome:131.0.6778.86"));
     }
 
     [DbFact]

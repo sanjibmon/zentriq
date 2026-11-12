@@ -56,7 +56,10 @@ public static class PatchEndpoints
                        (SELECT count(*) FROM zentriq.asset_actions WHERE kind = 'patch' AND operation = 'install' AND status IN ('queued','sent','running')),
                        (SELECT count(*) FROM zentriq.asset_patches WHERE state = 'installed' AND installed_at > now() - interval '30 days'),
                        (SELECT count(*) FROM zentriq.patch_policies WHERE enabled),
-                       (SELECT count(*) FROM zentriq.agent_registrations WHERE status = 'active' AND NOT ('{PatchStore.Capability}' = ANY(capabilities)))
+                       (SELECT count(*) FROM zentriq.agent_registrations WHERE status = 'active' AND NOT ('{PatchStore.Capability}' = ANY(capabilities))),
+                       (SELECT count(DISTINCT p.id) FROM zentriq.patches p JOIN zentriq.asset_patches ap ON ap.patch_id = p.id AND ap.state IN ('missing','failed') WHERE p.kind = 'os'),
+                       (SELECT count(DISTINCT p.id) FROM zentriq.patches p JOIN zentriq.asset_patches ap ON ap.patch_id = p.id AND ap.state IN ('missing','failed') WHERE p.kind = 'microsoft'),
+                       (SELECT count(DISTINCT p.id) FROM zentriq.patches p JOIN zentriq.asset_patches ap ON ap.patch_id = p.id AND ap.state IN ('missing','failed') WHERE p.kind = 'thirdparty')
                 """);
             await using var r = await cmd.ExecuteReaderAsync(ct);
             await r.ReadAsync(ct);
@@ -66,22 +69,24 @@ public static class PatchEndpoints
                 devices = r.GetInt64(0), scanned = r.GetInt64(1), upToDate = r.GetInt64(2), urgentDevices = r.GetInt64(3), rebootPending = r.GetInt64(4),
                 scanFailed = r.GetInt64(5), notScanned = r.GetInt64(6), missingPatches = r.GetInt64(7), urgentPatches = r.GetInt64(8), failed = r.GetInt64(9),
                 installing = r.GetInt64(10), installed30d = r.GetInt64(11), policies = r.GetInt64(12), olderAgents = r.GetInt64(13), settings,
+                missingByKind = new { os = r.GetInt64(14), microsoft = r.GetInt64(15), thirdparty = r.GetInt64(16) },
             });
         });
 
         // ---- updates ------------------------------------------------------------------------------------------------
-        g.MapGet("", async (NpgsqlDataSource ds, string? q, string? platform, string? classification, string? severity, string? approval, string? state, CancellationToken ct) =>
+        g.MapGet("", async (NpgsqlDataSource ds, string? q, string? platform, string? classification, string? severity, string? approval, string? state, string? kind, CancellationToken ct) =>
         {
             await using var cmd = ds.CreateCommand("""
                 SELECT p.id, p.platform, p.kb, p.title, p.classification, p.severity, p.product, p.package, p.version, p.released_at, p.size_bytes, p.reboot, p.cves,
                        p.support_url, p.approval, u.email, p.approved_at, p.first_seen_at,
                        count(*) FILTER (WHERE ap.state = 'missing'), count(*) FILTER (WHERE ap.state = 'failed'),
-                       count(*) FILTER (WHERE ap.state = 'pending_reboot'), count(*) FILTER (WHERE ap.state = 'installed')
+                       count(*) FILTER (WHERE ap.state = 'pending_reboot'), count(*) FILTER (WHERE ap.state = 'installed'), p.kind
                   FROM zentriq.patches p
                   LEFT JOIN zentriq.asset_patches ap ON ap.patch_id = p.id
                   LEFT JOIN zentriq.users u ON u.id = p.approved_by
                  WHERE (@q = '' OR p.title ILIKE '%' || @q || '%' OR p.kb = ltrim(upper(@q), 'KB') OR p.package ILIKE @q || '%' OR @q = ANY(p.cves))
                    AND (@pf = '' OR p.platform = @pf) AND (@cls = '' OR p.classification = @cls) AND (@sev = '' OR p.severity = @sev) AND (@ap = '' OR p.approval = @ap)
+                   AND (@kind = '' OR p.kind = @kind OR (@kind = 'software' AND p.kind IN ('microsoft','thirdparty')))
                  GROUP BY p.id, u.email
                 HAVING (@st = '' OR (@st = 'missing' AND count(*) FILTER (WHERE ap.state IN ('missing','failed')) > 0)
                         OR (@st = 'installed' AND count(*) FILTER (WHERE ap.state IN ('missing','failed','pending_reboot')) = 0))
@@ -96,6 +101,7 @@ public static class PatchEndpoints
             cmd.Parameters.AddWithValue("sev", severity ?? "");
             cmd.Parameters.AddWithValue("ap", approval ?? "");
             cmd.Parameters.AddWithValue("st", state ?? "");
+            cmd.Parameters.AddWithValue("kind", kind ?? "");
             var list = new List<object>();
             await using var r = await cmd.ExecuteReaderAsync(ct);
             while (await r.ReadAsync(ct))
@@ -105,6 +111,7 @@ public static class PatchEndpoints
                     package = S(r, 7), version = S(r, 8), releasedAt = r.IsDBNull(9) ? (DateOnly?)null : r.GetFieldValue<DateOnly>(9), size = r.IsDBNull(10) ? (long?)null : r.GetInt64(10),
                     reboot = r.IsDBNull(11) ? (bool?)null : r.GetBoolean(11), cves = r.GetFieldValue<string[]>(12), url = S(r, 13), approval = r.GetString(14), approvedBy = S(r, 15),
                     approvedAt = T(r, 16), firstSeenAt = T(r, 17), missing = r.GetInt64(18), failed = r.GetInt64(19), pendingReboot = r.GetInt64(20), installed = r.GetInt64(21),
+                    kind = r.GetString(22),
                 });
             return Results.Ok(list);
         });
@@ -190,7 +197,7 @@ public static class PatchEndpoints
             }
             var patches = new List<object>();
             await using (var cmd = ds.CreateCommand("""
-                SELECT p.id, p.kb, p.title, p.classification, p.severity, p.released_at, p.approval, p.reboot, ap.state, ap.detected_at, ap.installed_at, ap.message, p.cves, p.package, p.version
+                SELECT p.id, p.kb, p.title, p.classification, p.severity, p.released_at, p.approval, p.reboot, ap.state, ap.detected_at, ap.installed_at, ap.message, p.cves, p.package, p.version, p.kind
                   FROM zentriq.asset_patches ap JOIN zentriq.patches p ON p.id = ap.patch_id
                  WHERE ap.asset_id = @a
                  ORDER BY CASE ap.state WHEN 'failed' THEN 0 WHEN 'missing' THEN 1 WHEN 'pending_reboot' THEN 2 ELSE 3 END,
@@ -205,7 +212,7 @@ public static class PatchEndpoints
                     {
                         id = r.GetString(0), kb = S(r, 1), title = r.GetString(2), classification = r.GetString(3), severity = r.GetString(4),
                         releasedAt = r.IsDBNull(5) ? (DateOnly?)null : r.GetFieldValue<DateOnly>(5), approval = r.GetString(6), reboot = r.IsDBNull(7) ? (bool?)null : r.GetBoolean(7),
-                        state = r.GetString(8), detectedAt = T(r, 9), installedAt = T(r, 10), message = S(r, 11), cves = r.GetFieldValue<string[]>(12), package = S(r, 13), version = S(r, 14),
+                        state = r.GetString(8), detectedAt = T(r, 9), installedAt = T(r, 10), message = S(r, 11), cves = r.GetFieldValue<string[]>(12), package = S(r, 13), version = S(r, 14), kind = r.GetString(15),
                     });
             }
             var actions = new List<object>();

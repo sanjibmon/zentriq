@@ -157,6 +157,46 @@ Complete removal (irreversible – take and export a backup first):
     out existing sessions).
 * RBAC is enforced by the API for every endpoint; the UI only hides what the API would refuse.
 
+## Data scope, access rules and MFA per role (build 136)
+
+### Data scope — which devices a role works on
+
+*Roles › New role / Edit › Data scope* and *Groups › Edit › Data scope*: tick **locations**, **departments** and
+**device groups** (from Software Deployment). Nothing ticked means all devices.
+
+* A scoped role sees only the devices in one of the ticked locations, departments or device groups, and everything that
+  belongs to those devices: hardware and software inventory, change history, agents, patches, vulnerabilities,
+  scripts, deployments, remote sessions, Security Pack data, dashboards and reports. A device outside the scope does not
+  exist for them (404); they cannot change it, delete it or move it out of their scope.
+* A Zentriq group with a scope replaces the scope of its roles for its members (for example the built-in *IT Asset
+  Manager* role through a group *Kolkata IT* limited to the Kolkata location).
+* Scopes add up: a person with several roles or groups sees the devices of all of them, and **any role given without a
+  scope gives all devices**.
+* People whose access is limited cannot change roles, groups, directory mappings or what other users may see.
+* Non-IT assets and IT accessories are not scoped (they have their own permissions).
+* How it works: PostgreSQL row-level security. Connections of a scoped user switch to the role `zentriq_app_scoped`
+  (created by Setup), which sees only that user's devices; everything else (agents, the Worker, unrestricted users)
+  uses the normal connection and is not affected. Setup must run once after the upgrade (it always does).
+
+### Access rules per user
+
+*Users › Edit › Access rules*:
+
+| Rule | Effect |
+|---|---|
+| Access expires | After this time the user cannot sign in, and open sessions end at their next request (contractors, temporary staff). Shown as *Expired* in the list. |
+| Sign-in hours | Days and a time range in the **server's** time zone; a range past midnight (22:00–06:00) belongs to the day it starts. Outside the hours sign-in is refused and open sessions end. |
+| Allowed networks | Addresses or ranges (`192.168.10.0/24`, `10.1.2.3`, IPv6). From any other address sign-in is refused and open sessions end. Behind a reverse proxy the proxy must pass the client address. |
+
+The rules apply to local, Active Directory and Microsoft accounts; API tokens stop working when the account expires.
+You cannot save rules for your own account that would sign you out at once.
+
+### Require MFA for a role
+
+*Roles › role › Require multi-factor authentication* (built-in roles too: open the role and tick it). Members who have
+not set up an authenticator app must do so at their next sign-in, as with the organisation-wide setting. Microsoft
+accounts use Microsoft's MFA.
+
 ## Roles, groups and custom roles
 
 *Users, Roles & Groups* has three tabs.

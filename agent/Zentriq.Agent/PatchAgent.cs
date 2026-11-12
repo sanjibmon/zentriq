@@ -124,6 +124,7 @@ internal static class PatchAgent
         {
             var (report, error) = Execute(ScanScript, null, ScanTimeout, ct);
             if (report is null) { Post(client, Failure(error!), ct); return (false, null, error!); }
+            AddApps(report, ct);
             Post(client, report, ct);
             if (report.TryGetValue("ok", out var okv) && okv is JsonElement { ValueKind: JsonValueKind.False })
                 return (false, null, report["message"] as string ?? "The scan failed.");
@@ -135,34 +136,68 @@ internal static class PatchAgent
         Dictionary<string, JsonElement> p;
         try { p = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(a.Argument ?? "{}") ?? new Dictionary<string, JsonElement>(); }
         catch (JsonException) { return (false, null, "The patch request is not valid."); }
-        var ids = p.TryGetValue("ids", out var idv) && idv.ValueKind == JsonValueKind.Array
-            ? idv.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.String).Select(x => x.GetString()!.Trim().ToLowerInvariant())
-                .Where(x => x.Length is > 0 and <= 80 && x.All(c => char.IsLetterOrDigit(c) || c == '-')).Distinct().ToList()
+        var all = p.TryGetValue("ids", out var idv) && idv.ValueKind == JsonValueKind.Array
+            ? idv.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.String).Select(x => x.GetString()!.Trim()).ToList()
             : new List<string>();
-        if (ids.Count == 0) return (false, null, "No updates were chosen.");
+        // Windows updates (update ids) and third-party applications (winget:<package id>:<version>).
+        var ids = all.Select(x => x.ToLowerInvariant()).Where(x => x.Length is > 0 and <= 80 && x.All(c => char.IsLetterOrDigit(c) || c == '-')).Distinct().ToList();
+        var apps = all.Where(x => x.StartsWith("winget:", StringComparison.OrdinalIgnoreCase) && x.Length <= 220 && x.Skip(7).All(c => char.IsLetterOrDigit(c) || c is '.' or '-' or '_' or '+' or ':'))
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        if (ids.Count == 0 && apps.Count == 0) return (false, null, "No updates were chosen.");
         var reboot = p.TryGetValue("reboot", out var rb) && rb.ValueKind == JsonValueKind.String ? rb.GetString() : "when-needed";
         var delay = p.TryGetValue("rebootDelayMinutes", out var dv) && dv.ValueKind == JsonValueKind.Number ? Math.Max(1, Math.Min(240, dv.GetInt32())) : 10;
         var message = p.TryGetValue("rebootMessage", out var mv) && mv.ValueKind == JsonValueKind.String ? mv.GetString() : null;
 
+        // Applications first (winget), then the Windows updates; the Windows Update run ends with the new scan.
+        var appResults = new List<Dictionary<string, object?>>();
+        foreach (var app in apps)
+        {
+            var pkg = app.Substring(7, app.LastIndexOf(':') > 7 ? app.LastIndexOf(':') - 7 : app.Length - 7);
+            Log.Info($"Patch management: updating {pkg} with winget.");
+            var (aok, amsg) = WingetUpdates.Upgrade(pkg, ct);
+            appResults.Add(new Dictionary<string, object?> { ["id"] = app, ["ok"] = aok, ["reboot"] = false, ["message"] = amsg });
+        }
         AgentUpdater.PrepareFolder(Root);
-        var idsFile = Path.Combine(Root, "ids-" + a.Id + ".json");
-        File.WriteAllText(idsFile, JsonSerializer.Serialize(ids), new UTF8Encoding(false));
         Dictionary<string, object?>? rep; string? err;
-        try { (rep, err) = Execute(InstallScript, idsFile, InstallTimeout, ct); }
-        finally { try { File.Delete(idsFile); } catch (IOException) { } }
-        if (rep is null) { Post(client, Failure(err!), ct); return (false, null, err!); }
+        if (ids.Count > 0)
+        {
+            var idsFile = Path.Combine(Root, "ids-" + a.Id + ".json");
+            File.WriteAllText(idsFile, JsonSerializer.Serialize(ids), new UTF8Encoding(false));
+            try { (rep, err) = Execute(InstallScript, idsFile, InstallTimeout, ct); }
+            finally { try { File.Delete(idsFile); } catch (IOException) { } }
+        }
+        else (rep, err) = Execute(ScanScript, null, ScanTimeout, ct);
+        if (rep is null && appResults.Count == 0) { Post(client, Failure(err!), ct); return (false, null, err!); }
+        rep ??= Failure(err!);
+        if (appResults.Count > 0)
+        {
+            var merged = new List<object?>(appResults);
+            if (rep.TryGetValue("results", out var wr) && wr is JsonElement { ValueKind: JsonValueKind.Array } wra)
+                foreach (var x in wra.EnumerateArray()) merged.Add(x);
+            rep["results"] = merged;
+        }
+        AddApps(rep, ct);
         Post(client, rep, ct);
         if (rep.TryGetValue("ok", out var ok2) && ok2 is JsonElement { ValueKind: JsonValueKind.False })
             return (false, null, rep["message"] as string ?? "The installation failed.");
 
         int installed = 0, failed = 0;
         string? firstError = null;
-        if (rep.TryGetValue("results", out var rs) && rs is JsonElement { ValueKind: JsonValueKind.Array } results)
-            foreach (var r in results.EnumerateArray())
-            {
-                if (r.TryGetProperty("ok", out var o) && o.ValueKind == JsonValueKind.True) installed++;
-                else { failed++; firstError ??= r.TryGetProperty("message", out var m) ? m.GetString() : null; }
-            }
+        var resultList = rep.TryGetValue("results", out var rs) ? rs switch
+        {
+            JsonElement { ValueKind: JsonValueKind.Array } e => e.EnumerateArray().Select(x => (object?)x).ToList(),
+            List<object?> l => l,
+            _ => new List<object?>(),
+        } : new List<object?>();
+        foreach (var r in resultList)
+        {
+            bool ok; string? m;
+            if (r is JsonElement je) { ok = je.TryGetProperty("ok", out var o) && o.ValueKind == JsonValueKind.True; m = je.TryGetProperty("message", out var mm) ? mm.GetString() : null; }
+            else if (r is Dictionary<string, object?> d) { ok = d.TryGetValue("ok", out var o) && o is true; m = d.TryGetValue("message", out var mm) ? mm as string : null; }
+            else continue;
+            if (ok) installed++;
+            else { failed++; firstError ??= m; }
+        }
         var needsRestart = rep.TryGetValue("installRebootRequired", out var irr) && irr is JsonElement { ValueKind: JsonValueKind.True };
         var text = $"{installed} of {installed + failed} update(s) installed" + (failed > 0 ? $"; {failed} failed ({firstError})" : "") + ".";
         if (needsRestart)
@@ -179,6 +214,22 @@ internal static class PatchAgent
     }
 
     private static Dictionary<string, object?> Failure(string message) => new() { ["ok"] = false, ["message"] = message };
+
+    /// <summary>Adds the third-party applications winget can update (or why it cannot tell) to a scan report.</summary>
+    private static void AddApps(Dictionary<string, object?> report, CancellationToken ct)
+    {
+        try
+        {
+            var (apps, why) = WingetUpdates.Scan(ct);
+            if (apps is not null) report["apps"] = apps.Select(WingetUpdates.ToReport).ToList();
+            if (why is not null) { report["appsMessage"] = why; Log.Info("Patch management: " + why); }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            report["appsMessage"] = "winget could not be run: " + ex.Message;
+            Log.Warn("Patch management: winget could not be run: " + ex.Message);
+        }
+    }
 
     private static void Post(ServerClient client, Dictionary<string, object?> report, CancellationToken ct)
     {

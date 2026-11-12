@@ -29,6 +29,28 @@ Zentriq does not change where devices get their updates; it does not download up
 * A scan that cannot run says why — for example *The Windows Update service is disabled on this device*, *The
   device cannot reach its update server*, or a policy that blocks Windows Update.
 
+## Windows & OS updates and software updates (build 136)
+
+*Missing Updates* shows three views:
+
+| View | What |
+|---|---|
+| **Windows & OS Updates** | Windows itself (cumulative and security updates, servicing stack, .NET Framework, Defender definitions) and every Linux package update |
+| **Software Updates** | Other **Microsoft software** offered by the device's Windows Update / Microsoft Update or WSUS (Office, SQL Server, Edge, Visual Studio …) and **third-party applications** with a newer version in winget (Chrome, Firefox, Zoom, 7-Zip, Notepad++ …) |
+| All | Everything |
+
+* Third-party applications are found with **winget** (App Installer), run by the agent as SYSTEM: `winget upgrade`
+  lists installed applications with a newer version in the winget source. They appear with the classification
+  *Applications*, the package id and the installed and new version. Microsoft Store applications are left out (they
+  cannot be updated as SYSTEM). Installing runs `winget upgrade --id … --exact --silent`; the device is scanned again
+  afterwards.
+* winget is part of Windows 10 (1809+), Windows 11 and Windows Server 2025. On devices without it (Windows Server
+  2019/2022, LTSC) the scan says so on the *Devices* tab and only Windows updates are reported.
+* Microsoft software updates appear only when the device gets them from its update source (Microsoft Update turned on,
+  or approved in WSUS); Zentriq does not change the device's update source.
+* Approve, decline, deploy and policies work the same for both views; a policy includes third-party applications when
+  *Applications* is ticked.
+
 ## Approve, decline, deploy
 
 * *Missing Updates*: filter by state, platform, classification, severity and approval; search by title, KB, package
@@ -68,8 +90,8 @@ Declined updates are never installed by a policy. Offline devices install when t
 ## Requirements and limits
 
 * The Zentriq Agent of build 1.1.1.114 or later (older agents are listed and skipped; update them in *Agents*).
-* Windows: the Windows Update service must not be disabled. Third-party application updates are not part of this
-  release (use Software Deployment).
+* Windows: the Windows Update service must not be disabled. Third-party application updates need winget and the
+  Zentriq Agent of build 1.1.1.136 or later.
 * Linux: zypper updates are not classified as security updates yet.
 
 ## Audit

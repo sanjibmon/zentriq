@@ -119,7 +119,7 @@ Remove-Item $answer -Force   # contains the administrator password
 
 if (-not $installed) {
     foreach ($t in 'T02 PostgreSQL provisioning', 'T03 Database migration', 'T04 Administrator sign-in', 'T05 API and worker services', 'T06 Trial initialization',
-                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection', 'T68 Live agent connection', 'T69 Locations and IT accessories', 'T70 Manual hardware details', 'T71 Standard and Advanced installation', 'T72 Asset lifecycle', 'T73 Cloud and infrastructure', 'T74 Own asset tags, people and bulk upload', 'T75 Backup and restore', 'T76 Roles and groups', 'T77 Log retention and export', 'T78 Agent stop and disable protection', 'T79 Automatic agent update', 'T80 Agent check-in and diagnosis commands', 'T81 Licensing plans and online activation', 'T82 Software Deployment policy', 'T83 Application control on Windows', 'T84 Push deployment', 'T85 Remote support agent tamper protection', 'T86 Software licenses', 'T87 Web apps and accounts', 'T88 Network connected devices', 'T89 Warranty lookup', 'T90 Session recording', 'T91 Directory sign-in', 'T92 Patch management', 'T93 Scripts and remediation', 'T94 Tray icon and self-service', 'T95 Software metering and device experience', 'T96 Endpoint privilege management', 'T97 BitLocker management', 'T98 USB device control', 'T99 Product keys and pick lists', 'T100 Only TLS 1.2 and 1.3') {
+                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection', 'T68 Live agent connection', 'T69 Locations and IT accessories', 'T70 Manual hardware details', 'T71 Standard and Advanced installation', 'T72 Asset lifecycle', 'T73 Cloud and infrastructure', 'T74 Own asset tags, people and bulk upload', 'T75 Backup and restore', 'T76 Roles and groups', 'T77 Log retention and export', 'T78 Agent stop and disable protection', 'T79 Automatic agent update', 'T80 Agent check-in and diagnosis commands', 'T81 Licensing plans and online activation', 'T82 Software Deployment policy', 'T83 Application control on Windows', 'T84 Push deployment', 'T85 Remote support agent tamper protection', 'T86 Software licenses', 'T87 Web apps and accounts', 'T88 Network connected devices', 'T89 Warranty lookup', 'T90 Session recording', 'T91 Directory sign-in', 'T92 Patch management', 'T93 Scripts and remediation', 'T94 Tray icon and self-service', 'T95 Software metering and device experience', 'T96 Endpoint privilege management', 'T97 BitLocker management', 'T98 USB device control', 'T99 Product keys and pick lists', 'T100 Only TLS 1.2 and 1.3', 'T101 Data scope and access rules') {
         Record $t.Substring(0, 3) $t.Substring(4) 'BLOCKED' 'installation failed'
     }
 } else {
@@ -3040,6 +3040,88 @@ if (-not $installed) {
             Raw76 PUT "/users/$($user.id)" @{ status = 'disabled'; roles = @(); groups = @() } $s | Out-Null
             Raw76 DELETE "/groups/$($group.id)" $null $s | Out-Null
             Raw76 DELETE "/roles/$($role.id)" $null $s | Out-Null
+        }
+    } | Out-Null
+
+    # ---- T101: data scope, access rules, MFA per role (build 136) ----
+    Check 'T101' 'Data scope and access rules: a role limited to one location sees only its devices (others 404), cannot change roles; allowed networks, expiry and sign-in hours end the session and refuse sign-in; MFA required by the role' {
+        $s = Login
+        function Raw101([string] $Method, [string] $Path, $Body, $Session) {
+            $p = @{ Uri = "$base/api/v1$Path"; Method = $Method; WebSession = $Session; Headers = @{ 'X-Zentriq-Request' = '1' }; ContentType = 'application/json'; SkipHttpErrorCheck = $true }
+            if ($null -ne $Body) { $p.Body = ($Body | ConvertTo-Json -Depth 6) }
+            $r = Invoke-WebRequest @p
+            [pscustomobject]@{ StatusCode = [int]$r.StatusCode; Content = (Body $r) }
+        }
+        function Login101([string] $Mail, [string] $Pass) {
+            $f = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+            for ($i = 0; ; $i++) {
+                $lr = Invoke-WebRequest "$base/api/v1/auth/login" -Method Post -Body (@{ email = $Mail; password = $Pass } | ConvertTo-Json) -ContentType 'application/json' -Headers @{ 'X-Zentriq-Request' = '1' } -WebSession $f -SkipHttpErrorCheck
+                if ($lr.StatusCode -eq 429 -and $i -lt 5) { Start-Sleep 15; continue }
+                return [pscustomobject]@{ Session = $f; StatusCode = [int]$lr.StatusCode; Content = (Body $lr) }
+            }
+        }
+        $tag = Get-Random -Maximum 99999
+        $kol = Api POST '/locations' @{ name = "CI Kolkata $tag" } -Session $s
+        $mum = Api POST '/locations' @{ name = "CI Mumbai $tag" } -Session $s
+        $pcK = Api POST '/assets' @{ hostname = "CI-KOL-$tag"; category = 'other'; osFamily = 'other'; locationId = $kol.id } -Session $s
+        $pcM = Api POST '/assets' @{ hostname = "CI-MUM-$tag"; category = 'other'; osFamily = 'other'; locationId = $mum.id } -Session $s
+        $opts = Api GET '/access/scope-options' -Session $s
+        Assert (@($opts.locations | Where-Object id -eq $kol.id).Count -eq 1) 'scope options miss the location'
+        $role = Api POST '/roles' @{ name = "CI Kolkata helpdesk $tag"; permissions = @('dashboard.view', 'assets.view', 'users.manage'); scope = @{ locations = @($kol.id) } } -Session $s
+        $roles = Api GET '/roles' -Session $s
+        $mine = @($roles | Where-Object id -eq $role.id)[0]
+        Assert (@($mine.scope.locations).Count -eq 1 -and $mine.scope.locations[0].id -eq $kol.id) "role scope: $($mine.scope | ConvertTo-Json -Compress -Depth 4)"
+        $uMail = "kolkata$tag@ci.zentriq.test"
+        $uPass = 'Ko-' + [Guid]::NewGuid().ToString('N').Substring(0, 16) + '-x9'
+        $here = @('127.0.0.0/8', '::1/128')
+        $user = Api POST '/users' @{ email = $uMail; displayName = 'CI Kolkata'; password = $uPass; roles = @($role.id); access = @{ expiresAt = (Get-Date).ToUniversalTime().AddDays(30).ToString('o'); hours = @{ days = @(0, 1, 2, 3, 4, 5, 6); from = '00:00'; to = '23:59' }; networks = $here } } -Session $s
+        try {
+            $listed = @((Api GET '/users' -Session $s) | Where-Object id -eq $user.id)[0]
+            Assert (@($listed.access.networks).Count -eq 2 -and $listed.access.hours.from -eq '00:00') "access rules: $($listed.access | ConvertTo-Json -Compress -Depth 4)"
+            $l = Login101 $uMail $uPass
+            Assert ($l.StatusCode -eq 200) "scoped login $($l.StatusCode) $($l.Content)"
+            $f = $l.Session
+            $assets = Api GET "/assets?q=$tag&pageSize=200" -Session $f
+            $names = @($assets.items | ForEach-Object hostname)
+            Assert ($names -contains "CI-KOL-$tag" -and $names -notcontains "CI-MUM-$tag") "scoped devices: $($names -join ', ')"
+            Assert ((Raw101 GET "/assets/$($pcM.id)" $null $f).StatusCode -eq 404) 'device outside the scope readable'
+            Assert ((Raw101 GET "/assets/$($pcK.id)" $null $f).StatusCode -eq 200) 'device inside the scope not readable'
+            $esc = Raw101 PUT "/roles/$($role.id)" @{ name = "CI Kolkata helpdesk $tag"; permissions = @('assets.view', 'users.manage'); scope = @{} } $f
+            Assert ($esc.StatusCode -eq 403) "scoped user changed a role: $($esc.StatusCode)"
+            # The administrator still sees both devices.
+            $all = @((Api GET "/assets?q=$tag&pageSize=200" -Session $s).items | ForEach-Object hostname)
+            Assert ($all -contains "CI-KOL-$tag" -and $all -contains "CI-MUM-$tag") 'administrator lost devices'
+
+            # Networks: the running session ends at its next request, sign-in is refused with the reason.
+            Api PATCH "/users/$($user.id)" @{ access = @{ expiresAt = $null; hours = $null; networks = @('10.255.255.0/24') } } -Session $s | Out-Null
+            Assert ((Raw101 GET '/auth/me' $null $f).StatusCode -eq 401) 'session kept from a network that is not allowed'
+            $n = Login101 $uMail $uPass
+            Assert ($n.StatusCode -eq 401 -and $n.Content -match 'network') "network refusal: $($n.StatusCode) $($n.Content)"
+            # Expiry in the past.
+            Api PATCH "/users/$($user.id)" @{ access = @{ expiresAt = (Get-Date).ToUniversalTime().AddMinutes(-5).ToString('o'); hours = $null; networks = @() } } -Session $s | Out-Null
+            $e = Login101 $uMail $uPass
+            Assert ($e.StatusCode -eq 401 -and $e.Content -match 'expired') "expiry refusal: $($e.StatusCode) $($e.Content)"
+            # Sign-in hours that exclude now (a one-hour window twelve hours away, server time).
+            $away = (Get-Date).AddHours(12)
+            Api PATCH "/users/$($user.id)" @{ access = @{ expiresAt = $null; hours = @{ days = @(0, 1, 2, 3, 4, 5, 6); from = $away.ToString('HH:00'); to = $away.AddHours(1).ToString('HH:00') }; networks = @() } } -Session $s | Out-Null
+            $h = Login101 $uMail $uPass
+            Assert ($h.StatusCode -eq 401 -and $h.Content -match 'time') "hours refusal: $($h.StatusCode) $($h.Content)"
+            # Rules lifted, MFA required by the role: the session must enrol first.
+            Api PATCH "/users/$($user.id)" @{ access = @{ expiresAt = $null; hours = $null; networks = @() } } -Session $s | Out-Null
+            Api PUT "/roles/$($role.id)/mfa" @{ required = $true } -Session $s | Out-Null
+            $m = Login101 $uMail $uPass
+            Assert ($m.StatusCode -eq 200 -and ($m.Content | ConvertFrom-Json).mfaEnrollmentRequired) "MFA by role: $($m.StatusCode) $($m.Content)"
+            # Own account: rules that would sign the administrator out are refused.
+            $meId = (Api GET '/auth/me' -Session $s).id
+            $self = Raw101 PATCH "/users/$meId" @{ access = @{ expiresAt = $null; hours = $null; networks = @('10.255.255.0/24') } } $s
+            Assert ($self.StatusCode -eq 400) "self lock-out accepted: $($self.StatusCode)"
+            "role scoped to one location: 1 of 2 CI devices, other device 404, role change refused; networks end the session and refuse sign-in, expiry and hours refuse sign-in; MFA required by role; self lock-out refused"
+        } finally {
+            Raw101 PATCH "/users/$($user.id)" @{ status = 'disabled'; roles = @(); groups = @() } $s | Out-Null
+            Raw101 PATCH "/users/$($user.id)" @{ roles = @() } $s | Out-Null
+            Raw101 DELETE "/roles/$($role.id)" $null $s | Out-Null
+            Raw101 DELETE "/assets/$($pcK.id)" $null $s | Out-Null
+            Raw101 DELETE "/assets/$($pcM.id)" $null $s | Out-Null
         }
     } | Out-Null
 

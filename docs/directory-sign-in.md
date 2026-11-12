@@ -47,6 +47,9 @@ Console: *Users, Roles & Groups › Sign-in* (permission *users.manage*).
   (value) to a Zentriq role. Members get the role at every sign-in; when they leave the group they lose it at their
   next sign-in, and when a mapping is removed the role is taken away from everyone who had it through directory
   groups at once (their sessions reload their permissions).
+* A directory group can also be mapped to a **Zentriq group** (build 136): members get that group's roles **and its
+  data scope** at every sign-in, and lose them at their next sign-in after leaving the directory group. Removing the
+  mapping takes the group away from them at once. The group's *Directory groups* column shows the mapping.
 * Roles given in Zentriq (directly or through a Zentriq group) add to the directory roles.
 * A directory user without any role cannot sign in. Users who are not in a mapped group are not created.
 * A directory account is never linked to a **local** account with the same e-mail address (the sign-in is refused

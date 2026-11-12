@@ -49,7 +49,17 @@ public sealed record ScanReport(
     [property: JsonPropertyName("source")] string? Source,
     [property: JsonPropertyName("rebootPending")] bool? RebootPending,
     [property: JsonPropertyName("updates")] List<ScanUpdate>? Updates,
-    [property: JsonPropertyName("results")] List<InstallResult>? Results = null);
+    [property: JsonPropertyName("results")] List<InstallResult>? Results = null,
+    [property: JsonPropertyName("apps")] List<ScanApp>? Apps = null,
+    [property: JsonPropertyName("appsMessage")] string? AppsMessage = null);
+
+/// <summary>An application with a newer version in winget (Windows agent, build 136).</summary>
+public sealed record ScanApp(
+    [property: JsonPropertyName("id")] string? Id,
+    [property: JsonPropertyName("name")] string? Name,
+    [property: JsonPropertyName("installed")] string? Installed,
+    [property: JsonPropertyName("available")] string? Available,
+    [property: JsonPropertyName("source")] string? Source);
 
 /// <summary>Which missing updates a deployment installs (policies; a manual "install all missing").</summary>
 public sealed record PatchFilter(string[]? Classifications, string[]? Severities, bool ApprovedOnly, int DelayDays);
@@ -68,7 +78,35 @@ public static partial class PatchStore
     public const string Capability = "patch-management";
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
-    public static readonly string[] Classifications = ["critical", "security", "definition", "updates", "update-rollup", "feature-pack", "service-pack", "driver", "tools", "upgrade", "other"];
+    public static readonly string[] Classifications = ["critical", "security", "definition", "updates", "update-rollup", "feature-pack", "service-pack", "driver", "tools", "upgrade", "application", "other"];
+    public static readonly string[] Kinds = ["os", "microsoft", "thirdparty"];
+
+    /// <summary>
+    /// Operating system (Windows itself, .NET Framework, Defender; every Linux package), other Microsoft software (Office,
+    /// SQL Server, Edge … from Windows / Microsoft Update or WSUS) or a third-party application (winget).
+    /// </summary>
+    public static string KindOf(string platform, string id, string? product)
+    {
+        if (id.StartsWith("winget:", StringComparison.OrdinalIgnoreCase)) return "thirdparty";
+        if (platform == "linux" || string.IsNullOrWhiteSpace(product)) return "os";
+        return OsProduct().IsMatch(product) || !MicrosoftProduct().IsMatch(product) ? "os" : "microsoft";
+    }
+
+    [GeneratedRegex(@"^(windows|microsoft defender|windows defender|\.net framework|microsoft server operating system)", RegexOptions.IgnoreCase)]
+    private static partial Regex OsProduct();
+    [GeneratedRegex(@"(office|microsoft 365|sql server|visual studio|exchange|sharepoint|skype|teams|edge|silverlight|dynamics|project|visio|system center|azure|onedrive|lync|developer tools|asp\.net|\.net( [0-9]|$| core))", RegexOptions.IgnoreCase)]
+    private static partial Regex MicrosoftProduct();
+
+    /// <summary>A winget application as an update row: id winget:&lt;package&gt;:&lt;available version&gt;.</summary>
+    public static ScanUpdate? FromApp(ScanApp a)
+    {
+        var pkg = a.Id?.Trim();
+        var ver = a.Available?.Trim();
+        if (pkg is null || ver is null || !PackageName().IsMatch(pkg) || pkg.Length > 128 || ver.Length is 0 or > 60 || !PackageName().IsMatch(ver)) return null;
+        var name = string.IsNullOrWhiteSpace(a.Name) ? pkg : a.Name!.Trim();
+        var title = $"{name} {ver}" + (string.IsNullOrWhiteSpace(a.Installed) ? "" : $" (installed {a.Installed!.Trim()})");
+        return new ScanUpdate($"winget:{pkg}:{ver}", null, title, "application", null, name, pkg, ver, null, null, false, null, null);
+    }
     public static readonly string[] Severities = ["critical", "important", "moderate", "low", "unspecified"];
 
     // ---- settings ---------------------------------------------------------------------------------------------------
@@ -113,6 +151,7 @@ public static partial class PatchStore
             "drivers" or "driver" => "driver",
             "tools" => "tools",
             "upgrades" or "upgrade" => "upgrade",
+            "application" or "applications" => "application",
             _ => Classifications.Contains(n) ? n : "other",
         };
     }
@@ -155,7 +194,10 @@ public static partial class PatchStore
             if (pkg is null || ver is null || !PackageName().IsMatch(pkg) || ver.Length is 0 or > 120) return null;
             return $"linux:{pkg}:{ver}";
         }
-        var id = u.Id?.Trim().ToLowerInvariant();
+        var id = u.Id?.Trim();
+        if (id is not null && id.StartsWith("winget:", StringComparison.OrdinalIgnoreCase))
+            return u.Package is { } p && u.Version is { } v && PackageName().IsMatch(p.Trim()) && PackageName().IsMatch(v.Trim()) ? $"winget:{p.Trim()}:{v.Trim()}" : null;
+        id = id?.ToLowerInvariant();
         return id is not null && SafeId().IsMatch(id) ? id : null;
     }
 
@@ -163,7 +205,7 @@ public static partial class PatchStore
     public static string NormId(string id)
     {
         var s = id.Trim();
-        return s.StartsWith("linux:", StringComparison.Ordinal) ? s : s.ToLowerInvariant();
+        return s.StartsWith("linux:", StringComparison.Ordinal) || s.StartsWith("winget:", StringComparison.OrdinalIgnoreCase) ? s : s.ToLowerInvariant();
     }
 
     private static string? T(string? s, int max) => string.IsNullOrWhiteSpace(s) ? null : s.Trim().Length > max ? s.Trim()[..max] : s.Trim();
@@ -188,17 +230,20 @@ public static partial class PatchStore
         {
             var seen = new HashSet<string>(StringComparer.Ordinal);
             var packages = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var u in (report.Updates ?? []).Take(5000))
+            // Third-party applications (winget) are reported apart; without a winget answer their rows stay as they were.
+            var apps = platform == "windows" && report.Apps is not null ? report.Apps.Select(FromApp).OfType<ScanUpdate>() : Enumerable.Empty<ScanUpdate>();
+            foreach (var u in (report.Updates ?? []).Take(5000).Concat(apps.Take(1000)))
             {
                 var id = IdOf(u, platform);
                 if (id is null || !seen.Add(id)) continue;
-                if (platform == "linux") packages.Add(u.Package!.Trim());
+                var winget = id.StartsWith("winget:", StringComparison.Ordinal);
+                if (platform == "linux" || winget) packages.Add(u.Package!.Trim());
                 var title = T(u.Title, 500) ?? (platform == "linux" ? $"{u.Package} {u.Version}" : id);
                 DateOnly? released = DateTime.TryParse(u.Released, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal, out var rd) ? DateOnly.FromDateTime(rd) : null;
                 await using (var up = new NpgsqlCommand("""
-                    INSERT INTO zentriq.patches (id, platform, kb, title, classification, severity, product, package, version, released_at, size_bytes, reboot, cves, support_url)
-                    VALUES (@id, @pf, @kb, @t, @c, @s, @p, @pkg, @v, @rel, @size, @rb, @cves, @url)
-                    ON CONFLICT (id) DO UPDATE SET title = EXCLUDED.title, kb = COALESCE(EXCLUDED.kb, patches.kb), classification = EXCLUDED.classification,
+                    INSERT INTO zentriq.patches (id, platform, kb, title, classification, severity, product, package, version, released_at, size_bytes, reboot, cves, support_url, kind)
+                    VALUES (@id, @pf, @kb, @t, @c, @s, @p, @pkg, @v, @rel, @size, @rb, @cves, @url, @kind)
+                    ON CONFLICT (id) DO UPDATE SET title = EXCLUDED.title, kind = EXCLUDED.kind, kb = COALESCE(EXCLUDED.kb, patches.kb), classification = EXCLUDED.classification,
                         severity = CASE WHEN EXCLUDED.severity = 'unspecified' THEN patches.severity ELSE EXCLUDED.severity END,
                         product = COALESCE(EXCLUDED.product, patches.product), released_at = COALESCE(EXCLUDED.released_at, patches.released_at),
                         size_bytes = COALESCE(EXCLUDED.size_bytes, patches.size_bytes), reboot = COALESCE(EXCLUDED.reboot, patches.reboot),
@@ -213,8 +258,9 @@ public static partial class PatchStore
                     up.Parameters.AddWithValue("c", Classification(u.Classification));
                     up.Parameters.AddWithValue("s", Severity(u.Severity));
                     up.Parameters.Add(new NpgsqlParameter("p", NpgsqlDbType.Text) { Value = (object?)T(u.Product, 200) ?? DBNull.Value });
-                    up.Parameters.Add(new NpgsqlParameter("pkg", NpgsqlDbType.Text) { Value = platform == "linux" ? u.Package!.Trim() : DBNull.Value });
-                    up.Parameters.Add(new NpgsqlParameter("v", NpgsqlDbType.Text) { Value = platform == "linux" ? u.Version!.Trim() : DBNull.Value });
+                    up.Parameters.Add(new NpgsqlParameter("pkg", NpgsqlDbType.Text) { Value = platform == "linux" || winget ? u.Package!.Trim() : DBNull.Value });
+                    up.Parameters.Add(new NpgsqlParameter("v", NpgsqlDbType.Text) { Value = platform == "linux" || winget ? u.Version!.Trim() : DBNull.Value });
+                    up.Parameters.AddWithValue("kind", KindOf(platform, id, u.Product));
                     up.Parameters.Add(new NpgsqlParameter("rel", NpgsqlDbType.Date) { Value = (object?)released ?? DBNull.Value });
                     up.Parameters.Add(new NpgsqlParameter("size", NpgsqlDbType.Bigint) { Value = u.Size is > 0 ? u.Size : DBNull.Value });
                     up.Parameters.Add(new NpgsqlParameter("rb", NpgsqlDbType.Boolean) { Value = (object?)u.Reboot ?? DBNull.Value });
@@ -253,7 +299,8 @@ public static partial class PatchStore
             await using (var gone = new NpgsqlCommand("""
                 WITH old AS (
                     SELECT ap.patch_id, ap.state, p.package FROM zentriq.asset_patches ap JOIN zentriq.patches p ON p.id = ap.patch_id
-                     WHERE ap.asset_id = @a AND p.platform = @pf AND ap.state <> 'installed' AND NOT (ap.patch_id = ANY(@seen))),
+                     WHERE ap.asset_id = @a AND p.platform = @pf AND ap.state <> 'installed' AND NOT (ap.patch_id = ANY(@seen))
+                       AND (p.kind <> 'thirdparty' OR @apps)),
                 del AS (
                     DELETE FROM zentriq.asset_patches ap USING old WHERE ap.asset_id = @a AND ap.patch_id = old.patch_id AND old.package = ANY(@pkgs) RETURNING ap.patch_id)
                 UPDATE zentriq.asset_patches ap SET state = 'installed', installed_at = now(), updated_at = now(), message = NULL
@@ -267,6 +314,7 @@ public static partial class PatchStore
                 gone.Parameters.AddWithValue("seen", seen.ToArray());
                 gone.Parameters.AddWithValue("pkgs", packages.ToArray());
                 gone.Parameters.AddWithValue("rp", rebootPending);
+                gone.Parameters.AddWithValue("apps", report.Apps is not null);
                 installed = await gone.ExecuteNonQueryAsync(ct);
             }
             // Installed by this deployment and waiting for the restart (Windows no longer lists them as missing).
@@ -309,7 +357,7 @@ public static partial class PatchStore
         {
             sc.Parameters.AddWithValue("a", assetId);
             sc.Parameters.AddWithValue("ok", report.Ok);
-            sc.Parameters.Add(new NpgsqlParameter("m", NpgsqlDbType.Text) { Value = (object?)T(report.Message, 1000) ?? DBNull.Value });
+            sc.Parameters.Add(new NpgsqlParameter("m", NpgsqlDbType.Text) { Value = (object?)T(report.Ok ? report.AppsMessage : report.Message, 1000) ?? DBNull.Value });
             sc.Parameters.Add(new NpgsqlParameter("src", NpgsqlDbType.Text) { Value = (object?)T(report.Source, 200) ?? DBNull.Value });
             sc.Parameters.AddWithValue("rp", rebootPending);
             sc.Parameters.AddWithValue("n", missing);

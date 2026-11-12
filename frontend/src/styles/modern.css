@@ -791,3 +791,5 @@ input[type=file].in { height: auto; padding: 7px 10px; }
 .access-block .link-btn { text-decoration: none; text-align: left; font-weight: 500; }
 .day-chip { display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border: 1px solid var(--line); border-radius: 6px; font-size: 12px; cursor: pointer; }
 .day-chip input { margin: 0; }
+.seg .seg-n { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 9px; font-size: 11px; background: rgba(127, 127, 127, .18); }
+.seg button.on .seg-n { background: rgba(255, 255, 255, .25); }

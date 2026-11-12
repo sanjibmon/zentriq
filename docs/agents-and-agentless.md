@@ -128,6 +128,12 @@ and its tamper protection. Both use the same agent port, enrollment codes, setti
 * Each installation has its own **agent CA** (`Secrets\agent-ca.pfx`, readable by the API service only, included in
   backups). It issues one client certificate per agent (1 year, renewed automatically 30 days before expiry).
 
+### Renamed computers
+
+When a computer with the agent is renamed (and restarted, on Windows), its next check-in and inventory carry the new
+name: the device, its agent and every list show it at once, and the device's change history records *Computer name*
+changed from the old name to the new one. Nothing has to be done in the console; the agent keeps its enrollment.
+
 ### Updating agents
 
 *Agents › Update* (one device) or *Update N agent(s)* (all) – the agent fetches the package from this server over its

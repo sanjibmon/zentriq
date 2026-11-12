@@ -100,6 +100,28 @@ $$
                           AND (dg.platform IS NULL OR dg.platform = a.os_family)))
 $$;
 
+-- Whether a device with these values is in the scoped user's scope (checks a changed row: moving a device out of the
+-- scope is refused).
+CREATE OR REPLACE FUNCTION scope_allows(p_id uuid, p_location uuid, p_department uuid, p_os text) RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = zentriq, pg_temp AS
+$$
+    SELECT EXISTS (
+        SELECT 1
+          FROM user_role_grants x
+          JOIN roles r ON r.id = x.role_id
+          LEFT JOIN user_groups ug ON ug.id = x.group_id
+          CROSS JOIN LATERAL (SELECT ug.id IS NOT NULL AND cardinality(ug.scope_location_ids) + cardinality(ug.scope_department_ids) + cardinality(ug.scope_device_group_ids) > 0 AS own) o
+          CROSS JOIN LATERAL (SELECT CASE WHEN o.own THEN ug.scope_location_ids ELSE r.scope_location_ids END AS locs,
+                                     CASE WHEN o.own THEN ug.scope_department_ids ELSE r.scope_department_ids END AS deps,
+                                     CASE WHEN o.own THEN ug.scope_device_group_ids ELSE r.scope_device_group_ids END AS grps) g
+         WHERE x.user_id = scope_user()
+           AND (cardinality(g.locs) + cardinality(g.deps) + cardinality(g.grps) = 0
+                OR p_location = ANY(g.locs) OR p_department = ANY(g.deps)
+                OR EXISTS (SELECT 1 FROM device_groups dg WHERE dg.id = ANY(g.grps)
+                              AND (p_id = ANY(dg.asset_ids) OR p_department = ANY(dg.department_ids) OR p_location = ANY(dg.location_ids))
+                              AND (dg.platform IS NULL OR dg.platform = p_os))))
+$$;
+
 -- (Re)creates the row-level security of the devices and of every table that belongs to a device (asset_id). Called by
 -- the migrator after each migration run, with the application role, so tables added later are covered too. Rows without
 -- a device (asset_id null) stay visible to scoped users; new rows may always be inserted.
@@ -128,7 +150,11 @@ BEGIN
         EXECUTE format('DROP POLICY IF EXISTS scope_insert ON zentriq.%I', t.table_name);
         IF has_scoped THEN
             EXECUTE format('CREATE POLICY scope_select ON zentriq.%I FOR SELECT TO %I USING (%s IN (SELECT zentriq.scope_asset_ids()))', t.table_name, scoped, keycol);
-            EXECUTE format('CREATE POLICY scope_update ON zentriq.%I FOR UPDATE TO %I USING (%s IN (SELECT zentriq.scope_asset_ids()))', t.table_name, scoped, keycol);
+            IF t.col = 'id' THEN
+                EXECUTE format('CREATE POLICY scope_update ON zentriq.%I FOR UPDATE TO %I USING (id IN (SELECT zentriq.scope_asset_ids())) WITH CHECK (zentriq.scope_allows(id, location_id, department_id, os_family))', t.table_name, scoped);
+            ELSE
+                EXECUTE format('CREATE POLICY scope_update ON zentriq.%I FOR UPDATE TO %I USING (%s IN (SELECT zentriq.scope_asset_ids()))', t.table_name, scoped, keycol);
+            END IF;
             EXECUTE format('CREATE POLICY scope_delete ON zentriq.%I FOR DELETE TO %I USING (%s IN (SELECT zentriq.scope_asset_ids()))', t.table_name, scoped, keycol);
             EXECUTE format('CREATE POLICY scope_insert ON zentriq.%I FOR INSERT TO %I WITH CHECK (true)', t.table_name, scoped);
         END IF;
