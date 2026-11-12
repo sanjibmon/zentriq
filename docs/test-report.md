@@ -1,6 +1,30 @@
 # Test report
 
-Latest: GitHub Actions run 43161426091, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022
+Latest: GitHub Actions run 43182444766, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022
+Datacenter 10.0.20348** VM plus an Ubuntu job for the Linux agent. Release: `v1.1.1-build.132` (pre-release,
+**unsigned**), package version **1.1.1.132**, commit `9f6b98e`. Results: unit + PostgreSQL integration tests **479 PASS**
+(481, 2 skipped); installer acceptance **90 passed, 0 failed** (10 not run: need hardware, a domain, a reboot or old
+Windows); upgrade suites **14/14** (schema 42); Linux agent on 11 distributions **11/11**.
+
+New in build 132: the Device Experience page has no tagline under its title.
+
+| File | SHA256 |
+|---|---|
+| Zentriq-Setup-x64.exe | `5178bebe8ac262438a9d34bc0df97969b46708dda931e709bb1bb9e8ebc6474c` |
+| Zentriq.msi | `159041582298af17db0f63bdf91b52e61ceeed0e8a5f5f006891c6c4a29debf6` |
+| ZentriqAgent-x64.msi | `52bcf9a9ed079425d7811923bdfb79af52c0c9e2f25729738c1553a20c11d73c` |
+| zentriq-agent-linux-x64.deb | `46dbb0bb93acebfc5da8c2a1a0dcbc5541da4a69feee377578a016ee64c68b9a` |
+| zentriq-agent-linux-x64.rpm | `50c14d7511645267b6f49617a1bf1a50af2f266ef6626579a1d1b6d3ed713b18` |
+| zentriq-agent-linux-x64.tar.gz | `e42eb11db5dc8e713e053a490773c735f8a730cfb110e1c8922f7434dc71f145` |
+| zentriq-agent-linux-arm64.deb | `9bcffd0eb0b6dc26e9661ddbf00367e2c1fe28f7dcdff53a90a92da83838bf38` |
+| zentriq-agent-linux-arm64.rpm | `e6cc8c16de9522e16648a8fb81dfda38c5f92a1c3ef1d099007d6091bf10f1b9` |
+| zentriq-agent-linux-arm64.tar.gz | `fc485565e30d117968c4cb6da708ad14942b4b5d6c189d6632741f4936e33c6a` |
+| Zentriq-1.1.1-msi-offline-kit.zip | `9353a7d98e1225c56dd00fb7681129c11da75090bb2a3053317e6db00c3e2081` |
+| Zentriq-1.1.1-docs.zip | `02137eb7e032e4bd9915eff9e5fff0f6d6624e10828f548e053ee85f80fea562` |
+
+## Build 131
+
+GitHub Actions run 43161426091, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022
 Datacenter 10.0.20348** VM plus an Ubuntu job for the Linux agent. Release: `v1.1.1-build.131` (pre-release,
 **unsigned**), package version **1.1.1.131**, commit `c006e34`. Results: unit + PostgreSQL integration tests **479 PASS**
 (481, 2 skipped); installer acceptance **90 passed, 0 failed** (10 not run: need hardware, a domain, a reboot or old
