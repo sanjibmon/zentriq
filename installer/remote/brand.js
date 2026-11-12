@@ -62,4 +62,22 @@ for (const f of ['meshinstall-linux.sh', 'meshinstall-initd.sh'].map((x) => path
 const ico = path.join(src, 'remote-agent.ico');
 if (fs.existsSync(ico)) fs.copyFileSync(ico, path.join(mc, 'public', 'favicon.ico'));
 
+// 5. Patched dependency versions ("overrides" in the app's package.json): MeshCentral checks the exact versions of the
+//    modules it lists ('compression@1.8.1') at start and would try to download the old ones. Point its list at the
+//    versions actually installed.
+const appPkg = path.join(app, 'package.json');
+const overrides = fs.existsSync(appPkg) ? (JSON.parse(fs.readFileSync(appPkg, 'utf8')).overrides || {}) : {};
+const mainJs = path.join(mc, 'meshcentral.js');
+let mainSrc = fs.readFileSync(mainJs, 'utf8');
+for (const name of Object.keys(overrides)) {
+  const pj = path.join(app, 'node_modules', name, 'package.json');
+  if (!fs.existsSync(pj)) continue;
+  const installed = JSON.parse(fs.readFileSync(pj, 'utf8')).version;
+  const esc = name.replace(/[.*+?^${}()|[\]\\\/]/g, '\\$&');
+  let n = 0;
+  mainSrc = mainSrc.replace(new RegExp(`(['"])${esc}@[0-9][^'"]*\\1`, 'g'), (m, q) => { n++; return `${q}${name}@${installed}${q}`; });
+  console.log(`${name} ${installed}: ${n} module reference(s) in meshcentral.js updated.`);
+}
+fs.writeFileSync(mainJs, mainSrc);
+
 console.log(`Zentriq branding applied: ${fs.readdirSync(views).length} page(s) installed, ${changes} name(s) replaced in ${files} file(s).`);
