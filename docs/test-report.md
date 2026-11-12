@@ -1,6 +1,39 @@
 # Test report
 
-Latest: GitHub Actions run 43084157690 (attempt 2), workflow `windows-release`, on a GitHub-hosted **Windows Server 2022
+Latest: GitHub Actions run 43161426091, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022
+Datacenter 10.0.20348** VM plus an Ubuntu job for the Linux agent. Release: `v1.1.1-build.131` (pre-release,
+**unsigned**), package version **1.1.1.131**, commit `c006e34`. Results: unit + PostgreSQL integration tests **479 PASS**
+(481, 2 skipped); installer acceptance **90 passed, 0 failed** (10 not run: need hardware, a domain, a reboot or old
+Windows); upgrade suites **14/14** (schema 42); Linux agent on 11 distributions **11/11**.
+
+New in build 131: product keys found during inventory are kept encrypted, hidden by default and shown on request
+(audited) — *Software Licenses › Product Keys* and View on the Activation tab for Windows and Office (T99); the product
+and licence dialogs offer the software, publishers and versions found in the inventory as pick lists, with free typing
+still possible; licence type **Retail**. See [Software license management](software-license-management.md).
+
+Run 43148045322 (build 130) was not released: T92 failed (89 passed, 1 failed). An automatic patch scan was running
+when the agent was installed again and enrolled under a new registration; the scan stayed *running* under the replaced
+registration and blocked every new scan of the device. Fixed: when an agent checks in, open scans and queued work of an
+earlier, no longer active registration of the same device are taken over (scans and queued work are queued again,
+installs and scripts already sent are marked failed).
+
+| File | SHA256 |
+|---|---|
+| Zentriq-Setup-x64.exe | `0f6141fa127a22cfaa0faa2e3305a73f314078cbe399c0fd2d108a2b3d92e671` |
+| Zentriq.msi | `ea09f40d79f0e200c958bb4a2c67fcd48c78ea97d2540e10492368bbab33196f` |
+| ZentriqAgent-x64.msi | `d66695388ae30d540c513f2cc5b0f2cfe4aeafd7b58fc39b1117719267c0a9d4` |
+| zentriq-agent-linux-x64.deb | `34e6005bcf43dfd0eafea34ce721d7ed681a9136a92681837c88071203ab47fb` |
+| zentriq-agent-linux-x64.rpm | `24d44872541a1604ce5b0e0ae076c503b618f177d97dfd2529f568a244184c27` |
+| zentriq-agent-linux-x64.tar.gz | `efa64eef20d6f3bf4a8c2fe8323c469114109e56fd8ca5a939d27d3ba6781d76` |
+| zentriq-agent-linux-arm64.deb | `747602a9a782370aa64a7c606365b73ec3fce8db48bde5ce3c58a8a0950fd257` |
+| zentriq-agent-linux-arm64.rpm | `9fcb20659a2c643ce371b5a254f7adbc6621e1e1cbd2619f11e9de375c811499` |
+| zentriq-agent-linux-arm64.tar.gz | `dff94e6d8c58da56bf3a3fd436f193ad8c7cb80b43e7d7de9aeaa1f67a3431d7` |
+| Zentriq-1.1.1-msi-offline-kit.zip | `cbc7c70c4dda3b02e1d8438f59a92e9af456942db3a8ae3c9f562f1dd4fe2034` |
+| Zentriq-1.1.1-docs.zip | `815bf52af9ccac60ce9380adac7bd4aeaeddb8b082cfe70aa9689a3c66ded4e9` |
+
+## Build 129
+
+GitHub Actions run 43084157690 (attempt 2), workflow `windows-release`, on a GitHub-hosted **Windows Server 2022
 Datacenter 10.0.20348** VM plus an Ubuntu job for the Linux agent. Release: `v1.1.1-build.129` (pre-release,
 **unsigned**), package version **1.1.1.129**, commit `3259a52`. Results: unit + PostgreSQL integration tests **464 PASS**
 (466, 2 skipped); installer acceptance **89 passed, 0 failed** (10 not run: need hardware, a domain, a reboot or old
