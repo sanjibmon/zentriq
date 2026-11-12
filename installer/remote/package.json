@@ -8,5 +8,11 @@
     "meshcentral": "1.2.5",
     "node-windows": "0.1.14",
     "loadavg-windows": "1.1.1"
-  }
+  },
+  "overrides": {
+    "node-forge": "1.4.3",
+    "compression": "1.8.2",
+    "image-size": "2.1.0"
+  },
+  "//overrides": "Patched versions of MeshCentral 1.2.5 dependencies with known vulnerabilities (npm audit, build 134). Same major versions; checked at build time by Get-RemoteSupport.ps1."
 }

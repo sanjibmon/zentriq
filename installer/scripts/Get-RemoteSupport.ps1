@@ -67,6 +67,19 @@ try {
 $mc = Get-Content (Join-Path $app 'node_modules\meshcentral\package.json') -Raw | ConvertFrom-Json
 $want = (Get-Content (Join-Path $remoteSrc 'package.json') -Raw | ConvertFrom-Json).dependencies.meshcentral
 if ($mc.version -ne $want) { throw "MeshCentral $($mc.version) installed, expected $want." }
+# Dependencies forced to patched versions ("overrides" in installer/remote/package.json): prove they were applied.
+$overrides = (Get-Content (Join-Path $remoteSrc 'package.json') -Raw | ConvertFrom-Json).overrides
+if ($overrides) {
+    foreach ($o in $overrides.PSObject.Properties) {
+        $pj = Join-Path $app "node_modules\$($o.Name)\package.json"
+        $got = if (Test-Path $pj) { (Get-Content $pj -Raw | ConvertFrom-Json).version } else { $null }
+        if ($got -and $got -ne $o.Value) { throw "$($o.Name) $got installed, expected $($o.Value) (override)." }
+        Get-ChildItem (Join-Path $app 'node_modules') -Recurse -Filter package.json -ErrorAction SilentlyContinue |
+            Where-Object { $_.Directory.Name -eq $o.Name -and $_.Directory.Parent.Name -eq 'node_modules' } |
+            ForEach-Object { $v = (Get-Content $_.FullName -Raw | ConvertFrom-Json).version; if ($v -ne $o.Value) { throw "$($o.Name) $v at $($_.DirectoryName), expected $($o.Value) (override)." } }
+        Write-Host "$($o.Name) $($o.Value) (patched version)."
+    }
+}
 # The server checks its modules at start and would try to download missing ones: prove they are all present.
 & (Join-Path $OutDir 'node\node.exe') -e @"
 const need=['archiver','cbor','compression','cookie-session','express','express-handlebars','express-ws','ipcheck','minimist','multiparty','@seald-io/nedb','node-forge','ua-parser-js','ua-client-hints-js','ws','yauzl','@zip.js/zip.js','node-windows','loadavg-windows'];

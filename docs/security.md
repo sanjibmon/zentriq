@@ -38,5 +38,8 @@
 Before going live (see the go-live plan): configure the code-signing certificate (Azure Key Vault or DigiCert
 KeyLocker, docs/code-signing.md) and the signature details; keep the production license signing key (`zentriq-prod-2026-11`)
 backed up offline and off the build servers; protect the `main` branch and the signing secrets; have an external penetration test
-done; review the dependency audit in the quick build's logs (`npm-audit.log`; build 133: 4 high findings in MeshCentral's
-dependencies).
+done; review the dependency audit in the quick build's logs (`npm-audit.log`). Build 133 found 4 high findings in MeshCentral 1.2.5's
+dependencies; from build 134 they are forced to patched versions (`node-forge` 1.4.3, `compression` 1.8.2,
+`image-size` 2.1.0, `overrides` in `installer/remote/package.json`, checked when the installer is built). The remaining
+moderate findings (`glob`/`minimatch` under `archiver` and `express-handlebars`) concern file-name matching inside the
+server, not network input.
