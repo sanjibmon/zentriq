@@ -118,7 +118,11 @@ public static class AuthEndpoints
                 if (verify == PasswordVerificationResult.SuccessRehashNeeded) user.PasswordHash = hasher.HashPassword(user, body.Password!);
             }
 
-            var mfaRequired = (await db.SystemSettings.AsNoTracking().Where(s => s.Key == "security.mfa_required").Select(s => s.Value).FirstOrDefaultAsync(ct))?.Trim() == "true";
+            // Access rules: expiry, sign-in hours, networks (checked after the password, so they reveal nothing to others).
+            if (user.Rules().Denied(now, http.Connection.RemoteIpAddress, TimeZoneInfo.Local) is { } denied)
+                return Fail(denied, AccessRules.Message(denied));
+            var mfaRequired = (await db.SystemSettings.AsNoTracking().Where(s => s.Key == "security.mfa_required").Select(s => s.Value).FirstOrDefaultAsync(ct))?.Trim() == "true"
+                || await RoleRequiresMfaAsync(ds, user.Id, ct);
             if (user.MfaEnabled)
             {
                 if (string.IsNullOrEmpty(body.MfaCode))
@@ -183,6 +187,8 @@ public static class AuthEndpoints
             catch (DirectorySignInException ex) { return await Failed(ex.Reason, ex.Message, who.Email); }
             var user = await db.Users.FirstAsync(u => u.Id == outcome.UserId, ct);
             if (user.LockedUntil is { } lu && lu > DateTimeOffset.UtcNow) return await Failed("locked", "The account is locked. Try again later.", user.Email);
+            if (user.Rules().Denied(DateTimeOffset.UtcNow, http.Connection.RemoteIpAddress, TimeZoneInfo.Local) is { } denied)
+                return await Failed(denied, AccessRules.Message(denied), user.Email);
             if (outcome.Created) await audit.WriteAsync(new AuditActor(user.Id, user.Email, ip), "user.create", user.Email, "Success", new { method = "entra", roles = outcome.Roles }, ct: ct);
             // Multi-factor authentication is Microsoft Entra ID's (Conditional Access / security defaults), not Zentriq's.
             user.FailedAttempts = 0; user.LastLoginAt = DateTimeOffset.UtcNow;
@@ -262,6 +268,14 @@ public static class AuthEndpoints
         await http.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, props);
     }
 
+    /// <summary>Whether one of the user's roles requires an authenticator app (Users, Roles &amp; Groups › role › Require MFA).</summary>
+    public static async Task<bool> RoleRequiresMfaAsync(NpgsqlDataSource ds, Guid userId, CancellationToken ct)
+    {
+        await using var cmd = ds.CreateCommand("SELECT EXISTS (SELECT 1 FROM zentriq.user_role_grants g JOIN zentriq.roles r ON r.id = g.role_id WHERE g.user_id = @u AND r.mfa_required)");
+        cmd.Parameters.AddWithValue("u", userId);
+        return (bool)(await cmd.ExecuteScalarAsync(ct))!;
+    }
+
     /// <summary>The session identity: the user, the roles given directly and through groups, and their permissions.</summary>
     public static async Task<ClaimsPrincipal> BuildPrincipalAsync(ZentriqDbContext db, User user, bool mfaPending, CancellationToken ct)
     {
@@ -276,6 +290,7 @@ public static class AuthEndpoints
             new(ZentriqClaims.Access, user.AccessStamp.ToString()),
         };
         claims.AddRange(roleIds.Select(r => new Claim(ZentriqClaims.Role, r)));
+        if (await db.Database.SqlQuery<bool>($"SELECT zentriq.user_is_scoped({user.Id}) AS \"Value\"").SingleAsync(ct)) claims.Add(new Claim(ZentriqClaims.Scoped, "1"));
         if (mfaPending) claims.Add(new Claim(ZentriqClaims.MfaPending, "1"));
         else claims.AddRange(perms.Select(p => new Claim(ZentriqClaims.Permission, p)));
         return new ClaimsPrincipal(new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme));

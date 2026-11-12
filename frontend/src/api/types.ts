@@ -231,6 +231,8 @@ export interface UserRow {
   roles: { id: string; name: string }[];
   /** Groups the user is in, with the names of the roles each gives. */
   groups?: { id: string; name: string; roles: string[] }[];
+  /** Access rules (build 136): expiry, sign-in hours (server time, 0 = Sunday), allowed networks. */
+  access?: { expiresAt: string | null; hours: { days: number[]; from: string; to: string } | null; networks: string[]; expired?: boolean };
 }
 
 export interface Role {

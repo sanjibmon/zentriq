@@ -15,6 +15,10 @@ public sealed class RequestContext(IHttpContextAccessor accessor, AuditWriter au
     public string UserName => Principal.FindFirstValue(ClaimTypes.Email) ?? "anonymous";
     public string? SourceIp => Http.Connection.RemoteIpAddress?.ToString();
     public bool Has(string permission) => Principal.HasClaim(ZentriqClaims.Permission, permission);
+    /// <summary>The user's roles are all limited by a data scope (part of the devices).</summary>
+    public bool Scoped => Principal.HasClaim(ZentriqClaims.Scoped, "1");
+    public static IResult ScopedRefused() => Results.Problem(statusCode: 403,
+        title: "Your access is limited to part of the devices, so you cannot change roles, groups or what other users may see. Ask an administrator with access to all devices.");
     public AuditActor Actor => new(UserId, UserName, SourceIp);
 
     public Task AuditAsync(string action, string? target, string outcome = "Success", object? detail = null, CancellationToken ct = default) =>

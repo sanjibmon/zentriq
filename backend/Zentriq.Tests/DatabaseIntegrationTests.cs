@@ -38,6 +38,8 @@ public sealed class TestDatabase : IAsyncLifetime
             await c.OpenAsync();
             await Exec(c, $"CREATE ROLE {Owner} LOGIN PASSWORD '{_ownerPw}' NOSUPERUSER NOCREATEDB NOCREATEROLE");
             await Exec(c, $"CREATE ROLE {App} LOGIN PASSWORD '{_appPw}' NOSUPERUSER NOCREATEDB NOCREATEROLE");
+            await Exec(c, $"CREATE ROLE {App}_scoped NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE");
+            await Exec(c, $"GRANT {App}_scoped TO {App}");
             await Exec(c, $"CREATE DATABASE {Db} OWNER {Owner} ENCODING 'UTF8' TEMPLATE template0");
         }
         await using (var c = new NpgsqlConnection(new NpgsqlConnectionStringBuilder(_admin) { Database = Db, Pooling = false }.ConnectionString))
@@ -58,6 +60,7 @@ public sealed class TestDatabase : IAsyncLifetime
         await using var c = new NpgsqlConnection(new NpgsqlConnectionStringBuilder(_admin) { Database = "postgres", Pooling = false }.ConnectionString);
         await c.OpenAsync();
         await Exec(c, $"DROP DATABASE IF EXISTS {Db} WITH (FORCE)");
+        await Exec(c, $"DROP ROLE IF EXISTS {App}_scoped");
         await Exec(c, $"DROP ROLE IF EXISTS {App}");
         await Exec(c, $"DROP ROLE IF EXISTS {Owner}");
     }

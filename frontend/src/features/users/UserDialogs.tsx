@@ -3,6 +3,7 @@ import { api } from '../../api/client';
 import type { Role, UserRow } from '../../api/types';
 import { Callout } from '../../components/ui';
 import { errorText } from '../discovery/DirectoryPanel';
+import { AccessRulesEditor, type AccessRulesValue } from './AccessControls';
 
 /** Add a user, or edit name/roles/status and set a new password. */
 export function UserDialog({ existing, roles, groups = [], onClose, onSaved }: { existing: UserRow | null; roles: Role[]; groups?: { id: string; name: string; roles: { name: string }[] }[]; onClose: () => void; onSaved: () => void }) {
@@ -12,6 +13,8 @@ export function UserDialog({ existing, roles, groups = [], onClose, onSaved }: {
   const [inGroups, setInGroups] = useState<string[]>(existing?.groups?.map((g) => g.id) ?? []);
   const [password, setPassword] = useState('');
   const [status, setStatus] = useState(existing?.status ?? 'active');
+  const [access, setAccess] = useState<AccessRulesValue>({ expiresAt: existing?.access?.expiresAt ?? null, hours: existing?.access?.hours ?? null, networks: existing?.access?.networks ?? [] });
+  const [showAccess, setShowAccess] = useState(!!(existing?.access && (existing.access.expiresAt || existing.access.hours || existing.access.networks.length)));
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -19,8 +22,8 @@ export function UserDialog({ existing, roles, groups = [], onClose, onSaved }: {
     e.preventDefault();
     setBusy(true); setError(null);
     try {
-      if (existing) await api.patch(`/users/${existing.id}`, { displayName: name, roles: picked, status, newPassword: password || null, groups: inGroups });
-      else await api.post('/users', { email: email.trim(), displayName: name.trim(), password, roles: picked, groups: inGroups });
+      if (existing) await api.patch(`/users/${existing.id}`, { displayName: name, roles: picked, status, newPassword: password || null, groups: inGroups, access });
+      else await api.post('/users', { email: email.trim(), displayName: name.trim(), password, roles: picked, groups: inGroups, access });
       onSaved();
     } catch (err) { setError(errorText(err)); } finally { setBusy(false); }
   }
@@ -54,6 +57,12 @@ export function UserDialog({ existing, roles, groups = [], onClose, onSaved }: {
               ))}
             </div>
           </div>}
+          <div className="access-block">
+            <button type="button" className="link-btn" onClick={() => setShowAccess((v) => !v)} aria-expanded={showAccess}>
+              {showAccess ? '▾' : '▸'} Access rules <span className="muted">— expiry, sign-in hours, networks</span>
+            </button>
+            {showAccess && <AccessRulesEditor value={access} onChange={setAccess} />}
+          </div>
           {existing && (
             <label>Status
               <select className="in" value={status} onChange={(e) => setStatus(e.target.value)}><option value="active">Active</option><option value="disabled">Disabled</option></select>

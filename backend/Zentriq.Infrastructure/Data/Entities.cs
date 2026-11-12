@@ -79,7 +79,16 @@ public sealed class User
     public DateTimeOffset? LastLoginAt { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
+    /// <summary>Access rules (build 136): the account stops working after this time.</summary>
+    public DateTimeOffset? AccessExpiresAt { get; set; }
+    /// <summary>Allowed sign-in hours as JSON (<c>Zentriq.Application.Security.SigninHours</c>); null = any time.</summary>
+    public string? SigninHours { get; set; }
+    /// <summary>Addresses or CIDR ranges the user may sign in from; empty = anywhere.</summary>
+    public string[] AllowedNetworks { get; set; } = [];
     public List<UserRole> Roles { get; set; } = [];
+
+    public Zentriq.Application.Security.AccessRules Rules() =>
+        new(AccessExpiresAt, Zentriq.Application.Security.SigninHours.Parse(SigninHours), AllowedNetworks ?? []);
 }
 
 public sealed class Permission

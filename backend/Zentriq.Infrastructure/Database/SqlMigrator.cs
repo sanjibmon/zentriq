@@ -118,6 +118,14 @@ public sealed partial class SqlMigrator(ILogger<SqlMigrator> logger)
                 g.Parameters.AddWithValue("r", appRole);
                 await g.ExecuteNonQueryAsync(ct);
             }
+            // Data scope (V0043): row-level security of devices and of every table that belongs to a device.
+            await using (var sp = new NpgsqlCommand("SELECT to_regprocedure('zentriq.apply_scope_policies(text)') IS NOT NULL", conn))
+                if (await sp.ExecuteScalarAsync(ct) is true)
+                {
+                    await using var pol = new NpgsqlCommand("SELECT zentriq.apply_scope_policies(@r)", conn);
+                    pol.Parameters.AddWithValue("r", appRole);
+                    await pol.ExecuteNonQueryAsync(ct);
+                }
             await using (var h = new NpgsqlCommand(
                 "INSERT INTO zentriq.installation_history (action, to_version, outcome, detail) VALUES ('migrate', @p, 'succeeded', jsonb_build_object('applied', @n::int, 'schemaVersion', @s::int))", conn))
             {

@@ -10,6 +10,7 @@ import { Icon } from '../../components/Icon';
 import { UserDialog } from './UserDialogs';
 import { GroupDialog, RoleDialog, type GroupRow, type RoleRow } from './RoleDialogs';
 import { describe } from './access';
+import { accessBadges, scopeCount, scopeText } from './AccessControls';
 import { SignInTab } from './SignInTab';
 import { errorText } from '../discovery/DirectoryPanel';
 
@@ -54,7 +55,7 @@ export function UsersPage() {
           <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => navigate(k === 'users' ? '/users' : `/users?tab=${k}`, true)}>{l}</button>
         ))}
       </div>
-      {tab === 'signin' && <SignInTab roles={roles.data ?? []} />}
+      {tab === 'signin' && <SignInTab roles={roles.data ?? []} groups={groups.data ?? []} onChanged={() => groups.reload()} />}
       {tab === 'users' && <>
         <ErrorBox error={users.error} />
         <Panel flush>
@@ -67,7 +68,10 @@ export function UsersPage() {
               {(u.directoryRoles ?? []).length > 0 && <div className="faint" style={{ fontSize: 11.5 }}>from directory groups: {(u.directoryRoles ?? []).join(', ')}</div>}
             </> },
             { key: 'm', label: 'MFA', render: (u) => <Pill tone={u.mfaEnabled ? 'ok' : 'warn'}>{u.mfaEnabled ? 'Enrolled' : 'Not enrolled'}</Pill> },
-            { key: 's', label: 'Status', render: (u) => <Pill tone={u.locked ? 'crit' : u.status === 'active' ? 'ok' : ''}>{u.locked ? 'Locked' : fmt.label(u.status)}</Pill> },
+            { key: 's', label: 'Status', render: (u) => <>
+              <Pill tone={u.locked || u.access?.expired ? 'crit' : u.status === 'active' ? 'ok' : ''}>{u.locked ? 'Locked' : u.access?.expired ? 'Expired' : fmt.label(u.status)}</Pill>
+              {accessBadges(u.access).filter((b) => b !== 'Expired').length > 0 && <div className="faint" style={{ fontSize: 11.5 }} title="Access rules">{accessBadges(u.access).filter((b) => b !== 'Expired').join(' · ')}</div>}
+            </> },
             { key: 'l', label: 'Last sign-in', render: (u) => fmt.ago(u.lastLoginAt) },
             { key: 'x', label: '', render: (u) => <div className="row-actions">
               <button className="btn sm" onClick={() => setEdit(u)}>Edit</button>
@@ -82,6 +86,8 @@ export function UsersPage() {
           <DataTable rows={roles.data ?? []} empty={roles.loading ? 'Loading…' : 'No roles.'} columns={[
             { key: 'n', label: 'Role', className: 'wrap', render: (r) => <><b>{r.name}</b> {r.builtIn ? <Pill tone="info">Built-in</Pill> : <Pill>Custom</Pill>}<div className="faint" style={{ fontSize: 11.5 }}>{r.description}</div></> },
             { key: 'p', label: 'Access', className: 'wrap', render: (r) => r.id === 'admin' ? <span>Everything</span> : <ul className="access-list">{describe(r.permissions).map((d) => <li key={d}>{d}</li>)}</ul> },
+            { key: 'sc', label: 'Devices', className: 'wrap', render: (r) => scopeCount(r.scope) === 0 ? <span className="faint">All</span> : <span title={scopeText(r.scope)}>{scopeText(r.scope)}</span> },
+            { key: 'mfa', label: 'MFA', render: (r) => r.mfaRequired ? <Pill tone="info">Required</Pill> : <span className="faint">—</span> },
             { key: 'u', label: 'Given to', render: (r) => <span className="faint">{r.users} user(s){r.groups ? ` · ${r.groups} group(s)` : ''}</span> },
             { key: 'a', label: '', render: (r) => <div className="row-actions">
               <button className="btn sm" onClick={() => setRoleEdit({ role: r })}>{r.builtIn ? 'View' : 'Edit'}</button>
@@ -97,6 +103,8 @@ export function UsersPage() {
           <DataTable rows={groups.data ?? []} empty={groups.loading ? 'Loading…' : 'No groups yet.'} columns={[
             { key: 'n', label: 'Group', className: 'wrap', render: (g) => <><b>{g.name}</b><div className="faint" style={{ fontSize: 11.5 }}>{g.description}</div></> },
             { key: 'r', label: 'Roles', className: 'wrap', render: (g) => g.roles.map((r) => r.name).join(', ') || <span className="muted">—</span> },
+            { key: 'sc', label: 'Devices', className: 'wrap', render: (g) => scopeCount(g.scope) === 0 ? <span className="faint">Roles' scope</span> : <span>{scopeText(g.scope)}</span> },
+            { key: 'd', label: 'Directory groups', className: 'wrap', render: (g) => (g.directoryGroups ?? []).length === 0 ? <span className="faint">—</span> : (g.directoryGroups ?? []).map((d) => d.groupName ?? d.groupRef).join(', ') },
             { key: 'm', label: 'Members', className: 'wrap', render: (g) => g.members.length === 0 ? <span className="muted">—</span>
               : <span title={g.members.map((m) => m.email).join(', ')}>{g.members.slice(0, 4).map((m) => m.displayName).join(', ')}{g.members.length > 4 ? ` +${g.members.length - 4}` : ''}</span> },
             { key: 'a', label: '', render: (g) => <div className="row-actions">

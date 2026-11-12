@@ -19,6 +19,8 @@ public static class ZentriqClaims
     public const string MfaPending = "zq:mfa_pending";
     /// <summary>Changes when the user's roles or their permissions change: the session's permissions are then reloaded.</summary>
     public const string Access = "zq:access";
+    /// <summary>The user's roles are all limited by a data scope: the API reads devices through a scoped connection.</summary>
+    public const string Scoped = "zq:scoped";
 }
 
 public static class SessionEvents
@@ -44,6 +46,13 @@ public static class SessionEvents
             var db = ctx.HttpContext.RequestServices.GetRequiredService<ZentriqDbContext>();
             var u = await db.Users.AsNoTracking().Where(x => x.Id == id).FirstOrDefaultAsync();
             if (u is null || u.Status != "active" || u.SecurityStamp != st) { Reject(); return; }
+            // Access rules (expiry, sign-in hours, networks) apply to running sessions too.
+            if (u.Rules().Denied(now, ctx.HttpContext.Connection.RemoteIpAddress, TimeZoneInfo.Local) is { } why)
+            {
+                await ctx.HttpContext.RequestServices.GetRequiredService<Zentriq.Infrastructure.Audit.AuditWriter>()
+                    .WriteAsync(new Zentriq.Infrastructure.Audit.AuditActor(u.Id, u.Email, ctx.HttpContext.Connection.RemoteIpAddress?.ToString()), "auth.session_ended", u.Email, "Denied", new { reason = why });
+                Reject(); return;
+            }
             // Roles or role permissions changed since sign-in: reload them, the user stays signed in.
             if (ctx.Principal?.FindFirstValue(ZentriqClaims.Access) != u.AccessStamp.ToString())
             {
@@ -108,6 +117,9 @@ public static class ApiErrors
     public static (int Status, string Title) Map(Exception? ex) => ex switch
     {
         BadHttpRequestException b => (b.StatusCode, "The request is invalid."),
+        // Row-level security (data scope): a scoped user tried to change a device, or move it, outside their scope.
+        Npgsql.PostgresException { SqlState: "42501" } p when p.MessageText.Contains("row-level security", StringComparison.Ordinal) =>
+            (403, "This device is outside the devices you may manage (data scope of your roles)."),
         DbUpdateConcurrencyException => (409, "The record was changed by someone else. Reload and try again."),
         Zentriq.Infrastructure.Licensing.WorkloadLimitExceededException w => (409, w.Message),
         _ => (500, "An unexpected error occurred. The details are in the server log."),

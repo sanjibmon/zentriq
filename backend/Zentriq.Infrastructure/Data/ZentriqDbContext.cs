@@ -43,6 +43,7 @@ public sealed class ZentriqDbContext(DbContextOptions<ZentriqDbContext> options)
         b.Entity<User>(e =>
         {
             e.ToTable("users");
+            e.Property(x => x.SigninHours).HasColumnType("jsonb");
             e.HasMany(x => x.Roles).WithOne().HasForeignKey(x => x.UserId);
         });
         b.Entity<Permission>(e => { e.ToTable("permissions"); e.HasKey(x => x.Code); });

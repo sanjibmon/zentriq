@@ -14,7 +14,8 @@ public static class SignInEndpoints
 {
     public sealed record EntraBody(bool Enabled, string? TenantId, string? ClientId, bool? CreateUsers, string? ClientSecret);
     public sealed record TestBody(string? Username, string? Password);
-    public sealed record MappingBody(string Provider, string GroupRef, string? GroupName, string RoleId);
+    /// <summary>A directory group mapped to a Zentriq role (RoleId) or to a Zentriq group (GroupId).</summary>
+    public sealed record MappingBody(string Provider, string GroupRef, string? GroupName, string? RoleId, Guid? GroupId = null);
 
     public static void MapSignInEndpoints(this RouteGroupBuilder api)
     {
@@ -78,7 +79,8 @@ public static class SignInEndpoints
             }
             var mappings = (await store.MappingsAsync(ct)).Where(m => m.Provider == "ldap").ToList();
             var refs = who.Groups.Select(x => x.Ref.ToLowerInvariant()).ToHashSet();
-            var roles = mappings.Where(m => refs.Contains(m.GroupRef.ToLowerInvariant())).Select(m => m.RoleId).Distinct().ToList();
+            var hits = mappings.Where(m => refs.Contains(m.GroupRef.ToLowerInvariant())).ToList();
+            var roles = hits.Where(m => m.RoleId is not null).Select(m => m.RoleId!).Concat(hits.Where(m => m.ZentriqGroup is not null).Select(m => "group " + m.ZentriqGroup)).Distinct().ToList();
             await rc.AuditAsync("auth.signin.test", body.Username, detail: new { ok = true, groups = who.Groups.Count, roles });
             return Results.Ok(new
             {
@@ -90,35 +92,56 @@ public static class SignInEndpoints
 
         g.MapPost("/mappings", async (MappingBody body, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
         {
+            if (rc.Scoped) return RequestContext.ScopedRefused();
+            if ((body.RoleId is { Length: > 0 }) == (body.GroupId is not null)) return Validation.Problem("roleId", "Choose a role or a Zentriq group.");
             if (body.Provider is not ("ldap" or "entra")) return Validation.Problem("provider", "Choose Active Directory or Microsoft Entra ID.");
             var gref = (body.GroupRef ?? "").Trim();
             if (gref.Length is 0 or > 1000) return Validation.Problem("groupRef", body.Provider == "ldap" ? "Enter the group's distinguished name (CN=…,OU=…,DC=…)." : "Enter the group's object ID or an app role value.");
             if (body.Provider == "ldap" && !gref.Contains('=')) return Validation.Problem("groupRef", "Enter the group's distinguished name, for example CN=Zentriq Admins,OU=Groups,DC=contoso,DC=com.");
-            await using var cmd = ds.CreateCommand("""
+            await using var cmd = ds.CreateCommand(body.GroupId is null ? """
                 INSERT INTO zentriq.auth_group_mappings (provider, group_ref, group_name, role_id, created_by)
                 SELECT @p, @g, @n, r.id, @by FROM zentriq.roles r WHERE r.id = @r
                 ON CONFLICT (provider, lower(group_ref), role_id) DO UPDATE SET group_name = COALESCE(EXCLUDED.group_name, zentriq.auth_group_mappings.group_name)
+                RETURNING id
+                """ : """
+                INSERT INTO zentriq.auth_group_mappings (provider, group_ref, group_name, group_id, created_by)
+                SELECT @p, @g, @n, ug.id, @by FROM zentriq.user_groups ug WHERE ug.id = @gid
+                ON CONFLICT (provider, lower(group_ref), group_id) WHERE group_id IS NOT NULL DO UPDATE SET group_name = COALESCE(EXCLUDED.group_name, zentriq.auth_group_mappings.group_name)
                 RETURNING id
                 """);
             cmd.Parameters.AddWithValue("p", body.Provider);
             cmd.Parameters.AddWithValue("g", gref);
             cmd.Parameters.Add(new NpgsqlParameter("n", NpgsqlDbType.Text) { Value = string.IsNullOrWhiteSpace(body.GroupName) ? DBNull.Value : body.GroupName.Trim() });
             cmd.Parameters.AddWithValue("r", body.RoleId ?? "");
+            cmd.Parameters.AddWithValue("gid", body.GroupId ?? Guid.Empty);
             cmd.Parameters.AddWithValue("by", rc.UserName);
-            if (await cmd.ExecuteScalarAsync(ct) is not Guid id) return Validation.Problem("roleId", "Choose a role.");
-            await rc.AuditAsync("auth.signin.mapping", gref, detail: new { body.Provider, gref, body.GroupName, body.RoleId });
+            if (await cmd.ExecuteScalarAsync(ct) is not Guid id) return Validation.Problem("roleId", body.GroupId is null ? "Choose a role." : "Choose a Zentriq group.");
+            await rc.AuditAsync("auth.signin.mapping", gref, detail: new { body.Provider, gref, body.GroupName, body.RoleId, body.GroupId });
             return Results.Ok(new { id });
         });
 
         g.MapDelete("/mappings/{id:guid}", async (Guid id, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
         {
-            string provider, gref, role;
-            await using (var cmd = ds.CreateCommand("DELETE FROM zentriq.auth_group_mappings WHERE id = @id RETURNING provider, group_ref, role_id"))
+            if (rc.Scoped) return RequestContext.ScopedRefused();
+            string provider, gref, role; Guid? group;
+            await using (var cmd = ds.CreateCommand("DELETE FROM zentriq.auth_group_mappings WHERE id = @id RETURNING provider, group_ref, COALESCE(role_id, ''), group_id"))
             {
                 cmd.Parameters.AddWithValue("id", id);
                 await using var r = await cmd.ExecuteReaderAsync(ct);
                 if (!await r.ReadAsync(ct)) return Results.NotFound();
-                provider = r.GetString(0); gref = r.GetString(1); role = r.GetString(2);
+                provider = r.GetString(0); gref = r.GetString(1); role = r.GetString(2); group = r.IsDBNull(3) ? null : r.GetGuid(3);
+            }
+            if (group is { } gid)
+            {
+                await using var revokeGroup = ds.CreateCommand("""
+                    WITH d AS (DELETE FROM zentriq.user_directory_groups WHERE provider = @p AND group_id = @g RETURNING user_id)
+                    UPDATE zentriq.users SET access_stamp = gen_random_uuid() WHERE id IN (SELECT user_id FROM d)
+                    """);
+                revokeGroup.Parameters.AddWithValue("p", provider);
+                revokeGroup.Parameters.AddWithValue("g", gid);
+                await revokeGroup.ExecuteNonQueryAsync(ct);
+                await rc.AuditAsync("auth.signin.mapping_removed", gref, detail: new { provider, group = gid });
+                return Results.NoContent();
             }
             // The role is taken away from the directory users who had it at once (those in another group mapped to it get
             // it back at their next sign-in); their sessions reload their permissions.

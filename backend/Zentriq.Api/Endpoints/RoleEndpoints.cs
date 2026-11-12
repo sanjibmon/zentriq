@@ -13,8 +13,35 @@ namespace Zentriq.Api.Endpoints;
 /// </summary>
 public static partial class RoleEndpoints
 {
-    public sealed record RoleBody(string? Name, string? Description, string[]? Permissions);
-    public sealed record GroupBody(string? Name, string? Description, string[]? Roles, Guid[]? Members);
+    /// <summary>Data scope: devices in any of these locations, departments or device groups. All empty: every device.</summary>
+    public sealed record ScopeBody(Guid[]? Locations, Guid[]? Departments, Guid[]? DeviceGroups)
+    {
+        public Guid[] L => (Locations ?? []).Distinct().ToArray();
+        public Guid[] D => (Departments ?? []).Distinct().ToArray();
+        public Guid[] G => (DeviceGroups ?? []).Distinct().ToArray();
+    }
+    public sealed record RoleBody(string? Name, string? Description, string[]? Permissions, bool? MfaRequired = null, ScopeBody? Scope = null);
+    public sealed record GroupBody(string? Name, string? Description, string[]? Roles, Guid[]? Members, ScopeBody? Scope = null);
+    public sealed record MfaBody(bool Required);
+
+    private const string ScopeSelect = """
+        jsonb_build_object(
+            'locations', COALESCE((SELECT jsonb_agg(jsonb_build_object('id', l.id, 'name', l.name) ORDER BY l.name) FROM zentriq.locations l WHERE l.id = ANY({0}.scope_location_ids)), '[]'::jsonb),
+            'departments', COALESCE((SELECT jsonb_agg(jsonb_build_object('id', d.id, 'name', d.name) ORDER BY d.name) FROM zentriq.departments d WHERE d.id = ANY({0}.scope_department_ids)), '[]'::jsonb),
+            'deviceGroups', COALESCE((SELECT jsonb_agg(jsonb_build_object('id', x.id, 'name', x.name) ORDER BY x.name) FROM zentriq.device_groups x WHERE x.id = ANY({0}.scope_device_group_ids)), '[]'::jsonb))::text
+        """;
+
+    private static async Task SetScopeAsync(NpgsqlConnection conn, NpgsqlTransaction tx, string table, object id, ScopeBody? scope, CancellationToken ct)
+    {
+        await using var cmd = new NpgsqlCommand($"UPDATE zentriq.{table} SET scope_location_ids = @l, scope_department_ids = @d, scope_device_group_ids = @g WHERE id = @id", conn, tx);
+        cmd.Parameters.AddWithValue("id", id);
+        cmd.Parameters.Add(new NpgsqlParameter("l", NpgsqlDbType.Array | NpgsqlDbType.Uuid) { Value = scope?.L ?? [] });
+        cmd.Parameters.Add(new NpgsqlParameter("d", NpgsqlDbType.Array | NpgsqlDbType.Uuid) { Value = scope?.D ?? [] });
+        cmd.Parameters.Add(new NpgsqlParameter("g", NpgsqlDbType.Array | NpgsqlDbType.Uuid) { Value = scope?.G ?? [] });
+        await cmd.ExecuteNonQueryAsync(ct);
+    }
+
+    private static System.Text.Json.JsonElement Json(string s) => System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(s);
 
     public static void MapRoleEndpoints(this RouteGroupBuilder api)
     {
@@ -22,12 +49,13 @@ public static partial class RoleEndpoints
 
         g.MapGet("/roles", async (NpgsqlDataSource ds, CancellationToken ct) =>
         {
-            await using var cmd = ds.CreateCommand("""
+            await using var cmd = ds.CreateCommand($"""
                 SELECT r.id, r.name, r.description, r.built_in,
                        ARRAY(SELECT rp.permission_code FROM zentriq.role_permissions rp WHERE rp.role_id = r.id ORDER BY 1),
                        (SELECT count(*) FROM zentriq.user_roles ur WHERE ur.role_id = r.id),
                        (SELECT count(*) FROM zentriq.user_group_roles gr WHERE gr.role_id = r.id),
-                       (SELECT count(DISTINCT g.user_id) FROM zentriq.user_role_grants g JOIN zentriq.users u ON u.id = g.user_id AND u.status = 'active' WHERE g.role_id = r.id)
+                       (SELECT count(DISTINCT g.user_id) FROM zentriq.user_role_grants g JOIN zentriq.users u ON u.id = g.user_id AND u.status = 'active' WHERE g.role_id = r.id),
+                       r.mfa_required, {ScopeSelect.Replace("{0}", "r")}
                   FROM zentriq.roles r
                  ORDER BY r.built_in DESC, CASE r.id WHEN 'admin' THEN 0 ELSE 1 END, r.name
                 """);
@@ -38,8 +66,21 @@ public static partial class RoleEndpoints
                 {
                     id = r.GetString(0), name = r.GetString(1), description = r.GetString(2), builtIn = r.GetBoolean(3), permissions = r.GetFieldValue<string[]>(4),
                     users = r.GetInt64(5), groups = r.GetInt64(6), activeMembers = r.GetInt64(7),
+                    mfaRequired = r.GetBoolean(8), scope = Json(r.GetString(9)),
                 });
             return Results.Ok(list);
+        });
+
+        // What a data scope can be made of (Roles and Groups dialogs).
+        g.MapGet("/access/scope-options", async (NpgsqlDataSource ds, CancellationToken ct) =>
+        {
+            await using var cmd = ds.CreateCommand("""
+                SELECT jsonb_build_object(
+                    'locations', COALESCE((SELECT jsonb_agg(jsonb_build_object('id', id, 'name', name) ORDER BY name) FROM zentriq.locations), '[]'::jsonb),
+                    'departments', COALESCE((SELECT jsonb_agg(jsonb_build_object('id', id, 'name', name) ORDER BY name) FROM zentriq.departments), '[]'::jsonb),
+                    'deviceGroups', COALESCE((SELECT jsonb_agg(jsonb_build_object('id', id, 'name', name) ORDER BY name) FROM zentriq.device_groups), '[]'::jsonb))::text
+                """);
+            return Results.Text((string)(await cmd.ExecuteScalarAsync(ct))!, "application/json");
         });
 
         g.MapGet("/permissions", async (NpgsqlDataSource ds, CancellationToken ct) =>
@@ -53,6 +94,7 @@ public static partial class RoleEndpoints
 
         g.MapPost("/roles", async (RoleBody body, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
         {
+            if (rc.Scoped) return RequestContext.ScopedRefused();
             if (await CheckRoleAsync(body, ds, rc, null, ct) is { } bad) return bad;
             var id = NewRoleId(body.Name!);
             await using var conn = await ds.OpenConnectionAsync(ct);
@@ -67,8 +109,15 @@ public static partial class RoleEndpoints
                 catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation) { return Validation.Problem("name", "A role with this name exists."); }
             }
             await SetPermissionsAsync(conn, tx, id, body.Permissions!, ct);
+            await SetScopeAsync(conn, tx, "roles", id, body.Scope, ct);
+            await using (var mfa = new NpgsqlCommand("UPDATE zentriq.roles SET mfa_required = @m WHERE id = @id", conn, tx))
+            {
+                mfa.Parameters.AddWithValue("id", id);
+                mfa.Parameters.AddWithValue("m", body.MfaRequired == true);
+                await mfa.ExecuteNonQueryAsync(ct);
+            }
             await tx.CommitAsync(ct);
-            await rc.AuditAsync("role.create", body.Name!.Trim(), detail: new { id, permissions = body.Permissions });
+            await rc.AuditAsync("role.create", body.Name!.Trim(), detail: new { id, permissions = body.Permissions, body.MfaRequired, scope = body.Scope });
             return Results.Ok(new { id });
         });
 
@@ -76,6 +125,7 @@ public static partial class RoleEndpoints
         {
             if (await BuiltInAsync(ds, id, ct) is not { } builtIn) return Results.NotFound();
             if (builtIn) return Results.Problem(statusCode: 409, title: "Built-in roles cannot be changed. Duplicate the role and change the copy.");
+            if (rc.Scoped) return RequestContext.ScopedRefused();
             if (await CheckRoleAsync(body, ds, rc, id, ct) is { } bad) return bad;
             await using var conn = await ds.OpenConnectionAsync(ct);
             await using var tx = await conn.BeginTransactionAsync(ct);
@@ -88,14 +138,34 @@ public static partial class RoleEndpoints
                 catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation) { return Validation.Problem("name", "A role with this name exists."); }
             }
             await SetPermissionsAsync(conn, tx, id, body.Permissions!, ct);
+            await SetScopeAsync(conn, tx, "roles", id, body.Scope, ct);
+            await using (var mfa = new NpgsqlCommand("UPDATE zentriq.roles SET mfa_required = @m WHERE id = @id", conn, tx))
+            {
+                mfa.Parameters.AddWithValue("id", id);
+                mfa.Parameters.AddWithValue("m", body.MfaRequired == true);
+                await mfa.ExecuteNonQueryAsync(ct);
+            }
             await TouchRoleMembersAsync(conn, tx, [id], ct);
             await tx.CommitAsync(ct);
-            await rc.AuditAsync("role.update", body.Name!.Trim(), detail: new { id, permissions = body.Permissions });
+            await rc.AuditAsync("role.update", body.Name!.Trim(), detail: new { id, permissions = body.Permissions, body.MfaRequired, scope = body.Scope });
+            return Results.NoContent();
+        });
+
+        // Built-in roles too: require an authenticator app for the members of a role (from their next sign-in).
+        g.MapPut("/roles/{id}/mfa", async (string id, MfaBody body, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
+        {
+            if (rc.Scoped) return RequestContext.ScopedRefused();
+            await using var cmd = ds.CreateCommand("UPDATE zentriq.roles SET mfa_required = @m, updated_at = now() WHERE id = @id RETURNING name");
+            cmd.Parameters.AddWithValue("id", id);
+            cmd.Parameters.AddWithValue("m", body.Required);
+            if (await cmd.ExecuteScalarAsync(ct) is not string name) return Results.NotFound();
+            await rc.AuditAsync("role.mfa", name, detail: new { id, required = body.Required });
             return Results.NoContent();
         });
 
         g.MapDelete("/roles/{id}", async (string id, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
         {
+            if (rc.Scoped) return RequestContext.ScopedRefused();
             if (await BuiltInAsync(ds, id, ct) is not { } builtIn) return Results.NotFound();
             if (builtIn) return Results.Problem(statusCode: 409, title: "Built-in roles cannot be deleted.");
             await using (var used = ds.CreateCommand("""
@@ -119,8 +189,9 @@ public static partial class RoleEndpoints
 
         g.MapGet("/groups", async (NpgsqlDataSource ds, CancellationToken ct) =>
         {
-            await using var cmd = ds.CreateCommand("""
-                SELECT g.id, g.name, g.description, g.created_at,
+            await using var cmd = ds.CreateCommand($"""
+                SELECT g.id, g.name, g.description, g.created_at, {ScopeSelect.Replace("{0}", "g")},
+                       COALESCE((SELECT jsonb_agg(jsonb_build_object('id', m.id, 'provider', m.provider, 'groupRef', m.group_ref, 'groupName', m.group_name)) FROM zentriq.auth_group_mappings m WHERE m.group_id = g.id), '[]'::jsonb)::text,
                        COALESCE((SELECT jsonb_agg(jsonb_build_object('id', r.id, 'name', r.name) ORDER BY r.name) FROM zentriq.user_group_roles gr JOIN zentriq.roles r ON r.id = gr.role_id WHERE gr.group_id = g.id), '[]'::jsonb)::text,
                        COALESCE((SELECT jsonb_agg(jsonb_build_object('id', u.id, 'displayName', u.display_name, 'email', u.email, 'status', u.status) ORDER BY u.display_name) FROM zentriq.user_group_members m JOIN zentriq.users u ON u.id = m.user_id WHERE m.group_id = g.id), '[]'::jsonb)::text
                   FROM zentriq.user_groups g ORDER BY lower(g.name)
@@ -131,8 +202,9 @@ public static partial class RoleEndpoints
                 list.Add(new
                 {
                     id = r.GetGuid(0), name = r.GetString(1), description = r.GetString(2), createdAt = r.GetFieldValue<DateTimeOffset>(3),
-                    roles = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(r.GetString(4)),
-                    members = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(r.GetString(5)),
+                    scope = Json(r.GetString(4)), directoryGroups = Json(r.GetString(5)),
+                    roles = Json(r.GetString(6)),
+                    members = Json(r.GetString(7)),
                 });
             return Results.Ok(list);
         });
@@ -144,6 +216,7 @@ public static partial class RoleEndpoints
 
         g.MapDelete("/groups/{id:guid}", async (Guid id, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
         {
+            if (rc.Scoped) return RequestContext.ScopedRefused();
             await using var conn = await ds.OpenConnectionAsync(ct);
             await using var tx = await conn.BeginTransactionAsync(ct);
             await TouchGroupMembersAsync(conn, tx, id, ct);
@@ -163,6 +236,7 @@ public static partial class RoleEndpoints
 
     private static async Task<IResult> SaveGroupAsync(Guid? id, GroupBody body, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct)
     {
+        if (rc.Scoped) return RequestContext.ScopedRefused();
         var name = body.Name?.Trim() ?? "";
         if (name.Length is 0 or > 100) return Validation.Problem("name", "Enter a name (max 100 characters).");
         var roles = (body.Roles ?? []).Distinct().ToArray();
@@ -195,6 +269,7 @@ public static partial class RoleEndpoints
             set.Parameters.Add(new NpgsqlParameter("members", NpgsqlDbType.Array | NpgsqlDbType.Uuid) { Value = members });
             await set.ExecuteNonQueryAsync(ct);
         }
+        await SetScopeAsync(conn, tx, "user_groups", gid, body.Scope, ct);
         await TouchGroupMembersAsync(conn, tx, gid, ct);   // members after the change
         if (await AdminsAsync(conn, tx, ct) == 0)
         {
@@ -202,7 +277,7 @@ public static partial class RoleEndpoints
             return Results.Problem(statusCode: 409, title: "At least one active administrator is required.");
         }
         await tx.CommitAsync(ct);
-        await rc.AuditAsync(id is null ? "group.create" : "group.update", name, detail: new { id = gid, roles, members = members.Length });
+        await rc.AuditAsync(id is null ? "group.create" : "group.update", name, detail: new { id = gid, roles, members = members.Length, scope = body.Scope });
         return id is null ? Results.Ok(new { id = gid }) : Results.NoContent();
     }
 
@@ -271,7 +346,7 @@ public static partial class RoleEndpoints
 
     private static async Task TouchGroupMembersAsync(NpgsqlConnection conn, NpgsqlTransaction tx, Guid group, CancellationToken ct)
     {
-        await using var cmd = new NpgsqlCommand("UPDATE zentriq.users SET access_stamp = gen_random_uuid() WHERE id IN (SELECT user_id FROM zentriq.user_group_members WHERE group_id = @g)", conn, tx);
+        await using var cmd = new NpgsqlCommand("UPDATE zentriq.users SET access_stamp = gen_random_uuid() WHERE id IN (SELECT user_id FROM zentriq.user_group_members WHERE group_id = @g UNION SELECT user_id FROM zentriq.user_directory_groups WHERE group_id = @g)", conn, tx);
         cmd.Parameters.AddWithValue("g", group);
         await cmd.ExecuteNonQueryAsync(ct);
     }

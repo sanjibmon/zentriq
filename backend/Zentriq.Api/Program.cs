@@ -171,6 +171,8 @@ app.UseAuthorization();
 
 app.MapHealthEndpoints();
 var api = app.MapGroup("/api/v1");
+// Data scope: scoped users read devices through their own connections (row-level security).
+api.AddEndpointFilter<DataScopeFilter>();
 api.MapSetupEndpoints();
 api.MapAuthEndpoints();
 api.MapAccountEndpoints(options);

@@ -234,7 +234,28 @@ public sealed class InventoryStore(LicensingService licensing, Zentriq.Infrastru
         cmd.Parameters.Add(Text("mf", HardwareProfiles.Clean(doc.Device.Manufacturer)));
         cmd.Parameters.Add(Text("md", HardwareProfiles.Clean(doc.Device.Model)));
         cmd.Parameters.Add(Text("ib", doc.Device.IdentifiedBy is { Count: > 0 } ib ? JsonSerializer.Serialize(ib) : null));
+        // A renamed computer: the new name replaces the old one everywhere (devices, agents); the change history keeps both.
+        string? oldName = null;
+        if (doc.Device.Hostname is { Length: > 0 })
+        {
+            await using var q = new NpgsqlCommand("SELECT hostname FROM zentriq.assets WHERE id = @id", conn, tx);
+            q.Parameters.AddWithValue("id", id);
+            oldName = await q.ExecuteScalarAsync(ct) as string;
+        }
         await cmd.ExecuteNonQueryAsync(ct);
+        if (oldName is { Length: > 0 } && doc.Device.Hostname is { Length: > 0 } newName && !string.Equals(oldName, newName, StringComparison.OrdinalIgnoreCase))
+        {
+            await using var ch = new NpgsqlCommand("""
+                INSERT INTO zentriq.asset_changes (asset_id, kind, change, component, item, old_value, new_value, source)
+                VALUES (@a, 'hardware', 'changed', 'Computer name', 'Computer name', @o, @n, @s);
+                UPDATE zentriq.agent_registrations SET hostname = @n WHERE asset_id = @a AND status = 'active';
+                """, conn, tx);
+            ch.Parameters.AddWithValue("a", id);
+            ch.Parameters.AddWithValue("o", oldName);
+            ch.Parameters.AddWithValue("n", newName);
+            ch.Parameters.AddWithValue("s", doc.Source);
+            await ch.ExecuteNonQueryAsync(ct);
+        }
     }
 
     /// <summary>The device type an inventory shows: its chassis (laptop, virtual, switch, printer…), else from the category.</summary>

@@ -35,17 +35,19 @@ public sealed class ApiTokenAuthenticationHandler(IOptionsMonitor<Authentication
                    ARRAY(SELECT DISTINCT rp.permission_code FROM zentriq.user_role_grants ur JOIN zentriq.role_permissions rp ON rp.role_id = ur.role_id
                           WHERE ur.user_id = u.id AND rp.permission_code = ANY(t.permissions
                                 || CASE WHEN 'reports.export' = ANY(t.permissions) THEN ARRAY['reports.view'] ELSE '{}'::text[] END)),
-                   t.last_used_at IS NULL OR t.last_used_at < now() - interval '1 minute'
+                   t.last_used_at IS NULL OR t.last_used_at < now() - interval '1 minute',
+                   zentriq.user_is_scoped(u.id)
               FROM zentriq.api_tokens t JOIN zentriq.users u ON u.id = t.created_by
              WHERE t.token_hash = @h AND t.revoked_at IS NULL AND (t.expires_at IS NULL OR t.expires_at > now()) AND u.status = 'active'
+               AND (u.access_expires_at IS NULL OR u.access_expires_at > now())
             """);
         cmd.Parameters.AddWithValue("h", IntegrationStore.HashToken(token));
-        Guid tokenId, userId; string name, email, display; string[] perms; bool touch;
+        Guid tokenId, userId; string name, email, display; string[] perms; bool touch, scoped;
         await using (var r = await cmd.ExecuteReaderAsync(Context.RequestAborted))
         {
             if (!await r.ReadAsync(Context.RequestAborted)) return AuthenticateResult.Fail("The API token is not valid, has expired or was revoked.");
             tokenId = r.GetGuid(0); name = r.GetString(1); userId = r.GetGuid(2); email = r.GetString(3); display = r.GetString(4);
-            perms = r.GetFieldValue<string[]>(5); touch = r.GetBoolean(6);
+            perms = r.GetFieldValue<string[]>(5); touch = r.GetBoolean(6); scoped = r.GetBoolean(7);
         }
         if (touch)
         {
@@ -62,6 +64,7 @@ public sealed class ApiTokenAuthenticationHandler(IOptionsMonitor<Authentication
             new(TokenIdClaim, tokenId.ToString()),
         };
         claims.AddRange(perms.Select(p => new Claim(ZentriqClaims.Permission, p)));
+        if (scoped) claims.Add(new Claim(ZentriqClaims.Scoped, "1"));
         var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, Scheme));
         return AuthenticateResult.Success(new AuthenticationTicket(principal, Scheme));
     }

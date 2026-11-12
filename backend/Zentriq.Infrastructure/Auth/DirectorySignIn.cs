@@ -39,7 +39,8 @@ public sealed class EntraSignInSettings
 }
 
 /// <summary>A directory group (LDAP distinguished name, Entra group object ID or app role value) that gives a Zentriq role.</summary>
-public sealed record GroupMapping(Guid Id, string Provider, string GroupRef, string? GroupName, string RoleId);
+/// <summary>A directory group mapped to a Zentriq role or to a Zentriq group (exactly one of the two).</summary>
+public sealed record GroupMapping(Guid Id, string Provider, string GroupRef, string? GroupName, string? RoleId, Guid? GroupId = null, string? ZentriqGroup = null);
 
 /// <summary>A person signed in by the directory: a stable id, e-mail, name and the groups they are in.</summary>
 public sealed record DirectoryIdentity(string Provider, string ExternalId, string Email, string DisplayName, IReadOnlyList<(string Ref, string? Name)> Groups);
@@ -99,9 +100,15 @@ public sealed class SignInStore(NpgsqlDataSource ds, CredentialProtector protect
     public async Task<List<GroupMapping>> MappingsAsync(CancellationToken ct)
     {
         var list = new List<GroupMapping>();
-        await using var cmd = ds.CreateCommand("SELECT id, provider, group_ref, group_name, role_id FROM zentriq.auth_group_mappings ORDER BY provider, lower(COALESCE(group_name, group_ref)), role_id");
+        await using var cmd = ds.CreateCommand("""
+            SELECT m.id, m.provider, m.group_ref, m.group_name, m.role_id, m.group_id, g.name
+              FROM zentriq.auth_group_mappings m LEFT JOIN zentriq.user_groups g ON g.id = m.group_id
+             ORDER BY m.provider, lower(COALESCE(m.group_name, m.group_ref)), m.role_id, g.name
+            """);
         await using var r = await cmd.ExecuteReaderAsync(ct);
-        while (await r.ReadAsync(ct)) list.Add(new GroupMapping(r.GetGuid(0), r.GetString(1), r.GetString(2), r.IsDBNull(3) ? null : r.GetString(3), r.GetString(4)));
+        while (await r.ReadAsync(ct))
+            list.Add(new GroupMapping(r.GetGuid(0), r.GetString(1), r.GetString(2), r.IsDBNull(3) ? null : r.GetString(3), r.IsDBNull(4) ? null : r.GetString(4),
+                r.IsDBNull(5) ? null : r.GetGuid(5), r.IsDBNull(6) ? null : r.GetString(6)));
         return list;
     }
 }
@@ -203,13 +210,20 @@ public static class DirectoryUsers
         await using var conn = await ds.OpenConnectionAsync(ct);
         await using var tx = await conn.BeginTransactionAsync(ct);
         var roles = new List<string>();
-        await using (var cmd = new NpgsqlCommand("SELECT DISTINCT role_id FROM zentriq.auth_group_mappings WHERE provider = @p AND lower(group_ref) = ANY(@g) ORDER BY 1", conn, tx))
+        var groups = new List<Guid>();
+        await using (var cmd = new NpgsqlCommand("SELECT DISTINCT role_id, group_id FROM zentriq.auth_group_mappings WHERE provider = @p AND lower(group_ref) = ANY(@g)", conn, tx))
         {
             cmd.Parameters.AddWithValue("p", who.Provider);
             cmd.Parameters.AddWithValue("g", refs);
             await using var r = await cmd.ExecuteReaderAsync(ct);
-            while (await r.ReadAsync(ct)) roles.Add(r.GetString(0));
+            while (await r.ReadAsync(ct))
+            {
+                if (!r.IsDBNull(0)) roles.Add(r.GetString(0));
+                if (!r.IsDBNull(1)) groups.Add(r.GetGuid(1));
+            }
         }
+        roles = roles.Distinct().Order().ToList();
+        groups = groups.Distinct().ToList();
 
         Guid? userId = null; string? status = null;
         await using (var cmd = new NpgsqlCommand("SELECT id, status FROM zentriq.users WHERE auth_source = @p AND external_id = @x", conn, tx))
@@ -242,7 +256,7 @@ public static class DirectoryUsers
         if (userId is null)
         {
             if (!createUsers) throw new DirectorySignInException("There is no Zentriq account for you yet. Ask a Zentriq administrator to add you.", "no-account");
-            if (roles.Count == 0) throw new DirectorySignInException("You are not in a directory group that has access to Zentriq.", "no-group");
+            if (roles.Count == 0 && groups.Count == 0) throw new DirectorySignInException("You are not in a directory group that has access to Zentriq.", "no-group");
             await using var ins = new NpgsqlCommand("""
                 INSERT INTO zentriq.users (email, display_name, password_hash, auth_source, external_id) VALUES (@e, @n, 'AA==', @p, @x) RETURNING id
                 """, conn, tx);
@@ -271,6 +285,23 @@ public static class DirectoryUsers
         {
             add.Parameters.AddWithValue("u", userId.Value);
             add.Parameters.AddWithValue("r", roles.ToArray());
+            add.Parameters.AddWithValue("p", who.Provider);
+            changed += await add.ExecuteNonQueryAsync(ct);
+        }
+        // Zentriq groups: exactly the groups mapped from the person's directory groups.
+        await using (var del = new NpgsqlCommand("DELETE FROM zentriq.user_directory_groups WHERE user_id = @u AND NOT (group_id = ANY(@g))", conn, tx))
+        {
+            del.Parameters.AddWithValue("u", userId.Value);
+            del.Parameters.AddWithValue("g", groups.ToArray());
+            changed += await del.ExecuteNonQueryAsync(ct);
+        }
+        await using (var add = new NpgsqlCommand("""
+            INSERT INTO zentriq.user_directory_groups (user_id, group_id, provider) SELECT @u, x.group_id, @p FROM unnest(@g) AS x(group_id)
+            ON CONFLICT DO NOTHING
+            """, conn, tx))
+        {
+            add.Parameters.AddWithValue("u", userId.Value);
+            add.Parameters.AddWithValue("g", groups.ToArray());
             add.Parameters.AddWithValue("p", who.Provider);
             changed += await add.ExecuteNonQueryAsync(ct);
         }

@@ -5,19 +5,19 @@ import { useConfirm } from '../../components/Confirm';
 import { Icon } from '../../components/Icon';
 import { Callout, DataTable, ErrorBox, Panel, Pill } from '../../components/ui';
 import { CopyBox } from '../../components/CopyBox';
-import type { RoleRow } from './RoleDialogs';
+import type { GroupRow, RoleRow } from './RoleDialogs';
 
 interface LdapCfg { enabled: boolean; host: string; port: number; ldaps: boolean; verifyCertificate: boolean; dcName: string | null; baseDn: string | null; domain: string | null; createUsers: boolean }
 interface EntraCfg { enabled: boolean; tenantId: string; clientId: string; createUsers: boolean; secretStored: boolean }
-interface Mapping { id: string; provider: 'ldap' | 'entra'; groupRef: string; groupName: string | null; roleId: string }
+interface Mapping { id: string; provider: 'ldap' | 'entra'; groupRef: string; groupName: string | null; roleId: string | null; groupId?: string | null; zentriqGroup?: string | null }
 interface SignInData { ldap: LdapCfg; entra: EntraCfg; redirectUri: string; mappings: Mapping[]; users: Record<string, number> }
 interface TestResult { ok: boolean; message: string; groups?: { dn: string; name: string | null }[]; roles?: string[] }
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const PROVIDER: Record<string, string> = { ldap: 'Active Directory', entra: 'Microsoft Entra ID' };
 
-/** Users, Roles & Groups › Sign-in: Active Directory and Microsoft Entra ID sign-in, and directory groups → roles. */
-export function SignInTab({ roles }: { roles: RoleRow[] }) {
+/** Users, Roles & Groups › Sign-in: Active Directory and Microsoft Entra ID sign-in, and directory groups → roles or Zentriq groups. */
+export function SignInTab({ roles, groups = [], onChanged }: { roles: RoleRow[]; groups?: GroupRow[]; onChanged?: () => void }) {
   const [tick, setTick] = useState(0);
   const data = useApi(() => api.get<SignInData>('/auth/sign-in'), [tick]);
   const confirm = useConfirm();
@@ -34,20 +34,20 @@ export function SignInTab({ roles }: { roles: RoleRow[] }) {
 
   async function run(f: () => Promise<unknown>, ok: string) {
     setBusy(true); setMsg(null);
-    try { await f(); setMsg({ tone: 'ok', text: ok }); setTick((x) => x + 1); } catch (e) { setMsg({ tone: 'crit', text: errText(e) }); } finally { setBusy(false); }
+    try { await f(); setMsg({ tone: 'ok', text: ok }); setTick((x) => x + 1); onChanged?.(); } catch (e) { setMsg({ tone: 'crit', text: errText(e) }); } finally { setBusy(false); }
   }
   async function runTest() {
     setBusy(true); setTestResult(null);
     try { setTestResult(await api.post<TestResult>('/auth/sign-in/ldap/test', test)); } catch (e) { setTestResult({ ok: false, message: errText(e) }); } finally { setBusy(false); setTest((t) => ({ ...t, password: '' })); }
   }
   async function removeMapping(m: Mapping) {
-    if (!(await confirm({ title: 'Remove this group?', danger: true, confirmLabel: 'Remove', message: <>Members of <b>{m.groupName ?? m.groupRef}</b> lose the role <b>{roles.find((r) => r.id === m.roleId)?.name ?? m.roleId}</b> now (unless another mapped group gives it at their next sign-in).</> }))) return;
+    if (!(await confirm({ title: 'Remove this group?', danger: true, confirmLabel: 'Remove', message: <>Members of <b>{m.groupName ?? m.groupRef}</b> lose {m.groupId ? <>the Zentriq group <b>{m.zentriqGroup}</b></> : <>the role <b>{roles.find((r) => r.id === m.roleId)?.name ?? m.roleId}</b></>} now (unless another mapped group gives it at their next sign-in).</> }))) return;
     await run(() => api.del(`/auth/sign-in/mappings/${m.id}`), 'Group removed.');
   }
 
   if (data.error) return <ErrorBox error={data.error} />;
   if (!d || !ldap || !entra) return <p className="muted">Loading…</p>;
-  const roleName = (id: string) => roles.find((r) => r.id === id)?.name ?? id;
+  const roleName = (id: string | null) => roles.find((r) => r.id === id)?.name ?? id ?? '';
   return (
     <>
       {msg && <Callout tone={msg.tone} icon={msg.tone === 'crit' ? 'alert' : 'info'}>{msg.text}</Callout>}
@@ -82,7 +82,7 @@ export function SignInTab({ roles }: { roles: RoleRow[] }) {
                 {!!testResult.groups?.length && <div className="tbl-wrap"><table className="t">
                   <thead><tr><th>Group</th><th /></tr></thead>
                   <tbody>{testResult.groups.map((g) => <tr key={g.dn}><td><b>{g.name ?? g.dn}</b><div className="faint mono" style={{ fontSize: 11 }}>{g.dn}</div></td>
-                    <td><button className="btn sm" onClick={() => setMap({ provider: 'ldap', groupRef: g.dn, groupName: g.name ?? '', roleId: map.roleId })}>Map to a Role</button></td></tr>)}</tbody>
+                    <td><button className="btn sm" onClick={() => setMap({ provider: 'ldap', groupRef: g.dn, groupName: g.name ?? '', roleId: map.roleId })}>Map this group</button></td></tr>)}</tbody>
                 </table></div>}
               </div>}
             </details>
@@ -111,7 +111,7 @@ export function SignInTab({ roles }: { roles: RoleRow[] }) {
         </Panel>
       </div>
 
-      <Panel title="Directory Groups and Roles" sub="Members of a group get its role in Zentriq at each sign-in; leaving the group removes it" flush>
+      <Panel title="Directory Groups and Roles" sub="Members of a directory group get its role — or a Zentriq group with its roles and data scope — at each sign-in; leaving the group removes it" flush>
         <div className="toolbar-row" style={{ padding: '10px 14px', flexWrap: 'wrap' }}>
           <select className="in" value={map.provider} onChange={(e) => setMap({ ...map, provider: e.target.value as 'ldap' | 'entra' })}>
             <option value="ldap">Active Directory</option><option value="entra">Microsoft Entra ID</option>
@@ -119,16 +119,22 @@ export function SignInTab({ roles }: { roles: RoleRow[] }) {
           <input className="in mono" style={{ flex: 2, minWidth: 220 }} value={map.groupRef} onChange={(e) => setMap({ ...map, groupRef: e.target.value })}
             placeholder={map.provider === 'ldap' ? 'CN=Zentriq Admins,OU=Groups,DC=contoso,DC=com' : 'Group object ID or app role value'} />
           <input className="in" style={{ flex: 1, minWidth: 140 }} value={map.groupName} onChange={(e) => setMap({ ...map, groupName: e.target.value })} placeholder="Name (shown here)" />
-          <select className="in" value={map.roleId} onChange={(e) => setMap({ ...map, roleId: e.target.value })}>
-            <option value="">Role…</option>{roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+          <select className="in" value={map.roleId} onChange={(e) => setMap({ ...map, roleId: e.target.value })} aria-label="Gives">
+            <option value="">Gives…</option>
+            <optgroup label="Role">{roles.map((r) => <option key={r.id} value={`role:${r.id}`}>{r.name}</option>)}</optgroup>
+            {groups.length > 0 && <optgroup label="Zentriq group">{groups.map((g) => <option key={g.id} value={`group:${g.id}`}>{g.name}</option>)}</optgroup>}
           </select>
           <button className="btn primary" disabled={busy || !map.groupRef.trim() || !map.roleId}
-            onClick={() => void run(async () => { await api.post('/auth/sign-in/mappings', { ...map, groupName: map.groupName || null }); setMap({ ...map, groupRef: '', groupName: '' }); }, 'Group mapped.')}><Icon name="plus" size={13} /> Add</button>
+            onClick={() => void run(async () => {
+              const [kind, target] = [map.roleId.slice(0, map.roleId.indexOf(':')), map.roleId.slice(map.roleId.indexOf(':') + 1)];
+              await api.post('/auth/sign-in/mappings', { provider: map.provider, groupRef: map.groupRef, groupName: map.groupName || null, roleId: kind === 'role' ? target : null, groupId: kind === 'group' ? target : null });
+              setMap({ ...map, groupRef: '', groupName: '' });
+            }, 'Group mapped.')}><Icon name="plus" size={13} /> Add</button>
         </div>
         <DataTable rows={d.mappings} empty="No directory groups mapped yet. Directory users without a mapped group (or a role given in Zentriq) cannot sign in." columns={[
           { key: 'p', label: 'Directory', render: (m) => PROVIDER[m.provider] },
           { key: 'g', label: 'Group', className: 'wrap', render: (m) => <><b>{m.groupName ?? m.groupRef}</b>{m.groupName && <div className="faint mono" style={{ fontSize: 11 }}>{m.groupRef}</div>}</> },
-          { key: 'r', label: 'Role', render: (m) => roleName(m.roleId) },
+          { key: 'r', label: 'Gives', render: (m) => m.groupId ? <><span className="faint">Group</span> <b>{m.zentriqGroup}</b></> : roleName(m.roleId) },
           { key: 'x', label: '', render: (m) => <button className="icon-btn" aria-label="Remove" onClick={() => void removeMapping(m)}><Icon name="trash" size={14} /></button> },
         ]} />
       </Panel>

@@ -782,3 +782,12 @@ input[type=file].in { height: auto; padding: 7px 10px; }
 .combo-note { display: block; padding: 7px 10px; }
 .key-cell { display: inline-flex; align-items: center; gap: 10px; white-space: nowrap; }
 .key-cell .mono { letter-spacing: .02em; }
+
+/* Build 136: data scope picker, access rules */
+.scope-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 760px) { .scope-grid { grid-template-columns: 1fr; } }
+.scope-col .check-list { min-height: 60px; }
+.access-block { border-top: 1px solid var(--line); padding-top: 10px; display: flex; flex-direction: column; gap: 10px; }
+.access-block .link-btn { text-decoration: none; text-align: left; font-weight: 500; }
+.day-chip { display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border: 1px solid var(--line); border-radius: 6px; font-size: 12px; cursor: pointer; }
+.day-chip input { margin: 0; }

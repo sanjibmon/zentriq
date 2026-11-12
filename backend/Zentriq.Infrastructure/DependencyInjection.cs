@@ -32,11 +32,9 @@ public static class DependencyInjection
         var appSecrets = new Lazy<AppSecrets>(() => LoadAppSecrets(paths));
         services.AddSingleton<Func<AppSecrets>>(_ => () => appSecrets.Value);
 
-        services.AddSingleton(_ =>
-        {
-            var cs = ConnectionStrings.Build(options.Database, options.Database.AppUser, appSecrets.Value.DbAppPassword, applicationName: applicationName);
-            return new NpgsqlDataSourceBuilder(cs).Build();
-        });
+        string AppConnectionString() => ConnectionStrings.Build(options.Database, options.Database.AppUser, appSecrets.Value.DbAppPassword, applicationName: applicationName);
+        services.AddSingleton(_ => new NpgsqlDataSourceBuilder(AppConnectionString()).Build());
+        services.AddSingleton(_ => new ScopedDataSources(AppConnectionString));
         services.AddDbContext<ZentriqDbContext>((sp, o) =>
             o.UseNpgsql(sp.GetRequiredService<NpgsqlDataSource>()));
 

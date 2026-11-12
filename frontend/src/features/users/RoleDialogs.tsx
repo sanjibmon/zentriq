@@ -6,11 +6,13 @@ import { Modal } from '../../components/Modal';
 import { Callout } from '../../components/ui';
 import { errorText } from '../discovery/DirectoryPanel';
 import { AREAS } from './access';
+import { ScopePicker, scopeIds, scopeText, type Scope, type ScopeIds } from './AccessControls';
 
-export interface RoleRow { id: string; name: string; description: string; builtIn: boolean; permissions: string[]; users: number; groups: number; activeMembers: number }
+export interface RoleRow { id: string; name: string; description: string; builtIn: boolean; permissions: string[]; users: number; groups: number; activeMembers: number; mfaRequired?: boolean; scope?: Scope }
 export interface GroupRow {
   id: string; name: string; description: string; createdAt: string;
   roles: { id: string; name: string }[]; members: { id: string; displayName: string; email: string; status: string }[];
+  scope?: Scope; directoryGroups?: { id: string; provider: string; groupRef: string; groupName: string | null }[];
 }
 
 /** Create, edit or duplicate a role: what it can see and change, area by area. Built-in roles open read-only. */
@@ -20,6 +22,8 @@ export function RoleDialog({ role, copy, onClose, onSaved }: { role: RoleRow | n
   const [name, setName] = useState(role ? (copy ? `${role.name} (copy)` : role.name) : '');
   const [description, setDescription] = useState(role?.description ?? '');
   const [perms, setPerms] = useState<Set<string>>(new Set(role?.permissions ?? ['dashboard.view', 'reports.view']));
+  const [mfa, setMfa] = useState(!!role?.mfaRequired);
+  const [scope, setScope] = useState<ScopeIds>(scopeIds(role?.scope));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,8 +39,9 @@ export function RoleDialog({ role, copy, onClose, onSaved }: { role: RoleRow | n
   async function submit(e: FormEvent) {
     e.preventDefault();
     setBusy(true); setError(null);
-    const body = { name: name.trim(), description: description.trim(), permissions: [...perms] };
+    const body = { name: name.trim(), description: description.trim(), permissions: [...perms], mfaRequired: mfa, scope };
     try {
+      if (readOnly) { await api.put(`/roles/${role!.id}/mfa`, { required: mfa }); onSaved(`Role "${role!.name}": MFA ${mfa ? 'required' : 'not required'} from the members' next sign-in.`); return; }
       if (role && !copy) await api.put(`/roles/${role.id}`, body); else await api.post('/roles', body);
       onSaved(`Role "${body.name}" saved. Users with it get the new rights at their next click.`);
     } catch (err) { setError(errorText(err)); } finally { setBusy(false); }
@@ -53,6 +58,7 @@ export function RoleDialog({ role, copy, onClose, onSaved }: { role: RoleRow | n
       footer={<>
         <button type="button" className="btn" onClick={onClose} disabled={busy}>{readOnly ? 'Close' : 'Cancel'}</button>
         {!readOnly && <button type="submit" form="role-form" className="btn primary" disabled={busy || !name.trim() || perms.size === 0}>{busy ? 'Saving…' : 'Save role'}</button>}
+        {readOnly && mfa !== !!role?.mfaRequired && <button type="submit" form="role-form" className="btn primary" disabled={busy}>{busy ? 'Saving…' : 'Save MFA setting'}</button>}
       </>}>
       <form id="role-form" className="form-v" onSubmit={submit}>
         {error && <Callout tone="crit" icon="alert">{error}</Callout>}
@@ -75,6 +81,16 @@ export function RoleDialog({ role, copy, onClose, onSaved }: { role: RoleRow | n
           </tbody>
         </table>
         <small className="muted">Anything not ticked is hidden from the role: menus, pages, dashboard widgets, report data sources and API access. You can only give permissions you have yourself.</small>
+        <label className="row" style={{ gap: 8 }}>
+          <input type="checkbox" checked={mfa} onChange={(e) => setMfa(e.target.checked)} />
+          <span><b>Require multi-factor authentication</b> <span className="muted">— members must set up an authenticator app at their next sign-in (Microsoft accounts use Microsoft's MFA).</span></span>
+        </label>
+        <div>
+          <div className="field-title">Data scope — which devices the role works on</div>
+          {readOnly
+            ? <p className="muted" style={{ margin: 0 }}>{scopeText(role?.scope)}. Duplicate the role to limit it to locations, departments or device groups.</p>
+            : <ScopePicker value={scope} onChange={setScope} />}
+        </div>
       </form>
     </Modal>
   );
@@ -86,6 +102,7 @@ export function GroupDialog({ group, roles, users, onClose, onSaved }: { group: 
   const [description, setDescription] = useState(group?.description ?? '');
   const [picked, setPicked] = useState<string[]>(group?.roles.map((r) => r.id) ?? []);
   const [members, setMembers] = useState<string[]>(group?.members.map((m) => m.id) ?? []);
+  const [scope, setScope] = useState<ScopeIds>(scopeIds(group?.scope));
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -94,7 +111,7 @@ export function GroupDialog({ group, roles, users, onClose, onSaved }: { group: 
   async function submit(e: FormEvent) {
     e.preventDefault();
     setBusy(true); setError(null);
-    const body = { name: name.trim(), description: description.trim(), roles: picked, members };
+    const body = { name: name.trim(), description: description.trim(), roles: picked, members, scope };
     try {
       if (group) await api.put(`/groups/${group.id}`, body); else await api.post('/groups', body);
       onSaved(`Group "${body.name}" saved.`);
@@ -132,6 +149,14 @@ export function GroupDialog({ group, roles, users, onClose, onSaved }: { group: 
             </div>
           </div>
         </div>
+        <div>
+          <div className="field-title">Data scope of the group</div>
+          <ScopePicker value={scope} onChange={setScope} />
+          <small className="muted">When set, it replaces the scope of the group's roles for the group's members. Several roles or groups add up: a person sees the devices of all of them, and a role without a scope gives all devices.</small>
+        </div>
+        {(group?.directoryGroups?.length ?? 0) > 0 && (
+          <Callout icon="info">Also given to the members of {group!.directoryGroups!.map((d) => d.groupName ?? d.groupRef).join(', ')} ({group!.directoryGroups![0].provider === 'entra' ? 'Microsoft Entra ID' : 'Active Directory'}) at their sign-in — see the Sign-in tab.</Callout>
+        )}
         <small className="muted">Members get the group's roles in addition to their own. Changes apply at their next click; nobody is signed out.</small>
       </form>
     </Modal>

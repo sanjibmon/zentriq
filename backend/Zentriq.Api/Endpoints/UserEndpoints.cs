@@ -9,8 +9,24 @@ namespace Zentriq.Api.Endpoints;
 
 public static class UserEndpoints
 {
-    public sealed record CreateUserBody(string Email, string DisplayName, string Password, string[] Roles, Guid[]? Groups = null);
-    public sealed record UpdateUserBody(string? DisplayName, string? Status, string[]? Roles, string? NewPassword, Guid[]? Groups = null);
+    /// <summary>Access rules: replaced as a whole when given. Null expiry / hours: none; empty networks: anywhere.</summary>
+    public sealed record AccessBody(DateTimeOffset? ExpiresAt, SigninHours? Hours, string[]? Networks);
+    public sealed record CreateUserBody(string Email, string DisplayName, string Password, string[] Roles, Guid[]? Groups = null, AccessBody? Access = null);
+    public sealed record UpdateUserBody(string? DisplayName, string? Status, string[]? Roles, string? NewPassword, Guid[]? Groups = null, AccessBody? Access = null);
+
+    /// <summary>Checks access rules; returns a problem or null. For the editor's own account, refuses rules that would lock them out now.</summary>
+    private static IResult? ApplyAccess(User u, AccessBody a, bool self, HttpContext http)
+    {
+        if (a.Hours is { } h && h.Validate() is { } hm) return Validation.Problem("access.hours", hm);
+        if (AccessRules.ValidateNetworks(a.Networks ?? [], out var nets) is { } nm) return Validation.Problem("access.networks", nm);
+        var rules = new AccessRules(a.ExpiresAt, a.Hours, nets);
+        if (self && rules.Denied(DateTimeOffset.UtcNow, http.Connection.RemoteIpAddress, TimeZoneInfo.Local) is { } why)
+            return Validation.Problem("access", "These rules would sign you out at once (" + (why == "network" ? "this computer's address is not in the networks" : "outside the hours") + ").");
+        u.AccessExpiresAt = a.ExpiresAt;
+        u.SigninHours = a.Hours?.ToJson();
+        u.AllowedNetworks = nets.ToArray();
+        return null;
+    }
 
     public static void MapUserEndpoints(this RouteGroupBuilder api)
     {
@@ -50,13 +66,15 @@ public static class UserEndpoints
                 authSource = source.TryGetValue(u.Id, out var src) ? src : "local",
                 directoryRoles = dirRoles.TryGetValue(u.Id, out var dr) ? dr : [],
                 locked = u.LockedUntil > DateTimeOffset.UtcNow,
+                access = new { expiresAt = u.AccessExpiresAt, hours = SigninHours.Parse(u.SigninHours), networks = u.AllowedNetworks ?? [], expired = u.AccessExpiresAt <= DateTimeOffset.UtcNow },
                 roles = u.Roles.Select(r => new { id = r.RoleId, name = r.Role!.Name }),
                 groups = groups.TryGetValue(u.Id, out var gs) ? gs : [],
             }));
         }).RequireAuthorization(Permissions.UsersManage);
 
-        g.MapPost("/users", async (CreateUserBody body, ZentriqDbContext db, Npgsql.NpgsqlDataSource ds, IPasswordHasher<User> hasher, RequestContext rc, CancellationToken ct) =>
+        g.MapPost("/users", async (CreateUserBody body, ZentriqDbContext db, Npgsql.NpgsqlDataSource ds, IPasswordHasher<User> hasher, RequestContext rc, HttpContext http, CancellationToken ct) =>
         {
+            if (rc.Scoped) return RequestContext.ScopedRefused();
             if (string.IsNullOrWhiteSpace(body.Email) || !body.Email.Contains('@')) return Validation.Problem("email", "Enter a valid e-mail address.");
             if (string.IsNullOrWhiteSpace(body.DisplayName)) return Validation.Problem("displayName", "Name is required.");
             var pwErr = PasswordPolicy.Validate(body.Password, body.Email);
@@ -69,6 +87,7 @@ public static class UserEndpoints
             var now = DateTimeOffset.UtcNow;
             var u = new User { Id = Guid.NewGuid(), Email = email, DisplayName = body.DisplayName.Trim(), SecurityStamp = Guid.NewGuid(), CreatedAt = now, UpdatedAt = now, PasswordChangedAt = now };
             u.PasswordHash = hasher.HashPassword(u, body.Password);
+            if (body.Access is { } acc && ApplyAccess(u, acc, false, http) is { } accErr) return accErr;
             db.Users.Add(u);
             foreach (var r in roles) db.UserRoles.Add(new UserRole { UserId = u.Id, RoleId = r });
             await db.SaveChangesAsync(ct);
@@ -78,10 +97,11 @@ public static class UserEndpoints
             return Results.Created($"/api/v1/users/{u.Id}", new { u.Id, u.Email });
         }).RequireAuthorization(Permissions.UsersManage);
 
-        g.MapPatch("/users/{id:guid}", async (Guid id, UpdateUserBody body, ZentriqDbContext db, Npgsql.NpgsqlDataSource ds, IPasswordHasher<User> hasher, RequestContext rc, CancellationToken ct) =>
+        g.MapPatch("/users/{id:guid}", async (Guid id, UpdateUserBody body, ZentriqDbContext db, Npgsql.NpgsqlDataSource ds, IPasswordHasher<User> hasher, RequestContext rc, HttpContext http, CancellationToken ct) =>
         {
             var u = await db.Users.Include(x => x.Roles).FirstOrDefaultAsync(x => x.Id == id, ct);
             if (u is null) return Results.NotFound();
+            if (rc.Scoped && (body.Roles is not null || body.Groups is not null || body.Access is not null)) return RequestContext.ScopedRefused();
             var changes = new List<string>();
             if (body.DisplayName is { } dn && !string.IsNullOrWhiteSpace(dn)) { u.DisplayName = dn.Trim(); changes.Add("displayName"); }
             if (body.Status is { } st)
@@ -89,6 +109,11 @@ public static class UserEndpoints
                 if (st is not ("active" or "disabled")) return Validation.Problem("status", "Status must be active or disabled.");
                 if (st == "disabled" && id == rc.UserId) return Validation.Problem("status", "You cannot disable your own account.");
                 u.Status = st; changes.Add("status");
+            }
+            if (body.Access is { } acc)
+            {
+                if (ApplyAccess(u, acc, id == rc.UserId, http) is { } accErr) return accErr;
+                changes.Add("access");
             }
             var accessChanged = false;
             if (body.Roles is { } roles)

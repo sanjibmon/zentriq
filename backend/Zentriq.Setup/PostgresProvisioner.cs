@@ -205,6 +205,11 @@ public sealed class PostgresProvisioner(Reporter log)
                 await ExecAsync(conn, $"{verb} ROLE {Quote(role)} LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD '{ScramSha256.Verifier(pw)}'", ct);
                 log.Info($"{(exists ? "Updated" : "Created")} role {role}.");
             }
+            // Data scope: connections of console users limited to part of the devices switch to this role (row-level security).
+            var scoped = AppRole + "_scoped";
+            if (await ScalarAsync(conn, "SELECT 1 FROM pg_roles WHERE rolname = @r", ("r", scoped), ct) is null)
+                await ExecAsync(conn, $"CREATE ROLE {Quote(scoped)} NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS", ct);
+            await ExecAsync(conn, $"GRANT {Quote(scoped)} TO {Quote(AppRole)}", ct);
             await ExecAsync(conn, $"ALTER ROLE {Quote(AppRole)} SET search_path = zentriq, public", ct);
             await ExecAsync(conn, $"ALTER ROLE {Quote(OwnerRole)} SET search_path = zentriq, public", ct);
 
