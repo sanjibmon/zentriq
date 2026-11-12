@@ -364,6 +364,32 @@ public static partial class AgentEndpoints
             // Patch operations and scripts run beside the check-in; the agent lists those it still has. One that is not listed
             // was interrupted by a restart of the agent (or of the device): a scan is simply queued again, an installation
             // or a script is marked failed (it may have run in part).
+            // The agent was installed again and enrolled anew: what its earlier registration left open on this device is taken
+            // over. A scan, and anything not handed out yet, is queued for this agent; an installation or a script that was
+            // under way is marked failed. (Without this a scan stayed "running" for ever and no new scan could be requested.)
+            if (agent.AssetId is { } ownAsset && (kinds.Contains("patch") || kinds.Contains("script")))
+            {
+                await using var adopt = ds.CreateCommand("""
+                    UPDATE zentriq.asset_actions x
+                       SET agent_id = @a,
+                           status = CASE WHEN x.status = 'queued' OR (x.kind = 'patch' AND x.operation = 'scan') THEN 'queued' ELSE 'failed' END,
+                           completed_at = CASE WHEN x.status = 'queued' OR (x.kind = 'patch' AND x.operation = 'scan') THEN NULL ELSE now() END,
+                           sent_at = CASE WHEN x.status = 'queued' OR (x.kind = 'patch' AND x.operation = 'scan') THEN NULL ELSE x.sent_at END,
+                           detail = CASE WHEN x.status = 'queued' THEN x.detail
+                                         WHEN x.kind = 'patch' AND x.operation = 'scan' THEN 'Interrupted: the agent was installed again; scanning again.'
+                                         ELSE 'Interrupted: the agent was installed again while this was running. It may have run in part.' END
+                     WHERE x.asset_id = @asset AND x.channel = 'agent' AND x.kind IN ('patch','script') AND x.status IN ('queued','sent','running')
+                       AND x.agent_id IS DISTINCT FROM @a
+                       AND NOT EXISTS (SELECT 1 FROM zentriq.agent_registrations o WHERE o.id = x.agent_id AND o.status = 'active')
+                    RETURNING x.id, x.kind, x.operation, x.status
+                    """);
+                adopt.Parameters.AddWithValue("a", agent.Id);
+                adopt.Parameters.AddWithValue("asset", ownAsset);
+                await using var ar = await adopt.ExecuteReaderAsync(ct);
+                while (await ar.ReadAsync(ct))
+                    lf.CreateLogger("Zentriq.Agents").LogInformation("Agent {AgentId}: action {ActionId} ({Kind} {Operation}) of an earlier registration of this device taken over; now {Status}",
+                        agent.Id, ar.GetGuid(0), ar.GetString(1), ar.GetString(2), ar.GetString(3));
+            }
             if (req.RunningActions is { } running && (kinds.Contains("patch") || kinds.Contains("script")))
             {
                 await using var lost = ds.CreateCommand("""
