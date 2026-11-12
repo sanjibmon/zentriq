@@ -27,7 +27,7 @@ export function AuditPage() {
       {csv && <CsvExportDialog what="audit log" path="/audit/export" onClose={() => setCsv(false)} />}
       {tab === 'retention' ? <LogRetention /> : <>
       <form className="toolbar-row" onSubmit={(e) => { e.preventDefault(); setPage(1); setSearch(q); }}>
-        <input className="in grow" placeholder="Search user, action or target…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search audit log" />
+        <input className="in grow" placeholder="Search user, action or target…" value={q} onChange={(e) => { setQ(e.target.value); if (!e.target.value.trim()) { setPage(1); setSearch(''); } }} aria-label="Search audit log" />
         <select className="in" value={outcome} onChange={(e) => { setPage(1); setOutcome(e.target.value); }} aria-label="Outcome">
           <option value="">Any outcome</option>
           <option value="Success">Success</option>

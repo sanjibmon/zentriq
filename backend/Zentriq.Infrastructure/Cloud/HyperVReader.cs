@@ -136,6 +136,6 @@ public static class HyperVReader
             _ => null,
         };
         // WMI reports "never" as 1601 or 0001 dates.
-        return d is { Year: > 1970 } ? d : null;
+        return d is { Year: > 1970 } x ? x.ToUniversalTime() : null;
     }
 }

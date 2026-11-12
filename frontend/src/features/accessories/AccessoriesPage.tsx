@@ -126,7 +126,7 @@ function StockTab({ tick, canEdit, categories, onMove, lowFirst }: { tick: numbe
   return (
     <>
       <form className="toolbar-row" onSubmit={(e) => { e.preventDefault(); setSearch(q); }}>
-        <input className="in grow" placeholder="Search accessory, brand, model or SKU…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search stock" />
+        <input className="in grow" placeholder="Search accessory, brand, model or SKU…" value={q} onChange={(e) => { setQ(e.target.value); if (!e.target.value.trim()) { setSearch(''); } }} aria-label="Search stock" />
         <select className="in" value={locationId} onChange={(e) => setLocationId(e.target.value)} aria-label="Location">
           <option value="">All locations</option>
           {(locs.data?.items ?? []).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
@@ -171,7 +171,7 @@ function IssuedTab({ tick, canEdit, onReturn }: { tick: number; canEdit: boolean
   return (
     <>
       <form className="toolbar-row" onSubmit={(e) => { e.preventDefault(); setSearch(q); }}>
-        <input className="in grow" placeholder="Search person or accessory…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search issued accessories" />
+        <input className="in grow" placeholder="Search person or accessory…" value={q} onChange={(e) => { setQ(e.target.value); if (!e.target.value.trim()) { setSearch(''); } }} aria-label="Search issued accessories" />
         <select className="in" value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} aria-label="Department">
           <option value="">All departments</option>
           {(deps.data?.items ?? []).map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
@@ -223,7 +223,7 @@ function MovementsTab({ tick }: { tick: number }) {
   return (
     <>
       <form className="toolbar-row" onSubmit={(e) => { e.preventDefault(); reset(); setSearch(q); }}>
-        <input className="in grow" placeholder="Search accessory, person, invoice, vendor or serial…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search movements" />
+        <input className="in grow" placeholder="Search accessory, person, invoice, vendor or serial…" value={q} onChange={(e) => { setQ(e.target.value); if (!e.target.value.trim()) { reset(); setSearch(''); } }} aria-label="Search movements" />
         <select className="in" value={kind} onChange={(e) => { reset(); setKind(e.target.value); }} aria-label="Movement">
           <option value="">All movements</option>
           {(Object.keys(KIND) as MovementKind[]).map((k) => <option key={k} value={k}>{KIND[k][0]}</option>)}

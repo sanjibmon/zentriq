@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../../api/client';
 import type { DirectoryConnection, DirectoryObject, DirectoryTestResult, Paged } from '../../api/types';
 import { useAuth } from '../../app/auth';
@@ -44,13 +44,25 @@ export function DirectoryPanel({ onScan }: { onScan: (connectionId: string) => v
     return () => clearInterval(t);
   }, [busy, conns.reload]);
 
+  // A sync that was started here: when it finishes, say how it went (the table row also shows the error).
+  const waiting = useRef<string | null>(null);
+  useEffect(() => {
+    const c = waiting.current ? list.find((x) => x.id === waiting.current) : null;
+    if (!c || c.syncJobStatus === 'queued' || c.syncJobStatus === 'running') return;
+    waiting.current = null;
+    if (c.lastSyncStatus === 'succeeded') setMsg({ tone: 'ok', text: `Read "${c.name}": ${c.counts.computer ?? 0} computers, ${c.counts.user ?? 0} users, ${c.counts.group ?? 0} groups, ${c.counts.organizationalUnit ?? 0} OUs.` });
+    else setMsg({ tone: 'crit', text: `Reading "${c.name}" failed${c.lastError ? `: ${c.lastError}` : '.'}` });
+  }, [list]);
+
   async function sync(c: DirectoryConnection) {
     setMsg(null);
+    waiting.current = c.id;
     try {
       await api.post(`/directory/connections/${c.id}/sync`);
       setMsg({ tone: 'info', text: `Reading "${c.name}" from ${c.serverHost}… The tables below update when it finishes.` });
       conns.reload();
     } catch (err) {
+      waiting.current = null;
       setMsg({ tone: 'crit', text: errorText(err) });
     }
   }

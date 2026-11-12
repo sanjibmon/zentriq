@@ -133,6 +133,8 @@ builder.Services.AddScoped<RequestContext>();
 builder.Services.ConfigureHttpJsonOptions(o =>
 {
     o.SerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+    // Times from browsers and agents arrive with their local offset; PostgreSQL (Npgsql) accepts only UTC.
+    Zentriq.Application.UtcDateTimeOffsetConverter.AddTo(o.SerializerOptions);
 });
 
 var app = builder.Build();

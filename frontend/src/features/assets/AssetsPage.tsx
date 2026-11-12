@@ -152,7 +152,7 @@ export function AssetsPage() {
         </>} />
       {msg && <Callout tone={msg.tone} icon={msg.tone === 'crit' ? 'alert' : 'info'}>{msg.text}</Callout>}
       <form className="toolbar-row" onSubmit={(e) => { e.preventDefault(); reset(); setSearch(q); }}>
-        <input className="in grow" placeholder="Search hostname, IP, logged-on user, serial, OS or owner…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search assets" />
+        <input className="in grow" placeholder="Search hostname, IP, logged-on user, serial, OS or owner…" value={q} onChange={(e) => { setQ(e.target.value); if (!e.target.value.trim()) { reset(); setSearch(''); } }} aria-label="Search assets" />
         <select className="in" value={category} onChange={(e) => { reset(); setCategory(e.target.value); }} aria-label="Category">
           <option value="">All categories</option>
           {CATEGORIES.map((c) => <option key={c} value={c}>{fmt.label(c)}</option>)}

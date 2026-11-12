@@ -39,7 +39,7 @@ public static class DirectoryCollector
             {
                 string? Attr(string n) => e.Attributes.Contains(n) && e.Attributes[n].Count > 0 ? e.Attributes[n][0]?.ToString() : null;
                 var guidBytes = e.Attributes.Contains("objectGUID") ? e.Attributes["objectGUID"].GetValues(typeof(byte[])).Cast<byte[]>().FirstOrDefault() : null;
-                DateTimeOffset? lastLogon = long.TryParse(Attr("lastLogonTimestamp"), out var ft) && ft > 0 ? DateTimeOffset.FromFileTime(ft) : null;
+                DateTimeOffset? lastLogon = long.TryParse(Attr("lastLogonTimestamp"), out var ft) && ft > 0 ? DateTimeOffset.FromFileTime(ft).ToUniversalTime() : null;
                 result.Add(new DirectoryComputer(Attr("name") ?? "", Attr("dNSHostName"), Attr("operatingSystem"),
                     guidBytes is { Length: 16 } ? new Guid(guidBytes) : Guid.Empty, lastLogon, e.DistinguishedName));
                 if (result.Count >= limit) return result;

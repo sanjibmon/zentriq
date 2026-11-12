@@ -217,7 +217,8 @@ jobs:
       - name: Installer acceptance suite
         timeout-minutes: 75
         shell: pwsh
-        run: ./tests/installer/Invoke-InstallerAcceptance.ps1 -Bundle "$PWD/artifacts/release-main/Zentriq-Setup-x64.exe" -UpgradeBundle "$PWD/artifacts/release-upgrade/Zentriq-Setup-x64.exe" -OutDir "$env:RUNNER_TEMP/acceptance" *>&1 | Tee-Object -FilePath "$env:RUNNER_TEMP/ci-logs/5-acceptance.log"
+        # Runs in India Standard Time (UTC+05:30), not the runner's UTC: times with a local offset must reach PostgreSQL as UTC.
+        run: Set-TimeZone -Id 'India Standard Time'; ./tests/installer/Invoke-InstallerAcceptance.ps1 -Bundle "$PWD/artifacts/release-main/Zentriq-Setup-x64.exe" -UpgradeBundle "$PWD/artifacts/release-upgrade/Zentriq-Setup-x64.exe" -OutDir "$env:RUNNER_TEMP/acceptance" *>&1 | Tee-Object -FilePath "$env:RUNNER_TEMP/ci-logs/5-acceptance.log"
 
       - name: Summary
         if: always()

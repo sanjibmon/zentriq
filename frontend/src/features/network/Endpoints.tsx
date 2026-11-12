@@ -62,7 +62,7 @@ export function EndpointsTab() {
         </Callout>
       )}
       <form className="toolbar-row" onSubmit={(e) => { e.preventDefault(); setSearch(q.trim()); }}>
-        <input className="in grow" placeholder="Search a MAC address, IP address, vendor, device, switch or port…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search connected devices" />
+        <input className="in grow" placeholder="Search a MAC address, IP address, vendor, device, switch or port…" value={q} onChange={(e) => { setQ(e.target.value); if (!e.target.value.trim()) { setSearch(''); } }} aria-label="Search connected devices" />
         <select className="in" value={filter} onChange={(e) => { setFilter(e.target.value); setPicked([]); }} aria-label="Filter">
           {FILTERS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
         </select>

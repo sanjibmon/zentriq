@@ -20,7 +20,7 @@ public sealed record ApplyResult(Guid? AssetId, bool Created, string? Note);
 /// </summary>
 public sealed class InventoryStore(LicensingService licensing, Zentriq.Infrastructure.Secrets.CredentialProtector? protector = null)
 {
-    public static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
+    public static readonly JsonSerializerOptions Json = Zentriq.Application.UtcDateTimeOffsetConverter.AddTo(new(JsonSerializerDefaults.Web));
 
     public async Task<ApplyResult> ApplyAsync(NpgsqlConnection conn, InventoryDocument doc, MatchHints hints, LicenseStatus license, CancellationToken ct)
     {

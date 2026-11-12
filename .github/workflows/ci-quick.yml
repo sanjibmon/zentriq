@@ -116,6 +116,9 @@ jobs:
             (cd frontend && npm audit --omit=dev) || true
             echo; echo "== remote support engine (MeshCentral) =="
             if [ -d "$RUNNER_TEMP/mc" ]; then (cd "$RUNNER_TEMP/mc" && npm audit --omit=dev) || true; else echo "not installed in this run"; fi
+            echo; echo "== latest versions on npm (for overrides) =="
+            for p in meshcentral node-forge compression express express-handlebars archiver archiver-utils zip-stream glob minimatch image-size; do echo "$p $(npm view $p version 2>/dev/null)"; done
+            if [ -d "$RUNNER_TEMP/mc" ]; then (cd "$RUNNER_TEMP/mc" && npm ls node-forge compression express express-handlebars archiver glob minimatch image-size --all 2>/dev/null | head -60) || true; fi
             echo; echo "== .NET packages (all projects, transitive) =="
             dotnet list backend/Zentriq.slnx package --vulnerable --include-transitive || true
           } > npm-audit.log 2>&1

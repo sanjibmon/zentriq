@@ -186,7 +186,7 @@ function Resources() {
   return (
     <>
       <form className="toolbar-row" onSubmit={(e) => { e.preventDefault(); reset(); setSearch(q); }}>
-        <input className="in grow" placeholder="Search name, ID, host name, IP, OS, region, tag…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search resources" />
+        <input className="in grow" placeholder="Search name, ID, host name, IP, OS, region, tag…" value={q} onChange={(e) => { setQ(e.target.value); if (!e.target.value.trim()) { reset(); setSearch(''); } }} aria-label="Search resources" />
         <select className="in" value={provider} onChange={(e) => { reset(); setProvider(e.target.value); }} aria-label="Platform">
           <option value="">All platforms</option>{PROVIDERS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
         </select>
@@ -288,7 +288,7 @@ function Findings({ tick, onMsg }: { tick: number; onMsg: (m: string, tone?: 'in
   return (
     <>
       <form className="toolbar-row" onSubmit={(e) => { e.preventDefault(); setSearch(q); }}>
-        <input className="in grow" placeholder="Search resource, finding, connection…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search findings" />
+        <input className="in grow" placeholder="Search resource, finding, connection…" value={q} onChange={(e) => { setQ(e.target.value); if (!e.target.value.trim()) { setSearch(''); } }} aria-label="Search findings" />
         <select className="in" value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Status">
           <option value="open">Open</option><option value="ignored">Ignored</option><option value="resolved">Resolved</option><option value="all">All</option>
         </select>

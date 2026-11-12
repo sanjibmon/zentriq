@@ -175,7 +175,7 @@ function AssetsTab({ tick, summary, categories, departments, canEdit, onOpen, on
         </div>
       )}
       <form className="toolbar-row" onSubmit={(e) => { e.preventDefault(); setSearch(q.trim()); setPage(1); }}>
-        <input className="in grow" placeholder="Search tag, name, serial, barcode, model, person or location…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search non-IT assets" />
+        <input className="in grow" placeholder="Search tag, name, serial, barcode, model, person or location…" value={q} onChange={(e) => { setQ(e.target.value); if (!e.target.value.trim()) { setSearch(''); setPage(1); } }} aria-label="Search non-IT assets" />
         <select className="in" value={group} onChange={(e) => { setGroup(e.target.value); setCategory(''); setPage(1); }} aria-label="Category group">
           <option value="">All groups</option>{groups.map((g) => <option key={g}>{g}</option>)}
         </select>

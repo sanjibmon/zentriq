@@ -178,7 +178,7 @@ function RulesTab({ tick, canManage, groups, changed, failed }: Ctx) {
   return (
     <>
       <form className="toolbar-row" onSubmit={(e) => { e.preventDefault(); setSearch(q); }}>
-        <input className="in grow" placeholder="Search software, publisher or SHA-256…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search approved software" />
+        <input className="in grow" placeholder="Search software, publisher or SHA-256…" value={q} onChange={(e) => { setQ(e.target.value); if (!e.target.value.trim()) { setSearch(''); } }} aria-label="Search approved software" />
         <select className="in" value={action} onChange={(e) => setAction(e.target.value)} aria-label="Approved or blocked">
           <option value="">Approved and blocked</option><option value="allow">Approved</option><option value="block">Blocked</option>
         </select>
@@ -351,7 +351,7 @@ function InventoryTab({ tick, canManage, groups, changed, failed }: Ctx) {
   return (
     <>
       <form className="toolbar-row" onSubmit={(e) => { e.preventDefault(); setSearch(q); }}>
-        <input className="in grow" placeholder="Search software or publisher…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search software" />
+        <input className="in grow" placeholder="Search software or publisher…" value={q} onChange={(e) => { setQ(e.target.value); if (!e.target.value.trim()) { setSearch(''); } }} aria-label="Search software" />
         <select className="in" value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Status"><option value="unapproved">Not approved</option><option value="approved">Approved</option><option value="">All</option></select>
         <select className="in" value={platform} onChange={(e) => setPlatform(e.target.value)} aria-label="Platform"><option value="">Windows and Linux</option><option value="windows">Windows</option><option value="linux">Linux</option></select>
         <button className="btn" type="submit">Search</button>
@@ -490,7 +490,7 @@ function EventsTab({ tick, canManage, groups, changed, initialKind }: Ctx & { in
   return (
     <>
       <form className="toolbar-row" onSubmit={(e) => { e.preventDefault(); setSearch(q); }}>
-        <input className="in grow" placeholder="Search software, device, user or file…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search events" />
+        <input className="in grow" placeholder="Search software, device, user or file…" value={q} onChange={(e) => { setQ(e.target.value); if (!e.target.value.trim()) { setSearch(''); } }} aria-label="Search events" />
         <select className="in" value={kind} onChange={(e) => setKind(e.target.value)} aria-label="Kind"><option value="">All events</option>{Object.entries(KIND_LABEL).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
         <select className="in" value={days} onChange={(e) => setDays(Number(e.target.value))} aria-label="Period"><option value={1}>24 hours</option><option value={7}>7 days</option><option value={30}>30 days</option><option value={90}>90 days</option></select>
         <button className="btn" type="submit">Search</button>

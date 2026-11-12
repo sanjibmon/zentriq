@@ -79,7 +79,7 @@ export function HardwarePage() {
       {tab === 'changes' ? <ChangesTab kind="hardware" /> : <>
       {msg && <Callout icon="info">{msg}</Callout>}
       <form className="toolbar-row" onSubmit={(e) => { e.preventDefault(); reset(); setSearch(q); }}>
-        <input className="in grow" placeholder="Search hostname, vendor, model, serial or CPU…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search hardware" />
+        <input className="in grow" placeholder="Search hostname, vendor, model, serial or CPU…" value={q} onChange={(e) => { setQ(e.target.value); if (!e.target.value.trim()) { reset(); setSearch(''); } }} aria-label="Search hardware" />
         <select className="in" value={department} onChange={(e) => { reset(); setDepartment(e.target.value); }} aria-label="Department">
           <option value="">All departments</option>
           <option value="none">Not assigned</option>

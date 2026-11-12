@@ -75,7 +75,7 @@ export function SoftwarePage() {
       </div>
       {tab === 'changes' ? <ChangesTab kind="software" /> : <>
       <form className="toolbar-row" onSubmit={(e) => { e.preventDefault(); setPage(1); setSearch(q); }}>
-        <input className="in grow" placeholder="Search product or publisher…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search software" />
+        <input className="in grow" placeholder="Search product or publisher…" value={q} onChange={(e) => { setQ(e.target.value); if (!e.target.value.trim()) { setPage(1); setSearch(''); } }} aria-label="Search software" />
         <select className="in" value={os} onChange={(e) => { setPage(1); setOs(e.target.value); }} aria-label="Operating system">
           <option value="">All operating systems</option>
           <option value="windows">Windows</option>

@@ -291,7 +291,7 @@ export function AllocateDialog({ license, onClose, onSaved }: { license: License
       <div className="grid-2">
         <div className="form-v">
           <form className="toolbar-row" onSubmit={(e) => { e.preventDefault(); setSearch(q.trim()); }} style={{ margin: 0 }}>
-            <input className="in grow" placeholder="Find devices by name or IP…" value={q} onChange={(e) => setQ(e.target.value)} />
+            <input className="in grow" placeholder="Find devices by name or IP…" value={q} onChange={(e) => { setQ(e.target.value); if (!e.target.value.trim()) { setSearch(''); } }} />
             <button className="btn" type="submit">Search</button>
           </form>
           <div style={{ maxHeight: 260, overflow: 'auto' }}>

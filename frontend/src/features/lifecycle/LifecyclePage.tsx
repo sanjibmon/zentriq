@@ -189,7 +189,7 @@ function Assets({ meta, tick, onMsg }: { meta: LcMeta; tick: number; onMsg: (m: 
   return (
     <>
       <form className="toolbar-row" onSubmit={(e) => { e.preventDefault(); reset(); setSearch(q); }}>
-        <input className="in grow" placeholder="Search tag, device, serial, model, person, vendor, PO…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search IT assets" />
+        <input className="in grow" placeholder="Search tag, device, serial, model, person, vendor, PO…" value={q} onChange={(e) => { setQ(e.target.value); if (!e.target.value.trim()) { reset(); setSearch(''); } }} aria-label="Search IT assets" />
         <select className="in" value={stage} onChange={(e) => { reset(); setStage(e.target.value); setStatus(''); }} aria-label="Stage">
           <option value="">All stages except disposed</option>
           {meta.stages.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
@@ -273,7 +273,7 @@ function People({ meta, tick, onMsg, onUpload }: { meta: LcMeta; tick: number; o
   return (
     <>
       <form className="toolbar-row" onSubmit={(e) => { e.preventDefault(); setSearch(q); }}>
-        <input className="in grow" placeholder="Search name, e-mail, employee ID, department, job title…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search people" />
+        <input className="in grow" placeholder="Search name, e-mail, employee ID, department, job title…" value={q} onChange={(e) => { setQ(e.target.value); if (!e.target.value.trim()) { setSearch(''); } }} aria-label="Search people" />
         <select className="in" value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Status">
           <option value="active">Active</option><option value="left">Left the organisation</option><option value="">Everyone</option>
         </select>

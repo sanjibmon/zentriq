@@ -224,7 +224,7 @@ function Findings({ onCve }: { onCve: (c: string) => void }) {
   return (
     <>
       <form className="toolbar-row" onSubmit={(e) => { e.preventDefault(); setPage(1); setSearch(q); }}>
-        <input className="in grow" placeholder="Search CVE, software, device, KB, ticket…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search findings" />
+        <input className="in grow" placeholder="Search CVE, software, device, KB, ticket…" value={q} onChange={(e) => { setQ(e.target.value); if (!e.target.value.trim()) { setPage(1); setSearch(''); } }} aria-label="Search findings" />
         <select className="in" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} aria-label="Status">
           <option value="active">Open + in progress</option><option value="open">Open</option><option value="in_progress">In progress</option><option value="accepted">Risk accepted</option>
           <option value="false_positive">False positive</option><option value="fixed">Fixed</option><option value="all">All</option>
@@ -369,7 +369,7 @@ function Products() {
     <>
       <Callout tone="info" icon="info">Map software to its NVD product (CPE vendor:product) so its vulnerabilities are found; well-known products are mapped automatically. Ignore internal software.</Callout>
       <form className="toolbar-row" onSubmit={(e) => { e.preventDefault(); setPage(1); setSearch(q); }}>
-        <input className="in grow" placeholder="Search software, vendor or product…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search software mappings" />
+        <input className="in grow" placeholder="Search software, vendor or product…" value={q} onChange={(e) => { setQ(e.target.value); if (!e.target.value.trim()) { setPage(1); setSearch(''); } }} aria-label="Search software mappings" />
         <select className="in" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} aria-label="Mapping status">
           <option value="">All</option><option value="unmapped">Not mapped</option><option value="auto">Mapped automatically</option><option value="manual">Mapped manually</option><option value="ignored">Ignored</option>
         </select>

@@ -163,7 +163,7 @@ function UpdatesTab({ tick, canApprove, canDeploy, changed, failed, deploy }: Ct
   return (
     <>
       <form className="toolbar-row" onSubmit={(e) => { e.preventDefault(); setSearch(q); }}>
-        <input className="in grow" placeholder="Search title, KB, package or CVE…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search updates" />
+        <input className="in grow" placeholder="Search title, KB, package or CVE…" value={q} onChange={(e) => { setQ(e.target.value); if (!e.target.value.trim()) { setSearch(''); } }} aria-label="Search updates" />
         <select className="in" value={state} onChange={(e) => setState(e.target.value)} aria-label="State"><option value="missing">Missing on devices</option><option value="installed">Installed everywhere</option><option value="">All</option></select>
         <select className="in" value={platform} onChange={(e) => setPlatform(e.target.value)} aria-label="Platform"><option value="">Windows and Linux</option><option value="windows">Windows</option><option value="linux">Linux</option></select>
         <select className="in" value={classification} onChange={(e) => setClassification(e.target.value)} aria-label="Classification"><option value="">Any classification</option>{Object.entries(CLASS_LABEL).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
@@ -243,7 +243,7 @@ function DevicesTab({ tick, canDeploy, changed, failed, deploy, openId }: Ctx & 
   return (
     <>
       <form className="toolbar-row" onSubmit={(e) => { e.preventDefault(); setSearch(q); }}>
-        <input className="in grow" placeholder="Search device…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search devices" />
+        <input className="in grow" placeholder="Search device…" value={q} onChange={(e) => { setQ(e.target.value); if (!e.target.value.trim()) { setSearch(''); } }} aria-label="Search devices" />
         <select className="in" value={state} onChange={(e) => setState(e.target.value)} aria-label="State">
           <option value="">All devices</option><option value="urgent">Missing critical / security</option><option value="missing">Missing updates</option><option value="uptodate">Up to date</option>
           <option value="reboot">Restart pending</option><option value="failed">Failed</option><option value="notscanned">Not scanned</option>

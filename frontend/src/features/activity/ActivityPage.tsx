@@ -47,7 +47,7 @@ export function ActivityPage() {
         actions={<button className="btn" onClick={() => setCsv(true)}><Icon name="down" size={14} /> Download CSV</button>} />
       {csv && <CsvExportDialog what="activity log" path="/activity/export" onClose={() => setCsv(false)} />}
       <form className="toolbar-row" onSubmit={(e) => { e.preventDefault(); setPage(1); setSearch(q); }}>
-        <input className="in grow" placeholder="Search device, service, software, user or result…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search activity" />
+        <input className="in grow" placeholder="Search device, service, software, user or result…" value={q} onChange={(e) => { setQ(e.target.value); if (!e.target.value.trim()) { setPage(1); setSearch(''); } }} aria-label="Search activity" />
         <select className="in" value={kind} onChange={(e) => { setPage(1); setKind(e.target.value); }} aria-label="Type">
           <option value="">All actions</option>
           <option value="service">Service actions</option>

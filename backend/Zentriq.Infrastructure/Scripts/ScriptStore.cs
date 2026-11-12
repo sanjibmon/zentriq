@@ -376,7 +376,7 @@ public static class ScriptStore
             await using (var upd = ds.CreateCommand("UPDATE zentriq.script_schedules SET last_run_at = now(), next_run_at = @n, enabled = CASE WHEN @n IS NULL THEN false ELSE enabled END WHERE id = @id"))
             {
                 upd.Parameters.AddWithValue("id", s.Id);
-                upd.Parameters.Add(new NpgsqlParameter("n", NpgsqlDbType.TimestampTz) { Value = next is { } n ? new DateTimeOffset(n) : DBNull.Value });
+                upd.Parameters.Add(new NpgsqlParameter("n", NpgsqlDbType.TimestampTz) { Value = next is { } n ? new DateTimeOffset(n).ToUniversalTime() : DBNull.Value });
                 await upd.ExecuteNonQueryAsync(ct);
             }
             try

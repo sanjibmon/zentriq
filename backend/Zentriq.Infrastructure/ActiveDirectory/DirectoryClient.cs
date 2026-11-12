@@ -139,7 +139,7 @@ public static class DirectoryClient
         string? S(string n) => e.Attributes.Contains(n) && e.Attributes[n].Count > 0 ? e.Attributes[n][0]?.ToString() : null;
         var guidBytes = e.Attributes.Contains("objectGUID") ? e.Attributes["objectGUID"].GetValues(typeof(byte[])).Cast<byte[]>().FirstOrDefault() : null;
         if (guidBytes is not { Length: 16 }) return null;
-        DateTimeOffset? FileTime(string n) => long.TryParse(S(n), out var ft) && ft > 0 && ft != long.MaxValue ? DateTimeOffset.FromFileTime(ft) : null;
+        DateTimeOffset? FileTime(string n) => long.TryParse(S(n), out var ft) && ft > 0 && ft != long.MaxValue ? DateTimeOffset.FromFileTime(ft).ToUniversalTime() : null;
         DateTimeOffset? Generalized(string n) =>
             S(n) is { Length: >= 14 } g && DateTime.TryParseExact(g[..14], "yyyyMMddHHmmss", null, System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal, out var d)
                 ? new DateTimeOffset(d, TimeSpan.Zero) : null;

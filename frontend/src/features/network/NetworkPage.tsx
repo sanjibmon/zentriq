@@ -142,7 +142,7 @@ function DevicesTab({ summary }: { summary: NetworkSummary | null }) {
         </div>
       )}
       <form className="toolbar-row" onSubmit={(e) => { e.preventDefault(); setSearch(q); }}>
-        <input className="in grow" placeholder="Search name, IP, manufacturer or model…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search network devices" />
+        <input className="in grow" placeholder="Search name, IP, manufacturer or model…" value={q} onChange={(e) => { setQ(e.target.value); if (!e.target.value.trim()) { setSearch(''); } }} aria-label="Search network devices" />
         <select className="in" value={type} onChange={(e) => setType(e.target.value)} aria-label="Device type">
           <option value="">All types</option>
           {NET_TYPES.map((t) => <option key={t} value={t}>{typeName(t)}</option>)}
@@ -248,7 +248,7 @@ export function PortsTab({ assetId }: { assetId?: string }) {
   return (
     <>
       <form className="toolbar-row" onSubmit={(e) => { e.preventDefault(); setSearch(q.trim()); }}>
-        <input className="in grow" placeholder={assetId ? 'Filter by port, MAC address, IP address or device…' : 'Where is a device connected? Search a MAC address, IP address, device name or port…'} value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search ports" />
+        <input className="in grow" placeholder={assetId ? 'Filter by port, MAC address, IP address or device…' : 'Where is a device connected? Search a MAC address, IP address, device name or port…'} value={q} onChange={(e) => { setQ(e.target.value); if (!e.target.value.trim()) { setSearch(''); } }} aria-label="Search ports" />
         <select className="in" value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Port filter">
           {PORT_FILTERS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
         </select>
