@@ -41,7 +41,7 @@ public sealed class ReportSchedule
                 "weekly" => (int)candidate.DayOfWeek == Weekday,
                 _ => candidate.Day == Day,
             };
-            if (ok && candidate > local) return new DateTimeOffset(candidate, zone.GetUtcOffset(candidate));
+            if (ok && candidate > local) return new DateTimeOffset(candidate, zone.GetUtcOffset(candidate)).ToUniversalTime();
             candidate = candidate.AddDays(1);
         }
         return after.AddDays(1);

@@ -38,7 +38,7 @@ public sealed class BackupSchedule
     {
         var local = d.ToDateTime(t, DateTimeKind.Unspecified);
         while (zone.IsInvalidTime(local)) local = local.AddMinutes(30);
-        return new DateTimeOffset(local, zone.GetUtcOffset(local));
+        return new DateTimeOffset(local, zone.GetUtcOffset(local)).ToUniversalTime();
     }
 
     /// <summary>The latest scheduled time at or before <paramref name="now"/> (null when disabled or invalid).</summary>

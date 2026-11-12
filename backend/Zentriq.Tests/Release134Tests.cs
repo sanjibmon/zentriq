@@ -39,6 +39,19 @@ public sealed class Release134Tests
     }
 
     [Fact]
+    public void Report_and_backup_schedules_in_india_return_utc()
+    {
+        var india = TimeZoneInfo.FindSystemTimeZoneById("Asia/Kolkata");
+        var from = new DateTimeOffset(2026, 11, 12, 0, 0, 0, TimeSpan.Zero);
+        var report = new Zentriq.Infrastructure.Reports.ReportSchedule { Frequency = "daily", Hour = 7 }.NextRun(from, india);
+        Assert.Equal(TimeSpan.Zero, report.Offset);
+        Assert.Equal(new DateTimeOffset(2026, 11, 13, 1, 30, 0, TimeSpan.Zero), report); // 07:00 IST
+        var backup = new Zentriq.Infrastructure.Backup.BackupSchedule { Enabled = true, Frequency = "daily", Time = "02:00" }.NextRun(from, india);
+        Assert.Equal(TimeSpan.Zero, backup!.Value.Offset);
+        Assert.Equal(new DateTimeOffset(2026, 11, 12, 20, 30, 0, TimeSpan.Zero), backup.Value); // 02:00 IST on the 13th
+    }
+
+    [Fact]
     public void Active_directory_file_time_is_utc()
     {
         // lastLogonTimestamp / pwdLastSet: FromFileTime gives the server's local offset; ToUniversalTime keeps the instant.
