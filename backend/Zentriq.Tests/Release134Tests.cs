@@ -45,7 +45,7 @@ public sealed class Release134Tests
         var from = new DateTimeOffset(2026, 11, 12, 0, 0, 0, TimeSpan.Zero);
         var report = new Zentriq.Infrastructure.Reports.ReportSchedule { Frequency = "daily", Hour = 7 }.NextRun(from, india);
         Assert.Equal(TimeSpan.Zero, report.Offset);
-        Assert.Equal(new DateTimeOffset(2026, 11, 13, 1, 30, 0, TimeSpan.Zero), report); // 07:00 IST
+        Assert.Equal(new DateTimeOffset(2026, 11, 12, 1, 30, 0, TimeSpan.Zero), report); // 07:00 IST the same day (it is 05:30 IST)
         var backup = new Zentriq.Infrastructure.Backup.BackupSchedule { Enabled = true, Frequency = "daily", Time = "02:00" }.NextRun(from, india);
         Assert.Equal(TimeSpan.Zero, backup!.Value.Offset);
         Assert.Equal(new DateTimeOffset(2026, 11, 12, 20, 30, 0, TimeSpan.Zero), backup.Value); // 02:00 IST on the 13th
