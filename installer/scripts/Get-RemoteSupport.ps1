@@ -82,7 +82,7 @@ if ($overrides) {
 }
 # The server checks its modules at start and would try to download missing ones: prove they are all present.
 & (Join-Path $OutDir 'node\node.exe') -e @"
-const need=['archiver','cbor','compression','cookie-session','express','express-handlebars','express-ws','ipcheck','minimist','multiparty','@seald-io/nedb','node-forge','ua-parser-js','ua-client-hints-js','ws','yauzl','@zip.js/zip.js','node-windows','loadavg-windows'];
+const need=['archiver','cbor','compression','cookie-session','express','express-handlebars','express-ws','ipcheck','minimist','multiparty','@seald-io/nedb','node-forge','ua-parser-js','ua-client-hints-js','ws','yauzl','@zip.js/zip.js','node-windows','loadavg-windows','image-size'];
 const path=require('path'); const fs=require('fs'); const base=process.argv[1];
 const missing=need.filter(m=>!fs.existsSync(path.join(base,m,'package.json')));
 if(missing.length){console.error('Missing modules: '+missing.join(', ')+' in '+base);process.exit(1)} console.log('All MeshCentral modules present.');
