@@ -1,6 +1,35 @@
 # Test report
 
-Latest: GitHub Actions run 43235973527, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022
+Latest: GitHub Actions run 43266189157, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022
+Datacenter 10.0.20348** VM set to India Standard Time plus an Ubuntu job for the Linux agent. Release:
+`v1.1.1-build.136` (pre-release, **unsigned**), package version **1.1.1.136**, commit `b22364a`. Results: unit +
+PostgreSQL integration tests **492 PASS** (494, 2 skipped); installer acceptance **92 passed, 0 failed** (10 not run:
+need hardware, a domain, a reboot or old Windows); upgrade suites **14/14** (schema 44); Linux agent on 11
+distributions **11/11**.
+
+New in build 136: data scope per role and group (locations, departments, device groups; PostgreSQL row-level security
+for scoped users' connections only), access rules per user (expiry, sign-in hours, allowed networks), MFA required per
+role, directory groups mapped to Zentriq groups (T101); Patch Management splits Windows & OS updates from software
+updates (Microsoft software from Windows Update / WSUS, third-party applications through winget — the CI runner,
+Windows Server 2022, has no winget and the scan says so); renamed computers recorded in the change history.
+
+| File | SHA256 |
+|---|---|
+| Zentriq-Setup-x64.exe | `65d127bb8d9c263c91d48795c3391baf58bf01c24e41040d95b0772ac1ff3909` |
+| Zentriq.msi | `2e83160ef69be684140c20663671dc32612e015309938f9015b7b12fec430399` |
+| ZentriqAgent-x64.msi | `41f64c05498594292c16a7b7e21064deabbe26382d4bf1cd3c40443d9bc1cd49` |
+| zentriq-agent-linux-x64.deb | `c07a9f882849312b990b927890bf0b6aedb7fd00b915c01ddeacbeb805838144` |
+| zentriq-agent-linux-x64.rpm | `090c92f7eef41cf70a9694327b1ca1e3c4e338d1f4a09be5932a34bacd0f070a` |
+| zentriq-agent-linux-x64.tar.gz | `ff4d02d670fc58f96a7d421cb47ce96bdf58265b8753654adbd9cfb8576e47aa` |
+| zentriq-agent-linux-arm64.deb | `9ede18a6e91510c3e15da3fc9ca4447a6bd676cbd8612b0a44ed21dd22fd0487` |
+| zentriq-agent-linux-arm64.rpm | `70505f7444e9ae3bf575e418630072471eb037754b980df680fa856db38e6b80` |
+| zentriq-agent-linux-arm64.tar.gz | `30e8b64f07add2479339d0761b85a1d9f30d8d6c111b9177f1faa3f4a0f3811a` |
+| Zentriq-1.1.1-msi-offline-kit.zip | `c5108b325ecab0191478c2e8ea1cdd42443135321dc8e656fdd4e1db3b6554a7` |
+| Zentriq-1.1.1-docs.zip | `5d74ace66097cb5d813b82138d292a76ee1dfc61e7bb37e0b8e2844f465ac3b0` |
+
+## Build 135
+
+GitHub Actions run 43235973527, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022
 Datacenter 10.0.20348** VM **set to India Standard Time (UTC+05:30)** plus an Ubuntu job for the Linux agent. Release:
 `v1.1.1-build.135` (pre-release, **unsigned**), package version **1.1.1.135**, commit `0dd9b6e`. Results: unit +
 PostgreSQL integration tests **487 PASS** (489, 2 skipped); installer acceptance **91 passed, 0 failed** (10 not run:
