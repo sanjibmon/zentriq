@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { api } from '../../api/client';
 import { useApi } from '../../app/useApi';
-import { Check, Field, Fields, Section } from '../../components/Form';
+import { Check, Combo, Field, Fields, Section } from '../../components/Form';
 import { Modal } from '../../components/Modal';
 import { Callout, DataTable } from '../../components/ui';
 import { errText } from '../deployment/types';
 import { useDepartments } from '../departments/Departments';
-import { METRIC_LABEL, TYPE_LABEL, type Connection, type License, type LicenseType, type Metric, type Product } from './types';
+import { baseName, METRIC_LABEL, TYPE_LABEL, type Connection, type FoundSoftware, type License, type LicenseType, type Metric, type Product } from './types';
 
 const lines = (s: string) => s.split(/[\n;]/).map((x) => x.trim()).filter(Boolean);
 const num = (s: string) => (s.trim() === '' ? null : Number(s));
@@ -25,6 +25,15 @@ export function ProductDialog({ product, isNew, onClose, onSaved }: { product: P
   const [err, setErr] = useState<string | null>(null);
   const [preview, setPreview] = useState<{ name: string; publisher: string | null; devices: number }[] | null>(null);
   const apps = useApi(() => api.get<{ id: string; name: string }[]>('/webapps').catch(() => []), []);
+  // Software and publishers found in the inventory, to pick from (anything else is typed in).
+  const found = useApi(() => api.get<FoundSoftware>('/sam/inventory/software').catch(() => ({ software: [], publishers: [] }) as FoundSoftware), []);
+  const softwareOptions = (found.data?.software ?? []).map((x) => ({ value: x.name, sub: x.publisher, count: x.devices }));
+  const publisherOptions = (found.data?.publishers ?? []).map((x) => ({ value: x.name, count: x.devices }));
+  function pickSoftware(name: string, publisher: string | null | undefined) {
+    const base = baseName(name);
+    setF((p) => ({ ...p, name: base, publisher: p.publisher || publisher || '', names: p.kind === 'installed' && !p.names.trim() ? `${base}*` : p.names }));
+    setPreview(null);
+  }
   const body = () => ({
     name: f.name, publisher: f.publisher || null, category: f.category || 'Other', kind: f.kind, metric: f.metric, needsLicense: f.needsLicense,
     namePatterns: lines(f.names), excludePatterns: lines(f.excludes), publisherPatterns: lines(f.publishers), cloudSkus: lines(f.skus),
@@ -48,8 +57,13 @@ export function ProductDialog({ product, isNew, onClose, onSaved }: { product: P
         {err && <Callout tone="crit" icon="alert">{err}</Callout>}
         <Section title="Product">
           <Fields>
-            <Field label="Name" required><input className="in" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} maxLength={160} autoFocus placeholder="e.g. Microsoft Visio" /></Field>
-            <Field label="Publisher" optional><input className="in" value={f.publisher} onChange={(e) => setF({ ...f, publisher: e.target.value })} placeholder="e.g. Microsoft" /></Field>
+            <Field label="Name" required hint="Pick software found on your devices, or type a name that is not in the list.">
+              <Combo value={f.name} onChange={(v) => setF({ ...f, name: v })} onPick={(o) => pickSoftware(o.value, o.sub)} options={softwareOptions} loading={found.loading}
+                maxLength={160} autoFocus placeholder="e.g. Microsoft Visio" ariaLabel="Name" />
+            </Field>
+            <Field label="Publisher" optional>
+              <Combo value={f.publisher} onChange={(v) => setF({ ...f, publisher: v })} options={publisherOptions} loading={found.loading} placeholder="e.g. Microsoft" ariaLabel="Publisher" />
+            </Field>
             <Field label="Kind">
               <select className="in" value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value as 'installed' | 'cloud' })}>
                 <option value="installed">Installed software (found in the inventory)</option>
@@ -118,6 +132,11 @@ export function LicenseDialog({ license, productId, products, onClose, onSaved }
   });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // Versions installed of the chosen product and publishers found in the inventory, to pick from.
+  const versions = useApi<{ version: string; devices: number }[]>(() => (f.productId ? api.get<{ version: string; devices: number }[]>('/sam/inventory/versions', { productId: f.productId }).catch(() => []) : Promise.resolve([])), [f.productId]);
+  const found = useApi(() => api.get<FoundSoftware>('/sam/inventory/software').catch(() => ({ software: [], publishers: [] }) as FoundSoftware), []);
+  const versionOptions = (versions.data ?? []).map((v) => ({ value: v.version, count: v.devices }));
+  const vendorOptions = (found.data?.publishers ?? []).map((x) => ({ value: x.name, count: x.devices }));
   const sub = f.licenseType === 'subscription' || f.licenseType === 'trial';
   const free = f.licenseType === 'freeware' || f.licenseType === 'open_source';
   const set = (k: keyof typeof f, v: string | boolean) => setF({ ...f, [k]: v });
@@ -166,7 +185,9 @@ export function LicenseDialog({ license, productId, products, onClose, onSaved }
             </Field>}
             {!free && <div className="ff"><span className="ff-l">&nbsp;</span><Check checked={f.unlimited} onChange={(v) => set('unlimited', v)}>Unlimited (site licence)</Check></div>}
             <Field label="Edition" optional><input className="in" value={f.edition} onChange={(e) => set('edition', e.target.value)} placeholder="e.g. Professional" /></Field>
-            <Field label="Version" optional><input className="in" value={f.version} onChange={(e) => set('version', e.target.value)} placeholder="e.g. 2024" /></Field>
+            <Field label="Version" optional hint={versionOptions.length > 0 ? 'Versions installed on your devices, or type another.' : undefined}>
+              <Combo value={f.version} onChange={(v) => set('version', v)} options={versionOptions} loading={versions.loading} placeholder="e.g. 2024" ariaLabel="Version" />
+            </Field>
           </Fields>
           <Check checked={f.downgradeRights} onChange={(v) => set('downgradeRights', v)} hint="Older versions installed on devices count against this licence.">Downgrade rights</Check>
           {license && <Fields><Field label="Status"><select className="in" value={f.status} onChange={(e) => set('status', e.target.value)}><option value="active">Active</option><option value="retired">Retired</option></select></Field></Fields>}
@@ -188,7 +209,7 @@ export function LicenseDialog({ license, productId, products, onClose, onSaved }
         <Section title="Purchase">
           <Fields cols={3}>
             <Field label="Purchase date" optional><input className="in" type="date" value={f.purchaseDate} onChange={(e) => set('purchaseDate', e.target.value)} /></Field>
-            <Field label="Vendor" optional><input className="in" value={f.vendor} onChange={(e) => set('vendor', e.target.value)} placeholder="e.g. Microsoft" /></Field>
+            <Field label="Vendor" optional><Combo value={f.vendor} onChange={(v) => set('vendor', v)} options={vendorOptions} loading={found.loading} placeholder="e.g. Microsoft" ariaLabel="Vendor" /></Field>
             <Field label="Reseller" optional><input className="in" value={f.reseller} onChange={(e) => set('reseller', e.target.value)} /></Field>
             <Field label="PO number" optional><input className="in" value={f.poNumber} onChange={(e) => set('poNumber', e.target.value)} /></Field>
             <Field label="Invoice number" optional><input className="in" value={f.invoiceNumber} onChange={(e) => set('invoiceNumber', e.target.value)} /></Field>

@@ -10,7 +10,7 @@ namespace Zentriq.Api.Endpoints;
 
 /// <summary>
 /// Software License Management (software asset management): software products and how their installations are found,
-/// licences (perpetual, subscription, volume, OEM, enterprise, trial, freeware) with purchase and renewal details,
+/// licences (perpetual, subscription, volume, OEM, retail, enterprise, trial, freeware) with purchase and renewal details,
 /// allocations to devices and users, the licence position (installed / used vs owned), Microsoft 365 cloud licences,
 /// Windows and Office activation, expiry tracking and alerts.
 /// </summary>
@@ -26,11 +26,12 @@ public static class LicenseEndpoints
     public sealed record RenewBody(DateOnly? EndDate, int? Quantity, decimal? TotalCost, string? Note);
     public sealed record AllocateBody(Guid[]? AssetIds, string[]? Users, string? Note);
     public sealed record ConnectionBody(string? Name, string? TenantId, string? ClientId, string? ClientSecret, bool? Enabled, bool? SyncApps);
-    public sealed record SettingsBody(string[]? NotifyEmails, bool? NotifyInApp, int? ExpiryDays, int? UnusedPercent, int? InactiveDays, bool? WebDiscovery, bool? Metering = null, int? UnusedDays = null);
+    public sealed record SettingsBody(string[]? NotifyEmails, bool? NotifyInApp, int? ExpiryDays, int? UnusedPercent, int? InactiveDays, bool? WebDiscovery, bool? Metering = null, int? UnusedDays = null, bool? ProductKeys = null);
+    public sealed record ActivationKeyBody(Guid? AssetId, string? Application, string? PartialKey);
     public sealed record FromCatalogBody(string[]? Keys);
 
     private static readonly string[] Metrics = ["device", "user", "core", "concurrent", "site"];
-    private static readonly string[] Types = ["perpetual", "subscription", "volume", "oem", "enterprise", "trial", "freeware", "open_source"];
+    private static readonly string[] Types = ["perpetual", "subscription", "volume", "oem", "retail", "enterprise", "trial", "freeware", "open_source"];
     private static readonly string[] Billings = ["monthly", "quarterly", "annual", "multi_year", "one_time"];
 
     public static void MapLicenseEndpoints(this RouteGroupBuilder api)
@@ -115,7 +116,15 @@ public static class LicenseEndpoints
             s.WebDiscovery = body.WebDiscovery ?? s.WebDiscovery;
             s.Metering = body.Metering ?? s.Metering;
             if (body.UnusedDays is { } ud) { if (ud is < 14 or > 365) return Validation.Problem("unusedDays", "Choose 14 to 365 days."); s.UnusedDays = ud; }
+            var keysOff = body.ProductKeys == false && s.ProductKeys;
+            s.ProductKeys = body.ProductKeys ?? s.ProductKeys;
             await s.SaveAsync(ds, rc.UserId, ct);
+            if (keysOff)
+            {
+                // Switched off: the keys collected so far are removed as well.
+                await using var del = ds.CreateCommand("DELETE FROM zentriq.asset_product_keys");
+                await del.ExecuteNonQueryAsync(ct);
+            }
             await rc.AuditAsync("licenses.settings", null, detail: s);
             return Results.Ok(s);
         }).RequireAuthorization(Permissions.LicensesManage);
@@ -591,7 +600,9 @@ public static class LicenseEndpoints
                     SELECT a.id AS "assetId", COALESCE(a.hostname, host(a.primary_ip)) AS "hostname", a.os_name AS "os", dep.name AS "department",
                            l->>'product' AS "product", l->>'application' AS "application", l->>'channel' AS "channel", l->>'status' AS "status",
                            l->>'partialKey' AS "partialKey", (l->>'graceMinutes')::bigint AS "graceMinutes", l->>'description' AS "description",
-                           (l->>'status' IN ('licensed','embedded')) AS "activated", d.collected_at AS "collectedAt"
+                           (l->>'status' IN ('licensed','embedded')) AS "activated", d.collected_at AS "collectedAt",
+                           EXISTS (SELECT 1 FROM zentriq.asset_product_keys k WHERE k.asset_id = a.id AND k.application = l->>'application'
+                                     AND (l->>'partialKey' IS NULL OR k.key_hint = upper(l->>'partialKey'))) AS "hasKey"
                       FROM zentriq.asset_inventory_documents d JOIN zentriq.assets a ON a.id = d.asset_id AND a.status = 'active'
                       LEFT JOIN zentriq.departments dep ON dep.id = a.department_id,
                            jsonb_array_elements(CASE WHEN jsonb_typeof(d.document->'licenses') = 'array' THEN d.document->'licenses' ELSE '[]' END) l
@@ -606,6 +617,108 @@ public static class LicenseEndpoints
                 )::text
                 """, c => { c.Parameters.Add(T("f", filter)); c.Parameters.Add(T("q", string.IsNullOrWhiteSpace(q) ? null : q.Trim().Replace("%", ""))); }, ct);
             return Results.Text(json ?? "{}", "application/json");
+        });
+
+        // The full key behind a Windows / Office / firmware activation row, where the device keeps one.
+        g.MapPost("/activation/key", async (ActivationKeyBody body, NpgsqlDataSource ds, CredentialProtector protector, RequestContext rc, CancellationToken ct) =>
+        {
+            if (body.AssetId is not { } assetId || body.Application is not ("windows" or "office" or "firmware")) return Validation.Problem("application", "Choose a Windows, Office or firmware licence.");
+            await using var cmd = ds.CreateCommand("""
+                SELECT k.id, k.key_protected, k.product, COALESCE(a.hostname, host(a.primary_ip)), k.note
+                  FROM zentriq.asset_product_keys k JOIN zentriq.assets a ON a.id = k.asset_id
+                 WHERE k.asset_id = @a AND k.application = @app AND (@pk::text IS NULL OR k.key_hint = upper(@pk))
+                 ORDER BY k.last_seen_at DESC LIMIT 1
+                """);
+            cmd.Parameters.AddWithValue("a", assetId);
+            cmd.Parameters.AddWithValue("app", body.Application);
+            cmd.Parameters.Add(T("pk", string.IsNullOrWhiteSpace(body.PartialKey) ? null : body.PartialKey.Trim()));
+            await using var r = await cmd.ExecuteReaderAsync(ct);
+            if (!await r.ReadAsync(ct))
+                return Results.Problem(statusCode: 404, title: "The device does not keep this key in full — only its last five characters. That is the case for Office 2013 and later, Microsoft 365 and volume-activated Windows.");
+            var key = protector.Unprotect(r.GetGuid(0), r.GetString(1)).Password;
+            await rc.AuditAsync("licenses.device_key_view", r.GetString(2), detail: new { device = r.IsDBNull(3) ? null : r.GetString(3) });
+            return Results.Ok(new { key, note = r.IsDBNull(4) ? null : r.GetString(4) });
+        }).RequireAuthorization(Permissions.LicensesManage);
+
+        // ---- product keys found on devices ------------------------------------------------------------------------
+        g.MapGet("/keys", async (NpgsqlDataSource ds, string? application, string? q, Guid? assetId, CancellationToken ct) =>
+        {
+            await using var conn = await ds.OpenConnectionAsync(ct);
+            var json = await ScalarAsync(conn, """
+                SELECT jsonb_build_object(
+                  'enabled', COALESCE((SELECT (value->>'productKeys')::boolean FROM zentriq.system_settings WHERE key = 'licenses.settings'), true),
+                  'rows', (SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY lower(t."product"), lower(t."hostname")), '[]') FROM (
+                    SELECT k.id AS "id", a.id AS "assetId", COALESCE(a.hostname, host(a.primary_ip)) AS "hostname", dep.name AS "department", k.product AS "product",
+                           k.publisher AS "publisher", k.application AS "application", k.source AS "source", k.key_hint AS "keyHint", k.note AS "note",
+                           k.first_seen_at AS "firstSeenAt", k.last_seen_at AS "lastSeenAt"
+                      FROM zentriq.asset_product_keys k JOIN zentriq.assets a ON a.id = k.asset_id AND a.status = 'active'
+                      LEFT JOIN zentriq.departments dep ON dep.id = a.department_id
+                     WHERE (@app::text IS NULL OR k.application = @app OR (@app = 'microsoft' AND k.application <> 'other'))
+                       AND (@a::uuid IS NULL OR k.asset_id = @a)
+                       AND (@q::text IS NULL OR a.hostname ILIKE '%' || @q || '%' OR k.product ILIKE '%' || @q || '%' OR k.publisher ILIKE '%' || @q || '%' OR k.key_hint ILIKE '%' || @q || '%')
+                     LIMIT 10000) t))::text
+                """, c =>
+            {
+                c.Parameters.Add(T("app", string.IsNullOrWhiteSpace(application) ? null : application));
+                c.Parameters.Add(T("q", string.IsNullOrWhiteSpace(q) ? null : q.Trim().Replace("%", "")));
+                c.Parameters.Add(new NpgsqlParameter("a", NpgsqlDbType.Uuid) { Value = (object?)assetId ?? DBNull.Value });
+            }, ct);
+            return Results.Text(json ?? "{}", "application/json");
+        });
+
+        g.MapPost("/keys/{id:guid}/reveal", async (Guid id, NpgsqlDataSource ds, CredentialProtector protector, RequestContext rc, CancellationToken ct) =>
+        {
+            await using var cmd = ds.CreateCommand("""
+                SELECT k.key_protected, k.product, COALESCE(a.hostname, host(a.primary_ip))
+                  FROM zentriq.asset_product_keys k JOIN zentriq.assets a ON a.id = k.asset_id WHERE k.id = @id
+                """);
+            cmd.Parameters.AddWithValue("id", id);
+            await using var r = await cmd.ExecuteReaderAsync(ct);
+            if (!await r.ReadAsync(ct)) return Results.NotFound();
+            var key = protector.Unprotect(id, r.GetString(0)).Password;
+            await rc.AuditAsync("licenses.device_key_view", r.GetString(1), detail: new { device = r.IsDBNull(2) ? null : r.GetString(2) });
+            return Results.Ok(new { key });
+        }).RequireAuthorization(Permissions.LicensesManage);
+
+        // ---- software found in the inventory, to pick from when adding a product or a licence ---------------------
+        g.MapGet("/inventory/software", async (NpgsqlDataSource ds, CancellationToken ct) =>
+        {
+            await using var conn = await ds.OpenConnectionAsync(ct);
+            var json = await ScalarAsync(conn, """
+                SELECT jsonb_build_object(
+                  'software', (SELECT COALESCE(jsonb_agg(jsonb_build_object('name', n, 'publisher', pub, 'devices', d) ORDER BY lower(n)), '[]') FROM (
+                    SELECT min(s.name) n, min(s.publisher) pub, count(DISTINCT s.asset_id) d
+                      FROM zentriq.software_inventory s JOIN zentriq.assets a ON a.id = s.asset_id AND a.status = 'active'
+                     GROUP BY lower(s.name) ORDER BY 3 DESC LIMIT 5000) t),
+                  'publishers', (SELECT COALESCE(jsonb_agg(jsonb_build_object('name', pub, 'devices', d) ORDER BY lower(pub)), '[]') FROM (
+                    SELECT min(btrim(s.publisher)) pub, count(DISTINCT s.asset_id) d
+                      FROM zentriq.software_inventory s JOIN zentriq.assets a ON a.id = s.asset_id AND a.status = 'active'
+                     WHERE btrim(COALESCE(s.publisher, '')) <> ''
+                     GROUP BY lower(btrim(s.publisher)) ORDER BY 2 DESC LIMIT 2000) t))::text
+                """, null, ct);
+            return Results.Text(json ?? "{}", "application/json");
+        });
+
+        // Versions (and editions in the names) installed of a product, or of software by name when the product is not saved yet.
+        g.MapGet("/inventory/versions", async (NpgsqlDataSource ds, Guid? productId, string? name, CancellationToken ct) =>
+        {
+            if (productId is null && string.IsNullOrWhiteSpace(name)) return Results.Ok(Array.Empty<object>());
+            await using var conn = await ds.OpenConnectionAsync(ct);
+            var json = await ScalarAsync(conn, """
+                SELECT COALESCE(jsonb_agg(jsonb_build_object('version', v, 'devices', d) ORDER BY d DESC, v DESC), '[]')::text FROM (
+                  SELECT btrim(s.version) v, count(DISTINCT s.asset_id) d
+                    FROM zentriq.software_inventory s JOIN zentriq.assets a ON a.id = s.asset_id AND a.status = 'active'
+                   WHERE btrim(COALESCE(s.version, '')) <> ''
+                     AND ((@p::uuid IS NOT NULL AND EXISTS (SELECT 1 FROM zentriq.sam_products p WHERE p.id = @p AND s.name ILIKE ANY (zentriq.sam_like(p.name_patterns))
+                              AND NOT (s.name ILIKE ANY (zentriq.sam_like(p.exclude_patterns)))))
+                       OR (@p::uuid IS NULL AND lower(s.name) = lower(@n)))
+                   GROUP BY btrim(s.version) ORDER BY 2 DESC LIMIT 300) t
+                """, c =>
+            {
+                c.Parameters.Add(new NpgsqlParameter("p", NpgsqlDbType.Uuid) { Value = (object?)productId ?? DBNull.Value });
+                c.Parameters.Add(T("n", string.IsNullOrWhiteSpace(name) ? null : name.Trim()));
+            }, ct);
+            return Results.Text(json ?? "[]", "application/json");
         });
 
         // ---- Microsoft 365 / cloud licences ------------------------------------------------------------------------

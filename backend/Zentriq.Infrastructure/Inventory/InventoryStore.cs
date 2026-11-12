@@ -18,7 +18,7 @@ public sealed record ApplyResult(Guid? AssetId, bool Created, string? Note);
 /// against the license. Matching order: preferred asset → agent id → SMBIOS UUID → serial number →
 /// MAC address → FQDN/hostname → IP address. New assets are created only within the license capacity.
 /// </summary>
-public sealed class InventoryStore(LicensingService licensing)
+public sealed class InventoryStore(LicensingService licensing, Zentriq.Infrastructure.Secrets.CredentialProtector? protector = null)
 {
     public static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -79,6 +79,15 @@ public sealed class InventoryStore(LicensingService licensing)
             catch (PostgresException) { await tx.RollbackAsync("experience", ct); }
             doc.Usage = null;
             doc.Experience = null;
+        }
+        // Product keys (collectors from build 130): encrypted in their own table, never part of the stored document.
+        var productKeys = doc.ProductKeys;
+        doc.ProductKeys = null;
+        if (productKeys is not null && protector is not null)
+        {
+            await tx.SaveAsync("productkeys", ct);
+            try { await Zentriq.Infrastructure.Licenses.ProductKeyStore.RecordAsync(conn, tx, assetId.Value, productKeys, protector, ct); }
+            catch (Exception ex) when (ex is PostgresException or InvalidOperationException or System.Security.Cryptography.CryptographicException) { await tx.RollbackAsync("productkeys", ct); }
         }
         await UpsertDocumentAsync(conn, tx, assetId.Value, doc, ct);
         await AddIdentifiersAsync(conn, tx, assetId.Value, doc, hints, ct);

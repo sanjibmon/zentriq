@@ -208,10 +208,15 @@ public static class WindowsCollector
                     doc.Services.Add(new ServiceItem { Name = Str(s, "Name") ?? "", DisplayName = Str(s, "DisplayName"), State = Str(s, "State"), StartMode = Str(s, "StartMode") });
             });
 
-        // Windows and Office activation (Software License Management: genuine / licensed check). Only the last five
-        // characters of a product key are ever read (PartialProductKey); a full key is never collected.
+        // Windows and Office activation (Software License Management: genuine / licensed check) with the last five
+        // characters of each product key.
         if (doc.Os.Family == "windows")
             Section(doc, "activation", () => doc.Licenses = Activation(wmi), optional: true);
+
+        // Product keys the device keeps in full (firmware, Windows, Office from an installer package, other software).
+        // The server stores them encrypted and apart from the inventory document.
+        if (doc.Os.Family == "windows" && registry is not null)
+            Section(doc, "product keys", () => doc.ProductKeys = ProductKeys.Collect(wmi, registry, doc.Os.Name, doc.Software), optional: true);
 
         // Web applications in use (Web Apps & Accounts): host names in the DNS client cache. The server keeps only the
         // names that belong to a known web application and discards the rest.

@@ -119,7 +119,7 @@ Remove-Item $answer -Force   # contains the administrator password
 
 if (-not $installed) {
     foreach ($t in 'T02 PostgreSQL provisioning', 'T03 Database migration', 'T04 Administrator sign-in', 'T05 API and worker services', 'T06 Trial initialization',
-                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection', 'T68 Live agent connection', 'T69 Locations and IT accessories', 'T70 Manual hardware details', 'T71 Standard and Advanced installation', 'T72 Asset lifecycle', 'T73 Cloud and infrastructure', 'T74 Own asset tags, people and bulk upload', 'T75 Backup and restore', 'T76 Roles and groups', 'T77 Log retention and export', 'T78 Agent stop and disable protection', 'T79 Automatic agent update', 'T80 Agent check-in and diagnosis commands', 'T81 Licensing plans and online activation', 'T82 Software Deployment policy', 'T83 Application control on Windows', 'T84 Push deployment', 'T85 Remote support agent tamper protection', 'T86 Software licenses', 'T87 Web apps and accounts', 'T88 Network connected devices', 'T89 Warranty lookup', 'T90 Session recording', 'T91 Directory sign-in', 'T92 Patch management', 'T93 Scripts and remediation', 'T94 Tray icon and self-service', 'T95 Software metering and device experience', 'T96 Endpoint privilege management', 'T97 BitLocker management', 'T98 USB device control') {
+                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection', 'T68 Live agent connection', 'T69 Locations and IT accessories', 'T70 Manual hardware details', 'T71 Standard and Advanced installation', 'T72 Asset lifecycle', 'T73 Cloud and infrastructure', 'T74 Own asset tags, people and bulk upload', 'T75 Backup and restore', 'T76 Roles and groups', 'T77 Log retention and export', 'T78 Agent stop and disable protection', 'T79 Automatic agent update', 'T80 Agent check-in and diagnosis commands', 'T81 Licensing plans and online activation', 'T82 Software Deployment policy', 'T83 Application control on Windows', 'T84 Push deployment', 'T85 Remote support agent tamper protection', 'T86 Software licenses', 'T87 Web apps and accounts', 'T88 Network connected devices', 'T89 Warranty lookup', 'T90 Session recording', 'T91 Directory sign-in', 'T92 Patch management', 'T93 Scripts and remediation', 'T94 Tray icon and self-service', 'T95 Software metering and device experience', 'T96 Endpoint privilege management', 'T97 BitLocker management', 'T98 USB device control', 'T99 Product keys and pick lists') {
         Record $t.Substring(0, 3) $t.Substring(4) 'BLOCKED' 'installation failed'
     }
 } else {
@@ -1534,6 +1534,63 @@ if (-not $installed) {
                 try { Api PUT '/security-pack/usb/policy' @{ mode = 'off' } -Session $s | Out-Null } catch { }
                 Remove-ItemProperty 'HKLM:\SOFTWARE\Zentriq\Agent' -Name UsbTestDevices -ErrorAction SilentlyContinue
                 Remove-TestDisk $d
+            }
+        } | Out-Null
+
+        # ---- T99: product keys, software pick lists, licence type Retail (build 130) ----
+        Check 'T99' 'Product keys and pick lists: a key kept in the registry is found by the agent, listed hidden, shown on request (audited) and absent from the inventory document; software, publishers and versions offered from the inventory; a Retail licence; collection can be turned off' {
+            $s = Login
+            $regPath = 'HKLM:\SOFTWARE\ZentriqCiVendor\Key Demo'
+            $demo = 'ZQCI-4471-KD92-77QX3'
+            New-Item $regPath -Force | Out-Null
+            Set-ItemProperty $regPath -Name 'LicenseKey' -Value $demo
+            Set-ItemProperty $regPath -Name 'InstallDir' -Value 'C:\Program Files\Key Demo'
+            try {
+                Wake-Agent $s
+                $row = Dep-Wait { $k = Api GET '/sam/keys?q=ZentriqCiVendor' -Session $s; @($k.rows) | Where-Object assetId -eq $script:agentAsset | Select-Object -First 1 } 300 'the product key in the console'
+                Assert ($row.product -eq 'ZentriqCiVendor Key Demo' -and $row.application -eq 'other' -and $row.keyHint -eq '77QX3') "key row: $($row | ConvertTo-Json -Compress)"
+                Assert (-not (($row | ConvertTo-Json -Compress) -match [regex]::Escape($demo))) 'the list shows the key in full'
+                $shown = Api POST "/sam/keys/$($row.id)/reveal" -Session $s
+                Assert ($shown.key -eq $demo) "revealed key: $($shown.key)"
+                $aud = Api GET '/audit?action=licenses.device_key_view&pageSize=5' -Session $s
+                Assert ($aud.total -ge 1) 'viewing the key is not in the audit log'
+                $inv = Api GET "/assets/$($script:agentAsset)/inventory" -Session $s
+                Assert (-not (($inv | ConvertTo-Json -Compress -Depth 12) -match [regex]::Escape($demo))) 'the key is part of the inventory document'
+                # Windows itself: whatever this Windows keeps (a volume-activated server may keep none); a row with View must give a key.
+                $all = Api GET "/sam/keys?assetId=$($script:agentAsset)" -Session $s
+                $ms = @($all.rows | Where-Object { $_.application -ne 'other' })
+                $act = Api GET '/sam/activation' -Session $s
+                $withKey = @($act.rows | Where-Object { $_.assetId -eq $script:agentAsset -and $_.hasKey }) | Select-Object -First 1
+                if ($withKey) {
+                    $full = Api POST '/sam/activation/key' @{ assetId = $withKey.assetId; application = $withKey.application; partialKey = $withKey.partialKey } -Session $s
+                    Assert ($full.key -match '^[A-Z0-9]{5}(-[A-Z0-9]{5}){4}$' -and (-not $withKey.partialKey -or $full.key.EndsWith($withKey.partialKey))) 'the activation key does not match its last five characters'
+                }
+                # Pick lists from the inventory.
+                $found = Api GET '/sam/inventory/software' -Session $s
+                Assert (@($found.software).Count -ge 1 -and @($found.publishers).Count -ge 1) "pick lists: $(@($found.software).Count) software, $(@($found.publishers).Count) publishers"
+                $title = @($found.software | Where-Object { $_.name.Length -ge 4 })[0]
+                $vers = @(Api GET "/sam/inventory/versions?name=$([uri]::EscapeDataString($title.name))" -Session $s | ForEach-Object { $_ })
+                $prod = Api POST '/sam/products' @{ name = 'CI Retail Product'; publisher = $title.publisher; kind = 'installed'; metric = 'device'; namePatterns = @($title.name) } -Session $s
+                $pv = @(Api GET "/sam/inventory/versions?productId=$($prod.id)" -Session $s | ForEach-Object { $_ })
+                Assert ($pv.Count -eq $vers.Count) "versions by product $($pv.Count), by name $($vers.Count)"
+                $lic = Api POST '/sam/licenses' @{ productId = $prod.id; name = 'CI boxed copy'; licenseType = 'retail'; quantity = 1; version = $(if ($pv.Count) { $pv[0].version } else { $null }) } -Session $s
+                $got = (Api GET "/sam/licenses/$($lic.id)" -Session $s).license
+                Assert ($got.licenseType -eq 'retail') "licence type: $($got.licenseType)"
+                Api DELETE "/sam/products/$($prod.id)" -Session $s | Out-Null
+                # Off: the collected keys are deleted and none are stored; on again.
+                Api PUT '/sam/settings' @{ productKeys = $false } -Session $s | Out-Null
+                $off = Api GET '/sam/keys' -Session $s
+                Assert (-not $off.enabled -and @($off.rows).Count -eq 0) "after switching off: $(@($off.rows).Count) key(s)"
+                Wake-Agent $s
+                Start-Sleep 45
+                Assert (@((Api GET '/sam/keys' -Session $s).rows).Count -eq 0) 'keys stored while switched off'
+                Api PUT '/sam/settings' @{ productKeys = $true } -Session $s | Out-Null
+                Wake-Agent $s
+                Dep-Wait { @((Api GET '/sam/keys?q=ZentriqCiVendor' -Session $s).rows).Count -ge 1 } 300 'the key again after switching on' | Out-Null
+                "registry key found, hidden (ends $($row.keyHint)), shown on request and audited; $($ms.Count) Windows/Office/firmware key(s)$(if ($withKey) { ", $($withKey.application) key viewed" }); $(@($found.software).Count) software and $(@($found.publishers).Count) publishers to pick from, $($pv.Count) version(s); Retail licence; off deletes and stops, on collects again"
+            } finally {
+                try { Api PUT '/sam/settings' @{ productKeys = $true } -Session $s | Out-Null } catch { }
+                Remove-Item 'HKLM:\SOFTWARE\ZentriqCiVendor' -Recurse -Force -ErrorAction SilentlyContinue
             }
         } | Out-Null
     }

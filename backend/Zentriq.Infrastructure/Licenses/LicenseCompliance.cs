@@ -23,6 +23,9 @@ public sealed class LicenseSettings
     /// <summary>An installation without use for this many days is unused (reclaim candidate).</summary>
     [JsonPropertyName("unusedDays")] public int UnusedDays { get; set; } = 90;
 
+    /// <summary>Product keys found on devices are stored (encrypted) and can be viewed by licence managers (build 130).</summary>
+    [JsonPropertyName("productKeys")] public bool ProductKeys { get; set; } = true;
+
     public const string Key = "licenses.settings";
 
     public static async Task<LicenseSettings> LoadAsync(NpgsqlDataSource ds, CancellationToken ct)

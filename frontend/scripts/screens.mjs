@@ -38,6 +38,17 @@ const dev = (i, score, rating, issues, extra = {}) => ({ assetId: `00000000-0000
   cpuHigh: 3, memHigh: 12, systemFree: 40 - i * 4, battery: 88, uptimeDays: 3 + i, issues, computedAt: new Date().toISOString(), ...extra });
 const now = new Date().toISOString();
 const samples = {
+  '/api/v1/sam/inventory/software': { software: [
+      { name: '7-Zip 23.01 (x64)', publisher: 'Igor Pavlov', devices: 212 }, { name: 'Adobe Acrobat (64-bit)', publisher: 'Adobe', devices: 64 },
+      { name: 'Microsoft Visio Professional 2019', publisher: 'Microsoft Corporation', devices: 18 }, { name: 'Microsoft Visual Studio Code', publisher: 'Microsoft Corporation', devices: 41 },
+      { name: 'Microsoft Visual Studio Professional 2022', publisher: 'Microsoft Corporation', devices: 12 }, { name: 'Notepad++ (64-bit x64)', publisher: 'Notepad++ Team', devices: 97 }],
+    publishers: [{ name: 'Adobe', devices: 64 }, { name: 'Igor Pavlov', devices: 212 }, { name: 'Microsoft Corporation', devices: 248 }, { name: 'Notepad++ Team', devices: 97 }] },
+  '/api/v1/sam/inventory/versions': [{ version: '16.0.17328.20162', devices: 140 }, { version: '16.0.16827.20166', devices: 61 }, { version: '15.0.5589.1001', devices: 7 }],
+  '/api/v1/sam/keys': { enabled: true, rows: [
+      { id: 'k1', assetId: 'a1', hostname: 'FIN-LT-014', department: 'Finance', product: 'Windows 11 Pro (firmware / OEM key)', publisher: 'Microsoft Corporation', application: 'firmware', source: 'firmware', keyHint: '8HVX7', note: null, firstSeenAt: now, lastSeenAt: now },
+      { id: 'k2', assetId: 'a1', hostname: 'FIN-LT-014', department: 'Finance', product: 'Windows 11 Pro', publisher: 'Microsoft Corporation', application: 'windows', source: 'windows', keyHint: '3V66T', note: 'Generic key installed by Windows (digital licence or KMS activation); it is not a purchased key.', firstSeenAt: now, lastSeenAt: now },
+      { id: 'k3', assetId: 'a2', hostname: 'ENG-WS-007', department: 'Engineering', product: 'Microsoft Office Professional Plus 2010', publisher: 'Microsoft Corporation', application: 'office', source: 'registry', keyHint: 'QK7M2', note: null, firstSeenAt: now, lastSeenAt: now },
+      { id: 'k4', assetId: 'a2', hostname: 'ENG-WS-007', department: 'Engineering', product: 'WinRAR 6.24 (64-bit)', publisher: 'win.rar GmbH', application: 'other', source: 'registry', keyHint: '77A1C', note: null, firstSeenAt: now, lastSeenAt: now }] },
   '/api/v1/security-pack/privilege': { kpis: { devices: 248, reporting: 241, toRemove: 37, devicesWithExtraAdmins: 29, removed: 0, elevations: 112, refused: 9, pending: 3, grants: 2, rules: 14 },
     policies: [{ groupId: null, groupName: null, updatedBy: 'admin@example.com', updatedAt: now, settings: { mode: 'audit', allowedAdmins: ['CORP\\Workstation Admins', 'CORP\\it-*'], elevation: true, requests: true, maxAdminMinutes: 240 } },
       { groupId: 'g1', groupName: 'Developers', updatedBy: 'admin@example.com', updatedAt: now, settings: { mode: 'enforce', allowedAdmins: [], elevation: true, requests: true, maxAdminMinutes: 480 } }] },
@@ -89,17 +100,22 @@ await page.route('**/api/**', (route) => {
   return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
 });
 const names = ['shell', 'add-device', 'add-accessory', 'add-it-assets', 'patch-policy', 'patch-deploy', 'new-script', 'new-schedule', 'license-product', 'license',
-  'web-app', 'deploy-rule', 'deploy-package', 'deploy-group', 'non-it-asset', 'deploy-job', 'deploy-offer', 'deploy-decide', 'experience', 'device-experience', 'license-usage', 'privilege', 'bitlocker', 'usb'];
+  'web-app', 'deploy-rule', 'deploy-package', 'deploy-group', 'non-it-asset', 'deploy-job', 'deploy-offer', 'deploy-decide', 'experience', 'device-experience', 'license-usage', 'license-keys', 'privilege', 'bitlocker', 'usb'];
 for (const n of names) {
   await page.goto(`http://127.0.0.1:4175/?d=${n}`);
   await page.waitForTimeout(700);
   if (n === 'shell') { await page.locator('.nav-head', { hasText: 'Discovery' }).first().click(); await page.waitForTimeout(400); }   // an open module
-  await page.screenshot({ path: join(out, `${n}.png`), fullPage: ['experience', 'device-experience', 'license-usage', 'privilege', 'bitlocker', 'usb'].includes(n) });
+  await page.screenshot({ path: join(out, `${n}.png`), fullPage: ['experience', 'device-experience', 'license-usage', 'license-keys', 'privilege', 'bitlocker', 'usb'].includes(n) });
   const card = page.locator('.modal-card').first();
   if (await card.count()) {
     // The whole window, also the part below the fold.
     await card.evaluate((el) => { el.style.maxHeight = 'none'; el.closest('.modal-scrim').style.position = 'absolute'; });
     await card.screenshot({ path: join(out, `${n}-window.png`) });
+  }
+  if (n === 'license-product') {   // the list of software found in the inventory, narrowed by typing
+    await page.locator('input[aria-label="Name"]').fill('vis');
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: join(out, 'license-product-list.png') });
   }
   console.log('screenshot', n);
 }

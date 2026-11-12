@@ -1,5 +1,5 @@
 export type Metric = 'device' | 'user' | 'core' | 'concurrent' | 'site';
-export type LicenseType = 'perpetual' | 'subscription' | 'volume' | 'oem' | 'enterprise' | 'trial' | 'freeware' | 'open_source';
+export type LicenseType = 'perpetual' | 'subscription' | 'volume' | 'oem' | 'retail' | 'enterprise' | 'trial' | 'freeware' | 'open_source';
 export type Status = 'compliant' | 'shortfall' | 'unlicensed' | 'over_licensed' | 'not_measured' | 'not_required' | 'unused';
 
 export interface Compliance {
@@ -70,10 +70,10 @@ export interface CloudUser { connectionId: string; userId: string; upn: string; 
 
 export interface Activation {
   assetId: string; hostname: string; os: string | null; department: string | null; product: string; application: string; channel: string | null; status: string;
-  partialKey: string | null; graceMinutes: number | null; description: string | null; activated: boolean; collectedAt: string;
+  partialKey: string | null; graceMinutes: number | null; description: string | null; activated: boolean; collectedAt: string; hasKey?: boolean;
 }
 
-export interface Settings { notifyEmails: string[]; notifyInApp: boolean; expiryDays: number; unusedPercent: number; inactiveDays: number; webDiscovery: boolean; metering: boolean; unusedDays: number }
+export interface Settings { notifyEmails: string[]; notifyInApp: boolean; expiryDays: number; unusedPercent: number; inactiveDays: number; webDiscovery: boolean; metering: boolean; unusedDays: number; productKeys?: boolean }
 
 export interface Suggestion {
   key: string; name: string; publisher: string | null; category: string; metric: Metric; license: string; namePatterns: string[]; excludePatterns: string[];
@@ -82,7 +82,7 @@ export interface Suggestion {
 
 export const METRIC_LABEL: Record<Metric, string> = { device: 'Per Device', user: 'Per User', core: 'Per Core', concurrent: 'Concurrent Users', site: 'Site / Unlimited' };
 export const TYPE_LABEL: Record<LicenseType, string> = {
-  perpetual: 'Perpetual', subscription: 'Subscription', volume: 'Volume', oem: 'OEM', enterprise: 'Enterprise Agreement', trial: 'Trial', freeware: 'Freeware', open_source: 'Open Source',
+  perpetual: 'Perpetual', subscription: 'Subscription', volume: 'Volume', oem: 'OEM', retail: 'Retail', enterprise: 'Enterprise Agreement', trial: 'Trial', freeware: 'Freeware', open_source: 'Open Source',
 };
 export const STATUS_LABEL: Record<Status, [string, 'ok' | 'warn' | 'crit' | 'info' | '']> = {
   compliant: ['Compliant', 'ok'], shortfall: ['Under-Licensed', 'crit'], unlicensed: ['Unlicensed', 'crit'], over_licensed: ['Over-Licensed', 'info'],
@@ -118,4 +118,21 @@ export function hours(min: number | null | undefined): string {
   if (m < 60) return `${m} min`;
   const h = Math.floor(m / 60);
   return h >= 100 ? `${h.toLocaleString()} h` : `${h} h ${m % 60} min`;
+}
+
+/** A product key found on a device (the key itself is fetched on request). */
+export interface DeviceKey {
+  id: string; assetId: string; hostname: string; department: string | null; product: string; publisher: string | null;
+  application: 'windows' | 'office' | 'firmware' | 'other'; source: string; keyHint: string; note: string | null; firstSeenAt: string; lastSeenAt: string;
+}
+export interface FoundSoftware { software: { name: string; publisher: string | null; devices: number }[]; publishers: { name: string; devices: number }[] }
+
+/** "7-Zip 23.01 (x64)" → "7-Zip": the name without a trailing version or architecture. */
+export function baseName(name: string): string {
+  let n = name.trim();
+  for (let i = 0; i < 3; i++) {
+    n = n.replace(/\s*\((?:[^)]*\b(?:x64|x86|64-bit|32-bit|64 bit|32 bit)\b[^)]*|[a-z]{2}-[a-z]{2}|[^)]*\d+\.\d+[^)]*)\)\s*$/i, '').trim();
+    n = n.replace(/\s+(?:-\s+)?(?:version\s+)?v?\d+(?:\.\d+)+[\w.\-+]*$/i, '').trim();
+  }
+  return n || name.trim();
 }

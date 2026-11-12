@@ -131,7 +131,7 @@ public static class WinRmCollector
         }
     }
 
-    private sealed class CimRegistrySource(CimSession session) : IRegistrySource
+    private sealed class CimRegistrySource(CimSession session) : IRegistrySource, IRegistryValueSource
     {
         private const uint Hklm = 0x80000002;
 
@@ -162,6 +162,20 @@ public static class WinRmCollector
         {
             var r = Invoke("GetDWORDValue", path, name);
             return Convert.ToUInt32(r.ReturnValue.Value) == 0 && r.OutParameters["uValue"]?.Value is { } v ? unchecked((int)Convert.ToUInt32(v)) : null;
+        }
+
+        public bool IsLocal => false;
+
+        public byte[]? GetBinary(string path, string name)
+        {
+            var r = Invoke("GetBinaryValue", path, name);
+            return Convert.ToUInt32(r.ReturnValue.Value) == 0 ? r.OutParameters["uValue"]?.Value as byte[] : null;
+        }
+
+        public IReadOnlyList<string> ValueNames(string path)
+        {
+            var r = Invoke("EnumValues", path);
+            return Convert.ToUInt32(r.ReturnValue.Value) == 0 && r.OutParameters["sNames"]?.Value is string[] names ? names : [];
         }
     }
 

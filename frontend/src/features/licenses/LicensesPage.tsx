@@ -11,13 +11,13 @@ import { errText } from '../deployment/types';
 import { UsageTab } from './UsageTab';
 import { AllocateDialog, ConnectionDialog, LicenseDialog, ProductDialog, RenewDialog } from './LicenseDialogs';
 import {
-  ACTIVATION_LABEL, consumptionLabel, METRIC_LABEL, money, SEVERITY_TONE, STATUS_LABEL, TYPE_LABEL, type Activation, type Alert, type CloudSku, type CloudUser,
+  ACTIVATION_LABEL, consumptionLabel, METRIC_LABEL, money, SEVERITY_TONE, STATUS_LABEL, TYPE_LABEL, type Activation, type Alert, type CloudSku, type CloudUser, type DeviceKey,
   type Compliance, type Connection, type License, type Settings, type Suggestion, type Summary,
 } from './types';
 
-type Tab = 'overview' | 'products' | 'licenses' | 'usage' | 'cloud' | 'activation' | 'discover' | 'alerts' | 'settings';
+type Tab = 'overview' | 'products' | 'licenses' | 'usage' | 'cloud' | 'activation' | 'keys' | 'discover' | 'alerts' | 'settings';
 const TABS: [Tab, string][] = [
-  ['overview', 'Overview'], ['products', 'Software Products'], ['licenses', 'Licences'], ['usage', 'Software Usage'], ['cloud', 'Cloud Licences'], ['activation', 'Windows & Office Activation'],
+  ['overview', 'Overview'], ['products', 'Software Products'], ['licenses', 'Licences'], ['usage', 'Software Usage'], ['cloud', 'Cloud Licences'], ['activation', 'Windows & Office Activation'], ['keys', 'Product Keys'],
   ['discover', 'Discover'], ['alerts', 'Alerts'], ['settings', 'Settings'],
 ];
 
@@ -67,7 +67,8 @@ export function LicensesPage() {
       {tab === 'licenses' && <LicensesTab key={(query.get('filter') ?? '') + (licenseRoute ?? '')} {...ctx} initialFilter={query.get('filter') ?? ''} openId={licenseRoute} openAdd={query.get('add') === '1'} />}
       {tab === 'usage' && <UsageTab canManage={canManage} />}
       {tab === 'cloud' && <CloudTab {...ctx} />}
-      {tab === 'activation' && <ActivationTab key={query.get('filter') ?? ''} initialFilter={query.get('filter') ?? ''} />}
+      {tab === 'activation' && <ActivationTab key={query.get('filter') ?? ''} initialFilter={query.get('filter') ?? ''} canManage={canManage} failed={ctx.failed} />}
+      {tab === 'keys' && <KeysTab {...ctx} />}
       {tab === 'discover' && <DiscoverTab {...ctx} />}
       {tab === 'alerts' && <AlertsTab {...ctx} scope="licenses" />}
       {tab === 'settings' && <SettingsTab {...ctx} />}
@@ -342,12 +343,20 @@ function CloudUsers({ sku, initialFilter, onClose }: { sku?: CloudSku; initialFi
 
 // ---- activation ------------------------------------------------------------------------------------------------------
 
-function ActivationTab({ initialFilter }: { initialFilter: string }) {
+function ActivationTab({ initialFilter, canManage, failed }: { initialFilter: string; canManage: boolean; failed: (e: unknown) => void }) {
   const [filter, setFilter] = useSticky('LicensesPage.ActivationTab.filter', initialFilter || 'problems');
   const [q, setQ] = useSticky('LicensesPage.ActivationTab.q', '');
   const data = useApi(() => api.get<{ rows: Activation[]; channels: Record<string, number> }>('/sam/activation', { filter: filter === 'all' ? null : filter, q }), [filter, q]);
   const rows = (data.data?.rows ?? []).map((r, i) => ({ ...r, id: `${r.assetId}:${r.product}:${i}` }));
   const channels = Object.entries(data.data?.channels ?? {}).sort((a, b) => b[1] - a[1]);
+  // Full keys are fetched one at a time, on request (each view is recorded in the audit log), and hidden again on leaving the tab.
+  const [shown, setShown] = useState<Record<string, string>>({});
+  async function view(r: Activation & { id: string }) {
+    try {
+      const k = await api.post<{ key: string }>('/sam/activation/key', { assetId: r.assetId, application: r.application, partialKey: r.partialKey });
+      setShown((m) => ({ ...m, [r.id]: k.key }));
+    } catch (e) { failed(e); }
+  }
   return (
     <>
       <div className="toolbar-row">
@@ -364,10 +373,72 @@ function ActivationTab({ initialFilter }: { initialFilter: string }) {
           { key: 'p', label: 'Product', className: 'wrap', render: (r) => <>{r.product}{r.description && <div className="faint" style={{ fontSize: 11.5 }}>{r.description}</div>}</> },
           { key: 'c', label: 'Channel', render: (r) => r.channel ?? '—' },
           { key: 's', label: 'Status', render: (r) => <Pill tone={r.activated ? 'ok' : r.status === 'unknown' ? '' : 'crit'}>{ACTIVATION_LABEL[r.status] ?? r.status}</Pill> },
-          { key: 'k', label: 'Key', render: (r) => (r.partialKey ? <span className="mono">•••••-{r.partialKey}</span> : '—') },
+          { key: 'k', label: 'Key', render: (r) => {
+            const full = shown[r.id];
+            return (
+              <span className="key-cell">
+                {full ? <span className="mono">{full}</span> : r.partialKey ? <span className="mono" title={r.hasKey ? undefined : 'The device keeps only the last five characters of this key.'}>•••••-{r.partialKey}</span> : r.hasKey ? <span className="mono">•••••-•••••</span> : '—'}
+                {r.hasKey && canManage && (full
+                  ? <><CopyKey value={full} /><button className="link-btn" onClick={() => setShown((m) => { const n = { ...m }; delete n[r.id]; return n; })}>Hide</button></>
+                  : <button className="link-btn" onClick={() => void view(r)}>View</button>)}
+              </span>);
+          } },
           { key: 'g', label: 'Grace Left', render: (r) => (r.graceMinutes && !r.activated ? `${Math.round(r.graceMinutes / 1440)} d` : '—') },
           { key: 'd', label: 'Department', render: (r) => r.department ?? '—' },
           { key: 't', label: 'Checked', render: (r) => fmt.ago(r.collectedAt) },
+        ]} />
+      </Panel>
+    </>
+  );
+}
+
+// ---- product keys found on devices -----------------------------------------------------------------------------------
+
+function CopyKey({ value }: { value: string }) {
+  const [done, setDone] = useState(false);
+  return <button className="link-btn" onClick={() => { void navigator.clipboard?.writeText(value).then(() => { setDone(true); setTimeout(() => setDone(false), 1500); }); }}>{done ? 'Copied' : 'Copy'}</button>;
+}
+
+const KEY_APP: Record<DeviceKey['application'], string> = { windows: 'Windows', office: 'Office', firmware: 'Firmware (OEM)', other: 'Other Software' };
+const KEY_SOURCE: Record<string, string> = { firmware: 'Firmware', windows: 'Windows registration', registry: 'Registry' };
+
+export function KeysTab({ canManage, failed }: Pick<Ctx, 'canManage' | 'failed'>) {
+  const [app, setApp] = useSticky('LicensesPage.KeysTab.app', '');
+  const [q, setQ] = useSticky('LicensesPage.KeysTab.q', '');
+  const data = useApi(() => api.get<{ enabled: boolean; rows: DeviceKey[] }>('/sam/keys', { application: app || null, q }), [app, q]);
+  const [shown, setShown] = useState<Record<string, string>>({});
+  async function view(k: DeviceKey) {
+    try { const r = await api.post<{ key: string }>(`/sam/keys/${k.id}/reveal`); setShown((m) => ({ ...m, [k.id]: r.key })); } catch (e) { failed(e); }
+  }
+  const rows = data.data?.rows ?? [];
+  return (
+    <>
+      <div className="toolbar-row">
+        <input className="in grow" placeholder="Search devices, products, publishers, last characters…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search" />
+        <select className="in" value={app} onChange={(e) => setApp(e.target.value)} aria-label="Filter">
+          <option value="">Everything</option><option value="windows">Windows</option><option value="office">Office</option><option value="firmware">Firmware (OEM)</option><option value="other">Other Software</option>
+        </select>
+      </div>
+      {data.data && !data.data.enabled && <Callout tone="warn" icon="alert">Collecting product keys is switched off (Settings tab). Nothing is stored until it is switched on again.</Callout>}
+      <ErrorBox error={data.error} />
+      <Panel flush>
+        <DataTable rows={rows} empty={data.loading ? 'Loading…' : 'No product keys yet. They come with the next inventory of Windows devices (Zentriq Agent 1.1.1.130 or later, or WinRM).'} columns={[
+          { key: 'h', label: 'Device', render: (k) => <Link to={`/assets/${k.assetId}`}><b>{k.hostname}</b></Link> },
+          { key: 'p', label: 'Product', className: 'wrap', render: (k) => <>{k.product}{(k.publisher || k.note) && <div className="faint" style={{ fontSize: 11.5 }}>{k.note ?? k.publisher}</div>}</> },
+          { key: 'a', label: 'Kind', render: (k) => KEY_APP[k.application] ?? k.application },
+          { key: 's', label: 'Found In', render: (k) => KEY_SOURCE[k.source] ?? k.source },
+          { key: 'k', label: 'Key', render: (k) => {
+            const full = shown[k.id];
+            return (
+              <span className="key-cell">
+                <span className="mono">{full ?? `•••••-${k.keyHint}`}</span>
+                {canManage && (full
+                  ? <><CopyKey value={full} /><button className="link-btn" onClick={() => setShown((m) => { const n = { ...m }; delete n[k.id]; return n; })}>Hide</button></>
+                  : <button className="link-btn" onClick={() => void view(k)}>View</button>)}
+              </span>);
+          } },
+          { key: 'd', label: 'Department', render: (k) => k.department ?? '—' },
+          { key: 't', label: 'Last Seen', render: (k) => fmt.ago(k.lastSeenAt) },
         ]} />
       </Panel>
     </>
@@ -458,7 +529,7 @@ function SettingsForm({ initial, canManage, changed, failed }: { initial: Settin
     setBusy(true);
     try {
       await api.put('/sam/settings', { notifyEmails: f.emails.split(/[\n,;]/).map((x) => x.trim()).filter(Boolean), notifyInApp: f.notifyInApp, expiryDays: f.expiryDays,
-        unusedPercent: f.unusedPercent, inactiveDays: f.inactiveDays, webDiscovery: f.webDiscovery, metering: f.metering, unusedDays: f.unusedDays });
+        unusedPercent: f.unusedPercent, inactiveDays: f.inactiveDays, webDiscovery: f.webDiscovery, metering: f.metering, unusedDays: f.unusedDays, productKeys: f.productKeys ?? true });
       changed('Settings saved.');
     } catch (e) { failed(e); } finally { setBusy(false); }
   }
@@ -482,6 +553,8 @@ function SettingsForm({ initial, canManage, changed, failed }: { initial: Settin
           <small className="faint" style={{ marginTop: -6 }}>Windows devices report the host names in their DNS cache with the inventory; only names of known web apps are kept.</small>
           <label className="row-check"><input type="checkbox" checked={f.metering} disabled={!canManage} onChange={(e) => setF({ ...f, metering: e.target.checked })} /> Software Metering</label>
           <small className="faint" style={{ marginTop: -6 }}>Devices with the Zentriq Agent record which programs run, for which user and for how long (no window titles, documents or keystrokes). Turning it off removes the totals kept on the devices.</small>
+          <label className="row-check"><input type="checkbox" checked={f.productKeys ?? true} disabled={!canManage} onChange={(e) => setF({ ...f, productKeys: e.target.checked })} /> Collect Product Keys</label>
+          <small className="faint" style={{ marginTop: -6 }}>Windows devices report the product keys they keep (Windows, Office, other software). Keys are stored encrypted, hidden until someone who manages licences chooses View, and each view is recorded in the audit log. Turning it off deletes the keys collected so far.</small>
           <label>An installation is unused after (days without use)<input className="in" type="number" min={14} max={365} value={f.unusedDays} disabled={!canManage} onChange={(e) => setF({ ...f, unusedDays: Number(e.target.value) })} /></label>
           {canManage && <div><button className="btn primary" disabled={busy} onClick={() => void save()}>{busy ? 'Saving…' : 'Save'}</button></div>}
         </div>

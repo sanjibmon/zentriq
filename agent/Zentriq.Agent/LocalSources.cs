@@ -31,7 +31,7 @@ internal sealed class LocalWmiSource : IWmiSource
 }
 
 /// <summary>HKLM, 64-bit view (32-bit software is read through WOW6432Node paths).</summary>
-internal sealed class LocalRegistrySource : IRegistrySource
+internal sealed class LocalRegistrySource : IRegistrySource, IRegistryValueSource
 {
     private readonly RegistryKey _hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
 
@@ -58,5 +58,19 @@ internal sealed class LocalRegistrySource : IRegistrySource
     {
         using var k = _hklm.OpenSubKey(path, false);
         return k?.GetValue(name) is int i ? i : (int?)null;
+    }
+
+    public bool IsLocal => true;
+
+    public byte[]? GetBinary(string path, string name)
+    {
+        using var k = _hklm.OpenSubKey(path, false);
+        return k?.GetValue(name) as byte[];
+    }
+
+    public IReadOnlyList<string> ValueNames(string path)
+    {
+        using var k = _hklm.OpenSubKey(path, false);
+        return k?.GetValueNames() ?? new string[0];
     }
 }
