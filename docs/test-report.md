@@ -1,6 +1,34 @@
 # Test report
 
-Latest: GitHub Actions run 43182444766, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022
+Latest: GitHub Actions run 43199242180, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022
+Datacenter 10.0.20348** VM plus an Ubuntu job for the Linux agent. Release: `v1.1.1-build.133` (pre-release,
+**unsigned**), package version **1.1.1.133**, commit `7fa7a73`. Results: unit + PostgreSQL integration tests **482 PASS**
+(484, 2 skipped); installer acceptance **91 passed, 0 failed** (10 not run: need hardware, a domain, a reboot or old
+Windows); upgrade suites **14/14** (schema 42); Linux agent on 11 distributions **11/11**.
+
+New in build 133 (go-live hardening): the console and agent port accept only TLS 1.2 and 1.3 (T100); console sessions
+end 12 hours after signing in; signed agents accept only update packages signed by the same publisher; DigiCert
+KeyLocker signing mode and configurable signature details in the build; dependency audit in the quick build. The first
+audit found 12 known vulnerabilities (4 high) in the dependencies of the bundled MeshCentral 1.2.5; the web console and
+.NET packages have none.
+
+| File | SHA256 |
+|---|---|
+| Zentriq-Setup-x64.exe | `fd9df6653c073fbb8fd42256142f1e8f53b10dfbf42f128e41ddd0343a134836` |
+| Zentriq.msi | `14cfeaab2148306c18c0a1872592394a0ef97d668d56ba54489ad8312a22d044` |
+| ZentriqAgent-x64.msi | `cf7cb3bdaf905711c4bd7aa348168928e44acba2cc2c88bd09ee03017330807c` |
+| zentriq-agent-linux-x64.deb | `25251e575b8b9c543e582f163c52cb77ba2a6bbf9b047b6da40ce2fd7068345a` |
+| zentriq-agent-linux-x64.rpm | `cd82064e9cd266f1509d4ad886e5375c91f58edb73335db77dbc720b1db17e33` |
+| zentriq-agent-linux-x64.tar.gz | `0186a60b0a1729cf70633b3b91a415ba25280891e2bf2cb0932a27a4b789af4d` |
+| zentriq-agent-linux-arm64.deb | `311e249351fba0a55bd0fa775dbd77857ddd01b133a9fb916b6d08f4558c035d` |
+| zentriq-agent-linux-arm64.rpm | `0cff5bb77b29402f43d5e61a72d0b22a56a2d561511bb526c4c488be18681315` |
+| zentriq-agent-linux-arm64.tar.gz | `669c654ed226bfa943b4b0699671902aa6014060f66c603562fddc59e067ebda` |
+| Zentriq-1.1.1-msi-offline-kit.zip | `c490f0ec44f1726b97cfbed47618103580ab2d6ee6b76adc33dcee7666f67f01` |
+| Zentriq-1.1.1-docs.zip | `0e41879485b114e37f312ce5f63e3d4a9d994bb7063ee829ff9bbfbc2dcb33b7` |
+
+## Build 132
+
+GitHub Actions run 43182444766, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022
 Datacenter 10.0.20348** VM plus an Ubuntu job for the Linux agent. Release: `v1.1.1-build.132` (pre-release,
 **unsigned**), package version **1.1.1.132**, commit `9f6b98e`. Results: unit + PostgreSQL integration tests **479 PASS**
 (481, 2 skipped); installer acceptance **90 passed, 0 failed** (10 not run: need hardware, a domain, a reboot or old

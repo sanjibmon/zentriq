@@ -36,6 +36,7 @@
   every request. Agents pin the server key (or require a publicly trusted certificate) and never listen on a port. Agent updates are checked against the SHA-256 from the server and, once agents are code-signed, must be signed by the same publisher as the running agent.
 
 Before going live (see the go-live plan): configure the code-signing certificate (Azure Key Vault or DigiCert
-KeyLocker, docs/code-signing.md) and the signature details; generate the production license signing key offline and
-keep it off the build servers; protect the `main` branch and the signing secrets; have an external penetration test
-done; review the dependency audit in the quick build's logs (`npm-audit.log`).
+KeyLocker, docs/code-signing.md) and the signature details; keep the production license signing key (`zentriq-prod-2026-11`)
+backed up offline and off the build servers; protect the `main` branch and the signing secrets; have an external penetration test
+done; review the dependency audit in the quick build's logs (`npm-audit.log`; build 133: 4 high findings in MeshCentral's
+dependencies).
