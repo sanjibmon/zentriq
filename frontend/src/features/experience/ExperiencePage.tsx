@@ -29,7 +29,7 @@ export function ExperiencePage() {
   const set = (f: () => void) => { f(); setPage(1); };
   return (
     <>
-      <PageHead title="Device Experience" icon="gauge" desc="How well each device works for the people who use it: start-up time, crashes, blue screens, resources, disk and battery over the last 7 days." />
+      <PageHead title="Device Experience" icon="gauge" />
       <ErrorBox error={summary.error} />
       {s && s.devices === 0 && <Callout>No device has reported yet. Devices with the Zentriq Agent 1.1.1.120 or later report with their next inventory; update older agents under <Link to="/agents">Agents</Link>.</Callout>}
       {s && s.devices > 0 && (
