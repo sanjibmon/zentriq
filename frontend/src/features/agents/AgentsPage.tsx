@@ -7,7 +7,8 @@ import { useAuth } from '../../app/auth';
 import { Link } from '../../app/router';
 import { useApi } from '../../app/useApi';
 import { CopyBox } from '../../components/CopyBox';
-import { Callout, DataTable, ErrorBox, fmt, Kpis, PageHead, Panel, Pill, type Tone } from '../../components/ui';
+import { Callout, DataTable, ErrorBox, fmt, Kpis, PageHead, Pager, Panel, Pill, type Tone } from '../../components/ui';
+import { useSticky } from '../../app/sticky';
 import { useConfirm } from '../../components/Confirm';
 
 const HEALTH: Record<AgentRow['health'], [string, Tone]> = {
@@ -65,7 +66,19 @@ export function AgentsPage() {
   // (newest version, then most recent check-in). Replaced and revoked registrations are hidden unless asked for.
   const current = latestPerDevice(all.filter((r) => r.status === 'active'));
   const hidden = all.length - current.length;
-  const rows = showOld ? all : current;
+  const [q, setQ] = useSticky('AgentsPage.q', '');
+  const [search, setSearch] = useSticky('AgentsPage.search', '');
+  const [page, setPage] = useState(1);
+  const pageSize = 50;
+  const needle = search.trim().toLowerCase();
+  // Search: device name, IP address, operating system, version, platform.
+  const rows = (showOld ? all : current).filter((r) => !needle || [r.hostname, r.lastIp, r.osName, r.version, r.platform, r.id].some((v) => v?.toLowerCase().includes(needle)));
+  const pages = Math.max(1, Math.ceil(rows.length / pageSize));
+  const pageRows = rows.slice((Math.min(page, pages) - 1) * pageSize, Math.min(page, pages) * pageSize);
+  // Selected agents (across pages) and what can be done with them.
+  const pickedRows = all.filter((r) => picked.includes(r.id));
+  const pickedUpdatable = pickedRows.filter((r) => r.status === 'active' && r.updateAvailable && r.canSelfUpdate && !(r.update && ['queued', 'sent', 'running'].includes(r.update.status)));
+  const pickedManual = pickedRows.filter((r) => r.status === 'active' && r.updateAvailable && !r.canSelfUpdate);
   const count = (h: AgentRow['health']) => current.filter((r) => r.health === h).length;
   const outdated = current.filter((r) => r.updateAvailable);
   const selfUpdatable = outdated.filter((r) => r.canSelfUpdate && r.update?.status !== 'running' && r.update?.status !== 'queued' && r.update?.status !== 'sent');
@@ -87,18 +100,28 @@ export function AgentsPage() {
     const r = await api.post<{ message: string }>(`/agents/${a.id}/collect`);
     setMsg(r.message);
   }
+  async function collectPicked() {
+    const list = pickedRows.filter((r) => r.status === 'active');
+    let ok = 0;
+    for (const a of list) {
+      try { await api.post(`/agents/${a.id}/collect`); ok++; } catch { /* reported below */ }
+    }
+    setMsg(`Inventory requested from ${ok} of ${list.length} selected agent(s); each sends it at its next check-in.`);
+    setPicked([]);
+  }
   async function update(list: AgentRow[] | 'all') {
     const n = list === 'all' ? outdated.length : list.length;
     const target = pkg.data?.package?.version ?? rows.find((r) => r.latestVersion)?.latestVersion ?? 'the latest version';
     if (!(await confirm({
-      title: list === 'all' ? `Update ${n} agent(s) to ${target}?` : `Update the agent on ${list[0]!.hostname ?? list[0]!.id} to ${target}?`,
+      title: list === 'all' ? `Update ${n} agent(s) to ${target}?` : list.length > 1 ? `Update ${list.length} selected agents to ${target}?` : `Update the agent on ${list[0]!.hostname ?? list[0]!.id} to ${target}?`,
       confirmLabel: 'Update agent',
       message: 'At its next check-in (set by the check-in interval) each agent downloads the package from this server over its secure agent connection, verifies the checksum and installs it silently. The agent service restarts for a few seconds; enrollment, certificate and history are kept. Inventory and device actions continue afterwards.',
     }))) return;
     setMsg(null);
     try {
       const r = await api.post<{ message: string }>('/agents/update', list === 'all' ? { all: true } : { agentIds: list.map((a) => a.id) });
-      setMsg(r.message);
+      setMsg(r.message + (list !== 'all' && list.length > 1 && pickedManual.length > 0 ? ` ${pickedManual.length} selected agent(s) predate console updates and need the MSI installed once.` : ''));
+      if (list !== 'all' && list.length > 1) setPicked([]);
       agents.reload();
     } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
   }
@@ -192,12 +215,26 @@ export function AgentsPage() {
       )}
       {tab === 'settings' ? <SettingsTab onSaved={(t) => setMsg(t)} onAll={() => setSchedule({ ids: 'all' })} /> : tab === 'agents' ? (
         <Panel flush title="Agents" sub="Each agent checks its connection and sends inventory on its own schedule"
-          right={manage && <div style={{ display: 'flex', gap: 6 }}>
-            {picked.length > 0 && <button className="btn sm primary" onClick={() => setSchedule({ ids: picked })}><Icon name="clock" size={12} /> Schedule ({picked.length})</button>}
+          right={manage && <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            {picked.length > 0 && <span className="faint" style={{ alignSelf: 'center', fontSize: 12.5 }}>{picked.length} selected</span>}
+            {picked.length > 0 && <button className="btn sm primary" disabled={pickedUpdatable.length === 0}
+              title={pickedUpdatable.length === 0 ? 'None of the selected agents can be updated from here (already current, already updating, or installed before console updates)' : `Update ${pickedUpdatable.length} of the selected agents`}
+              onClick={() => void update(pickedUpdatable)}><Icon name="down" size={12} /> Update ({pickedUpdatable.length})</button>}
+            {picked.length > 0 && <button className="btn sm" onClick={() => void collectPicked()}>Collect ({picked.length})</button>}
+            {picked.length > 0 && <button className="btn sm" onClick={() => setSchedule({ ids: picked })}><Icon name="clock" size={12} /> Schedule ({picked.length})</button>}
+            {picked.length > 0 && <button className="btn sm" onClick={() => setPicked([])}>Clear selection</button>}
             <button className="btn sm" onClick={() => setSchedule({ ids: 'all' })}><Icon name="clock" size={12} /> Schedule for all</button>
           </div>}>
-          <DataTable rows={rows} empty={agents.loading ? 'Loading…' : 'No agents yet. Create an enrollment code and install the agent MSI on a device.'} columns={[
-            ...(manage ? [{ key: 'sel', label: <input type="checkbox" aria-label="Select all" checked={rows.length > 0 && picked.length === rows.filter((x) => x.status === 'active').length} onChange={(e) => setPicked(e.target.checked ? rows.filter((x) => x.status === 'active').map((x) => x.id) : [])} />,
+          <form className="toolbar-row" style={{ padding: '10px 12px 0' }} onSubmit={(e) => { e.preventDefault(); setSearch(q); setPage(1); }}>
+            <input className="in grow" type="search" placeholder="Search device, IP address, operating system or version…" value={q}
+              onChange={(e) => { setQ(e.target.value); if (!e.target.value.trim()) { setSearch(''); setPage(1); } }} aria-label="Search agents" />
+            <button className="btn" type="submit"><Icon name="search" size={13} /> Search</button>
+          </form>
+          {rows.length > pageSize && <Pager top page={Math.min(page, pages)} pageSize={pageSize} total={rows.length} onPage={setPage} />}
+          <DataTable rows={pageRows} empty={agents.loading ? 'Loading…' : needle ? 'No agent matches the search.' : 'No agents yet. Create an enrollment code and install the agent MSI on a device.'} columns={[
+            ...(manage ? [{ key: 'sel', label: <input type="checkbox" aria-label="Select all on this page" title="Select all on this page"
+                checked={pageRows.some((x) => x.status === 'active') && pageRows.filter((x) => x.status === 'active').every((x) => picked.includes(x.id))}
+                onChange={(e) => { const ids = pageRows.filter((x) => x.status === 'active').map((x) => x.id); setPicked(e.target.checked ? [...new Set([...picked, ...ids])] : picked.filter((x) => !ids.includes(x))); }} />,
               render: (r: AgentRow) => r.status === 'active' ? <input type="checkbox" aria-label={`Select ${r.hostname ?? r.id}`} checked={picked.includes(r.id)} onChange={() => setPicked(picked.includes(r.id) ? picked.filter((x) => x !== r.id) : [...picked, r.id])} /> : null }] : []),
             { key: 'h', label: 'Device', render: (r) => <>{r.assetId ? <Link to={`/assets/${r.assetId}`}><b>{r.hostname ?? r.id}</b></Link> : <b>{r.hostname ?? r.id}</b>}<TamperState r={r} /></> },
             { key: 'os', label: 'Operating system', className: 'wrap', render: (r) => <>{r.osName ?? <span className="faint">—</span>}{r.platform?.startsWith('linux') && <div className="faint" style={{ fontSize: 11.5 }}>Linux agent · {r.platform === 'linux-arm64' ? 'ARM64' : 'x64'}</div>}</> },
@@ -212,6 +249,7 @@ export function AgentsPage() {
             { key: 'v', label: 'Version', render: (r) => <span title={r.certificateExpires ? `Certificate expires ${fmt.day(r.certificateExpires)}` : ''}>{r.version}<UpdateState r={r} /></span> },
             { key: 'x', label: '', render: (r) => manage && r.status === 'active' ? <div style={{ display: 'flex', gap: 6, flexWrap: 'nowrap', justifyContent: 'flex-end' }}>{r.status === 'active' && r.updateAvailable && r.canSelfUpdate && !(r.update && ['queued', 'sent', 'running'].includes(r.update.status)) && <button className="btn sm primary" onClick={() => void update([r])}>Update</button>}{r.status === 'active' && r.updateAvailable && !r.canSelfUpdate && <button className="btn sm" onClick={() => void manualUpdate(r)}>Update…</button>}<button className="btn sm" title="Collect inventory now" onClick={() => void collect(r)}>Collect</button><button className="btn sm" title="Tamper protection, device code, restart or disable" onClick={() => setControl(r)}>Agent…</button><button className="btn sm danger" onClick={() => void revoke(r)}>Revoke</button></div> : null },
           ]} />
+          {rows.length > pageSize && <Pager page={Math.min(page, pages)} pageSize={pageSize} total={rows.length} onPage={setPage} />}
         </Panel>
       ) : (
         <Panel flush title="Enrollment codes" sub="20 characters; given with the server address when the agent is installed"

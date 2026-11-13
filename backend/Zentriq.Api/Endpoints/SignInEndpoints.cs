@@ -44,6 +44,8 @@ public static class SignInEndpoints
             if (body.Enabled && body.Host.Length == 0) return Validation.Problem("host", "Enter the domain controller or the domain's DNS name.");
             if (body.Host.Length > 253 || (body.Host.Length > 0 && Uri.CheckHostName(body.Host) == UriHostNameType.Unknown)) return Validation.Problem("host", "Enter a host name or IP address.");
             if (body.Port is < 1 or > 65535) return Validation.Problem("port", "Enter a port (636 for LDAPS, 389 for LDAP).");
+            if (body.Ldaps && body.Port is 389 or 3268) return Validation.Problem("port", $"Port {body.Port} is plain LDAP: untick LDAPS to use it, or use port 636 for LDAPS.");
+            if (!body.Ldaps && body.Port is 636 or 3269) return Validation.Problem("port", $"Port {body.Port} is LDAPS: tick LDAPS to use it, or use port 389 for LDAP.");
             body.BaseDn = string.IsNullOrWhiteSpace(body.BaseDn) ? null : body.BaseDn.Trim();
             body.Domain = string.IsNullOrWhiteSpace(body.Domain) ? null : body.Domain.Trim();
             body.DcName = string.IsNullOrWhiteSpace(body.DcName) ? null : body.DcName.Trim();

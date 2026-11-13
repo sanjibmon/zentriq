@@ -47,6 +47,8 @@ public static class DirectoryClient
         else cred = new NetworkCredential(u, s.Password);
 
         var conn = new LdapConnection(new LdapDirectoryIdentifier(host, s.Port), cred, isDn ? AuthType.Basic : AuthType.Negotiate) { Timeout = timeout };
+        string? certProblem = null;
+        var certSeen = false;
         conn.SessionOptions.ProtocolVersion = 3;
         conn.SessionOptions.ReferralChasing = ReferralChasingOptions.None;
         if (s.Ldaps)
@@ -55,13 +57,26 @@ public static class DirectoryClient
             var expected = string.IsNullOrWhiteSpace(s.DcName) ? null : s.DcName.Trim();
             conn.SessionOptions.VerifyServerCertificate = (_, cert) =>
             {
+                certSeen = true;
                 if (!s.VerifyCertificate) return true;
                 using var c2 = new X509Certificate2(cert);
                 using var chain = new X509Chain();
                 chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
-                if (!chain.Build(c2)) return false;
-                // When connecting by IP address the name check is done against the DC name given in the connection.
-                return expected is null || c2.MatchesHostname(expected, allowWildcards: true);
+                if (!chain.Build(c2))
+                {
+                    var why = string.Join("; ", chain.ChainStatus.Select(x => x.StatusInformation.Trim()).Where(x => x.Length > 0).Distinct());
+                    certProblem = $"the domain controller's certificate ({c2.Subject}, issued by {c2.Issuer}) is not trusted by this server: {why}. " +
+                        "Import the issuing CA certificate into Local Computer › Trusted Root Certification Authorities on the Zentriq server, or untick 'Check the domain controller's certificate'";
+                    return false;
+                }
+                // The name check is done against the DC name given in the connection, or the host name.
+                var name = expected ?? (IPAddress.TryParse(host, out _) ? null : host);
+                if (name is not null && !c2.MatchesHostname(name, allowWildcards: true))
+                {
+                    certProblem = $"the domain controller's certificate is for {c2.GetNameInfo(X509NameType.DnsName, false)}, not {name}. Connect with the name on the certificate";
+                    return false;
+                }
+                return true;
             };
         }
         else
@@ -73,9 +88,36 @@ public static class DirectoryClient
         catch (LdapException ex)
         {
             conn.Dispose();
+            if (ex.ErrorCode == 81) throw new DirectoryException(Unreachable(s, host, certProblem, certSeen));
             throw new DirectoryException(Explain(ex, s));
         }
         return conn;
+    }
+
+    /// <summary>
+    /// "Server down" (LDAP 81) covers several causes; this tells them apart: the port does not answer, LDAPS on the LDAP
+    /// port (389), no certificate for LDAPS on the DC, or a certificate this server does not trust.
+    /// </summary>
+    private static string Unreachable(DirectorySettings s, string host, string? certProblem, bool certSeen)
+    {
+        var where = $"{host}:{s.Port}";
+        if (certProblem is not null) return $"Connected to {where}, but {certProblem}.";
+        bool open;
+        try
+        {
+            using var tcp = new System.Net.Sockets.TcpClient();
+            open = tcp.ConnectAsync(host, s.Port).Wait(TimeSpan.FromSeconds(5)) && tcp.Connected;
+        }
+        catch (Exception e) when (e is System.Net.Sockets.SocketException or AggregateException) { open = false; }
+        if (!open)
+            return $"Cannot reach the domain controller at {where}: the port does not answer (wrong name or address, DC down, or a firewall between this server and the DC). Check name resolution and that TCP {s.Port} is open from the Zentriq server.";
+        if (s.Ldaps && s.Port == 389)
+            return $"Port 389 answers, but it is plain LDAP and LDAPS (TLS) was chosen. Untick LDAPS to use 389 (signed and sealed with Kerberos / NTLM), or use port 636 for LDAPS.";
+        if (s.Ldaps && !certSeen)
+            return $"Port {s.Port} answers, but the domain controller did not start TLS: it has no certificate for LDAPS (install one from your certificate authority, e.g. Active Directory Certificate Services, with Server Authentication for the DC's name). Until then untick LDAPS and use port 389, which is signed and sealed with Kerberos / NTLM.";
+        if (s.Ldaps)
+            return $"Port {s.Port} answers, but the TLS connection failed (the DC's certificate or TLS settings). Try with 'Check the domain controller's certificate' unticked to narrow it down.";
+        return $"Port {s.Port} on {host} answers, but the LDAP connection failed (the DC refused the session; check that this port is LDAP, not LDAPS or Global Catalog over TLS).";
     }
 
     public static string Explain(LdapException ex, DirectorySettings s) => ex.ErrorCode switch

@@ -75,3 +75,18 @@ Unit tests (LDAP filter escaping and user names, no anonymous bind, ID token che
 nonce, tenant, audience, refused code, PKCE), PostgreSQL test (account created for a mapped group, roles replaced at
 each sign-in and removed when the person left, no account without a mapped group, local account not taken over) and
 the Windows acceptance test T91. First released in build 1.1.1.113.
+
+## When the connection test fails
+
+The test tells the causes apart:
+
+| Message | What to do |
+|---|---|
+| *the port does not answer* | Name resolution, DC down or a firewall: TCP 389 (LDAP) or 636 (LDAPS) must be open from the Zentriq server to the DC. |
+| *Port 389 answers, but it is plain LDAP and LDAPS was chosen* | Untick LDAPS (389 is signed and sealed with Kerberos / NTLM, no certificate needed) or use 636. Changing the port now changes the LDAPS tick with it. |
+| *the domain controller did not start TLS: it has no certificate for LDAPS* | The DC has no LDAPS certificate (install one from your CA, e.g. AD Certificate Services, with Server Authentication for the DC's name), or use LDAP on 389 meanwhile. |
+| *the domain controller's certificate … is not trusted by this server* | Import the issuing CA certificate into *Local Computer › Trusted Root Certification Authorities* on the Zentriq server, or untick *Check the domain controller's certificate*. |
+| *the certificate is for X, not Y* | Connect with the name on the DC's certificate (or enter it as the DC name when connecting by IP address). |
+| *rejected the user name or password* | Use DOMAIN\user or user@domain and the account's current password. |
+
+Saving refuses LDAPS on 389/3268 and LDAP on 636/3269.

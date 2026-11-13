@@ -61,7 +61,7 @@ export function SignInTab({ roles, groups = [], onChanged }: { roles: RoleRow[];
             <label className="row-check"><input type="checkbox" checked={ldap.enabled} onChange={(e) => setLdap({ ...ldap, enabled: e.target.checked })} /> Allow sign-in with Active Directory accounts</label>
             <div className="form-grid-2">
               <label>Domain controller or domain <input className="in mono" value={ldap.host} onChange={(e) => setLdap({ ...ldap, host: e.target.value })} placeholder="dc01.contoso.com" /></label>
-              <label>Port <input className="in" type="number" value={ldap.port} onChange={(e) => setLdap({ ...ldap, port: Number(e.target.value) })} /></label>
+              <label>Port <input className="in" type="number" value={ldap.port} onChange={(e) => { const port = Number(e.target.value); setLdap({ ...ldap, port, ldaps: port === 389 || port === 3268 ? false : port === 636 || port === 3269 ? true : ldap.ldaps }); }} /></label>
               <label>Domain for plain user names <input className="in mono" value={ldap.domain ?? ''} onChange={(e) => setLdap({ ...ldap, domain: e.target.value })} placeholder="CONTOSO or contoso.com" /></label>
               <label>Search base (optional) <input className="in mono" value={ldap.baseDn ?? ''} onChange={(e) => setLdap({ ...ldap, baseDn: e.target.value })} placeholder="DC=contoso,DC=com" /></label>
             </div>
