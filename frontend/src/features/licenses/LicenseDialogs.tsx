@@ -7,6 +7,7 @@ import { Callout, DataTable } from '../../components/ui';
 import { errText } from '../deployment/types';
 import { useDepartments } from '../departments/Departments';
 import { baseName, METRIC_LABEL, TYPE_LABEL, type Connection, type FoundSoftware, type License, type LicenseType, type Metric, type Product } from './types';
+import { HelpSteps, Step, UiBtn, UiPath, Val } from '../../components/Help';
 
 const lines = (s: string) => s.split(/[\n;]/).map((x) => x.trim()).filter(Boolean);
 const num = (s: string) => (s.trim() === '' ? null : Number(s));
@@ -340,12 +341,13 @@ export function ConnectionDialog({ connection, onClose, onSaved }: { connection:
         </div>
         <div>
           <b>App registration (Microsoft Entra admin center)</b>
-          <ol style={{ paddingLeft: 18, fontSize: 13, lineHeight: 1.55 }}>
-            <li>App registrations › New registration (single tenant).</li>
-            <li>API permissions › Microsoft Graph › <b>Application</b>: Organization.Read.All, User.Read.All, Application.Read.All, GroupMember.Read.All; optional AuditLog.Read.All (last sign-in, needs Entra ID P1).</li>
-            <li>Grant admin consent.</li>
-            <li>Certificates &amp; secrets › New client secret: copy its <b>Value</b>.</li>
-          </ol>
+          <div style={{ height: 8 }} />
+          <HelpSteps>
+            <Step title="Register the app"><UiPath>App registrations › New registration</UiPath> (single tenant).</Step>
+            <Step title="Add the permissions"><UiPath>API permissions › Microsoft Graph › Application</UiPath>: <Val>Organization.Read.All</Val> <Val>User.Read.All</Val> <Val>Application.Read.All</Val> <Val>GroupMember.Read.All</Val>; optional <Val>AuditLog.Read.All</Val> (last sign-in, needs Entra ID P1).</Step>
+            <Step title="Grant admin consent" />
+            <Step title="Create a secret"><UiPath>Certificates &amp; secrets › New client secret</UiPath>, and copy its <UiBtn>Value</UiBtn>.</Step>
+          </HelpSteps>
           <p className="faint" style={{ fontSize: 12.5 }}>Read only: Zentriq never changes the tenant. The secret is stored encrypted on the Zentriq server.</p>
         </div>
       </div>

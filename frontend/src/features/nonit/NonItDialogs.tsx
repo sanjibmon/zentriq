@@ -9,6 +9,7 @@ import {
   CONDITIONS, day, daysUntil, money, STATUSES, statusLabel, statusTone,
   type ImportResult, type NonItAsset, type NonItCategory, type NonItField,
 } from './types';
+import { HelpSteps, Step } from '../../components/Help';
 
 export const errText = (e: unknown) => {
   const b = (e as { body?: { errors?: Record<string, string[]>; title?: string } }).body;
@@ -316,25 +317,22 @@ export function BulkUpload({ onClose, onDone }: { onClose: () => void; onDone: (
           {check?.ok ? `Upload ${check.created + check.updated} row(s)` : 'Upload'}
         </button>
       </>}>
-      <ol className="steps-v">
-        <li>
-          <b>Download the form</b>
-          <p className="muted">An Excel workbook with the columns, drop-down lists of your categories, statuses and departments, and instructions.</p>
+      <HelpSteps>
+        <Step title={<>Download the form</>}>
+          <p style={{ margin: 0 }}>An Excel workbook with the columns, drop-down lists of your categories, statuses and departments, and instructions.</p>
           <a className="btn sm" href="/api/v1/nonit/template" download><Icon name="down" size={14} /> Download Excel form</a>
-        </li>
-        <li>
-          <b>Fill one row per item and save</b>
-          <p className="muted">Name and category are required. A row with an existing asset tag updates that asset; empty cells leave its values as they are.</p>
-        </li>
-        <li>
-          <b>Choose the file and check it</b>
+        </Step>
+        <Step title={<>Fill one row per item and save</>}>
+          <p style={{ margin: 0 }}>Name and category are required. A row with an existing asset tag updates that asset; empty cells leave its values as they are.</p>
+        </Step>
+        <Step title={<>Choose the file and check it</>}>
           <div className="toolbar-row" style={{ marginTop: 6 }}>
             <input type="file" accept=".xlsx,.csv" onChange={(e) => { setFile(e.target.files?.[0] ?? null); setCheck(null); setDone(null); }} aria-label="Excel or CSV file" />
           </div>
           <label className="row-check"><input type="checkbox" checked={update} onChange={(e) => { setUpdate(e.target.checked); setCheck(null); }} /> <span>Update assets whose tag already exists (otherwise skip them)</span></label>
           <label className="row-check"><input type="checkbox" checked={createCats} onChange={(e) => { setCreateCats(e.target.checked); setCheck(null); }} /> <span>Create categories that don't exist yet (group "Custom")</span></label>
-        </li>
-      </ol>
+        </Step>
+      </HelpSteps>
       {error && <Callout tone="crit" icon="alert">{error}</Callout>}
       {result && (
         <div style={{ marginTop: 12 }}>

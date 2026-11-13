@@ -6,31 +6,43 @@ import { useApi } from '../../app/useApi';
 import { Modal } from '../../components/Modal';
 import { Callout } from '../../components/ui';
 import { PROVIDERS, type CloudAccount, type Provider } from './types';
+import { HelpSteps, Step, UiBtn, UiPath, Val } from '../../components/Help';
 
 const err = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const list = (s: string) => s.split(/[\s,;]+/).map((x) => x.trim()).filter(Boolean);
 
 
 const HELP: Record<Provider, ReactNode> = {
-  azure: <>In the Azure portal: <b>Microsoft Entra ID › App registrations › New registration</b>; then <b>Certificates &amp; secrets › New client secret</b>.
-    On each subscription: <b>Access control (IAM) › Add role assignment › Reader</b> for the app. Zentriq reads with Azure Resource Graph and changes nothing.</>,
-  aws: <>In IAM: create a user for Zentriq, attach the <b>ReadOnlyAccess</b> policy (or <b>SecurityAudit</b> plus <b>ViewOnlyAccess</b>), and create an access key
-    (<i>Application running outside AWS</i>). Zentriq signs requests with the key and changes nothing.</>,
-  vmware: <>vCenter Server 6.5 or later. Create a user (for example <span className="mono">zentriq@vsphere.local</span>) and give it the <b>Read-only</b> role on the vCenter,
-    with <i>Propagate to children</i>. ESXi hosts without vCenter are not supported — use the agent or a network scan for those.</>,
-  gcp: <>In the Google Cloud console: <b>IAM &amp; Admin › Service accounts › Create</b>, give it the <b>Viewer</b> role on each project (or on the folder / organization),
-    then <b>Keys › Add key › JSON</b> and paste the whole downloaded file below. Zentriq reads Compute Engine, disks, addresses, firewall rules, load balancers,
+  azure: <HelpSteps>
+    <Step title="Register an app">In the Azure portal: <UiPath>Microsoft Entra ID › App registrations › New registration</UiPath>.</Step>
+    <Step title="Create a secret"><UiPath>Certificates &amp; secrets › New client secret</UiPath>.</Step>
+    <Step title="Give it read access">On each subscription: <UiPath>Access control (IAM) › Add role assignment</UiPath>, role <Val>Reader</Val>, for the app. Zentriq reads with Azure Resource Graph and changes nothing.</Step>
+  </HelpSteps>,
+  aws: <HelpSteps>
+    <Step title="Create a user">In IAM, create a user for Zentriq and attach the <Val>ReadOnlyAccess</Val> policy (or <Val>SecurityAudit</Val> plus <Val>ViewOnlyAccess</Val>).</Step>
+    <Step title="Create an access key">Use case <UiBtn>Application running outside AWS</UiBtn>. Zentriq signs requests with the key and changes nothing.</Step>
+  </HelpSteps>,
+  vmware: <>vCenter Server 6.5 or later. Create a user (for example <Val>zentriq@vsphere.local</Val>) and give it the <Val>Read-only</Val> role on the vCenter,
+    with <UiBtn>Propagate to children</UiBtn>. ESXi hosts without vCenter are not supported — use the agent or a network scan for those.</>,
+  gcp: <>
+    <HelpSteps>
+      <Step title="Create a service account">In the Google Cloud console: <UiPath>IAM &amp; Admin › Service accounts › Create</UiPath>.</Step>
+      <Step title="Give it read access">Role <Val>Viewer</Val> on each project (or on the folder / organization).</Step>
+      <Step title="Create a key"><UiPath>Keys › Add key › JSON</UiPath>, and paste the whole downloaded file below.</Step>
+    </HelpSteps>
+    Zentriq reads Compute Engine, disks, addresses, firewall rules, load balancers,
     Cloud Storage, Cloud SQL, GKE and Cloud Functions, and changes nothing. An API that is not enabled in a project is skipped.</>,
-  nutanix: <>Prism Central (all registered clusters) or Prism Element, port 9440. Create a local user, or use a directory user, with the <b>Viewer</b> role.
+  nutanix: <>Prism Central (all registered clusters) or Prism Element, port 9440. Create a local user, or use a directory user, with the <Val>Viewer</Val> role.
     Zentriq reads clusters, AHV hosts and virtual machines through the v3 REST API and changes nothing.</>,
-  proxmox: <>In Proxmox: <b>Datacenter › Permissions › API Tokens › Add</b> (for example user <span className="mono">zentriq@pve</span>, token <span className="mono">inventory</span>),
-    then <b>Permissions › Add › API Token Permission</b>: path <span className="mono">/</span>, role <b>PVEAuditor</b>, propagate. One node of a cluster is enough; port 8006.
-    Install the QEMU guest agent in the VMs to see their IP addresses and OS.</>,
-  xenserver: <>The <b>pool master</b> of an XCP-ng or Citrix Hypervisor (XenServer) pool, over HTTPS. Use root, or a pool user (Active Directory) with the
-    <b> Read Only</b> role. Xen Orchestra is not needed. Guest tools in the VMs give their IP addresses and OS.</>,
-  ovirt: <>The engine of oVirt, Red Hat Virtualization or Oracle Linux Virtualization Manager (<span className="mono">https://engine/ovirt-engine</span>). A user such as
-    <span className="mono"> zentriq@internal</span> with a read-only role (for example <b>ReadOnlyAdmin</b>) on the data center. The guest agent in the VMs gives IP, FQDN and OS.</>,
-  hyperv: <>Each Hyper-V host (every node of a failover cluster). The saved Windows credential must be in <b>Hyper-V Administrators</b> (or an administrator) on the hosts,
+  proxmox: <>
+    <HelpSteps>
+      <Step title="Create an API token"><UiPath>Datacenter › Permissions › API Tokens › Add</UiPath>, for example user <Val>zentriq@pve</Val>, token <Val>inventory</Val>.</Step>
+      <Step title="Give it read access"><UiPath>Permissions › Add › API Token Permission</UiPath>: path <Val>/</Val>, role <Val>PVEAuditor</Val>, <UiBtn>Propagate</UiBtn>.</Step>
+    </HelpSteps>
+    One node of a cluster is enough; port 8006. Install the QEMU guest agent in the VMs to see their IP addresses and OS.</>,
+  xenserver: <>The pool master of an XCP-ng or Citrix Hypervisor (XenServer) pool, over HTTPS. Use root, or a pool user (Active Directory) with the <Val>Read Only</Val> role. Xen Orchestra is not needed. Guest tools in the VMs give their IP addresses and OS.</>,
+  ovirt: <>The engine of oVirt, Red Hat Virtualization or Oracle Linux Virtualization Manager (<Val>https://engine/ovirt-engine</Val>). A user such as <Val>zentriq@internal</Val> with a read-only role (for example <Val>ReadOnlyAdmin</Val>) on the data center. The guest agent in the VMs gives IP, FQDN and OS.</>,
+  hyperv: <>Each Hyper-V host (every node of a failover cluster). The saved Windows credential must be in <Val>Hyper-V Administrators</Val> (or an administrator) on the hosts,
     and WinRM (5985) or WMI/DCOM must be reachable from the Zentriq server — the same as an agentless Windows scan.</>,
 };
 

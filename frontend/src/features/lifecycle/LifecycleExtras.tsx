@@ -10,6 +10,7 @@ import { Callout, DataTable, Panel, Pill } from '../../components/ui';
 import { DepartmentSelect, useDepartments } from '../departments/Departments';
 import { LocationSelect, useLocations } from '../locations/Locations';
 import type { LcField, LcImportResult, LcMeta, LcPerson } from './types';
+import { HelpSteps, Step } from '../../components/Help';
 
 const err = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -56,25 +57,22 @@ export function ImportDialog({ kind, onClose, onDone }: { kind: ImportKind; onCl
           {check?.ok ? `Upload ${check.created + check.updated} row(s)` : 'Upload'}
         </button>
       </>}>
-      <ol className="steps-v">
-        <li>
-          <b>Download the template</b>
-          <p className="muted">An Excel workbook with the columns, an example row, drop-down lists (device types, stages, departments, locations, people{kind === 'assets' ? ', your custom fields' : ''}) and instructions.</p>
+      <HelpSteps>
+        <Step title={<>Download the template</>}>
+          <p style={{ margin: 0 }}>An Excel workbook with the columns, an example row, drop-down lists (device types, stages, departments, locations, people{kind === 'assets' ? ', your custom fields' : ''}) and instructions.</p>
           <a className="btn sm" href={`/api/v1/lifecycle/import/${kind}/template`} download><Icon name="down" size={14} /> Download Excel template</a>
-        </li>
-        <li>
-          <b>Fill one row per {t.what} and save</b>
-          <p className="muted">{t.match} Excel (.xlsx) or CSV with the same headings.</p>
-        </li>
-        <li>
-          <b>Choose the file and check it</b>
+        </Step>
+        <Step title={<>Fill one row per {t.what} and save</>}>
+          <p style={{ margin: 0 }}>{t.match} Excel (.xlsx) or CSV with the same headings.</p>
+        </Step>
+        <Step title={<>Choose the file and check it</>}>
           <div className="toolbar-row" style={{ marginTop: 6 }}>
             <input type="file" accept=".xlsx,.csv" onChange={(e) => { setFile(e.target.files?.[0] ?? null); reset(); }} aria-label="Excel or CSV file" />
           </div>
           <label className="row-check"><input type="checkbox" checked={update} onChange={(e) => { setUpdate(e.target.checked); reset(); }} /> <span>Update {t.what === 'person' ? 'people' : t.what + 's'} that already exist (otherwise skip them)</span></label>
           {kind !== 'contracts' && <label className="row-check"><input type="checkbox" checked={create} onChange={(e) => { setCreate(e.target.checked); reset(); }} /> <span>Create departments and locations that don't exist yet</span></label>}
-        </li>
-      </ol>
+        </Step>
+      </HelpSteps>
       {error && <Callout tone="crit" icon="alert">{error}</Callout>}
       {result && (
         <div style={{ marginTop: 12 }}>

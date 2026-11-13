@@ -7,6 +7,7 @@ import { useConfirm } from '../../components/Confirm';
 import { CopyBox } from '../../components/CopyBox';
 import { Icon } from '../../components/Icon';
 import { Callout, DataTable, ErrorBox, fmt, Kpis, PageHead, Pager, Panel, Pill, type Tone } from '../../components/ui';
+import { UiBtn, UiPath } from '../../components/Help';
 
 // ---- types -------------------------------------------------------------------------------------------
 
@@ -248,9 +249,9 @@ function ChannelDialog({ channel, onClose, onSaved }: { channel: Channel | null;
           </>}
           {(kind === 'slack' || kind === 'teams') && <SecretInput label={kind === 'slack' ? 'Incoming webhook URL' : 'Workflows webhook URL'} set={isSet('url')} value={sec.url ?? ''} onChange={(v) => X({ url: v })}
             placeholder={kind === 'slack' ? 'https://hooks.slack.com/services/…' : 'https://….logic.azure.com/workflows/… or https://….webhook.office.com/…'}
-            help={kind === 'slack' ? 'Slack › Apps › Incoming Webhooks › Add to a channel. The URL is stored encrypted.'
-              : 'Teams › channel › Workflows › "Post to a channel when a webhook request is received". The URL is stored encrypted.'} />}
-          {kind === 'email' && <label>Recipients<textarea className="in" rows={2} value={recipients} onChange={(e) => setRecipients(e.target.value)} required placeholder="secops@example.com, it-team@example.com" /><small className="muted">Uses the SMTP server from System Settings › E-mail.</small></label>}
+            help={kind === 'slack' ? <>In Slack: <UiPath>Apps › Incoming Webhooks › Add to a channel</UiPath>. The URL is stored encrypted.</>
+              : <>In Teams: <UiPath>channel › Workflows</UiPath>, template <UiBtn>Post to a channel when a webhook request is received</UiBtn>. The URL is stored encrypted.</>} />}
+          {kind === 'email' && <label>Recipients<textarea className="in" rows={2} value={recipients} onChange={(e) => setRecipients(e.target.value)} required placeholder="secops@example.com, it-team@example.com" /><small className="muted">Uses the SMTP server from <UiPath>System Settings › E-mail</UiPath>.</small></label>}
           {kind === 'syslog' && <>
             <div className="form-grid-2">
               <label>Server<input className="in" value={s.host ?? ''} onChange={(e) => S({ host: e.target.value })} required placeholder="siem-collector.example.local" /></label>

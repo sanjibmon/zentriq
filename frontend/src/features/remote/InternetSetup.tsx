@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { api, ApiError } from '../../api/client';
 import { Icon } from '../../components/Icon';
 import { Callout, Pill } from '../../components/ui';
+import { HelpSteps, Step, Val } from '../../components/Help';
 
 export interface InternetCheckResult {
   host: string; port: number; ok: boolean; resolved: boolean; publicAddress: boolean; reachable: boolean; sameServer: boolean;
@@ -52,11 +53,11 @@ export function InternetSetup({ host: initialHost, port: initialPort, enginePort
         <label className="fld"><span>HTTPS port</span>
           <input className="in" type="number" min={1} max={65535} value={port} onChange={(e) => { setPort(Number(e.target.value) || enginePort); setResult(null); }} /></label>
       </div>
-      {!compact && <ol className="rs-howto">
-        <li>Point a public DNS record to your public IP address (or use the public IP itself).</li>
-        <li>On the router or firewall, forward TCP <b>{port}</b> to this server, port <b>{enginePort}</b>. Only remote support is published — not the console. HTTPS only; port 80 is not used.</li>
-        <li>For no browser warning outside, give the server a certificate from a public CA that includes the name (see the installation guide).</li>
-      </ol>}
+      {!compact && <HelpSteps>
+        <Step title="Public name">Point a public DNS record to your public IP address (or use the public IP itself).</Step>
+        <Step title="Port forwarding">On the router or firewall, forward TCP <Val>{port}</Val> to this server, port <Val>{enginePort}</Val>. Only remote support is published — not the console. HTTPS only; port 80 is not used.</Step>
+        <Step title="Certificate">For no browser warning outside, give the server a certificate from a public CA that includes the name (see the installation guide).</Step>
+      </HelpSteps>}
       {error && <Callout tone="crit" icon="alert">{error}</Callout>}
       {result && <div className={`rs-check ${result.usable ? 'ok' : 'bad'}`}>
         <div className="rs-check-steps">{steps.map(([l, t]) => <Pill key={l} tone={t as 'ok' | 'crit' | 'info' | ''}>{l}</Pill>)}</div>

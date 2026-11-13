@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { api } from '../../api/client';
 import { useAuth } from '../../app/auth';
 import { useApi } from '../../app/useApi';
 import { Icon } from '../../components/Icon';
 import { Callout, DataTable, ErrorBox, fmt, Panel, Pill } from '../../components/ui';
+import { UiPath } from '../../components/Help';
 
 export interface WarrantyProvider {
   vendor: 'dell' | 'lenovo' | 'hp'; label: string; enabled: boolean; configured: boolean; clientId: string | null; apiUrl: string | null; defaultUrl: string;
@@ -22,10 +23,10 @@ export interface WarrantyLookup {
 interface LookupResult { queued: boolean; message: string; found?: number; notFound?: number; errors?: number }
 
 const LABEL: Record<string, string> = { dell: 'Dell', lenovo: 'Lenovo', hp: 'HP' };
-const HELP: Record<string, string> = {
-  dell: 'Dell TechDirect › APIs › Warranty API: request a key, then use its Client ID and Client Secret.',
-  lenovo: 'Ask your Lenovo account team (or the Lenovo Support API program) for a warranty API Client ID. No secret is needed.',
-  hp: 'HP Developer Portal (developers.hp.com) › HP Warranty API › Get credentials (approval by HP). HP keys expire after 90 days by default.',
+const HELP: Record<string, ReactNode> = {
+  dell: <><UiPath>Dell TechDirect › APIs › Warranty API</UiPath>: request a key, then use its Client ID and Client Secret.</>,
+  lenovo: <>Ask your Lenovo account team (or the Lenovo Support API program) for a warranty API Client ID. No secret is needed.</>,
+  hp: <><UiPath>HP Developer Portal (developers.hp.com) › HP Warranty API › Get credentials</UiPath> (approval by HP). HP keys expire after 90 days by default.</>,
 };
 
 export async function lookUpWarranty(assetIds: string[] | 'all'): Promise<string> {

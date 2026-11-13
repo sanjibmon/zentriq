@@ -13,6 +13,7 @@ import { errText } from '../deployment/types';
 import { useDepartments } from '../departments/Departments';
 import { AlertsTab } from '../licenses/LicensesPage';
 import { money } from '../licenses/types';
+import { UiPath } from '../../components/Help';
 
 export type AppStatus = 'sanctioned' | 'review' | 'unsanctioned' | 'blocked';
 export interface WebApp {
@@ -86,7 +87,7 @@ function Overview({ s }: { s: Summary }) {
   const { navigate } = useRouter();
   return (
     <>
-      {!s.discovery && <Callout>Finding web apps on devices is off (Software Licenses › Settings). Apps come from Microsoft Entra single sign-on and from what you add.</Callout>}
+      {!s.discovery && <Callout>Finding web apps on devices is off (<UiPath>Software Licenses › Settings</UiPath>). Apps come from Microsoft Entra single sign-on and from what you add.</Callout>}
       <div className="grid-2">
         <Panel flush title="Most Used" sub="Users and devices in the last 30 days">
           <DataTable rows={s.top} onRow={(a) => navigate(`/modules/webapps/${a.id}`)} rowTitle="Open the app" empty="No use seen yet. It comes with the next inventory of Windows devices." columns={[

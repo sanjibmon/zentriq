@@ -5,6 +5,7 @@ import { useAuth } from '../../app/auth';
 import { useApi } from '../../app/useApi';
 import { useConfirm } from '../../components/Confirm';
 import { Callout, DataTable, ErrorBox, fmt, Kpis, Loading, PageHead, Panel, Pill, statusTone } from '../../components/ui';
+import { HelpSteps, Step, UiBtn, UiPath, Val } from '../../components/Help';
 
 type Msg = { tone: 'ok' | 'crit'; text: string } | null;
 
@@ -158,11 +159,11 @@ export function LicensingPage() {
                 </>
               ) : manage ? (
                 <>
-                  <ol className="lic-steps">
-                    <li>Choose <b>Import license file</b> and select the <span className="mono">.zlic</span> file from Zentriq.</li>
-                    <li>Zentriq checks its signature and asks the Zentriq license server to validate it (license active, not revoked, an activation free).</li>
-                    <li>Once validated, the license is activated for this server and refreshed by a daily check-in.</li>
-                  </ol>
+                  <HelpSteps>
+                    <Step title="Import the license file">Choose <UiBtn>Import license file</UiBtn> and select the <Val>.zlic</Val> file from Zentriq.</Step>
+                    <Step title="Validation">Zentriq checks its signature and asks the Zentriq license server to validate it (license active, not revoked, an activation free).</Step>
+                    <Step title="Activated">The license is activated for this server and refreshed by a daily check-in.</Step>
+                  </HelpSteps>
                   <div className="row-actions lic-actions">
                     <button className="btn primary" disabled={!!busy} onClick={() => fileRef.current?.click()}>{busy === 'import' ? 'Validating…' : 'Import license file…'}</button>
                     <input ref={fileRef} type="file" accept=".zlic,.json,application/json" hidden onChange={(e) => e.target.files?.[0] && void importLicense(e.target.files[0])} />
@@ -181,11 +182,11 @@ export function LicensingPage() {
 
             {manage && (
               <Panel title="Offline activation" sub="For servers without internet access (air-gapped)">
-                <ol className="lic-steps">
-                  <li>Download the activation request from this server.</li>
-                  <li>On a computer with internet access, open <span className="mono">{offlinePage}</span> and upload the request with the license file from Zentriq (or send both to Zentriq).</li>
-                  <li>Import the license file for this server that you receive back.</li>
-                </ol>
+                <HelpSteps>
+                  <Step title="Download the activation request">From this server.</Step>
+                  <Step title="Activate on a computer with internet access">Open <Val>{offlinePage}</Val> and upload the request with the license file from Zentriq (or send both to Zentriq).</Step>
+                  <Step title="Import the license file you receive back">It is made for this server.</Step>
+                </HelpSteps>
                 <div className="row-actions lic-actions">
                   <button className="btn" onClick={() => void exportRequest()}>Download activation request</button>
                   <button className="btn primary" disabled={!!busy} onClick={() => offRef.current?.click()}>Import license file…</button>
@@ -228,7 +229,7 @@ export function LicensingPage() {
                 { key: 'l', label: 'Available', render: (r) => !r.installed ? <span className="muted">—</span> : r.enabled ? <Pill tone="ok">Yes</Pill> : d.featuresEnabled ? <Pill tone="warn">Needs Advanced</Pill> : <Pill tone="crit">License required</Pill> },
               ]} />
               <div className="lic-foot muted">
-                <small><b>Standard</b>: Overview, Discover &amp; inventory, Insight &amp; admin. <b>Advanced</b>: Standard plus Remote support, Infrastructure, Secure &amp; remediate. The trial includes every section. To add a section that is not installed, run Zentriq Setup on the server and choose <i>Update › Advanced installation</i>.</small>
+                <small><Val>Standard</Val> Overview, Discover &amp; inventory, Insight &amp; admin. <Val>Advanced</Val> Standard plus Remote support, Infrastructure, Secure &amp; remediate. The trial includes every section. To add a section that is not installed, run Zentriq Setup on the server and choose <UiPath>Update › Advanced installation</UiPath>.</small>
               </div>
             </Panel></div>}
 

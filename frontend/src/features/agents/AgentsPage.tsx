@@ -10,6 +10,7 @@ import { CopyBox } from '../../components/CopyBox';
 import { Callout, DataTable, ErrorBox, fmt, Kpis, PageHead, Pager, Panel, Pill, type Tone } from '../../components/ui';
 import { useSticky } from '../../app/sticky';
 import { useConfirm } from '../../components/Confirm';
+import { Command, HelpSteps, Note, Step, UiBtn, UiPath, Val } from '../../components/Help';
 
 const HEALTH: Record<AgentRow['health'], [string, Tone]> = {
   online: ['Online', 'ok'],
@@ -129,7 +130,16 @@ export function AgentsPage() {
     const ok = await confirm({
       title: `Update the agent on ${a.hostname ?? a.id}`,
       confirmLabel: 'Download agent MSI',
-      message: `This agent (${a.version}) was installed before agents could update themselves, so it cannot receive the update from here. Install the new MSI on ${a.hostname ?? 'the device'} once: copy ZentriqAgent-x64.msi to it and run "msiexec /i ZentriqAgent-x64.msi /qn" in an elevated prompt, or assign the package with GPO, Intune or SCCM. No enrollment code is needed; the device keeps its registration and history. Afterwards the Update button works for it.`,
+      message: <div className="form-v">
+        <span className="muted">This agent ({a.version}) was installed before agents could update themselves. Install the new MSI on {a.hostname ?? 'the device'} once; it keeps its registration and history.</span>
+        <HelpSteps>
+          <Step title="Copy the installer to the device"><Val>ZentriqAgent-x64.msi</Val> (the button below downloads it), or assign it with GPO, Intune or SCCM instead.</Step>
+          <Step title="Run it">
+            <Command value="msiexec /i ZentriqAgent-x64.msi /qn" shell="Command Prompt (Administrator)" label="Install command" /></Step>
+          <Step title="Update from the console from now on">The <UiBtn>Update</UiBtn> button works for this device afterwards.</Step>
+        </HelpSteps>
+        <Note>No enrollment code is needed.</Note>
+      </div>,
     });
     if (ok && pkg.data?.package) window.location.href = pkg.data.package.url;
   }
@@ -168,7 +178,8 @@ export function AgentsPage() {
         </>} />
       {msg && <Callout>{msg}</Callout>}
       <ErrorBox error={agents.error ?? pkg.error} />
-      {pkg.data && !pkg.data.enrollmentAvailable && <Callout tone="warn" icon="alert">Agent enrollment is not configured on this server (agent CA missing). Run <span className="mono">zentriqctl repair</span> on the server.</Callout>}
+      {pkg.data && !pkg.data.enrollmentAvailable && <Callout tone="warn" icon="alert">Agent enrollment is not configured on this server (agent CA missing). On the server run:
+        <Command value="zentriqctl repair" shell="Command Prompt (Administrator)" label="Repair" /></Callout>}
       {manage && outdated.length > 0 && pkg.data?.package && (
         <Callout tone="info" icon="info">
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -188,12 +199,13 @@ export function AgentsPage() {
               <label>Enrollment code<CopyBox value={created.code} label="Enrollment code" /></label>
             </div>
             <small className="muted">In the installer wizard enter both, and choose how often the agent checks its connection and sends inventory (this code suggests every {every(created.checkinMinutes)} and {every(created.inventoryMinutes)}).</small>
-            <label>Windows: silent install (Intune, SCCM, GPO or an elevated prompt)<CopyBox value={created.installCommand} label="Install command" rows={2} /></label>
+            <div className="help-cmd-l">Windows: silent install (Intune, SCCM, GPO or an elevated prompt)<Command value={created.installCommand} shell="Command Prompt or PowerShell (Administrator)" label="Install command" /></div>
             {created.linuxInstallCommand ? <>
-              <label>Linux: install and enroll in one line (as root or with sudo; Ubuntu, Debian, RHEL, Rocky, AlmaLinux, Oracle, Fedora, SUSE, Amazon Linux and others, x64 or ARM64)<CopyBox value={created.linuxInstallCommand} label="Linux install command" rows={3} /></label>
-              <small className="muted">It downloads the installer and the right package (.deb, .rpm or .tar.gz) from this server&apos;s agent port, trusting only this server&apos;s key, installs the <span className="mono">zentriq-agent</span> service and enrolls. With your own tooling: install the package from <LinuxDownloads p={created.linuxPackages} />, then run <span className="mono">sudo zentriq-agent --enroll {created.code} --server {created.serverUrl}</span>.</small>
+              <div className="help-cmd-l">Linux: install and enroll in one line (as root or with sudo; Ubuntu, Debian, RHEL, Rocky, AlmaLinux, Oracle, Fedora, SUSE, Amazon Linux and others, x64 or ARM64)<Command value={created.linuxInstallCommand} shell="Terminal (root or sudo)" label="Linux install command" /></div>
+              <small className="muted">It downloads the installer and the right package (.deb, .rpm or .tar.gz) from this server&apos;s agent port, trusting only this server&apos;s key, installs the <Val>zentriq-agent</Val> service and enrolls. With your own tooling: install the package from <LinuxDownloads p={created.linuxPackages} />, then run:</small>
+              <Command value={`sudo zentriq-agent --enroll ${created.code} --server ${created.serverUrl}`} shell="Terminal" label="Enroll (Linux)" />
             </> : <small className="muted">Linux agent packages are not on this server.</small>}
-            <small className="muted">Devices outside your network need <span className="mono">{created.serverUrl}</span> to be reachable (published through your firewall). If the server&apos;s address changes, agents on the network find it again by themselves.</small>
+            <small className="muted">Devices outside your network need <Val>{created.serverUrl}</Val> to be reachable (published through your firewall). If the server&apos;s address changes, agents on the network find it again by themselves.</small>
           </div>
         </Panel>
       )}
@@ -271,8 +283,9 @@ export function AgentsPage() {
       {tab === 'agents' && rows.length === 0 && (tokens.data ?? []).some((t) => t.state === 'active') && (
         <Panel title="Installed the agent but the device is not listed?">
           <ul className="plain">
-            <li>On the device, open <span className="mono">C:\ProgramData\Zentriq\Agent\Logs\agent.log</span>. Each attempt is logged with the reason it failed.</li>
-            <li><b>“does not support proxies with the https scheme”</b> — a proxy was entered during setup. Leave <i>Proxy</i> empty unless the device must use a web proxy. To fix an installed agent run in an elevated PowerShell: <span className="mono">Remove-ItemProperty HKLM:\SOFTWARE\Zentriq\Agent -Name ProxyUrl; Restart-Service ZentriqAgent</span>, or install the latest agent MSI.</li>
+            <li>On the device, open <Val>C:\ProgramData\Zentriq\Agent\Logs\agent.log</Val>. Each attempt is logged with the reason it failed.</li>
+            <li><b>“does not support proxies with the https scheme”</b> — a proxy was entered during setup. Leave <UiPath>Proxy</UiPath> empty unless the device must use a web proxy. To fix an installed agent (or install the latest agent MSI):
+              <Command value={'Remove-ItemProperty HKLM:\\SOFTWARE\\Zentriq\\Agent -Name ProxyUrl; Restart-Service ZentriqAgent'} shell="PowerShell (Administrator)" label="Remove the proxy" /></li>
             <li><b>Cannot connect / timed out</b> — the device must reach this server on TCP {pkg.data?.agentPort ?? 8444}. Check the server address in the code and allow the port in Windows Firewall on this server.</li>
             <li><b>Enrollment code rejected</b> — the code expired, was revoked or reached its maximum number of devices. Create a new code.</li>
             <li>A code&apos;s <i>Uses</i> count goes up when a device enrolls successfully; 0 uses means no device has enrolled with it yet.</li>
@@ -282,16 +295,16 @@ export function AgentsPage() {
       {tab === 'agents' && rows.length > 0 && (
         <details className="panel agent-help">
           <summary><b>A device is not contacting the server?</b> <span className="muted">Commands to run on the device</span></summary>
-          <p className="muted" style={{ margin: '8px 0' }}>In an elevated Command Prompt or PowerShell on the device:</p>
-          <label>Contact the server now and show the result<CopyBox value={`${UNINSTALL_EXE} --checkin-now`} label="Check in now" /></label>
-          <label>Also send inventory now<CopyBox value={`${UNINSTALL_EXE} --collect-now`} label="Collect now" /></label>
-          <label>Find out why it cannot reach the server (service, enrollment, certificate, DNS, port, server key)<CopyBox value={`${UNINSTALL_EXE} --diagnose`} label="Diagnose" /></label>
-          <label>Restart the agent service (no code needed, also with tamper protection)<CopyBox value={`${UNINSTALL_EXE} --restart`} label="Restart" /></label>
-          <small className="muted">If the service was stopped or disabled with a code, start it again with <span className="mono">--enable</span>. The log is in <span className="mono">C:\ProgramData\Zentriq\Agent\Logs\agent.log</span>.</small>
-          <p className="muted" style={{ margin: '12px 0 8px' }}>On a Linux device (as root or with sudo) the same options work with <span className="mono">{LINUX_AGENT}</span>, for example:</p>
-          <label>Diagnose<CopyBox value={`${LINUX_AGENT} --diagnose`} label="Diagnose (Linux)" /></label>
-          <label>Show what the agent detects (distribution, edition, server or desktop)<CopyBox value={`${LINUX_AGENT} --identify`} label="Identify (Linux)" /></label>
-          <small className="muted">The log is in <span className="mono">/var/log/zentriq-agent/agent.log</span> and in the journal (<span className="mono">journalctl -u zentriq-agent</span>).</small>
+          <p className="muted" style={{ margin: '8px 0' }}>On the device:</p>
+          <div className="help-cmd-l">Contact the server now and show the result<Command value={`${UNINSTALL_EXE} --checkin-now`} shell="Command Prompt or PowerShell (Administrator)" label="Check in now" /></div>
+          <div className="help-cmd-l">Also send inventory now<Command value={`${UNINSTALL_EXE} --collect-now`} shell="Command Prompt or PowerShell (Administrator)" label="Collect now" /></div>
+          <div className="help-cmd-l">Find out why it cannot reach the server (service, enrollment, certificate, DNS, port, server key)<Command value={`${UNINSTALL_EXE} --diagnose`} shell="Command Prompt or PowerShell (Administrator)" label="Diagnose" /></div>
+          <div className="help-cmd-l">Restart the agent service (no code needed, also with tamper protection)<Command value={`${UNINSTALL_EXE} --restart`} shell="Command Prompt or PowerShell (Administrator)" label="Restart" /></div>
+          <small className="muted">If the service was stopped or disabled with a code, start it again with <Val>--enable</Val>. The log is in <Val>C:\ProgramData\Zentriq\Agent\Logs\agent.log</Val>.</small>
+          <p className="muted" style={{ margin: '12px 0 8px' }}>On a Linux device the same options work with <Val>{LINUX_AGENT}</Val>, for example:</p>
+          <div className="help-cmd-l">Diagnose<Command value={`${LINUX_AGENT} --diagnose`} shell="Terminal (root or sudo)" label="Diagnose (Linux)" /></div>
+          <div className="help-cmd-l">Show what the agent detects (distribution, edition, server or desktop)<Command value={`${LINUX_AGENT} --identify`} shell="Terminal (root or sudo)" label="Identify (Linux)" /></div>
+          <small className="muted">The log is in <Val>/var/log/zentriq-agent/agent.log</Val> and in the journal (<Val>journalctl -u zentriq-agent</Val>).</small>
         </details>
       )}
       {schedule && <ScheduleDialog ids={schedule.ids} onClose={() => setSchedule(null)} onDone={(m) => { setSchedule(null); setMsg(m); setPicked([]); agents.reload(); }} />}
@@ -448,16 +461,16 @@ function UninstallCodeDialog({ onClose }: { onClose: () => void }) {
       <div className="form-v">
         <ErrorBox error={state.error} />
         {err && <Callout tone="crit" icon="alert">{err}</Callout>}
-        {c && c.protection === false && <Callout tone="info" icon="info">Tamper protection is off (Agents › Settings): agents can be removed, stopped and disabled without a code.</Callout>}
+        {c && c.protection === false && <Callout tone="info" icon="info">Tamper protection is off (<UiPath>Agents › Settings</UiPath>): agents can be removed, stopped and disabled without a code.</Callout>}
         {c && (c.active && c.code ? <>
           <div className="big-code" aria-label="Uninstall code">{c.code}</div>
           <p style={{ margin: 0 }}>Works on <b>all devices</b> until <b>{fmt.date(c.expiresAt)}</b> (one hour){c.createdBy ? ` · created by ${c.createdBy}` : ''}.</p>
-          <label>Remove the agent (on the device, as administrator)<CopyBox value={`${UNINSTALL_EXE} --uninstall ${c.code}`} label="Uninstall command" rows={2} /></label>
-          <label>Stop the agent until the device restarts<CopyBox value={`${UNINSTALL_EXE} --stop ${c.code}`} label="Stop command" /></label>
-          <label>Disable the agent (until enabled again with --enable)<CopyBox value={`${UNINSTALL_EXE} --disable ${c.code}`} label="Disable command" /></label>
-          <label>Linux: remove the agent<CopyBox value={`${LINUX_AGENT} --uninstall ${c.code}`} label="Uninstall command (Linux)" /></label>
-          <small className="muted">Linux: <span className="mono">--stop</span> and <span className="mono">--disable</span> work the same way.</small>
-          <small className="muted">Or Apps &gt; Zentriq Agent &gt; Modify &gt; Remove, and enter the code. <span className="mono">--pause {'<code>'}</span> turns tamper protection off for one hour so the Services console can stop or disable the agent. Online devices receive the code within seconds, others when they next connect. For one device only, use <b>Agent… › Code for this device</b> in the agents list.</small>
+          <div className="help-cmd-l">Remove the agent (on the device, as administrator)<Command value={`${UNINSTALL_EXE} --uninstall ${c.code}`} shell="Command Prompt or PowerShell (Administrator)" label="Uninstall command" /></div>
+          <div className="help-cmd-l">Stop the agent until the device restarts<Command value={`${UNINSTALL_EXE} --stop ${c.code}`} shell="Command Prompt or PowerShell (Administrator)" label="Stop command" /></div>
+          <div className="help-cmd-l">Disable the agent (until enabled again with --enable)<Command value={`${UNINSTALL_EXE} --disable ${c.code}`} shell="Command Prompt or PowerShell (Administrator)" label="Disable command" /></div>
+          <div className="help-cmd-l">Linux: remove the agent<Command value={`${LINUX_AGENT} --uninstall ${c.code}`} shell="Terminal (root or sudo)" label="Uninstall command (Linux)" /></div>
+          <small className="muted">Linux: <Val>--stop</Val> and <Val>--disable</Val> work the same way.</small>
+          <small className="muted">Or <UiPath>Apps › Zentriq Agent › Modify › Remove</UiPath> and enter the code. <Val>--pause {'<code>'}</Val> turns tamper protection off for one hour so the Services console can stop or disable the agent. Online devices receive the code within seconds, others when they next connect. For one device only, use <UiPath>Agent… › Code for this device</UiPath> in the agents list.</small>
         </> : <p className="muted" style={{ margin: 0 }}>No code is active. Create one to remove, stop or disable the agent on devices: a random 16-character code that works on every device for one hour, then expires.</p>)}
       </div>
     </Modal>
@@ -497,9 +510,9 @@ function SettingsTab({ onSaved, onAll }: { onSaved: (msg: string) => void; onAll
         <div className="form-v">
           <label className="row-check"><input type="checkbox" checked={f.uninstallProtection} onChange={(e) => setF({ ...f, uninstallProtection: e.target.checked })} /> Require a code to uninstall, stop or disable the agent</label>
           <ul className="plain muted" style={{ margin: 0, fontSize: 13 }}>
-            <li>The agent service cannot be stopped, disabled or reconfigured in Services, with <span className="mono">sc</span> or PowerShell; its registry key and program folder are read-only for administrators.</li>
+            <li>The agent service cannot be stopped, disabled or reconfigured in Services, with <Val>sc</Val> or PowerShell; its registry key and program folder are read-only for administrators.</li>
             <li>A change made behind its back (for example after taking ownership) is undone within two minutes and reported here and in the audit log; a watchdog task starts the agent again after a restart.</li>
-            <li>On the device, a one-hour code (Agents › Agent code, or Agent… › Code for this device) allows <span className="mono">--uninstall</span>, <span className="mono">--stop</span>, <span className="mono">--disable</span> or <span className="mono">--pause</span>.</li>
+            <li>On the device, a one-hour code (<UiPath>Agents › Agent code</UiPath>, or <UiPath>Agent… › Code for this device</UiPath>) allows <Val>--uninstall</Val>, <Val>--stop</Val>, <Val>--disable</Val> or <Val>--pause</Val>.</li>
             <li>From here you can always pause protection, restart or disable an agent (Agent… in the list). Updates from the console keep working.</li>
           </ul>
           <div><button className="btn primary" disabled={busy} onClick={() => void save()}>Save</button></div>

@@ -17,6 +17,7 @@ import {
   formatCode, openQuick, openRemote, VIEW_LABEL,
   type QuickSession, type RemoteDevice, type RemoteSession, type RemoteSettings, type RemoteStatus, type RemoteView,
 } from './remote';
+import { Command, UiBtn, UiPath } from '../../components/Help';
 
 type Tab = 'quick' | 'devices' | 'help' | 'sessions' | 'setup';
 const TABS: [Tab, string][] = [['quick', 'Quick Support'], ['devices', 'Unattended Devices'], ['help', 'Help Requests'], ['sessions', 'History'], ['setup', 'Settings']];
@@ -224,7 +225,7 @@ function NewSession({ status, onClose, onCreated, onInternetSaved }: {
                 <p>Enter the public domain name or public IP that reaches this server. Zentriq checks it before creating the link.</p>
                 <InternetSetup compact host={status.internet?.host} port={status.internet?.port} enginePort={status.port} onSaved={() => { setInetOk(true); onInternetSaved(); }} />
               </div>
-            : <Callout tone="warn" icon="alert">Internet access is not set up. Ask an administrator to set a public address under Remote Support › Settings, or choose “On the office network”.</Callout>)}
+            : <Callout tone="warn" icon="alert">Internet access is not set up. Ask an administrator to set a public address under <UiPath>Remote Support › Settings</UiPath>, or choose <UiBtn>On the office network</UiBtn>.</Callout>)}
         <label className="fld"><span>Who needs help?</span><input className="in" autoFocus placeholder="Name (optional)" value={f.customer} onChange={(e) => setF({ ...f, customer: e.target.value })} /></label>
         <label className="fld"><span>E-mail</span><input className="in" type="email" placeholder="name@example.com (optional)" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></label>
         {f.email.trim() && <label className="row-check"><input type="checkbox" checked={f.sendEmail} onChange={(e) => setF({ ...f, sendEmail: e.target.checked })} /> Send the invitation by e-mail now</label>}
@@ -457,13 +458,13 @@ function Setup({ status, onChanged }: { status: RemoteStatus; onChanged: () => v
         <div className="rs-install">
           <div>
             <h4><span className="ico-tile"><Icon name="cycle" size={16} /></span> With the Zentriq Agent</h4>
-            <p>Select devices on <Link to="/remote?tab=devices">Unattended devices</Link> and click <b>Install</b> — done at their next check-in.</p>
+            <p>Select devices on <Link to="/remote?tab=devices">Unattended devices</Link> and click <UiBtn>Install</UiBtn> — done at their next check-in.</p>
           </div>
           <div>
             <h4><span className="ico-tile"><Icon name="down" size={16} /></span> Windows installer</h4>
             <p>Run as administrator, or deploy with Group Policy or Intune.</p>
             <button className="btn sm" disabled={!status.running} onClick={() => void download()}>Download ZentriqRemoteSupport.exe</button>
-            <CopyBox label="Silent install command" value="ZentriqRemoteSupport.exe -fullinstall" />
+            <Command shell="Command Prompt (Administrator)" label="Silent install command" value="ZentriqRemoteSupport.exe -fullinstall" />
           </div>
           <div>
             <h4><span className="ico-tile"><Icon name="link" size={16} /></span> Install link — Windows, macOS, Linux</h4>

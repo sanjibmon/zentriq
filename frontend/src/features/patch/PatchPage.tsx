@@ -11,6 +11,7 @@ import { Modal } from '../../components/Modal';
 import { Callout, DataTable, ErrorBox, fmt, Kpis, PageHead, Panel, Pill, type Tone } from '../../components/ui';
 import { errText } from '../deployment/types';
 import { describeTargets, emptyTargets, stateOf, TargetPicker, targetsEmpty, targetsOf, type TargetState, type Targets } from './Targets';
+import { HelpSteps, Step, UiBtn, UiPath } from '../../components/Help';
 
 // ---- types ----------------------------------------------------------------------------------------------------------
 
@@ -120,11 +121,11 @@ function OverviewTab({ s, canDeploy, changed, failed, deploy }: Ctx & { s: Summa
   return (
     <div className="grid-2">
       <Panel title="How It Works" sub="Windows Update Agent on Windows; apt, dnf, yum or zypper on Linux">
-        <ol className="steps-v" style={{ margin: 0, paddingLeft: 18, display: 'grid', gap: 8, fontSize: 13.5 }}>
-          <li><b>Scan.</b> Every device with the Zentriq Agent looks for missing updates {s.settings.autoScan ? `every ${s.settings.scanHours} h` : 'when you ask (automatic scans are off)'}, from its own update source (Windows Update, WSUS or its repositories).</li>
-          <li><b>Review.</b> <i>Missing Updates</i> lists each update with its classification, severity, CVEs and the devices that need it. Approve or decline.</li>
-          <li><b>Deploy.</b> Install now on chosen devices, or let <i>Automatic Deployment</i> install them in a maintenance window, with or without a restart.</li>
-        </ol>
+        <HelpSteps>
+          <Step title="Scan">Every device with the Zentriq Agent looks for missing updates {s.settings.autoScan ? `every ${s.settings.scanHours} h` : 'when you ask (automatic scans are off)'}, from its own update source (Windows Update, WSUS or its repositories).</Step>
+          <Step title="Review"><UiPath>Missing Updates</UiPath> lists each update with its classification, severity, CVEs and the devices that need it. <UiBtn>Approve</UiBtn> or <UiBtn>Decline</UiBtn>.</Step>
+          <Step title="Deploy">Install now on chosen devices, or let <UiPath>Automatic Deployment</UiPath> install them in a maintenance window, with or without a restart.</Step>
+        </HelpSteps>
         {canDeploy && <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
           <button className="btn" disabled={busy} onClick={() => void scanAll()}><Icon name="retry" size={14} /> {busy ? 'Asking…' : 'Scan All Devices'}</button>
           <button className="btn primary" onClick={() => deploy({ allMissing: true, classifications: ['critical', 'security'] })}><Icon name="patch" size={14} /> Install Critical & Security Updates</button>

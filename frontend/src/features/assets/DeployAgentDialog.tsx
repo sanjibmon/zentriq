@@ -5,6 +5,7 @@ import { useApi } from '../../app/useApi';
 import { CopyBox } from '../../components/CopyBox';
 import { Callout } from '../../components/ui';
 import { errorText } from '../discovery/DirectoryPanel';
+import { Command, HelpSteps, Note, Step, UiBtn, UiPath, Val } from '../../components/Help';
 
 type Tool = 'intune' | 'sccm' | 'gpo' | 'manual';
 
@@ -87,7 +88,7 @@ exit $p.ExitCode
             </label>
             <div style={{ alignSelf: 'end' }}><button type="button" className="btn" onClick={() => void createCode()}>New code for this rollout</button></div>
           </div>
-          {code && <small className="muted">Devices will connect to <span className="mono">{code.serverUrl}</span> — it must be reachable from them (TCP 8444).</small>}
+          {code && <small className="muted">Devices will connect to <Val>{code.serverUrl}</Val> — it must be reachable from them (TCP 8444).</small>}
           <div className="seg" role="tablist">
             {([['gpo', 'Group Policy'], ['intune', 'Microsoft Intune'], ['sccm', 'Configuration Manager'], ['manual', 'Manual / script']] as [Tool, string][]).map(([k, l]) => (
               <button key={k} type="button" className={tool === k ? 'on' : ''} onClick={() => setTool(k)}>{l}</button>
@@ -95,37 +96,38 @@ exit $p.ExitCode
           </div>
           {tool === 'gpo' && (
             <>
-              <ol className="plain" style={{ listStyle: 'decimal', paddingLeft: 18, display: 'grid', gap: 4, margin: 0 }}>
-                <li>Copy <a href="/downloads/ZentriqAgent-x64.msi" download>ZentriqAgent-x64.msi</a> to a share that <i>Domain Computers</i> can read.</li>
-                <li>Enter that path below and download the startup script.</li>
-                <li>In Group Policy Management, create a GPO on the computers' OU: <i>Computer Configuration › Policies › Windows Settings › Scripts › Startup › PowerShell Scripts</i> › add the script.</li>
-                <li>Computers install the agent at their next restart (or run <span className="mono">gpupdate /force</span> and restart). They appear under <i>Agents</i> a minute later.</li>
-              </ol>
+              <HelpSteps>
+                <Step title="Put the installer on a share">Copy <a href="/downloads/ZentriqAgent-x64.msi" download>ZentriqAgent-x64.msi</a> to a share that <Val>Domain Computers</Val> can read.</Step>
+                <Step title="Download the startup script">Enter that path below and download the script.</Step>
+                <Step title="Add it to a GPO">In Group Policy Management, create a GPO on the computers' OU, open <UiPath>Computer Configuration › Policies › Windows Settings › Scripts › Startup › PowerShell Scripts</UiPath> and add the script.</Step>
+                <Step title="Restart the computers">They install the agent at their next restart and appear under <UiPath>Agents</UiPath> a minute later. To apply the policy at once:
+                  <Command value="gpupdate /force" shell="Command Prompt (Administrator)" label="Apply Group Policy now" /></Step>
+              </HelpSteps>
               <label>MSI on the share <input className="in mono" value={share} onChange={(e) => setShare(e.target.value)} /></label>
               <div><button type="button" className="btn primary" disabled={!code} onClick={() => download('Install-ZentriqAgent.ps1', gpoScript)}>Download startup script</button></div>
             </>
           )}
           {tool === 'intune' && (
-            <ol className="plain" style={{ listStyle: 'decimal', paddingLeft: 18, display: 'grid', gap: 6, margin: 0 }}>
-              <li>Intune admin center › <i>Apps › Windows › Add › Line-of-business app</i> › upload <a href="/downloads/ZentriqAgent-x64.msi" download>ZentriqAgent-x64.msi</a>.</li>
-              <li>App information › <i>Command-line arguments</i>:<CopyBox value={`ENROLLMENTCODE="${c}"`} label="Intune command-line arguments" rows={2} /></li>
-              <li>Assign it as <i>Required</i> to your device group. Devices install it at their next Intune sync.</li>
-            </ol>
+            <HelpSteps>
+              <Step title="Add the app">In the Intune admin center open <UiPath>Apps › Windows › Add › Line-of-business app</UiPath> and upload <a href="/downloads/ZentriqAgent-x64.msi" download>ZentriqAgent-x64.msi</a>.</Step>
+              <Step title="Enter the command-line arguments">In <UiPath>App information › Command-line arguments</UiPath>:<CopyBox value={`ENROLLMENTCODE="${c}"`} label="Intune command-line arguments" rows={2} /></Step>
+              <Step title="Assign it">Assign it as <UiBtn>Required</UiBtn> to your device group. Devices install it at their next Intune sync.</Step>
+            </HelpSteps>
           )}
           {tool === 'sccm' && (
-            <ol className="plain" style={{ listStyle: 'decimal', paddingLeft: 18, display: 'grid', gap: 6, margin: 0 }}>
-              <li>Create an application (Windows Installer) from <a href="/downloads/ZentriqAgent-x64.msi" download>ZentriqAgent-x64.msi</a> on your content share.</li>
-              <li>Installation program:<CopyBox value={`msiexec /i "ZentriqAgent-x64.msi" ${msiArgs}`} label="Install command" rows={2} /></li>
-              <li>Detection: Windows Installer product code (filled in by the wizard). Deploy as <i>Required</i> to a collection built from the CSV above.</li>
-            </ol>
+            <HelpSteps>
+              <Step title="Create the application">Type Windows Installer, from <a href="/downloads/ZentriqAgent-x64.msi" download>ZentriqAgent-x64.msi</a> on your content share.</Step>
+              <Step title="Set the installation program"><Command value={`msiexec /i "ZentriqAgent-x64.msi" ${msiArgs}`} shell="Installation program" label="Install command" /></Step>
+              <Step title="Deploy it">Detection: the Windows Installer product code (the wizard fills it in). Deploy as <UiBtn>Required</UiBtn> to a collection built from the CSV above.</Step>
+            </HelpSteps>
           )}
           {tool === 'manual' && (
             <>
-              <p style={{ margin: 0 }}>Elevated command prompt on the device, in the folder with the MSI:</p>
-              <CopyBox value={`msiexec /i ZentriqAgent-x64.msi ${msiArgs}`} label="Install command" rows={2} />
+              <p style={{ margin: 0 }}>On the device, in the folder with the MSI:</p>
+              <Command value={`msiexec /i ZentriqAgent-x64.msi ${msiArgs}`} shell="Command Prompt (Administrator)" label="Install command" />
             </>
           )}
-          <small className="muted">Treat the enrollment code like a password: anyone who has it can enroll a device until it expires or reaches its device limit. Revoke it under Agents › Enrollment codes when the rollout is done.</small>
+          <Note tone="important">Treat the enrollment code like a password: anyone who has it can enroll a device until it expires or reaches its device limit. Revoke it under <UiPath>Agents › Enrollment codes</UiPath> when the rollout is done.</Note>
         </div>
         <footer><button type="button" className="btn" onClick={onClose}>Close</button></footer>
       </div>

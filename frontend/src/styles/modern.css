@@ -793,3 +793,34 @@ input[type=file].in { height: auto; padding: 7px 10px; }
 .day-chip input { margin: 0; }
 .seg .seg-n { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 9px; font-size: 11px; background: rgba(127, 127, 127, .18); }
 .seg button.on .seg-n { background: rgba(255, 255, 255, .25); }
+
+/* ---- Help text (components/Help.tsx): steps, where to click, buttons, values, commands, notes ---- */
+.help-steps { list-style: none; counter-reset: hs; margin: 0; padding: 0; display: grid; gap: 12px; }
+.help-steps > li { counter-increment: hs; display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 10px; align-items: start; }
+.help-steps > li::before { content: counter(hs); width: 24px; height: 24px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: 12px; display: grid; place-items: center; }
+.help-step { min-width: 0; padding-top: 2px; }
+.help-step-t { display: block; font-weight: 600; color: var(--fg); }
+.help-step-d { color: var(--muted); font-size: 13px; line-height: 1.55; }
+.help-step-d > * + * { margin-top: 6px; }
+.help-step-d .copybox { margin-top: 6px; }
+.ui-path { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 5px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px; padding: 0 7px; font-size: 12.5px; font-weight: 500; color: var(--fg); line-height: 20px; vertical-align: baseline; }
+.ui-path > i { font-style: normal; color: var(--faint); }
+.ui-path a { color: var(--accent); }
+.ui-btn { display: inline-block; border: 1px solid var(--line-strong); border-bottom-width: 2px; border-radius: 5px; padding: 0 7px; font-size: 12px; font-weight: 600; color: var(--fg); background: var(--surface); line-height: 19px; white-space: nowrap; }
+.ui-val { font-family: var(--mono); font-size: 12px; background: var(--accent-soft); color: var(--accent); border-radius: 4px; padding: 1px 5px; word-break: break-all; }
+.help-cmd { background: #0E1A23; color: #DCE6EC; border-radius: 8px; font-family: var(--mono); font-size: 12.5px; overflow: hidden; margin-top: 6px; border: 1px solid #1d2c37; }
+.help-cmd-h { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 5px 8px 5px 10px; background: #15242F; color: #8FA2B0; font-family: var(--font); font-size: 11.5px; }
+.help-cmd-h > span { display: inline-flex; align-items: center; gap: 6px; }
+.help-cmd-h button { display: inline-flex; align-items: center; gap: 4px; background: transparent; border: 1px solid #33495A; color: #C9D5DD; border-radius: 5px; font-size: 11px; padding: 2px 8px; cursor: pointer; font-family: var(--font); }
+.help-cmd-h button:hover { background: #1f3340; }
+.help-cmd pre { margin: 0; padding: 9px 12px; white-space: pre-wrap; word-break: break-all; font-family: inherit; color: inherit; background: none; }
+.help-cmd-p { color: #5FC4D3; user-select: none; }
+.help-note { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; align-items: start; border-left: 3px solid var(--info); background: var(--info-soft); padding: 8px 12px; border-radius: 0 8px 8px 0; font-size: 13px; color: var(--fg); }
+.help-note > svg { margin-top: 2px; color: var(--info); }
+.help-note.important { border-left-color: var(--warn); background: var(--warn-soft); }
+.help-note.important > svg { color: var(--warn); }
+.help-note b { display: block; }
+.help-cmd-l { display: grid; gap: 2px; font-size: 13px; }
+.help-step-d label, .help-step-d .btn, .help-step-d input { color: var(--fg); }
+.help-step-d p { margin: 0; }
+.callout .help-steps { margin-top: 2px; }

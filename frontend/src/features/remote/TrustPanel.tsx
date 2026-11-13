@@ -1,8 +1,8 @@
 import { api } from '../../api/client';
 import { useApi } from '../../app/useApi';
-import { CopyBox } from '../../components/CopyBox';
 import { Icon } from '../../components/Icon';
 import { Panel, Pill } from '../../components/ui';
+import { Command, UiPath, Val } from '../../components/Help';
 
 interface TrustInfo {
   mode: 'local-ca' | 'customer' | 'self-signed';
@@ -29,8 +29,8 @@ export function TrustPanel() {
             the server's address.
           </p>
           <div><a className="btn" href="/api/v1/trust/ca.cer" download="Zentriq-Local-CA.cer"><Icon name="down" size={13} /> Download Zentriq Local CA certificate</a></div>
-          <CopyBox label="Install on a PC (PowerShell as administrator)" value="Import-Certificate -FilePath .\Zentriq-Local-CA.cer -CertStoreLocation Cert:\LocalMachine\Root" />
-          <small className="muted">For many PCs, publish it with Group Policy: Computer Configuration › Policies › Windows Settings › Security Settings › Public Key Policies › Trusted Root Certification Authorities › Import. Firefox: enable <span className="mono">security.enterprise_roots.enabled</span>.</small>
+          <div className="help-cmd-l">Install on a PC<Command shell="PowerShell (Administrator)" label="Install the CA certificate" value={'Import-Certificate -FilePath .\\Zentriq-Local-CA.cer -CertStoreLocation Cert:\\LocalMachine\\Root'} /></div>
+          <small className="muted">For many PCs, publish it with Group Policy: <UiPath>Computer Configuration › Policies › Windows Settings › Security Settings › Public Key Policies › Trusted Root Certification Authorities › Import</UiPath>. Firefox: enable <Val>security.enterprise_roots.enabled</Val>.</small>
           {t.certificate && (
             <dl className="kv-grid" style={{ margin: 0 }}>
               <div><dt>Covers names</dt><dd className="mono">{t.certificate.names.join(', ') || '—'}</dd></div>

@@ -14,6 +14,7 @@ import {
   appliesLabel, RESULT_LABEL, resultTone, SCORE_COLOR, secSevTone,
   type BaselineDetail, type BaselineSummary, type DeviceScore, type RuleDetail, type SecException, type SecOverview, type SecRule,
 } from './types';
+import { UiPath } from '../../components/Help';
 
 type Tab = 'overview' | 'checks' | 'devices' | 'baselines' | 'exceptions';
 const TABS: [Tab, string][] = [['overview', 'Overview'], ['checks', 'Checks'], ['devices', 'Devices'], ['baselines', 'Baselines'], ['exceptions', 'Exceptions']];
@@ -440,7 +441,7 @@ function Exceptions() {
   }
   return (
     <>
-      <Callout tone="info" icon="info">Exceptions are added from a check (Checks › a check › Exception…). They are reviewed when they expire; expired exceptions no longer apply.</Callout>
+      <Callout tone="info" icon="info">Exceptions are added from a check (<UiPath>Checks › a check › Exception…</UiPath>). They are reviewed when they expire; expired exceptions no longer apply.</Callout>
       <Panel flush title="Exceptions">
         <ErrorBox error={list.error} />
         <DataTable rows={list.data ?? []} empty="No exceptions." columns={[

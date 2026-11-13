@@ -14,6 +14,7 @@ import { ManageOrgDialog, useAddLocation, useLocations } from '../locations/Loca
 import { ItemDialog, MovementDialog, type MovementPreset } from './AccessoryDialogs';
 import { CategoriesDialog } from './CategoriesDialog';
 import { KIND, money, type AccessoryItem, type AccessorySummary, type Holding, type MovementKind, type MovementRow, type StockRow } from './types';
+import { UiPath } from '../../components/Help';
 
 type Tab = 'stock' | 'issued' | 'movements' | 'catalogue';
 
@@ -252,7 +253,7 @@ function MovementsTab({ tick }: { tick: number }) {
         <DataTable rows={list.data?.items ?? []} columns={columns} empty={list.loading ? 'Loading…' : 'No movements in this period.'} />
         {list.data && <Pager page={page} pageSize={pageSize} total={list.data.total} onPage={setPage} />}
       </Panel>
-      <p className="faint" style={{ fontSize: 12 }}>Reports › IT accessory movements and IT accessory stock give the same data with any columns, grouping and export.</p>
+      <p className="faint" style={{ fontSize: 12 }}><UiPath>Reports › IT accessory movements</UiPath> and <UiPath>Reports › IT accessory stock</UiPath> give the same data with any columns, grouping and export.</p>
     </>
   );
 }

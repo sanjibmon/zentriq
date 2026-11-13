@@ -6,6 +6,7 @@ import { Icon } from '../../components/Icon';
 import { Callout, DataTable, ErrorBox, Panel, Pill } from '../../components/ui';
 import { CopyBox } from '../../components/CopyBox';
 import type { GroupRow, RoleRow } from './RoleDialogs';
+import { HelpSteps, Step, UiPath, Val } from '../../components/Help';
 
 interface LdapCfg { enabled: boolean; host: string; port: number; ldaps: boolean; verifyCertificate: boolean; dcName: string | null; baseDn: string | null; domain: string | null; createUsers: boolean }
 interface EntraCfg { enabled: boolean; tenantId: string; clientId: string; createUsers: boolean; secretStored: boolean }
@@ -93,11 +94,11 @@ export function SignInTab({ roles, groups = [], onChanged }: { roles: RoleRow[];
           right={<Pill tone={d.entra.enabled ? 'ok' : ''}>{d.entra.enabled ? 'On' : 'Off'}</Pill>}>
           <div className="form-v">
             <label className="row-check"><input type="checkbox" checked={entra.enabled} onChange={(e) => setEntra({ ...entra, enabled: e.target.checked })} /> Allow Sign In With Microsoft</label>
-            <ol className="faint" style={{ fontSize: 12.5, paddingLeft: 18, margin: 0 }}>
-              <li>Entra admin center › App registrations › New registration (single tenant). Platform <b>Web</b>, redirect URI below.</li>
-              <li>Token configuration › Add groups claim (Security groups, Group ID) — or define app roles and assign them.</li>
-              <li>Certificates &amp; secrets › New client secret; copy its value here.</li>
-            </ol>
+            <HelpSteps>
+              <Step title="Register the app">In the Entra admin center: <UiPath>App registrations › New registration</UiPath> (single tenant), platform <Val>Web</Val>, with the redirect URI below.</Step>
+              <Step title="Send the groups"><UiPath>Token configuration › Add groups claim</UiPath> (Security groups, Group ID), or define app roles and assign them.</Step>
+              <Step title="Create a secret"><UiPath>Certificates &amp; secrets › New client secret</UiPath>, and copy its value here.</Step>
+            </HelpSteps>
             <CopyBox label="Redirect URI (one per console address you use)" value={d.redirectUri} />
             <div className="form-grid-2">
               <label>Directory (tenant) ID <input className="in mono" value={entra.tenantId} onChange={(e) => setEntra({ ...entra, tenantId: e.target.value })} placeholder="00000000-0000-0000-0000-000000000000" /></label>

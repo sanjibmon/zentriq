@@ -7,6 +7,7 @@ import { Icon } from '../../components/Icon';
 import { LogoMark, PRODUCT } from '../../components/Logo';
 import { CompanyLogo } from '../../components/CompanyLogo';
 import { BrandArt } from './BrandArt';
+import { Command, HelpSteps, Step, UiPath } from '../../components/Help';
 
 export function LoginPage() {
   const { refresh } = useAuth();
@@ -105,10 +106,11 @@ export function LoginPage() {
           {resetByEmail === false ? (
             <>
               <p className="muted">Password reset by e-mail is not set up on this server.</p>
-              <ul className="plain muted" style={{ fontSize: 13 }}>
-                <li>Ask a Zentriq administrator to set a new password for you in <i>Users, Roles &amp; Sites</i>.</li>
-                <li>If you are the only administrator, sign in to the Zentriq server and run in an elevated prompt:<br /><span className="mono">zentriqctl reset-password --email you@company.com</span></li>
-              </ul>
+              <HelpSteps>
+                <Step title="Ask an administrator">A Zentriq administrator can set a new password for you in <UiPath>Users, Roles &amp; Groups</UiPath>.</Step>
+                <Step title="Only administrator?">Sign in to the Zentriq server and run:
+                  <Command value="zentriqctl reset-password --email you@company.com" shell="Command Prompt (Administrator)" label="Reset password" /></Step>
+              </HelpSteps>
             </>
           ) : (
             <>

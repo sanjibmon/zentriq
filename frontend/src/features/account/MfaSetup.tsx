@@ -4,6 +4,7 @@ import type { MfaEnrollment } from '../../api/types';
 import { Callout } from '../../components/ui';
 import { CopyBox } from '../../components/CopyBox';
 import { errorText } from '../discovery/DirectoryPanel';
+import { HelpSteps, Step, UiBtn, UiPath } from '../../components/Help';
 
 /** Authenticator-app enrollment: QR code (Microsoft Authenticator, Google Authenticator, …), then confirm with a code. */
 export function MfaSetup({ onDone }: { onDone: () => void }) {
@@ -34,10 +35,10 @@ export function MfaSetup({ onDone }: { onDone: () => void }) {
   return (
     <form className="form-v" onSubmit={confirm}>
       {error && <Callout tone="crit" icon="alert">{error}</Callout>}
-      <ol className="plain" style={{ paddingLeft: 18, listStyle: 'decimal', margin: 0, display: 'grid', gap: 6 }}>
-        <li>Open Microsoft Authenticator or Google Authenticator and choose <i>Add account</i> → <i>Other account</i> / <i>Scan a QR code</i>.</li>
-        <li>Scan this code:</li>
-      </ol>
+      <HelpSteps>
+        <Step title="Open your authenticator app">Microsoft Authenticator or Google Authenticator: <UiPath>Add account › Other account</UiPath> or <UiBtn>Scan a QR code</UiBtn>.</Step>
+        <Step title="Scan this code" />
+      </HelpSteps>
       <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap' }}>
         <div className="qr" role="img" aria-label="QR code for your authenticator app" style={{ background: '#fff', padding: 8, borderRadius: 8, width: 212, height: 212, border: '1px solid var(--line)' }}
           dangerouslySetInnerHTML={{ __html: enrollment.qrSvg.replace(/<svg /, '<svg width="196" height="196" ') }} />

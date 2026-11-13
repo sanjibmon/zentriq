@@ -9,6 +9,7 @@ import { Icon } from '../../components/Icon';
 import { Callout, DataTable, ErrorBox, fmt, Loading, PageHead, Pager, Panel, Pill } from '../../components/ui';
 import { DestinationDialog, PasswordDialog, RestoreDialog } from './BackupDialogs';
 import { errText, TRIGGERS, WEEKDAYS, type BackupOverview, type BackupRun, type Destination, type Schedule } from './types';
+import { HelpSteps, Step, UiPath } from '../../components/Help';
 
 type Msg = { tone: 'ok' | 'crit' | 'info' | 'warn'; text: string } | null;
 
@@ -125,13 +126,13 @@ function Overview({ data, admin, reload, setMsg, onRestoreFrom }: { data: Backup
       </Panel>
 
       <Panel title="Disaster recovery" sub="Rebuilding after the server is lost">
-        <ol className="dr-steps">
-          <li>Install Zentriq on the new server (same or newer version) with the Standard or Advanced setup, and sign in with the new administrator.</li>
-          <li>Open <b>Backup &amp; Restore › Restore…</b>: upload the latest backup, or add the same destination again and pick the backup there.</li>
-          <li>Enter the <b>backup password</b> (or paste the old server's recovery key). Zentriq replaces the data and restarts by itself.</li>
-          <li>Sign in with an account from the backup. Agents reconnect by themselves when the server keeps its name or IP address, or when the
-            DNS name they use points to the new server; the certificate key, agent CA and MFA keys come back with the backup.</li>
-        </ol>
+        <HelpSteps>
+          <Step title="Install Zentriq on the new server">Same or newer version, Standard or Advanced setup; sign in with the new administrator.</Step>
+          <Step title="Restore the backup">Open <UiPath>Backup &amp; Restore › Restore…</UiPath>: upload the latest backup, or add the same destination again and pick the backup there.</Step>
+          <Step title="Unlock it">Enter the backup password (or paste the old server's recovery key). Zentriq replaces the data and restarts by itself.</Step>
+          <Step title="Sign in again">Sign in with an account from the backup. Agents reconnect by themselves when the server keeps its name or IP address, or when the
+            DNS name they use points to the new server; the certificate key, agent CA and MFA keys come back with the backup.</Step>
+        </HelpSteps>
       </Panel>
 
       {editing && <DestinationDialog dest={editing === 'new' ? null : editing} onClose={() => setEditing(null)} onSaved={(t) => { setEditing(null); setMsg({ tone: 'ok', text: t }); reload(); }} />}
