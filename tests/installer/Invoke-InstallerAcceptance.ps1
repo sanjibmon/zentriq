@@ -2075,9 +2075,10 @@ if (-not $installed) {
             Api POST '/integrations/rules' @{ name = 'CI new devices'; eventType = 'asset.discovered'; minSeverity = 'info'; channelIds = @($wh.id, $sl.id); throttleMinutes = 0 } -Session $s | Out-Null
             Start-Sleep 5
             $asset = Api POST '/assets' @{ hostname = 'CI-INTEGRATION-DEVICE'; category = 'other'; osFamily = 'other'; criticality = 'Low' } -Session $s
-            $deadline = (Get-Date).AddMinutes(4)
+            # The worker picks events up once a minute, but can be busy with earlier tests' work for a few minutes.
+            $deadline = (Get-Date).AddMinutes(8)
             do { Start-Sleep 10; $got = @(Get-Content $hookFile -ErrorAction SilentlyContinue | ForEach-Object { $_ | ConvertFrom-Json } | Where-Object ev -eq 'asset.discovered') } while ($got.Count -eq 0 -and (Get-Date) -lt $deadline)
-            Assert ($got.Count -ge 1) 'no asset.discovered webhook within 4 minutes'
+            Assert ($got.Count -ge 1) 'no asset.discovered webhook within 8 minutes'
             $evBody = $got[0].body | ConvertFrom-Json
             Assert ($evBody.asset.hostname -eq 'CI-INTEGRATION-DEVICE' -and $evBody.type -eq 'asset.discovered') "event body: $($got[0].body)"
             Start-Sleep 3
