@@ -1,6 +1,40 @@
 # Test report
 
-Latest: GitHub Actions run 43396329750, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022
+Latest: GitHub Actions run 43469315922, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022
+Datacenter 10.0.20348** VM set to India Standard Time plus an Ubuntu job for the Linux agent. Release:
+`v1.1.1-build.141` (pre-release, **unsigned**), package version **1.1.1.141**, commit `097b27c`. Results: unit +
+PostgreSQL integration tests **508 PASS** (510, 2 skipped); installer acceptance **93 passed, 0 failed** (10 not run:
+need hardware, a domain, a reboot or old Windows); upgrade suites **14/14** (schema 45); Linux agent on 11
+distributions **11/11**.
+
+New in build 141: help text in the console has its own look for each kind of thing — numbered steps with a title,
+menu paths as chips, button names, values and file names, commands in a terminal box with a Copy button, tips and
+warnings — instead of bold text everywhere. Build 140 (same product code) was not released: acceptance T54 waited
+only 4 minutes for an alert that the busy worker sent after 4 min 15 s; the test now waits up to 8 minutes.
+
+| File | SHA256 |
+|---|---|
+| Zentriq-Setup-x64.exe | `8a17ad33052a4bdf4f368371738f6b9e63b496a6847b9c49b0356fe8c16631fc` |
+| Zentriq.msi | `39dabdda8a91319fedce2a7ba3090c67bde7c7b97800e9c8dabec5874a2dc8ef` |
+| ZentriqAgent-x64.msi | `c60e8ffdd5acc86b014895466e919befca3659e5ef48014d80240a31e5fd7a9b` |
+| zentriq-agent-linux-x64.deb | `30dfb4e6ccd56e8054a755e0db7ff371eec0301e743a72e132e002dece922356` |
+| zentriq-agent-linux-x64.rpm | `16f326194b383adb5c2af47ab7601ecc66349e05f93478b4ee2b667e36cf35a9` |
+| zentriq-agent-linux-x64.tar.gz | `a997992e6a6029be6080eec614553f7e5543dbc28ac614eb5c030384075bb128` |
+| zentriq-agent-linux-arm64.deb | `be4420e00eccbcb6df6b0132adf4014122ebc2ae4b9b0cf690e4581f5006d232` |
+| zentriq-agent-linux-arm64.rpm | `689f5c21df8afde941ead8f576fe451c850e100d1dabff07948d9858424da13e` |
+| zentriq-agent-linux-arm64.tar.gz | `04a7b1af5f18d31c4c5b3e250c9795b818b8d3e27680f2c2ecefa7f0db664528` |
+| Zentriq-1.1.1-msi-offline-kit.zip | `24d720c65e784c08f00cb0cfa036e3e7c753200edc17fa6ce9203e8e30ae68c4` |
+| Zentriq-1.1.1-docs.zip | `042dad2ada184de628e525f3f938e045b87a810dd86754947c81509c185e0d9f` |
+
+## Build 139
+
+GitHub Actions run 43434856768, commit `aa048df`, release `v1.1.1-build.139`: unit + integration **508 PASS**,
+acceptance **93 passed, 0 failed**, upgrades **14/14**, Linux **11/11**. Sign-in page: the Zentriq logo above the
+organization's logo; the Zentriq / directory account switch centred.
+
+## Build 138
+
+GitHub Actions run 43396329750, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022
 Datacenter 10.0.20348** VM set to India Standard Time plus an Ubuntu job for the Linux agent. Release:
 `v1.1.1-build.138` (pre-release, **unsigned**), package version **1.1.1.138**, commit `0836fda`. Results: unit +
 PostgreSQL integration tests **508 PASS** (510, 2 skipped); installer acceptance **93 passed, 0 failed** (10 not run:
