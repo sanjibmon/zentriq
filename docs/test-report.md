@@ -1,6 +1,34 @@
 # Test report
 
-Latest: GitHub Actions run 43266189157, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022
+Latest: GitHub Actions run 43375071807, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022
+Datacenter 10.0.20348** VM set to India Standard Time plus an Ubuntu job for the Linux agent. Release:
+`v1.1.1-build.137` (pre-release, **unsigned**), package version **1.1.1.137**, commit `395c2ed`. Results: unit +
+PostgreSQL integration tests **492 PASS** (494, 2 skipped); installer acceptance **92 passed, 0 failed** (10 not run:
+need hardware, a domain, a reboot or old Windows); upgrade suites **14/14** (schema 44); Linux agent on 11
+distributions **11/11**.
+
+New in build 137: the agent list has a search box, 50 agents per page, and actions on selected agents (Update,
+Collect inventory, Schedule); the Active Directory / LDAP connection test names the cause when it fails (port closed,
+LDAPS chosen on plain-LDAP port 389, no LDAPS certificate on the domain controller, untrusted certificate, name
+mismatch, wrong user name or password); saving refuses LDAPS on 389/3268 and LDAP on 636/3269.
+
+| File | SHA256 |
+|---|---|
+| Zentriq-Setup-x64.exe | `39a0f96e7e4b99abefd9bd6e849b54f2b96cf04a21d9933a0bdb14924537034b` |
+| Zentriq.msi | `0c96b23164628daff6c210c57cf5b925ffdb3cf33282023097d98bba3fe73507` |
+| ZentriqAgent-x64.msi | `a2564ff3ad0d55b1c75d5162ba16836c14f4c0e8cc0f5069f06a80aef44c62cb` |
+| zentriq-agent-linux-x64.deb | `f7e794b71925c466ca1411df6aa55dfedbad0e04eb68fd93970f54ad2f033fb3` |
+| zentriq-agent-linux-x64.rpm | `9802800a636491e9a9035af02a12df04f8b73b663119557e47636e4b6b6a8acf` |
+| zentriq-agent-linux-x64.tar.gz | `240fc6b76b26fbe4af6e10649b1894e2ab42233c1850da703ea48e347b6a2d66` |
+| zentriq-agent-linux-arm64.deb | `d6af54f85bb75204927b7648ece52b413e21f04adfc1cac961e4f97a6dc0bc30` |
+| zentriq-agent-linux-arm64.rpm | `7f1ce57b607ee1d082ee6a949cfc3cd82a3a5f099873b727af8e39d28aa492cc` |
+| zentriq-agent-linux-arm64.tar.gz | `d3ce3d9278df5306084b17b1c1d7e88dd318ec20b6f7a2dd56272b4fbc8fef9c` |
+| Zentriq-1.1.1-msi-offline-kit.zip | `6a25234b3ce0a21f72736ee7cd4437b12b3fff990cdf083f71f39057dc628d6d` |
+| Zentriq-1.1.1-docs.zip | `3773fa88d58f1d70c2a19d4439ddb8f32fdc9fc48c486cd1036c93fff415ef15` |
+
+## Build 136
+
+GitHub Actions run 43266189157, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022
 Datacenter 10.0.20348** VM set to India Standard Time plus an Ubuntu job for the Linux agent. Release:
 `v1.1.1-build.136` (pre-release, **unsigned**), package version **1.1.1.136**, commit `b22364a`. Results: unit +
 PostgreSQL integration tests **492 PASS** (494, 2 skipped); installer acceptance **92 passed, 0 failed** (10 not run:
