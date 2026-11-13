@@ -55,7 +55,7 @@ public static class DirectoryClient
         {
             conn.SessionOptions.SecureSocketLayer = true;
             var expected = string.IsNullOrWhiteSpace(s.DcName) ? null : s.DcName.Trim();
-            conn.SessionOptions.VerifyServerCertificate = (_, cert) =>
+            conn.SessionOptions.VerifyServerCertificate = (_c, cert) =>
             {
                 certSeen = true;
                 if (!s.VerifyCertificate) return true;
