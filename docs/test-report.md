@@ -1,6 +1,33 @@
 # Test report
 
-Latest: GitHub Actions run 43375071807, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022
+Latest: GitHub Actions run 43396329750, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022
+Datacenter 10.0.20348** VM set to India Standard Time plus an Ubuntu job for the Linux agent. Release:
+`v1.1.1-build.138` (pre-release, **unsigned**), package version **1.1.1.138**, commit `0836fda`. Results: unit +
+PostgreSQL integration tests **508 PASS** (510, 2 skipped); installer acceptance **93 passed, 0 failed** (10 not run:
+need hardware, a domain, a reboot or old Windows); upgrade suites **14/14** (schema 45); Linux agent on 11
+distributions **11/11**.
+
+New in build 138: sign-out after inactivity (Settings › Security, 0-720 minutes, default 30): typing, clicking or
+scrolling in any console tab is activity, pages refreshing on their own are not; warning one minute before; enforced by
+the server from the idle time each request reports (T102).
+
+| File | SHA256 |
+|---|---|
+| Zentriq-Setup-x64.exe | `dd6bc652817a844bc0750af67226de5fcafe5f071d7e1c223647064dab90de46` |
+| Zentriq.msi | `e96b087f75b115a9b72d34fef263b4ed8c50619635a6f9360c514dfd5535fa48` |
+| ZentriqAgent-x64.msi | `67a9e03b0cac22999233ec179e8074e0202f10d6b529457f07df4d6e66beab72` |
+| zentriq-agent-linux-x64.deb | `d31e1860e72359f97fe81f01d8da45382ba41d8b936c8734c4be8ddbc591ffad` |
+| zentriq-agent-linux-x64.rpm | `f86a52e610ad3b2c2710e9a13537a1bd8ada6ea287545b7f17c0abf542b966bb` |
+| zentriq-agent-linux-x64.tar.gz | `509e34224cec82f14c89dc003d58f4b3b537cb90d44a21eab5bdbda1711f3b22` |
+| zentriq-agent-linux-arm64.deb | `49520f42b52ee81ac20e286a2f00d1099be8777e73e7f408557291cef2d1a10e` |
+| zentriq-agent-linux-arm64.rpm | `573da9c28a96b6b8f68482d7b00c0e371c19a009e812ff2c6391a94638338574` |
+| zentriq-agent-linux-arm64.tar.gz | `26a196848b3fe221567157348c9d3110080e63f2a0959bc714c6e6a0520edd6f` |
+| Zentriq-1.1.1-msi-offline-kit.zip | `99a7788cfb3171fa96047f82c848d5297cccd380addfd476a8adb9aca38d80ed` |
+| Zentriq-1.1.1-docs.zip | `df316d63991c9fc9c8cc48e0304cf87714e331a366de73d0e7fb52c318b3a617` |
+
+## Build 137
+
+GitHub Actions run 43375071807, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022
 Datacenter 10.0.20348** VM set to India Standard Time plus an Ubuntu job for the Linux agent. Release:
 `v1.1.1-build.137` (pre-release, **unsigned**), package version **1.1.1.137**, commit `395c2ed`. Results: unit +
 PostgreSQL integration tests **492 PASS** (494, 2 skipped); installer acceptance **92 passed, 0 failed** (10 not run:
