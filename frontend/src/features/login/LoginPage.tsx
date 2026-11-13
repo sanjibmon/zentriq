@@ -100,7 +100,7 @@ export function LoginPage() {
       <section className="login-panel">
         {forgot ? (
         <form className="login-card" onSubmit={sendReset} noValidate>
-          <div className="login-card-logo"><CompanyLogo height={44} /><LogoMark size={40} /></div>
+          <div className="login-card-logo"><LogoMark size={40} /><CompanyLogo className="login-company-logo" height={40} /></div>
           <h1>Reset password</h1>
           {resetByEmail === false ? (
             <>
@@ -125,9 +125,10 @@ export function LoginPage() {
         </form>
         ) : (
         <form className="login-card" onSubmit={submit} noValidate>
+          {/* Zentriq on top; the organization's logo (System Settings) below it, under a thin rule. */}
           <div className="login-card-logo">
-            <CompanyLogo height={44} />
             <LogoMark size={40} />
+            <CompanyLogo className="login-company-logo" height={40} />
           </div>
           <h1>Sign in</h1>
 
