@@ -119,7 +119,7 @@ Remove-Item $answer -Force   # contains the administrator password
 
 if (-not $installed) {
     foreach ($t in 'T02 PostgreSQL provisioning', 'T03 Database migration', 'T04 Administrator sign-in', 'T05 API and worker services', 'T06 Trial initialization',
-                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection', 'T68 Live agent connection', 'T69 Locations and IT accessories', 'T70 Manual hardware details', 'T71 Standard and Advanced installation', 'T72 Asset lifecycle', 'T73 Cloud and infrastructure', 'T74 Own asset tags, people and bulk upload', 'T75 Backup and restore', 'T76 Roles and groups', 'T77 Log retention and export', 'T78 Agent stop and disable protection', 'T79 Automatic agent update', 'T80 Agent check-in and diagnosis commands', 'T81 Licensing plans and online activation', 'T82 Software Deployment policy', 'T83 Application control on Windows', 'T84 Push deployment', 'T85 Remote support agent tamper protection', 'T86 Software licenses', 'T87 Web apps and accounts', 'T88 Network connected devices', 'T89 Warranty lookup', 'T90 Session recording', 'T91 Directory sign-in', 'T92 Patch management', 'T93 Scripts and remediation', 'T94 Tray icon and self-service', 'T95 Software metering and device experience', 'T96 Endpoint privilege management', 'T97 BitLocker management', 'T98 USB device control', 'T99 Product keys and pick lists', 'T100 Only TLS 1.2 and 1.3', 'T101 Data scope and access rules') {
+                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection', 'T68 Live agent connection', 'T69 Locations and IT accessories', 'T70 Manual hardware details', 'T71 Standard and Advanced installation', 'T72 Asset lifecycle', 'T73 Cloud and infrastructure', 'T74 Own asset tags, people and bulk upload', 'T75 Backup and restore', 'T76 Roles and groups', 'T77 Log retention and export', 'T78 Agent stop and disable protection', 'T79 Automatic agent update', 'T80 Agent check-in and diagnosis commands', 'T81 Licensing plans and online activation', 'T82 Software Deployment policy', 'T83 Application control on Windows', 'T84 Push deployment', 'T85 Remote support agent tamper protection', 'T86 Software licenses', 'T87 Web apps and accounts', 'T88 Network connected devices', 'T89 Warranty lookup', 'T90 Session recording', 'T91 Directory sign-in', 'T92 Patch management', 'T93 Scripts and remediation', 'T94 Tray icon and self-service', 'T95 Software metering and device experience', 'T96 Endpoint privilege management', 'T97 BitLocker management', 'T98 USB device control', 'T99 Product keys and pick lists', 'T100 Only TLS 1.2 and 1.3', 'T101 Data scope and access rules', 'T102 Sign-out after inactivity') {
         Record $t.Substring(0, 3) $t.Substring(4) 'BLOCKED' 'installation failed'
     }
 } else {
@@ -3122,6 +3122,45 @@ if (-not $installed) {
             Raw101 DELETE "/roles/$($role.id)" $null $s | Out-Null
             Raw101 DELETE "/assets/$($pcK.id)" $null $s | Out-Null
             Raw101 DELETE "/assets/$($pcM.id)" $null $s | Out-Null
+        }
+    } | Out-Null
+
+    # ---- T102: sign-out after inactivity (build 138) ----
+    Check 'T102' 'Sign-out after inactivity: the setting is validated (0-720); background requests from an idle console end the session after the limit, an active session stays signed in' {
+        $s = Login
+        function Raw102([string] $Method, [string] $Path, $Body, $Session, [int] $Idle = -1) {
+            $h = @{ 'X-Zentriq-Request' = '1' }
+            if ($Idle -ge 0) { $h['X-Zentriq-Idle'] = "$Idle" }
+            $p = @{ Uri = "$base/api/v1$Path"; Method = $Method; WebSession = $Session; Headers = $h; ContentType = 'application/json'; SkipHttpErrorCheck = $true }
+            if ($null -ne $Body) { $p.Body = ($Body | ConvertTo-Json -Depth 6) }
+            [int](Invoke-WebRequest @p).StatusCode
+        }
+        $settings = Api GET '/system/settings' -Session $s
+        Assert ($settings.'security.idle_signout_minutes' -eq 30) "default: $($settings.'security.idle_signout_minutes')"
+        Assert ((Raw102 PUT '/system/settings/security.idle_signout_minutes' @{ value = 721 } $s) -eq 400) '721 minutes accepted'
+        Assert ((Raw102 PUT '/system/settings/security.idle_signout_minutes' @{ value = -1 } $s) -eq 400) '-1 minutes accepted'
+        try {
+            Assert ((Raw102 PUT '/system/settings/security.idle_signout_minutes' @{ value = 1 } $s) -eq 204) 'saving 1 minute failed'
+            $idle = Login; $busy = Login
+            $me = Invoke-RestMethod "$base/api/v1/auth/me" -WebSession $busy -Headers @{ 'X-Zentriq-Idle' = '0' }
+            Assert ($me.idleSignoutMinutes -eq 1) "me: $($me.idleSignoutMinutes)"
+            $start = Get-Date
+            foreach ($at in 30, 60) {
+                Start-Sleep -Seconds ([Math]::Max(0, $at - ((Get-Date) - $start).TotalSeconds))
+                $i = Raw102 GET '/auth/alive' $null $idle 9999
+                $b = Raw102 GET '/auth/alive' $null $busy 0
+                Assert ($i -eq 200 -and $b -eq 200) "at $at s: idle $i, active $b"
+            }
+            Start-Sleep -Seconds ([Math]::Max(0, 95 - ((Get-Date) - $start).TotalSeconds))
+            $i = Raw102 GET '/auth/me' $null $idle 9999
+            $b = Raw102 GET '/auth/me' $null $busy 5
+            Assert ($i -eq 401) "idle session still signed in after 95 s: $i"
+            Assert ($b -eq 200) "active session signed out: $b"
+            # Requests without the header (downloads, scripts) count as activity.
+            Assert ((Raw102 GET '/auth/me' $null $s) -eq 200) 'administrator session without the header signed out'
+            "721 and -1 refused; with 1 minute: background requests from an idle session got 401 after 95 s, an active session and a session without the header stayed signed in"
+        } finally {
+            Raw102 PUT '/system/settings/security.idle_signout_minutes' @{ value = 30 } (Login) | Out-Null
         }
     } | Out-Null
 

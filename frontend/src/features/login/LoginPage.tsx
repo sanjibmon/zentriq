@@ -1,3 +1,4 @@
+import { takeIdleNotice } from '../../app/idle';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../../api/client';
 import type { LoginResult, SetupStatus } from '../../api/types';
@@ -19,7 +20,7 @@ export function LoginPage() {
   const [status, setStatus] = useState<SetupStatus | null>(null);
   const [forgot, setForgot] = useState(false);
   const [resetByEmail, setResetByEmail] = useState<boolean | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(() => takeIdleNotice());
   const [directory, setDirectory] = useState(false);
   const [providers, setProviders] = useState<{ directory: { domain: string | null } | null; microsoft: boolean }>({ directory: null, microsoft: false });
   const mfaRef = useRef<HTMLInputElement>(null);

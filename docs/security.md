@@ -16,7 +16,7 @@
   only the rights they need (e.g. API: read config/secrets, modify logs/exports/data-protection keys).
 * **HTTPS only** – Kestrel with **TLS 1.2 and 1.3 only** on the console and the agent port (TLS 1.0/1.1 refused even where Windows still allows them), HSTS, security headers; customer certificate by
   thumbprint or generated RSA-3072 self-signed certificate. The installer pins the exact certificate when verifying.
-* **Web security** – cookie sessions (HttpOnly, Secure, SameSite=Strict; end after 30 minutes without activity and 12 hours after signing in at the latest), anti-CSRF request header on state-changing
+* **Web security** – cookie sessions (HttpOnly, Secure, SameSite=Strict; end after a configurable time without user activity — Settings › Sign-in security, default 30 minutes, background refreshes do not count — and 12 hours after signing in at the latest), anti-CSRF request header on state-changing
   calls, login rate limiting, server-side RBAC on every endpoint, parameterised SQL/EF Core only, request size limits,
   ProblemDetails errors without stack traces, full audit trail.
 * **Licensing** – ECDSA P-256 signatures, verification keys compiled in, private key never shipped; see licensing.md.

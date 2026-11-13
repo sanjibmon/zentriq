@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { api, ApiError, setUnauthorizedHandler } from '../api/client';
 import type { Me } from '../api/types';
+import { idleExpired, installActivityTracking, noteIdleSignout } from './idle';
 
 interface AuthValue {
   me: Me | null;
@@ -30,7 +31,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    setUnauthorizedHandler(() => setMe(null));
+    installActivityTracking();
+    // The server ended the session: after inactivity (e.g. the computer slept), say so on the sign-in page.
+    setUnauthorizedHandler(() => { if (idleExpired()) noteIdleSignout(); setMe(null); });
     void refresh();
   }, [refresh]);
 

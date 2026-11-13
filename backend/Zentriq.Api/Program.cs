@@ -97,7 +97,8 @@ builder.Services.AddAuthentication(AuthSchemes.Smart)
         o.Cookie.HttpOnly = true;
         o.Cookie.SameSite = SameSiteMode.Strict;
         o.Cookie.SecurePolicy = httpOnly ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always;
-        o.ExpireTimeSpan = TimeSpan.FromMinutes(30);
+        // The cookie lasts as long as a session may (12 hours); inactivity ends it earlier (IdleSignout, Settings › Security).
+        o.ExpireTimeSpan = Zentriq.Application.Security.SessionLifetime.Max;
         o.SlidingExpiration = true;
         o.Events = SessionEvents.Create();
     });

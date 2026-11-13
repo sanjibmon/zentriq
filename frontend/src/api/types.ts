@@ -29,6 +29,8 @@ export interface Me {
   mfaEnabled: boolean;
   /** MFA is mandatory and not set up yet: the session has no permissions until enrollment is confirmed. */
   mfaEnrollmentRequired?: boolean;
+  /** Sign out after this many minutes without activity; 0 = never. */
+  idleSignoutMinutes?: number;
   roles: { id: string; name: string }[];
   permissions: string[];
   license: LicenseSummary;

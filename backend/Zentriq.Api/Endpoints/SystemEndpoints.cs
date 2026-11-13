@@ -20,6 +20,7 @@ public static class SystemEndpoints
         "discovery.approved_scopes", "discovery.max_targets", "discovery.confirm_above", "discovery.min_prefix",
         "discovery.default_concurrency", "discovery.max_concurrency", "discovery.probe_timeout_ms",
         "security.mfa_required", "security.lockout_threshold", "security.lockout_minutes", "security.password_reset_minutes",
+        Zentriq.Application.Security.IdleSignout.Setting,
         "display.show_ipv6",
     ];
 
@@ -67,6 +68,7 @@ public static class SystemEndpoints
             s.Value = body.Value.GetRawText(); s.UpdatedAt = DateTimeOffset.UtcNow; s.UpdatedBy = rc.UserId;
             await db.SaveChangesAsync(ct);
             await rc.AuditAsync("settings.update", key, detail: new { from = old, to = s.Value });
+            if (key == Zentriq.Application.Security.IdleSignout.Setting) IdleSetting.Forget();
             return Results.NoContent();
         }).RequireAuthorization(Permissions.SettingsManage);
 
@@ -141,6 +143,7 @@ public static class SystemEndpoints
             "security.lockout_threshold" => n is >= 3 and <= 20 ? null : "Must be between 3 and 20.",
             "security.lockout_minutes" => n is >= 1 and <= 1440 ? null : "Must be between 1 and 1440.",
             "security.password_reset_minutes" => n is >= 5 and <= 1440 ? null : "Must be between 5 and 1440.",
+            Zentriq.Application.Security.IdleSignout.Setting => Zentriq.Application.Security.IdleSignout.Validate(n),
             _ => n >= 0 ? null : "Must be zero or more.",
         };
     }

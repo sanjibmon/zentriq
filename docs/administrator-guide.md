@@ -137,7 +137,17 @@ Complete removal (irreversible – take and export a backup first):
 
 ## Account and access
 
-* Sign-in sessions: HttpOnly, Secure, SameSite=Strict cookie, 30 minutes sliding. Login attempts are rate limited.
+* Sign-in sessions: HttpOnly, Secure, SameSite=Strict cookie. A session ends after the inactivity time below and 12
+  hours after signing in at the latest. Login attempts are rate limited.
+* **Sign out after inactivity.** *System Settings › Sign-in security › Sign out after inactivity (minutes)*: any value
+  from 1 to 720 (e.g. 5, 10, 15; default 30), or 0 for never (the 12-hour limit remains). Activity is typing, clicking,
+  scrolling or moving the mouse in any console tab of the browser; pages that refresh on their own (dashboards, agent
+  and remote-session lists) do not keep the session open. One minute before the limit the console asks *Are you still
+  there?* with **Stay signed in**; at the limit it signs out and the sign-in page says why. The server enforces the
+  limit as well (the console reports the time since the last activity with every request), so a closed laptop lid, a
+  sleeping computer or a frozen tab does not keep a session open. Each such sign-out is in the audit log as
+  `auth.session_ended` with reason `idle`. The change applies to sessions already open within 30 seconds. Remote
+  sessions open in their own window and are not affected; the console behind them still signs out when unused.
 * **Two-step verification (MFA).** Each user turns it on under *avatar › My account & MFA › Set up authenticator app*:
   scan the QR code with **Microsoft Authenticator**, **Google Authenticator** or any TOTP app (or type the key shown),
   then enter the 6-digit code. From then on every sign-in asks for the current code.

@@ -1,5 +1,14 @@
 // Typed client for the Zentriq REST API (/api/v1). Same-origin cookie session; every state-changing
-// request carries the anti-CSRF header the API requires.
+// request carries the anti-CSRF header the API requires, and every request the seconds since the user's last activity
+// (sign-out after inactivity: background refreshes do not keep a session alive).
+
+import { idleSeconds, noteRequest } from '../app/idle';
+
+/** Headers every request carries. */
+function base(extra: Record<string, string> = {}): Record<string, string> {
+  noteRequest();
+  return { 'X-Zentriq-Idle': String(idleSeconds()), ...extra };
+}
 
 export class ApiError extends Error {
   constructor(
@@ -26,7 +35,7 @@ export function setUnauthorizedHandler(fn: () => void) {
 }
 
 async function request<T>(method: string, path: string, opts: { query?: Query; body?: unknown; allow401?: boolean } = {}): Promise<T> {
-  const headers: Record<string, string> = { Accept: 'application/json' };
+  const headers: Record<string, string> = base({ Accept: 'application/json' });
   if (method !== 'GET') headers['X-Zentriq-Request'] = '1';
   if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
   const res = await fetch(url(path, opts.query), {
@@ -60,7 +69,7 @@ export const api = {
   del: <T>(path: string) => request<T>('DELETE', path),
   /** POST with a JSON body that returns a file (report exports); saves it in the browser. */
   async downloadJson(path: string, body: unknown, fallbackName: string): Promise<void> {
-    const res = await fetch(url(path), { method: 'POST', headers: { 'X-Zentriq-Request': '1', 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify(body) });
+    const res = await fetch(url(path), { method: 'POST', headers: base({ 'X-Zentriq-Request': '1', 'Content-Type': 'application/json' }), credentials: 'same-origin', body: JSON.stringify(body) });
     if (!res.ok) {
       const text = await res.text();
       let title = res.statusText;
@@ -73,7 +82,7 @@ export const api = {
   },
   /** Uploads a file as the raw request body (feed imports). */
   upload: <T>(path: string, query: Query, file: Blob) =>
-    fetch(url(path, query), { method: 'POST', headers: { 'X-Zentriq-Request': '1', 'Content-Type': 'application/octet-stream' }, credentials: 'same-origin', body: file })
+    fetch(url(path, query), { method: 'POST', headers: base({ 'X-Zentriq-Request': '1', 'Content-Type': 'application/octet-stream' }), credentials: 'same-origin', body: file })
       .then(async (res) => {
         const text = await res.text();
         let data: unknown = null;
@@ -83,7 +92,7 @@ export const api = {
       }),
   /** POST that returns a file (e.g. the activation request) and saves it in the browser. */
   async download(path: string, fallbackName: string): Promise<void> {
-    const res = await fetch(url(path), { method: 'POST', headers: { 'X-Zentriq-Request': '1' }, credentials: 'same-origin' });
+    const res = await fetch(url(path), { method: 'POST', headers: base({ 'X-Zentriq-Request': '1' }), credentials: 'same-origin' });
     if (!res.ok) throw new ApiError(res.status, (await res.text()) || res.statusText);
     const cd = res.headers.get('Content-Disposition') ?? '';
     const name = /filename="?([^";]+)"?/.exec(cd)?.[1] ?? fallbackName;

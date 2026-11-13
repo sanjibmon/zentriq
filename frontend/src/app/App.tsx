@@ -46,6 +46,7 @@ import { LogoMark } from '../components/Logo';
 import { AuthProvider, useAuth } from './auth';
 import { Router, useRouter } from './router';
 import { ConfirmProvider } from '../components/Confirm';
+import { IdleWatcher } from '../components/IdleWatcher';
 
 /** The start page for users without the dashboard: the first area they may open. */
 function FirstAllowed() {
@@ -128,7 +129,7 @@ function Routes() {
 }
 
 function Gate() {
-  const { me, checking } = useAuth();
+  const { me, checking, logout } = useAuth();
   const { path } = useRouter();
   if (path === '/reset-password') return <ResetPasswordPage />;
   if (checking)
@@ -142,6 +143,7 @@ function Gate() {
   return (
     <Shell>
       <Routes />
+      <IdleWatcher minutes={me.idleSignoutMinutes ?? 30} onSignOut={logout} />
     </Shell>
   );
 }

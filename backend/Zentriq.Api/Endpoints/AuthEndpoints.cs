@@ -205,6 +205,10 @@ public static class AuthEndpoints
             return Results.NoContent();
         }).AllowAnonymous();
 
+        // The console calls this while the user is working without other requests, so the session sees the activity.
+        g.MapGet("/alive", async (ZentriqDbContext db, CancellationToken ct) =>
+            Results.Ok(new { idleSignoutMinutes = await IdleSetting.GetAsync(db, ct) })).RequireAuthorization();
+
         g.MapGet("/me", async (RequestContext rc, ZentriqDbContext db, CancellationToken ct) =>
         {
             var u = await db.Users.AsNoTracking().Include(x => x.Roles).ThenInclude(r => r.Role).FirstAsync(x => x.Id == rc.UserId, ct);
@@ -213,6 +217,7 @@ public static class AuthEndpoints
             {
                 id = u.Id, email = u.Email, displayName = u.DisplayName, mfaEnabled = u.MfaEnabled,
                 mfaEnrollmentRequired = rc.Principal.HasClaim(c => c.Type == ZentriqClaims.MfaPending),
+                idleSignoutMinutes = await IdleSetting.GetAsync(db, ct),
                 roles = u.Roles.Select(r => new { id = r.RoleId, name = r.Role!.Name }),
                 permissions = rc.Principal.FindAll(ZentriqClaims.Permission).Select(c => c.Value).OrderBy(x => x),
                 license = new { mode = lic.Mode.ToString(), lic.Summary, lic.ExpiresAt, lic.DaysRemaining, featuresEnabled = lic.FeaturesEnabled, lic.Modules, edition = lic.Edition,
@@ -265,6 +270,7 @@ public static class AuthEndpoints
         var principal = await BuildPrincipalAsync(db, user, mfaPending, ct);
         var props = new AuthenticationProperties { IsPersistent = false };
         props.Items[SessionLifetime.Item] = SessionLifetime.Format(DateTimeOffset.UtcNow);
+        props.Items[IdleSignout.Item] = SessionLifetime.Format(DateTimeOffset.UtcNow);
         await http.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, props);
     }
 

@@ -53,6 +53,19 @@ public static class SessionEvents
                     .WriteAsync(new Zentriq.Infrastructure.Audit.AuditActor(u.Id, u.Email, ctx.HttpContext.Connection.RemoteIpAddress?.ToString()), "auth.session_ended", u.Email, "Denied", new { reason = why });
                 Reject(); return;
             }
+            // Sign-out after inactivity (Settings › Security): background refreshes do not count, the console sends the
+            // seconds since the user's last activity.
+            var idleMinutes = await IdleSetting.GetAsync(db, ctx.HttpContext.RequestAborted);
+            var idleSeconds = Zentriq.Application.Security.IdleSignout.ParseHeader(ctx.HttpContext.Request.Headers[Zentriq.Application.Security.IdleSignout.Header]);
+            switch (Zentriq.Application.Security.IdleSignout.Check(ctx.Properties.Items, now, idleSeconds, idleMinutes))
+            {
+                case Zentriq.Application.Security.IdleSignout.Outcome.Expired:
+                    await ctx.HttpContext.RequestServices.GetRequiredService<Zentriq.Infrastructure.Audit.AuditWriter>()
+                        .WriteAsync(new Zentriq.Infrastructure.Audit.AuditActor(u.Id, u.Email, ctx.HttpContext.Connection.RemoteIpAddress?.ToString()), "auth.session_ended", u.Email, "Denied", new { reason = "idle", minutes = idleMinutes });
+                    Reject(); return;
+                case Zentriq.Application.Security.IdleSignout.Outcome.Renew:
+                    ctx.ShouldRenew = true; break;
+            }
             // Roles or role permissions changed since sign-in: reload them, the user stays signed in.
             if (ctx.Principal?.FindFirstValue(ZentriqClaims.Access) != u.AccessStamp.ToString())
             {
@@ -68,6 +81,25 @@ public static class SessionEvents
             }
         },
     };
+}
+
+/// <summary>The sign-out-after-inactivity setting, read at most every 30 seconds (every authenticated request needs it).</summary>
+public static class IdleSetting
+{
+    private static (int Minutes, DateTimeOffset At)? cached;
+
+    public static async Task<int> GetAsync(ZentriqDbContext db, CancellationToken ct)
+    {
+        var c = cached;
+        if (c is { } hit && DateTimeOffset.UtcNow - hit.At < TimeSpan.FromSeconds(30)) return hit.Minutes;
+        var v = await db.SystemSettings.AsNoTracking().Where(s => s.Key == Zentriq.Application.Security.IdleSignout.Setting).Select(s => s.Value).FirstOrDefaultAsync(ct);
+        var m = int.TryParse(v?.Trim().Trim('"'), out var n) && Zentriq.Application.Security.IdleSignout.Validate(n) is null ? n : Zentriq.Application.Security.IdleSignout.Default;
+        cached = (m, DateTimeOffset.UtcNow);
+        return m;
+    }
+
+    /// <summary>After the setting is saved: the next request reads it again.</summary>
+    public static void Forget() => cached = null;
 }
 
 /// <summary>

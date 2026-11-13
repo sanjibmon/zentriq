@@ -39,6 +39,9 @@ export function SecuritySettings() {
                 }} />
                 <span><b>Require two-step verification (MFA) for all users</b><br /><small className="muted">Microsoft Authenticator, Google Authenticator or any TOTP app.</small></span>
               </label>
+              <NumberSetting label="Sign out after inactivity (minutes)" value={Number(s['security.idle_signout_minutes'] ?? 30)} min={0} max={720}
+                hint="Any value from 1 to 720, e.g. 5, 10 or 15. 0: never (sessions still end 12 hours after sign-in). Typing, clicking or scrolling in any console tab is activity; pages refreshing on their own are not. A warning appears one minute before."
+                onSave={(v) => void put('security.idle_signout_minutes', v)} />
               <NumberSetting label="Lock an account after this many wrong passwords" value={Number(s['security.lockout_threshold'] ?? 5)} min={3} max={20} onSave={(v) => void put('security.lockout_threshold', v)} />
               <NumberSetting label="Lock for (minutes)" value={Number(s['security.lockout_minutes'] ?? 15)} min={1} max={1440} onSave={(v) => void put('security.lockout_minutes', v)} />
               <label className="row-check" style={{ borderTop: '1px solid var(--line)', paddingTop: 10 }}>
@@ -58,7 +61,7 @@ export function SecuritySettings() {
   );
 }
 
-function NumberSetting({ label, value, min, max, onSave }: { label: string; value: number; min: number; max: number; onSave: (v: number) => void }) {
+function NumberSetting({ label, value, min, max, onSave, hint }: { label: string; value: number; min: number; max: number; onSave: (v: number) => void; hint?: string }) {
   const [v, setV] = useState(String(value));
   useEffect(() => setV(String(value)), [value]);
   const changed = Number(v) !== value;
@@ -66,8 +69,9 @@ function NumberSetting({ label, value, min, max, onSave }: { label: string; valu
     <label>{label}
       <div style={{ display: 'flex', gap: 6 }}>
         <input className="in" type="number" min={min} max={max} value={v} onChange={(e) => setV(e.target.value)} style={{ maxWidth: 120 }} />
-        {changed && <button type="button" className="btn sm" onClick={() => onSave(Number(v))}>Save</button>}
+        {changed && <button type="button" className="btn sm" disabled={v.trim() === '' || !Number.isInteger(Number(v)) || Number(v) < min || Number(v) > max} onClick={() => onSave(Number(v))}>Save</button>}
       </div>
+      {hint && <small className="muted">{hint}</small>}
     </label>
   );
 }
