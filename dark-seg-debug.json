@@ -1,0 +1,47 @@
+{
+ "found": true,
+ "html": "<div class=\"seg\" role=\"radiogroup\" aria-label=\"Target source\"><button type=\"button\" class=\"on\">IP addresses &amp; networks</button><button type=\"button\" class=\"\">Active Directory computers</button></div>",
+ "seg": {
+  "display": "flex",
+  "height": "36.8438px",
+  "fontSize": "14px",
+  "lineHeight": "20.3px",
+  "color": "rgb(234, 241, 245)",
+  "opacity": "1",
+  "padding": "3px",
+  "overflow": "visible",
+  "visibility": "visible",
+  "textIndent": "0px",
+  "width": "356.906px"
+ },
+ "buttons": [
+  {
+   "text": "IP addresses & networks",
+   "display": "block",
+   "height": "28.8438px",
+   "fontSize": "13px",
+   "lineHeight": "18.85px",
+   "color": "rgb(234, 241, 245)",
+   "opacity": "1",
+   "padding": "5px 12px",
+   "overflow": "visible",
+   "visibility": "visible",
+   "textIndent": "0px",
+   "width": "167.328px"
+  },
+  {
+   "text": "Active Directory computers",
+   "display": "block",
+   "height": "28.8438px",
+   "fontSize": "13px",
+   "lineHeight": "18.85px",
+   "color": "rgb(178, 192, 202)",
+   "opacity": "1",
+   "padding": "5px 12px",
+   "overflow": "visible",
+   "visibility": "visible",
+   "textIndent": "0px",
+   "width": "179.578px"
+  }
+ ]
+}

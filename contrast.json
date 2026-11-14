@@ -1,0 +1,410 @@
+[
+ {
+  "scheme": "light",
+  "page": "dashboard",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "light",
+  "page": "discovery",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "light",
+  "page": "assets",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "light",
+  "page": "non-it",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "light",
+  "page": "hardware",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "light",
+  "page": "accessories",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "light",
+  "page": "software",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "light",
+  "page": "network",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "light",
+  "page": "experience",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "light",
+  "page": "agents",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "light",
+  "page": "activity",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "light",
+  "page": "remote",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "light",
+  "page": "cloud",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "light",
+  "page": "lifecycle",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "light",
+  "page": "patch",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "light",
+  "page": "scripts",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "light",
+  "page": "vulnerabilities",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "light",
+  "page": "security",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "light",
+  "page": "deploy",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "light",
+  "page": "licenses",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "light",
+  "page": "webapps",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "light",
+  "page": "privilege",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "light",
+  "page": "bitlocker",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "light",
+  "page": "usb",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "light",
+  "page": "reports",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "light",
+  "page": "integrations",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "light",
+  "page": "licensing",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "light",
+  "page": "audit",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "light",
+  "page": "users",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "light",
+  "page": "backup",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "light",
+  "page": "settings",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "light",
+  "page": "account",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "light",
+  "page": "dlg-new-scan",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "light",
+  "page": "dlg-cloud-add",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "dark",
+  "page": "dashboard",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "dark",
+  "page": "discovery",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "dark",
+  "page": "assets",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "dark",
+  "page": "non-it",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "dark",
+  "page": "hardware",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "dark",
+  "page": "accessories",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "dark",
+  "page": "software",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "dark",
+  "page": "network",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "dark",
+  "page": "experience",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "dark",
+  "page": "agents",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "dark",
+  "page": "activity",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "dark",
+  "page": "remote",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "dark",
+  "page": "cloud",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "dark",
+  "page": "lifecycle",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "dark",
+  "page": "patch",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "dark",
+  "page": "scripts",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "dark",
+  "page": "vulnerabilities",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "dark",
+  "page": "security",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "dark",
+  "page": "deploy",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "dark",
+  "page": "licenses",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "dark",
+  "page": "webapps",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "dark",
+  "page": "privilege",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "dark",
+  "page": "bitlocker",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "dark",
+  "page": "usb",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "dark",
+  "page": "reports",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "dark",
+  "page": "integrations",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "dark",
+  "page": "licensing",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "dark",
+  "page": "audit",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "dark",
+  "page": "users",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "dark",
+  "page": "backup",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "dark",
+  "page": "settings",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "dark",
+  "page": "account",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "dark",
+  "page": "dlg-new-scan",
+  "count": 0,
+  "items": []
+ },
+ {
+  "scheme": "dark",
+  "page": "dlg-cloud-add",
+  "count": 0,
+  "items": []
+ }
+]
