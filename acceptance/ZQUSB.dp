@@ -1,0 +1,6 @@
+create vdisk file="D:\a\_temp\acceptance\ZQUSB.vhdx" maximum=512 type=expandable
+attach vdisk
+create partition primary
+format fs=ntfs quick label=ZQUSB
+assign
+

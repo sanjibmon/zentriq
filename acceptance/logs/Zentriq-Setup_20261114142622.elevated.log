@@ -1,0 +1,6 @@
+[1380:1A04][2026-11-14T14:26:22]i001: Burn x64 v5.0.2+aa65968c419420d32e3e1b647aea0082f5ca5b78, Windows v10.0 x64 (Build 20348: Service Pack 0), path: C:\Windows\TEMP\{8645BB25-001F-4F3E-9A05-1A1744D7F82F}\.be\Zentriq-Setup-x64.exe
+[1380:1A04][2026-11-14T14:26:22]i000: Initializing string variable 'ZQ_ANSWERFILE' to value ''
+[1380:1A04][2026-11-14T14:26:22]i000: Initializing string variable 'ZQ_SECTIONS' to value ''
+[1380:1A04][2026-11-14T14:26:22]i009: Command Line: '-q -burn.elevated ***** ***** *****'
+[1380:1A04][2026-11-14T14:26:22]i000: Setting string variable 'WixBundleLog' to value 'C:\Users\RUNNER~1\AppData\Local\Temp\Zentriq-Setup_20261114142622.elevated.log'
+[1380:1A04][2026-11-14T14:28:52]i021: Exit code: 0x0

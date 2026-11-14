@@ -1,0 +1,4 @@
+﻿2026-11-14T09:38:46.1640981Z INFO Scheduled log export 2025-12-31 – 2026-06-30 (Every 6 months (each half-year)).
+2026-11-14T09:38:46.2563952Z INFO Log archive zentriq-logs-runnervm9zap3-20260101-20260630-8b90.zip: 0 audit and 0 activity entries (0 KiB).
+2026-11-14T09:38:46.2750524Z INFO Running maintenance.log_archive 0e4cefb6-6066-4dfd-9b22-c5820774d6ec (attempt 1/1).
+2026-11-14T09:38:46.3147028Z INFO Log archive zentriq-logs-runnervm9zap3-20261015-20261114-8fbc.zip: 475 audit and 20 activity entries (40 KiB).

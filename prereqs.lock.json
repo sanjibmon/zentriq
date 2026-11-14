@@ -1,0 +1,30 @@
+{
+  "postgresql": {
+    "file": "postgresql-17.11-1-windows-x64.exe",
+    "product": "PostgreSQL",
+    "version": "17.11-1",
+    "fileVersion": "1.0.0.0",
+    "productVersion": "17",
+    "sha256": "f104c552d8495a6f20738c2a03f643164bc64b9985363329e314dec24559f0b7",
+    "pinned": true,
+    "signer": "CN=EnterpriseDB Corporation, O=EnterpriseDB Corporation, L=Wilmington, S=Delaware, C=US",
+    "signerThumbprint": "7BEDD1269FCCF7A5D95F18274750B79893C06C70",
+    "timestamped": true,
+    "bytes": 373033224,
+    "license": "PostgreSQL License (https://www.postgresql.org/about/licence/); installer by EnterpriseDB"
+  },
+  "vcredist": {
+    "file": "vc_redist.x64.exe",
+    "product": "Microsoft Visual C++ 2015-2022 Redistributable (x64)",
+    "version": "14.44.35211.0",
+    "fileVersion": "14.44.35211.0",
+    "productVersion": "14.44.35211.0",
+    "sha256": "cc0ff0eb1dc3f5188ae6300faef32bf5beeba4bdd6e8e445a9184072096b713b",
+    "pinned": true,
+    "signer": "CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US",
+    "signerThumbprint": "8F985BE8FD256085C90A95D3C74580511A1DB975",
+    "timestamped": true,
+    "bytes": 25635768,
+    "license": "Microsoft Software License Terms - Visual C++ Redistributable (redistribution permitted)"
+  }
+}

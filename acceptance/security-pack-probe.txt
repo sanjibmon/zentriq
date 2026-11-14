@@ -1,0 +1,12 @@
+os: Microsoft Windows Server 2022 Datacenter 10.0.20348.0
+manage-bde: True
+Win32_EncryptableVolume: 2 volume(s): C: type=0 protection=0; D: type=1 protection=0
+feature BitLocker: Installed
+TPM: none
+pnputil disable-device: True
+cmdlets: Set-Disk True, New-VHD True, Get-PnpDevice True
+vdisk: drive E: bus File Backed Virtual, model 'Microsoft Virtual Disk', interface SCSI, pnp SCSI\DISK&VEN_MSFT&PROD_VIRTUAL_DISK\2&1F4ADFFE&0&000001, number 2
+vdisk BitLocker: BitLocker Drive Encryption: Configuration Tool version 10.0.20348 Copyright (C) 2013 Microsoft Corporation. All rights reserved. Volume E: [ZQPROBE] [Data Volume] Size: 0.50 GB BitLocker Version: None Conversion Status: Fully Decrypted Percentage Encrypted: 0.0% Encryption Method: None Protection Status: Protection Off Lock Status: Unlocked Identification Field: None Automatic Unlock: Disabled Key Protectors: None Found
+vdisk BitLocker on: BitLocker Drive Encryption: Configuration Tool version 10.0.20348 Copyright (C) 2013 Microsoft Corporation. All rights reserved. Volume E: [ZQPROBE] [Data Volume] Key Protectors Added: Numerical Password: ID: {55BB9F24-8E72-4AC6-8FE1-14FF26D729EC} Password: 245729-610698-476146-299409-060643-058575-422972-688787 ACTIONS REQUIRED: 1. Save this numerical recovery password in a secure location away from your computer: 245729-610698-476146-299409-060643-058575-422972-688787 To prevent data loss, save this password immediately. This password helps ensure that you can unlock the encrypted volume. Used Space Only encryption is now in progress.
+vdisk read-only: write refused; Microsoft DiskPart version 10.0.20348.1 Copyright (C) Microsoft Corporation. On computer: runnervm9zap3 Disk 2 is now the selected disk. Disk attributes set successfully. DiskPart successfully offlined the selected disk. DiskPart successfully onlined the selected disk.
+vdisk disable: error No MSFT_Volume objects found with property 'FileSystemLabel' equal to 'ZQPROBE'.  Verify the value of the property and retry.
