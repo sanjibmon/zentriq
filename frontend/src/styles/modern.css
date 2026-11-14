@@ -921,3 +921,8 @@ input[type=file]::file-selector-button:hover { border-color: var(--accent); colo
 .chart.vbars { flex: none; min-height: 150px; }
 .vbars button { display: flex; flex-direction: column; justify-content: flex-end; }
 .vbars .col { flex: 1 1 auto; min-height: 90px; }
+.cl-need.cl-gcp i { background: conic-gradient(#ea4335 0 25%, #fbbc04 0 50%, #34a853 0 75%, #4285f4 0); }
+.cl-need.cl-nutanix i { background: linear-gradient(135deg, #7855fa, #024da1); }
+.cl-need.cl-proxmox i { background: linear-gradient(135deg, #f7a54b, #e57000); }
+.cl-need.cl-xenserver i { background: linear-gradient(135deg, #2bb3d9, #0f5c8a); }
+.cl-need.cl-ovirt i { background: linear-gradient(135deg, #e04a4a, #8f1d1d); }
