@@ -48,8 +48,13 @@ tier are exact. Daily usage snapshots (`license.usage_snapshot`) are kept for re
 | Plan | IT devices | Non-IT assets | IT accessories | Cloud / VM instances | Remote support | Sections |
 |---|---|---|---|---|---|---|
 | **Trial** (14 days, once) | 30 | 50 | Unlimited | 10 | 1 technician | All |
-| **Free** (no end) | 25 | 25 | Unlimited | 5 | None | Standard edition |
-| **Licensed** | As purchased | Pack or unlimited | Unlimited | As purchased | As purchased | Standard or Advanced |
+| **Free** (no end) | 25 | 25 | Unlimited | 5 | None | Overview, Discovery & Inventory, Infrastructure, Insight & Admin |
+| **Licensed** | As purchased | Pack or unlimited | Unlimited | As purchased | Add-on, per technician | Standard or Advanced |
+
+**Editions (build 142).** *Standard*: Overview, Discovery & Inventory, Security Pack, Insight & Admin. *Advanced*:
+Standard plus Infrastructure and Secure & Remediate. *Remote Support* is an add-on for either edition: a license with
+one or more remote support technicians includes it. Licenses issued before build 142 keep what their edition covered
+then (Standard: Infrastructure; Advanced: Remote Support).
 
 ### Trial
 
@@ -67,7 +72,8 @@ The installation moves to the free tier automatically when:
 * a subscription has ended and its grace period has passed, or
 * the license was revoked, suspended or deactivated at the license server.
 
-The free tier runs the **Standard edition** within the free limits. If the data is above the free limits, the
+The free tier runs asset management — Overview, Discovery & Inventory, Infrastructure and Insight & Admin, without the
+Security Pack, Secure & Remediate or Remote Support — within the free limits. If the data is above the free limits, the
 state is **Free (over limit)**: licensed features pause until a license is activated or the records are reduced.
 Data is **never** deleted, and sign-in, viewing data, backup, restore and licensing always keep working.
 

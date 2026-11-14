@@ -16,7 +16,7 @@ public sealed class ProvisionInput
     [JsonPropertyName("workerService")] public string WorkerService { get; set; } = "ZentriqWorker";
     [JsonPropertyName("skipServiceStart")] public bool SkipServiceStart { get; set; }
     /// <summary>
-    /// Product sections to install: "standard" (Overview, Discover &amp; inventory, Insight &amp; admin), "all"/"advanced", or a
+    /// Product sections to install: "standard" (Overview, Discover &amp; inventory, Security Pack, Insight &amp; admin), "all"/"advanced", or a
     /// list such as "overview,discover,insight,remote". Empty keeps what is recorded (everything on installations from
     /// before sections existed).
     /// </summary>

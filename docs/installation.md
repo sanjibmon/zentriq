@@ -31,8 +31,8 @@ Run `Zentriq-Setup-x64.exe` as an administrator. The wizard:
 1. **Welcome** and **license agreement**.
 2. **System check** – OS, memory, disk, ports, PostgreSQL, existing Zentriq data. Items marked *FAIL* block setup; *WARN* items are advisory. *Re-check* after fixing.
 3. **Installation type** (build 79):
-   - **Standard installation** (recommended): *Overview*, *Discover & inventory*, *Infrastructure* (Asset Lifecycle, Cloud & Infrastructure) and *Insight & admin*.
-   - **Advanced installation**: Standard plus the sections ticked on the next page: *Remote support*, *Secure & remediate*.
+   - **Standard installation** (recommended): *Overview*, *Discover & inventory*, *Security Pack* (endpoint privilege, BitLocker, USB device control) and *Insight & admin*.
+   - **Advanced installation**: Standard plus what is ticked on the next page: *Infrastructure* and *Secure & remediate* (Advanced edition), and the *Remote support* add-on.
 
    Sections that are not installed do not appear in the console. Their APIs answer "not installed", and the Remote Support service is disabled. See [Installation types and editions](#installation-types-and-editions).
 4. **Folders** – program files (default `C:\Program Files\Zentriq`) and the data folder (default `C:\ProgramData\Zentriq`), which contains `Config`, `Secrets`, `Logs`, `Packages`, `Exports` and `Backups`. Data is never stored with the program files.
@@ -56,17 +56,23 @@ In every case the data folder, the database, users, settings and enrolled agents
 
 ## Installation types and editions
 
-| Section | Contents | Standard installation | Advanced installation | Licence edition |
-|---|---|---|---|---|
-| Overview | Dashboards | ✓ | ✓ | Standard |
-| Discover & inventory | Discovery, IT / non-IT assets, hardware, software, network, IT accessories, agents, activity | ✓ | ✓ | Standard |
-| Insight & admin | Reports, integrations; licensing, users, audit, settings | ✓ | ✓ | Standard |
-| Remote support | Remote desktop, files, terminal, quick support, unattended access | — | optional | Advanced |
-| Infrastructure | Asset lifecycle (build 80), Cloud & infrastructure — Azure, AWS, vCenter, Hyper-V (build 81); part of Standard | ✓ | ✓ | Standard |
-| Secure & remediate | Vulnerabilities, security configuration, patch management, software deployment | — | optional | Advanced |
+Since build 142:
 
-- **What you can use** is what is **installed** and **licensed**. The 14-day trial licenses every section.
-- **Standard licence:** Advanced sections that are installed show a lock and an *Advanced* badge.
+| Section | Contents | Standard installation | Advanced installation | Licence |
+|---|---|---|---|---|
+| Overview | Dashboards | ✓ | ✓ | Standard edition |
+| Discover & inventory | Discovery, IT / non-IT assets, hardware, software, network, IT accessories, device experience, agents, activity | ✓ | ✓ | Standard edition |
+| Security Pack | Endpoint privilege management, BitLocker management, USB device control | ✓ | ✓ | Standard edition |
+| Insight & admin | Reports, integrations; licensing, users, audit, settings | ✓ | ✓ | Standard edition |
+| Infrastructure | Cloud & infrastructure (Azure, AWS, Google Cloud, VMware, Hyper-V, Proxmox ...), asset lifecycle | — | optional | Advanced edition |
+| Secure & remediate | Patch management, scripts, vulnerabilities, security configuration, software deployment, software licenses, web apps | — | optional | Advanced edition |
+| Remote support | Remote desktop, files, terminal, quick support, unattended access | — | optional | **Add-on** for either edition (per technician) |
+
+- **What you can use** is what is **installed** and **licensed**. The 14-day trial licenses every section, the add-on included.
+- **Standard licence:** Advanced sections that are installed show a lock and *requires the Advanced edition*; Remote
+  support without the add-on shows *needs the add-on*.
+- **Licences issued before build 142** keep what their edition covered then: Standard keeps Infrastructure, Advanced
+  keeps Remote support. A Standard installation from before build 142 keeps its Infrastructure section after updating.
 - **Recorded choice:** the choice is kept in `HKLM\SOFTWARE\Zentriq\Console\Sections` and in the database (`product.sections`). Repair and version updates keep it.
 - **Existing servers:** servers installed before build 79 count as Advanced (all sections), so nothing disappears after updating.
 

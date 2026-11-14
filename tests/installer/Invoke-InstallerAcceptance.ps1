@@ -3202,12 +3202,12 @@ if (-not $installed) {
         "defaults 1 year; 30 days refused; export of 30 days: $($mine.auditRows) audit / $($mine.activityRows) activity entries, checksum and manifest OK; scheduled half-year archive made; CSV downloads OK"
     } | Out-Null
 
-    Check 'T71' 'Installation type: Advanced recorded, change to Standard (Remote support off, section locked) and back with Setup Update' {
+    Check 'T71' 'Installation type: Advanced recorded, change to Standard (Infrastructure, Secure & remediate and the Remote support add-on off; Security Pack kept) and back with Setup Update' {
         $s = Login
         $st = Api GET '/licensing/status' -Session $s
         Assert ($st.edition -eq 'trial') "edition: $($st.edition)"
         $secs = @($st.sections)
-        Assert ($secs.Count -eq 6 -and @($secs | Where-Object { -not $_.installed -or -not $_.enabled }).Count -eq 0) "trial on Advanced installation: $($secs | ConvertTo-Json -Compress)"
+        Assert ($secs.Count -eq 7 -and @($secs | Where-Object { -not $_.installed -or -not $_.enabled }).Count -eq 0) "trial on Advanced installation: $($secs | ConvertTo-Json -Compress)"
         Assert ((Get-ItemProperty 'HKLM:\SOFTWARE\Zentriq\Console').Sections -eq 'all') "registry Sections: $((Get-ItemProperty 'HKLM:\SOFTWARE\Zentriq\Console').Sections)"
         $code = (Get-ChildItem 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall' | Get-ItemProperty |
                  Where-Object { $_.PSObject.Properties['DisplayName'] -and $_.DisplayName -eq 'Zentriq' -and $_.PSObject.Properties['WindowsInstaller'] -and $_.WindowsInstaller -eq 1 } | Select-Object -First 1).PSChildName
@@ -3223,12 +3223,15 @@ if (-not $installed) {
         $st = Api GET '/licensing/status' -Session $s
         $remote = @($st.sections) | Where-Object id -eq 'remote'
         $secure = @($st.sections) | Where-Object id -eq 'secure'
-        Assert (-not $remote.installed -and -not $secure.installed) "after Standard: $($st.sections | ConvertTo-Json -Compress)"
+        $infra = @($st.sections) | Where-Object id -eq 'infrastructure'
+        $pack = @($st.sections) | Where-Object id -eq 'securitypack'
+        Assert (-not $remote.installed -and -not $secure.installed -and -not $infra.installed) "after Standard: $($st.sections | ConvertTo-Json -Compress)"
+        Assert ($pack.installed -and $pack.enabled -and $pack.offer -eq 'standard' -and $remote.offer -eq 'addon' -and $infra.offer -eq 'advanced') "Security Pack / offers on Standard: $($st.sections | ConvertTo-Json -Compress)"
         $blocked = Invoke-WebRequest "$base/api/v1/vulnerabilities/overview" -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } -SkipHttpErrorCheck
         Assert ([int]$blocked.StatusCode -eq 403) "vulnerabilities API on a Standard installation: $([int]$blocked.StatusCode)"
         $svc = Get-CimInstance Win32_Service -Filter "Name='ZentriqRemote'"
         Assert ($svc.StartMode -eq 'Disabled' -and $svc.State -ne 'Running') "ZentriqRemote on Standard: $($svc.StartMode) / $($svc.State)"
-        Assert ((Get-ItemProperty 'HKLM:\SOFTWARE\Zentriq\Console').Sections -eq 'overview,discover,infrastructure,insight') 'registry not Standard'
+        Assert ((Get-ItemProperty 'HKLM:\SOFTWARE\Zentriq\Console').Sections -eq 'overview,discover,securitypack,insight') "registry not Standard: $((Get-ItemProperty 'HKLM:\SOFTWARE\Zentriq\Console').Sections)"
         $inv = Invoke-WebRequest "$base/api/v1/assets" -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } -SkipHttpErrorCheck
         Assert ([int]$inv.StatusCode -eq 200) "inventory on Standard: $([int]$inv.StatusCode)"
 
@@ -3239,7 +3242,7 @@ if (-not $installed) {
         $deadline = (Get-Date).AddMinutes(3)
         do { Start-Sleep 5; $svc = Get-CimInstance Win32_Service -Filter "Name='ZentriqRemote'" } while ($svc.State -ne 'Running' -and (Get-Date) -lt $deadline)
         Assert ($svc.StartMode -ne 'Disabled' -and $svc.State -eq 'Running') "ZentriqRemote after Advanced: $($svc.StartMode) / $($svc.State)"
-        "trial: 6 sections; Standard: Remote support and Secure & remediate removed, vulnerabilities API 403, remote service disabled, inventory works; Advanced again: all sections, remote service running"
+        "trial: 7 sections; Standard: Infrastructure, Secure & remediate and Remote support removed, Security Pack kept, vulnerabilities API 403, remote service disabled, inventory works; Advanced again: all sections, remote service running"
     } | Out-Null
 
     if ($UpgradeBundle) {

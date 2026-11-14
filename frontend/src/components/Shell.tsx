@@ -55,7 +55,7 @@ export function Shell({ children }: { children: ReactNode }) {
             const link = (i: (typeof shown)[number], mod = false) => {
               const off = (locked && !i.admin) || addOn(i);
               return (
-                <Link key={i.id} to={i.path} className={`${mod ? 'nav-mod ' : ''}${active(i.path) ? 'active' : ''}${off ? ' locked' : ''}`} title={addOn(i) ? `${i.label} — not included in your license` : locked && !i.admin ? `${i.label} — requires the Advanced edition` : i.label}>
+                <Link key={i.id} to={i.path} className={`${mod ? 'nav-mod ' : ''}${active(i.path) ? 'active' : ''}${off ? ' locked' : ''}`} title={addOn(i) ? `${i.label} — not included in your license` : locked && !i.admin ? `${i.label} — ${sec?.offer === 'addon' ? 'needs the add-on' : 'requires the Advanced edition'}` : i.label}>
                   <Icon name={mod ? GROUP_ICON[group] ?? i.icon : i.icon} />
                   <span>{i.label}</span>
                   {off && <Icon name="lock" size={12} className="nav-lock-ico" />}

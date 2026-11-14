@@ -1,11 +1,12 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { api, ApiError } from '../../api/client';
-import type { LicensingStatus, WorkloadUsage } from '../../api/types';
+import type { LicensingStatus, OrganizationResponse, WorkloadUsage } from '../../api/types';
 import { useAuth } from '../../app/auth';
 import { useApi } from '../../app/useApi';
 import { useConfirm } from '../../components/Confirm';
-import { Callout, DataTable, ErrorBox, fmt, Kpis, Loading, PageHead, Panel, Pill, statusTone } from '../../components/ui';
+import { Callout, DataTable, ErrorBox, fmt, Loading, PageHead, Panel, Pill, statusTone } from '../../components/ui';
 import { HelpSteps, Step, UiBtn, UiPath, Val } from '../../components/Help';
+import { Icon } from '../../components/Icon';
 
 type Msg = { tone: 'ok' | 'crit'; text: string } | null;
 
@@ -33,11 +34,90 @@ const MODE_LABEL: Record<string, string> = {
   LeaseExpired: 'Check-in overdue', SupportExpired: 'Support expired', TrialExpired: 'Trial ended', LicenseExpired: 'License expired', ClockRollback: 'Clock moved back',
 };
 
-function planText(d: LicensingStatus): string {
-  if (d.mode.startsWith('Trial')) return 'Trial (all sections)';
-  if (d.mode.startsWith('Free')) return 'Free tier (Standard)';
-  const ed = d.editionTitle ?? (d.edition === 'advanced' ? 'Advanced' : d.edition === 'standard' ? 'Standard' : 'Custom');
-  return d.licenseType === 'perpetual' ? `${ed} · Perpetual` : d.licenseType === 'subscription' ? `${ed} · Subscription` : ed;
+
+const DAY = 86_400_000;
+
+/** Days left of a period, and how much of it is left (0-1). */
+function remaining(from: string | null | undefined, to: string | null | undefined): { days: number; part: number } | null {
+  if (!to) return null;
+  const end = new Date(to).getTime();
+  const start = from ? new Date(from).getTime() : end - 365 * DAY;
+  const now = Date.now();
+  const days = Math.max(0, Math.ceil((end - now) / DAY));
+  const part = end > start ? Math.min(1, Math.max(0, (end - now) / (end - start))) : 0;
+  return { days, part };
+}
+
+function Ring({ part, tone, children }: { part: number; tone: string; children: ReactNode }) {
+  const r = 52, c = 2 * Math.PI * r;
+  return (
+    <div className={`lic-ring ${tone}`}>
+      <svg viewBox="0 0 120 120" aria-hidden="true">
+        <circle cx="60" cy="60" r={r} className="track" />
+        <circle cx="60" cy="60" r={r} className="bar" strokeDasharray={`${c * part} ${c}`} transform="rotate(-90 60 60)" />
+      </svg>
+      <div className="lic-ring-c">{children}</div>
+    </div>
+  );
+}
+
+/** The license at a glance: who it is for, edition and state, what it covers, and how long it runs. */
+function LicenseHero({ d, org }: { d: LicensingStatus; org: string | null }) {
+  const trial = d.mode.startsWith('Trial');
+  const free = d.mode.startsWith('Free');
+  const perpetual = d.licenseType === 'perpetual';
+  const who = d.licensee?.company ?? d.license?.customerName ?? org ?? 'This organization';
+  const period = trial ? remaining(d.trial?.startedAt, d.trial?.expiresAt ?? d.expiresAt)
+    : perpetual ? remaining(d.license?.issuedAt, d.supportUntil)
+    : free ? null : remaining(d.license?.issuedAt, d.expiresAt);
+  const tone = statusTone(d.mode);
+  const ringTone = !period ? 'ok' : period.days <= 14 ? 'crit' : period.days <= 45 ? 'warn' : 'ok';
+  const edition = trial ? 'Trial' : free ? 'Free tier' : `${d.editionTitle ?? 'Custom'} edition`;
+  const contact = [d.licensee?.contactName, d.licensee?.contactEmail, d.licensee?.contactPhone].filter(Boolean).join(' · ');
+  const facts: [string, ReactNode][] = [
+    [trial ? 'Trial ends' : perpetual ? 'License' : free ? 'Runs' : 'Valid until', trial ? fmt.day(d.trial?.expiresAt ?? d.expiresAt) : perpetual ? 'Perpetual' : free ? 'No end' : fmt.day(d.expiresAt)],
+    ...(perpetual ? [['Support until', fmt.day(d.supportUntil ?? null)] as [string, ReactNode]] : []),
+    ['Type', trial ? '14-day evaluation' : free ? 'Free tier' : perpetual ? 'Perpetual + yearly support' : d.licenseType === 'subscription' ? 'Subscription' : 'License file'],
+    ['Activation', d.activation === 'online' ? 'Online (daily check-in)' : d.activation === 'offline' ? 'Offline (file)' : d.license ? 'License file' : '—'],
+    ...(d.license ? [['License ID', <span className="mono">{d.license.licenseId}</span>] as [string, ReactNode]] : []),
+    ...(d.installationId ? [['Installation ID', <span className="mono">{d.installationId}</span>] as [string, ReactNode]] : []),
+  ];
+  return (
+    <section className={`lic-hero tone-${tone}`} aria-label="License">
+      <div className="lic-hero-main">
+        <div className="lic-hero-eyebrow">{trial ? 'Evaluation for' : free ? 'Free tier for' : 'Licensed to'}</div>
+        <h2 className="lic-hero-name">{who}</h2>
+        {contact && <div className="lic-hero-contact">{contact}</div>}
+        {d.licensee?.address && <div className="lic-hero-contact">{d.licensee.address}{d.licensee.country ? `, ${d.licensee.country}` : ''}</div>}
+        <div className="lic-hero-badges">
+          <span className="lic-edition"><Icon name="key" size={14} /> {edition}</span>
+          <Pill tone={tone}>{MODE_LABEL[d.mode] ?? fmt.label(d.mode)}</Pill>
+        </div>
+        {d.sections && (
+          <div className="lic-hero-sections" aria-label="Sections">
+            {d.sections.map((x) => {
+              const on = x.installed && x.enabled;
+              return (
+                <span key={x.id} className={`lic-sec${on ? ' on' : ''}`} title={!x.installed ? 'Not installed on this server' : x.enabled ? 'Included' : x.offer === 'addon' ? 'Add-on, not included' : 'Needs the Advanced edition'}>
+                  <Icon name={on ? 'check' : 'lock'} size={12} /> {x.title}{x.offer === 'addon' && <em>add-on</em>}
+                </span>
+              );
+            })}
+          </div>
+        )}
+      </div>
+      <div className="lic-hero-side">
+        {period ? (
+          <Ring part={period.part} tone={ringTone}><b>{period.days.toLocaleString()}</b><small>{period.days === 1 ? 'day left' : 'days left'}{perpetual ? ' of support' : ''}</small></Ring>
+        ) : (
+          <Ring part={1} tone="ok"><b>∞</b><small>{free ? 'no end' : 'perpetual'}</small></Ring>
+        )}
+        <dl className="lic-hero-facts">
+          {facts.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}
+        </dl>
+      </div>
+    </section>
+  );
 }
 
 export function LicensingPage() {
@@ -47,7 +127,7 @@ export function LicensingPage() {
   const [msg, setMsg] = useState<Msg>(null);
   const [key, setKey] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
-  const [serverUrl, setServerUrl] = useState<string | null>(null);
+  const org = useApi(() => api.get<OrganizationResponse>('/organization').catch(() => null), []);
   const fileRef = useRef<HTMLInputElement>(null);
   const offRef = useRef<HTMLInputElement>(null);
   const d = st.data;
@@ -72,7 +152,6 @@ export function LicensingPage() {
       message: 'The license is released on the license server so the key can be activated on another server. This server falls back to the free tier (25 IT devices, 25 non-IT assets, 5 cloud instances, no remote support) until it is activated again. No data is deleted.' }))) return;
     await run('deactivate', async () => (await api.post<{ message: string }>('/licensing/deactivate')).message);
   }
-  const saveServer = () => run('server', async () => { await api.put('/licensing/server', { url: serverUrl ?? '' }); setServerUrl(null); return 'License server address saved.'; });
 
   async function exportRequest() {
     setMsg(null);
@@ -118,15 +197,7 @@ export function LicensingPage() {
           {d.warning && <Callout tone="warn" icon="alert">{d.warning}</Callout>}
           {d.mode === 'FreeOverLimit' && <Callout tone="crit" icon="alert">This server uses more than the free tier allows, so licensed features are paused. Activate a license, or reduce the records below the free limits. No data has been deleted.</Callout>}
           {d.revoked && !d.license && <Callout tone="crit" icon="alert">License {d.revoked.licenseId} ({d.revoked.customerName}) is no longer valid on this server (revoked, suspended or deactivated at the license server). Contact Zentriq, or activate another license.</Callout>}
-          <Kpis items={[
-            { label: 'State', value: <Pill tone={statusTone(d.mode)}>{MODE_LABEL[d.mode] ?? fmt.label(d.mode)}</Pill> },
-            { label: 'Plan', value: planText(d) },
-            d.licenseType === 'perpetual'
-              ? { label: 'Support until', value: fmt.day(d.supportUntil ?? null), sub: 'Versions released until then can be installed' }
-              : { label: d.mode.startsWith('Trial') ? 'Trial ends' : d.mode.startsWith('Free') ? 'Ends' : 'Subscription ends', value: d.mode.startsWith('Free') ? 'No end' : fmt.day(d.expiresAt) },
-            { label: 'Activation', value: d.activation === 'online' ? 'Online' : d.activation === 'offline' ? 'Offline (file)' : d.license ? 'License file' : '—',
-              sub: d.leaseUntil ? `Next check-in needed by ${fmt.day(d.leaseUntil)}` : undefined },
-          ]} />
+          <LicenseHero d={d} org={org.data?.profile?.name ?? null} />
 
           <div className="grid-2">
             <div className="lic-span"><Panel title="Usage" sub="What the plan counts. IT accessories are always unlimited." flush>
@@ -212,52 +283,20 @@ export function LicensingPage() {
               </dl>
             </Panel>
 
-            {d.plans && (
-              <Panel title="Plans">
-                <dl className="dl2">
-                  <dt>Trial</dt><dd>14 days, all sections: {d.plans.trial.devices} IT devices, {d.plans.trial.nonit_assets} non-IT assets, {d.plans.trial.cloud_instances} cloud/VM instances, {d.plans.trial.technicians} remote support technician; accessories unlimited.</dd>
-                  <dt>Free</dt><dd>Standard edition, no end: up to {d.plans.free.devices} IT devices and {d.plans.free.nonit_assets} non-IT assets, {d.plans.free.cloud_instances} cloud/VM instances, no remote support; accessories unlimited.</dd>
-                  <dt>Licensed</dt><dd>Per IT device, non-IT packs ({d.plans.nonItPacks.map((p) => p.toLocaleString()).join(', ')} or unlimited), per cloud/VM instance and per remote support technician. Subscription for {d.plans.subscriptionYears.join(', ')} years, or perpetual with yearly support.</dd>
-                </dl>
-              </Panel>
-            )}
 
             {d.sections && <div className="lic-span"><Panel title="Sections" sub="What is installed on this server and what your plan covers" flush>
               <DataTable rows={d.sections.map((x) => ({ ...x }))} columns={[
-                { key: 't', label: 'Section', render: (r) => <><b>{r.title}</b> <span className="faint lic-help">{r.standard ? 'Standard' : 'Advanced'}</span></> },
+                { key: 't', label: 'Section', render: (r) => <b>{r.title}</b> },
+                { key: 'o', label: 'Licensed with', render: (r) => r.offer === 'addon' ? <Pill tone="info">Add-on</Pill> : r.offer === 'standard' || r.standard ? <span className="muted">Standard and Advanced</span> : <span className="muted">Advanced</span> },
                 { key: 'i', label: 'Installed', render: (r) => r.installed ? <Pill tone="ok">Installed</Pill> : <Pill>Not installed</Pill> },
-                { key: 'l', label: 'Available', render: (r) => !r.installed ? <span className="muted">—</span> : r.enabled ? <Pill tone="ok">Yes</Pill> : d.featuresEnabled ? <Pill tone="warn">Needs Advanced</Pill> : <Pill tone="crit">License required</Pill> },
+                { key: 'l', label: 'Available', render: (r) => !r.installed ? <span className="muted">—</span> : r.enabled ? <Pill tone="ok">Yes</Pill> : d.featuresEnabled ? <Pill tone="warn">{r.offer === 'addon' ? 'Needs the add-on' : 'Needs Advanced'}</Pill> : <Pill tone="crit">License required</Pill> },
               ]} />
               <div className="lic-foot muted">
-                <small><Val>Standard</Val> Overview, Discover &amp; inventory, Insight &amp; admin. <Val>Advanced</Val> Standard plus Remote support, Infrastructure, Secure &amp; remediate. The trial includes every section. To add a section that is not installed, run Zentriq Setup on the server and choose <UiPath>Update › Advanced installation</UiPath>.</small>
+                <small><b>Standard</b> Overview, Discovery &amp; Inventory, Security Pack, Insight &amp; Admin. <b>Advanced</b> Standard plus Infrastructure and Secure &amp; Remediate. <b>Remote Support</b> is an add-on for either edition. The trial includes every section. To add a section that is not installed, run Zentriq Setup on the server and choose <UiPath>Update › Advanced installation</UiPath>.</small>
               </div>
             </Panel></div>}
 
-            {d.licensee && (
-              <Panel title="Licensed to">
-                <dl className="dl2">
-                  <dt>Company</dt><dd><b>{d.licensee.company}</b></dd>
-                  {d.licensee.contactName && <><dt>Contact</dt><dd>{d.licensee.contactName}</dd></>}
-                  {d.licensee.contactEmail && <><dt>Email</dt><dd>{d.licensee.contactEmail}</dd></>}
-                  {d.licensee.contactPhone && <><dt>Phone</dt><dd>{d.licensee.contactPhone}</dd></>}
-                  {d.licensee.address && <><dt>Address</dt><dd>{d.licensee.address}{d.licensee.country ? `, ${d.licensee.country}` : ''}</dd></>}
-                  {d.licensee.taxId && <><dt>Tax ID</dt><dd className="mono">{d.licensee.taxId}</dd></>}
-                </dl>
-                <small className="muted">From the signed license. Edit your company profile in System Settings.</small>
-              </Panel>
-            )}
 
-            {manage && (
-              <Panel title="License server" sub="Only change this when Zentriq asks you to">
-                <label className="field"><span>Address</span>
-                  <input className="in" value={serverUrl ?? online?.serverUrl ?? ''} onChange={(e) => setServerUrl(e.target.value)} placeholder="https://license.zentriq.com" />
-                </label>
-                <div className="row-actions">
-                  <button className="btn" disabled={serverUrl == null || !!busy} onClick={() => void saveServer()}>Save</button>
-                </div>
-                <small className="muted">Outbound HTTPS (port 443) from this server to the license server is needed for online activation and check-ins. The server's proxy settings apply.</small>
-              </Panel>
-            )}
           </div>
         </>
       )}

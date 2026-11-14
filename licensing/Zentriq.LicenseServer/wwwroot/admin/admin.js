@@ -215,11 +215,11 @@
         <div><label for="e_devices">IT devices (endpoints, servers, network devices)</label><input id="e_devices" type="number" min="0" value="${l.devices ?? 100}"></div>
         <div><label for="e_nonit">Non-IT assets</label><select id="e_nonit">${packs}<option value="" ${l.id && l.nonItPack == null ? 'selected' : ''}>Unlimited</option></select></div>
         <div><label for="e_cloud">Cloud and virtual machine instances</label><input id="e_cloud" type="number" min="0" value="${l.cloudInstances ?? 0}"></div>
-        <div><label for="e_tech">Remote support technicians</label><input id="e_tech" type="number" min="0" value="${l.technicians ?? 0}"></div>
+        <div><label for="e_tech">Remote Support add-on: technicians (0 = no add-on)</label><input id="e_tech" type="number" min="0" value="${l.technicians ?? 0}"></div>
         <div><label for="e_max">Servers that may activate this license</label><input id="e_max" type="number" min="1" max="100" value="${l.maxActivations ?? 1}"></div>
         <div><label for="e_grace">Grace days after the end</label><input id="e_grace" type="number" min="0" max="90" value="${l.graceDays ?? 30}"></div>
       </div>
-      <p class="small muted">IT accessories are always unlimited. The edition sets the product sections; add single modules below if needed.</p>
+      <p class="small muted">Standard: Overview, Discovery &amp; Inventory, Security Pack, Insight &amp; Admin. Advanced: Standard plus Infrastructure and Secure &amp; Remediate. Remote Support is an add-on for either edition, licensed per technician. IT accessories are always unlimited; add single modules below if needed.</p>
       <details><summary class="small">Extra modules</summary><div class="grid3">${mods}</div></details>
       <div class="mt"><label for="e_notes">Internal notes</label><textarea id="e_notes">${esc(l.notes)}</textarea></div>`;
   }

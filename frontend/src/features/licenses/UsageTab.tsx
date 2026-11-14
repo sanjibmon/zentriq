@@ -5,7 +5,7 @@ import { useSticky } from '../../app/sticky';
 import { useApi } from '../../app/useApi';
 import { Modal } from '../../components/Modal';
 import { Callout, DataTable, ErrorBox, fmt, Kpis, Pager, Panel, Pill } from '../../components/ui';
-import { hours, money, type ProgramUse, type UsageApp, type UsageSummary } from './types';
+import { hours, money, type ProgramRun, type ProgramUse, type UsageApp, type UsageSummary } from './types';
 
 const PAGE = 50;
 
@@ -73,20 +73,39 @@ export function UsageTab({ canManage }: { canManage: boolean }) {
 }
 
 function ProgramDialog({ app, days, onClose }: { app: UsageApp; days: number; onClose: () => void }) {
+  const [view, setView] = useState<'devices' | 'runs'>('devices');
   const data = useApi(() => api.get<ProgramUse[]>('/sam/usage/program', { exe: app.exe, days }), [app.exe, days]);
+  const runs = useApi(() => (view === 'runs' ? api.get<ProgramRun[]>('/sam/usage/sessions', { exe: app.exe, days }) : Promise.resolve(null)), [app.exe, days, view]);
   const rows = (data.data ?? []).map((r, i) => ({ ...r, id: `${r.assetId}:${r.user ?? ''}:${i}` }));
+  const runRows = (runs.data ?? []).map((r, i) => ({ ...r, id: `${r.assetId}:${r.user ?? ''}:${r.startedAt}:${i}` }));
   return (
     <Modal wide title={`${app.product ?? app.exe} — last ${days} days`} onClose={onClose} footer={<button className="btn" onClick={onClose}>Close</button>}>
-      <ErrorBox error={data.error} />
-      <DataTable rows={rows} empty={data.loading ? 'Loading…' : 'No use recorded.'} columns={[
-        { key: 'h', label: 'Device', render: (r) => <Link to={`/assets/${r.assetId}?tab=experience`}><b>{r.hostname}</b></Link> },
-        { key: 'u', label: 'User', render: (r) => r.user ?? '—' },
-        { key: 't', label: 'Time Running', render: (r) => hours(r.minutes) },
-        { key: 'd', label: 'Days Used', render: (r) => r.daysUsed },
-        { key: 'n', label: 'Launches', render: (r) => r.launches },
-        { key: 'l', label: 'Last Used', render: (r) => fmt.day(r.lastUsed) },
-        { key: 'v', label: 'Version', render: (r) => <span className="mono">{r.version ?? '—'}</span> },
-      ]} />
+      <div className="seg" role="tablist" aria-label="View" style={{ marginBottom: 12 }}>
+        <button type="button" role="tab" aria-selected={view === 'devices'} className={view === 'devices' ? 'on' : ''} onClick={() => setView('devices')}>By device and user</button>
+        <button type="button" role="tab" aria-selected={view === 'runs'} className={view === 'runs' ? 'on' : ''} onClick={() => setView('runs')}>Each launch</button>
+      </div>
+      {view === 'devices' ? <>
+        <ErrorBox error={data.error} />
+        <DataTable rows={rows} empty={data.loading ? 'Loading…' : 'No use recorded.'} columns={[
+          { key: 'h', label: 'Device', render: (r) => <Link to={`/assets/${r.assetId}?tab=experience`}><b>{r.hostname}</b></Link> },
+          { key: 'u', label: 'User', render: (r) => r.user ?? '—' },
+          { key: 't', label: 'Time Running', render: (r) => hours(r.minutes) },
+          { key: 'd', label: 'Days Used', render: (r) => r.daysUsed },
+          { key: 'n', label: 'Launches', render: (r) => r.launches },
+          { key: 'l', label: 'Last Used', render: (r) => fmt.day(r.lastUsed) },
+          { key: 'v', label: 'Version', render: (r) => <span className="mono">{r.version ?? '—'}</span> },
+        ]} />
+      </> : <>
+        <ErrorBox error={runs.error} />
+        <DataTable rows={runRows} empty={runs.loading ? 'Loading…' : 'No launch recorded yet. Agents from build 142 report each launch with their next inventory.'} columns={[
+          { key: 's', label: 'Started', render: (r) => fmt.date(r.startedAt) },
+          { key: 'e', label: 'Closed', render: (r) => (r.running ? <Pill tone="ok">Running</Pill> : fmt.date(r.endedAt)) },
+          { key: 'm', label: 'Duration', render: (r) => (r.running ? <span className="muted">{hours(r.minutes)} so far</span> : hours(r.minutes)) },
+          { key: 'h', label: 'Device', render: (r) => <Link to={`/assets/${r.assetId}?tab=experience`}><b>{r.hostname}</b></Link> },
+          { key: 'u', label: 'User', render: (r) => r.user ?? '—' },
+        ]} />
+        <small className="muted">Times are sampled once a minute: a launch is accurate to about a minute, and programs open for less than a minute may not appear. Up to 500 launches, newest first.</small>
+      </>}
     </Modal>
   );
 }

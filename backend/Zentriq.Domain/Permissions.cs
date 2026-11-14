@@ -117,15 +117,15 @@ public static class Modules
         Lifecycle, Integrations, Licenses, WebApps, SecurityPack
     ];
 
-    /// <summary>Add-ons: licensed on their own, never included by an edition (none at present).</summary>
-    public static readonly IReadOnlyList<string> AddOns = [];
+    /// <summary>Add-ons: licensed on their own for either edition, never included by an edition. Remote Support (since build 142).</summary>
+    public static readonly IReadOnlyList<string> AddOns = [Remote];
 }
 
 /// <summary>
 /// The product sections (the console's navigation groups and the installer's choices) and the modules in each.
-/// Standard installation and Standard edition: Overview, Discover &amp; inventory, Infrastructure (Cloud &amp; infrastructure,
-/// Asset lifecycle) and Insight &amp; admin. Advanced adds Remote support and Secure &amp; remediate. What can be used is what is
-/// installed AND licensed (the trial licenses everything).
+/// Standard installation and Standard edition (since build 142): Overview, Discovery &amp; Inventory, Security Pack and
+/// Insight &amp; Admin. Advanced adds Infrastructure and Secure &amp; Remediate. Remote Support is an add-on for either edition.
+/// What can be used is what is installed AND licensed (the trial licenses everything).
 /// </summary>
 public static class ProductSections
 {
@@ -134,17 +134,22 @@ public static class ProductSections
     public const string Remote = "remote";
     public const string Infrastructure = "infrastructure";
     public const string Secure = "secure";
+    /// <summary>Endpoint privilege management, BitLocker, USB device control (part of Secure &amp; Remediate until build 141).</summary>
+    public const string SecurityPack = "securitypack";
     public const string Insight = "insight";
 
-    public static readonly IReadOnlyList<string> All = [Overview, Discover, Remote, Infrastructure, Secure, Insight];
-    public static readonly IReadOnlyList<string> Standard = [Overview, Discover, Infrastructure, Insight];
-    public static readonly IReadOnlyList<string> Optional = [Remote, Secure];
+    public static readonly IReadOnlyList<string> All = [Overview, Discover, Remote, Infrastructure, Secure, SecurityPack, Insight];
+    public static readonly IReadOnlyList<string> Standard = [Overview, Discover, SecurityPack, Insight];
+    public static readonly IReadOnlyList<string> Optional = [Infrastructure, Secure, Remote];
 
     public static readonly IReadOnlyDictionary<string, string> Titles = new Dictionary<string, string>
     {
         [Overview] = "Overview", [Discover] = "Discovery & Inventory", [Remote] = "Remote Support",
-        [Infrastructure] = "Infrastructure", [Secure] = "Secure & Remediate", [Insight] = "Insight & Admin",
+        [Infrastructure] = "Infrastructure", [Secure] = "Secure & Remediate", [SecurityPack] = "Security Pack", [Insight] = "Insight & Admin",
     };
+
+    /// <summary>How each section is sold: in the Standard edition, the Advanced edition, or as an add-on for either.</summary>
+    public static string OfferOf(string section) => section == Remote ? "addon" : Standard.Contains(section) ? Editions.Standard : Editions.Advanced;
 
     public static readonly IReadOnlyDictionary<string, string[]> ModulesOf = new Dictionary<string, string[]>
     {
@@ -152,7 +157,8 @@ public static class ProductSections
         [Discover] = [Modules.Inventory, Modules.Discovery],
         [Remote] = [Modules.Remote],
         [Infrastructure] = [Modules.Cloud, Modules.Lifecycle],
-        [Secure] = [Modules.Patch, Modules.Vulnerability, Modules.Configuration, Modules.Deployment, Modules.Licenses, Modules.WebApps, Modules.SecurityPack],
+        [Secure] = [Modules.Patch, Modules.Vulnerability, Modules.Configuration, Modules.Deployment, Modules.Licenses, Modules.WebApps],
+        [SecurityPack] = [Modules.SecurityPack],
         [Insight] = [Modules.Reports, Modules.Integrations],
     };
 
@@ -188,9 +194,27 @@ public static class Editions
         _ => [],
     };
 
+    /// <summary>
+    /// Licenses issued before build 142 keep what their edition covered then: Standard included Infrastructure (Cloud &amp;
+    /// infrastructure, Asset lifecycle), Advanced included Remote Support.
+    /// </summary>
+    public static readonly DateTimeOffset Build142 = new(2026, 11, 14, 0, 0, 0, TimeSpan.Zero);
+
+    public static IReadOnlyList<string> ModulesOf(string? edition, DateTimeOffset? issuedAt)
+    {
+        var now = ModulesOf(edition);
+        if (issuedAt is not { } at || at >= Build142) return now;
+        return edition?.Trim().ToLowerInvariant() switch
+        {
+            Standard => now.Concat(new[] { Modules.Cloud, Modules.Lifecycle }).Distinct().ToList(),
+            Advanced => now.Concat(new[] { Modules.Remote }).Distinct().ToList(),
+            _ => now,
+        };
+    }
+
     /// <summary>Effective modules of a license: its edition's modules plus the modules it lists ("*" = all).</summary>
-    public static IReadOnlyList<string> Expand(string? edition, IReadOnlyList<string> modules) =>
-        modules.Contains("*") ? ["*"] : ModulesOf(edition).Concat(modules).Distinct().ToList();
+    public static IReadOnlyList<string> Expand(string? edition, IReadOnlyList<string> modules, DateTimeOffset? issuedAt = null) =>
+        modules.Contains("*") ? ["*"] : ModulesOf(edition, issuedAt).Concat(modules).Distinct().ToList();
 
     public const string Free = "free";
 

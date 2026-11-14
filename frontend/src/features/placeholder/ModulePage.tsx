@@ -42,11 +42,13 @@ export function SectionLockedPage({ section, label }: { section: SectionInfo; la
           <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
             <span className="ico-tile xl" style={{ margin: 0 }}><Icon name="lock" size={28} /></span>
             <div>
-              <h3 style={{ margin: '2px 0 6px' }}>{notInstalled ? `${section.title} is not installed` : `${section.title} needs the Advanced edition`}</h3>
+              <h3 style={{ margin: '2px 0 6px' }}>{notInstalled ? `${section.title} is not installed` : section.offer === 'addon' ? `${section.title} is an add-on` : `${section.title} needs the Advanced edition`}</h3>
               <p className="muted" style={{ margin: '0 0 10px' }}>
                 {notInstalled
                   ? `This server was installed with the Standard installation, which does not include ${section.title}. Run Zentriq Setup on the server, choose Update › Advanced installation and tick ${section.title}. Your data and settings are kept.`
-                  : `Your license is for the Standard edition (Overview, Discovery & Inventory, Insight & Admin). ${section.title} is part of the Advanced edition. Contact your Zentriq partner to upgrade; the new license is imported on the Licensing page and the section is available at once.`}
+                  : section.offer === 'addon'
+                    ? `${section.title} is licensed as an add-on to the Standard or Advanced edition, and your license does not include it. Contact your Zentriq partner to add it; the new license is imported on the Licensing page and the section is available at once.`
+                    : `Your license is for the Standard edition (Overview, Discovery & Inventory, Security Pack, Insight & Admin). ${section.title} is part of the Advanced edition. Contact your Zentriq partner to upgrade; the new license is imported on the Licensing page and the section is available at once.`}
               </p>
               {!notInstalled && can('licensing.manage') && <Link className="btn primary" to="/licensing">Open Licensing</Link>}
             </div>

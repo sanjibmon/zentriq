@@ -3,7 +3,7 @@ import { useAuth } from '../../app/auth';
 import { useApi } from '../../app/useApi';
 import { TrendArea } from '../../components/charts';
 import { Callout, DataTable, ErrorBox, fmt, Kpis, Panel, Pill } from '../../components/ui';
-import { hours } from '../licenses/types';
+import { hours, type ProgramRun } from '../licenses/types';
 import { ScorePill } from './ExperiencePage';
 import { EVENT_LABEL, seconds, type DeviceExperience as Data } from './types';
 
@@ -16,6 +16,7 @@ export function DeviceExperience({ assetId }: { assetId: string }) {
   const { can } = useAuth();
   const data = useApi(() => api.get<Data>(`/experience/devices/${assetId}`), [assetId]);
   const programs = useApi(() => (can('licenses.view') ? api.get<Programs>(`/sam/usage/device/${assetId}`, { days: 30 }).catch(() => null) : Promise.resolve(null)), [assetId]);
+  const runs = useApi(() => (can('licenses.view') ? api.get<ProgramRun[]>('/sam/usage/sessions', { assetId, days: 7, limit: 200 }).catch(() => null) : Promise.resolve(null)), [assetId]);
   const d = data.data;
   const c = d?.current;
   return (
@@ -71,6 +72,17 @@ export function DeviceExperience({ assetId }: { assetId: string }) {
             { key: 'd', label: 'Days Used', render: (p) => p.daysUsed },
             { key: 'n', label: 'Launches', render: (p) => p.launches },
             { key: 'l', label: 'Last Used', render: (p) => fmt.day(p.lastUsed) },
+          ]} />
+        </Panel>
+      )}
+      {runs.data && runs.data.length > 0 && (
+        <Panel flush title="Recent Launches" sub="Each time a program was started and closed, last 7 days (sampled every minute)">
+          <DataTable rows={runs.data.map((r, i) => ({ ...r, id: `${r.exe}:${r.user ?? ''}:${r.startedAt}:${i}` }))} columns={[
+            { key: 'p', label: 'Program', className: 'wrap', render: (r) => <><b>{r.product ?? r.exe}</b><div className="faint mono" style={{ fontSize: 11.5 }}>{r.exe}</div></> },
+            { key: 'u', label: 'User', render: (r) => r.user ?? '—' },
+            { key: 's', label: 'Started', render: (r) => fmt.date(r.startedAt) },
+            { key: 'e', label: 'Closed', render: (r) => (r.running ? <Pill tone="ok">Running</Pill> : fmt.date(r.endedAt)) },
+            { key: 'm', label: 'Duration', render: (r) => (r.running ? <span className="muted">{hours(r.minutes)} so far</span> : hours(r.minutes)) },
           ]} />
         </Panel>
       )}

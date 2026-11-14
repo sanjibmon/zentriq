@@ -73,7 +73,8 @@ public sealed class LicenseIssuer(SigningKeyHolder keys, LicenseServerOptions op
             NotBefore: l.StartsAt < now ? l.StartsAt : now.AddMinutes(-5),
             ExpiresAt: l.IsPerpetual ? LicenseFormats.PerpetualExpiry : l.ExpiresAt,
             GraceDays: l.GraceDays,
-            Modules: l.ExtraModules.Where(m => Modules.All.Contains(m)).Distinct().OrderBy(m => m, StringComparer.Ordinal).ToList(),
+            // Remote Support is an add-on (build 142): licensed when the license has remote support technicians.
+            Modules: l.ExtraModules.Concat(l.Technicians > 0 ? new[] { Modules.Remote } : Array.Empty<string>()).Where(m => Modules.All.Contains(m)).Distinct().OrderBy(m => m, StringComparer.Ordinal).ToList(),
             Entitlements: l.Entitlements(),
             RequestId: certificate ? null : requestId,
             Licensee: c.ToLicensee(),

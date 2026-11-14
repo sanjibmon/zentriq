@@ -1,0 +1,95 @@
+# Console screenshots for design review: installs a published release on a clean Windows VM, enrolls this VM's agent,
+# and captures every console page (light and dark) with an axe-core colour-contrast report. Pushed to branch ci-screens.
+# Runs on pushes to screens/** branches; RELEASE_TAG below picks the release.
+name: console-screens
+on:
+  push:
+    branches: ['screens/**']
+permissions:
+  contents: write
+jobs:
+  screens:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    env:
+      RELEASE_TAG: v1.1.1-build.141
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Download the release
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force rel | Out-Null
+          gh release download $env:RELEASE_TAG -R ${{ github.repository }} -p Zentriq-Setup-x64.exe -D rel
+      - name: Install Zentriq (silent) and enroll this VM's agent
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Set-TimeZone -Id 'India Standard Time'
+          foreach ($k in Get-ChildItem 'HKLM:\SOFTWARE\PostgreSQL\Installations' -ErrorAction SilentlyContinue) {
+            $v = Get-ItemProperty $k.PSPath
+            if ($v.Version -like '17.*') { Start-Process (Join-Path $v.'Base Directory' 'uninstall-postgresql.exe') -ArgumentList '--mode','unattended' -Wait; $dd = $v.PSObject.Properties['Data Directory']; if ($dd) { Remove-Item $dd.Value -Recurse -Force -ErrorAction SilentlyContinue } }
+          }
+          $pw = 'Zq!' + [Guid]::NewGuid().ToString('N').Substring(0, 20) + 'a9'
+          "ZQ_SCREENS_PW=$pw" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          $answer = "$env:RUNNER_TEMP\answers.json"
+          @{ postgres = @{ mode = 'bundled'; port = 5432; dataDir = 'C:\ZentriqData\postgresql' }; https = @{ port = 443; hostName = 'localhost' }
+             admin = @{ organization = 'Contoso Ltd'; email = 'admin@contoso.example'; displayName = 'Priya Sharma'; password = $pw } } | ConvertTo-Json -Depth 4 | Set-Content $answer -Encoding UTF8
+          $p = Start-Process rel\Zentriq-Setup-x64.exe -ArgumentList "ZQ_ANSWERFILE=`"$answer`"", 'ZQ_SECTIONS=all', '/quiet', '/norestart', '/log', "`"$env:RUNNER_TEMP\install.log`"" -Wait -PassThru
+          Remove-Item $answer -Force
+          if ($p.ExitCode -notin 0, 3010) { throw "setup exited $($p.ExitCode)" }
+          $base = 'https://localhost'
+          $deadline = (Get-Date).AddMinutes(5)
+          do { Start-Sleep 5; try { $ok = (Invoke-WebRequest "$base/health/ready" -SkipCertificateCheck -SkipHttpErrorCheck).StatusCode -eq 200 } catch { $ok = $false } } until ($ok -or (Get-Date) -gt $deadline)
+          $s = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+          $h = @{ 'X-Zentriq-Request' = '1' }
+          Invoke-RestMethod "$base/api/v1/auth/login" -Method Post -Body (@{ email = 'admin@contoso.example'; password = $pw } | ConvertTo-Json) -ContentType 'application/json' -Headers $h -WebSession $s -SkipCertificateCheck | Out-Null
+          function Api($m, $path, $body) { $a = @{ Uri = "$base/api/v1$path"; Method = $m; Headers = $h; WebSession = $s; SkipCertificateCheck = $true; ContentType = 'application/json' }; if ($body) { $a.Body = ($body | ConvertTo-Json -Depth 6) }; Invoke-RestMethod @a }
+          $pkg = Api GET '/agents/package'
+          Invoke-WebRequest "$base$($pkg.package.url)" -OutFile "$env:RUNNER_TEMP\agent.msi" -SkipCertificateCheck
+          Api PUT '/agents/settings' @{ checkinMinutes = 2; inventoryMinutes = 30; uninstallProtection = $false } | Out-Null
+          $tok = Api POST '/agents/enrollment-tokens' @{ name = 'screens'; validDays = 1; maxUses = 2; serverUrl = 'https://localhost:8444' }
+          $p = Start-Process msiexec.exe -ArgumentList '/i', "`"$env:RUNNER_TEMP\agent.msi`"", '/qn', 'SERVERURL=https://localhost:8444', "ENROLLMENTCODE=$($tok.code)", 'CHECKININTERVAL=2', 'INVENTORYINTERVAL=30' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "agent install exited $($p.ExitCode)" }
+          # Some sample data so lists are not empty.
+          foreach ($n in 'Kolkata HQ', 'Bengaluru Office', 'Mumbai DC') { try { Api POST '/locations' @{ name = $n } | Out-Null } catch { } }
+          foreach ($n in 'Finance', 'Engineering', 'Sales') { try { Api POST '/departments' @{ name = $n } | Out-Null } catch { } }
+          for ($i = 1; $i -le 6; $i++) { try { Api POST '/assets' @{ hostname = "LAPTOP-$('{0:D3}' -f (100 + $i))"; category = 'laptop'; osFamily = 'windows'; criticality = @('Low','Medium','High')[$i % 3] } | Out-Null } catch { } }
+          # Let the agent send its inventory.
+          $deadline = (Get-Date).AddMinutes(8)
+          do { Start-Sleep 20; $a = Api GET '/assets?pageSize=50' } until ((@($a.items | Where-Object { $_.lastSeenAt }).Count -ge 1) -or (Get-Date) -gt $deadline)
+          Start-Sleep 30
+      - name: Replace the installed web console with this branch's build
+        shell: pwsh
+        working-directory: frontend
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
+          $www = Join-Path $env:ProgramFiles 'Zentriq\api\wwwroot'
+          if (-not (Test-Path "$www\index.html")) { throw "web console not found at $www" }
+          Get-ChildItem "$www\assets" -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force
+          Copy-Item dist\* $www -Recurse -Force
+          Write-Host "Installed console replaced from $(git rev-parse --short HEAD)"
+      - name: Capture screenshots and contrast report
+        shell: pwsh
+        working-directory: tests/screens
+        run: |
+          npm init -y | Out-Null
+          npm install --no-audit --no-fund playwright@1.49.1 axe-core@4.10.2
+          npx playwright install chromium
+          node capture.mjs https://localhost admin@contoso.example "$env:RUNNER_TEMP\screens"
+      - name: Publish to branch ci-screens
+        if: always()
+        shell: pwsh
+        run: |
+          $d = "$env:RUNNER_TEMP\screens"
+          New-Item -ItemType Directory -Force $d | Out-Null
+          Copy-Item "$env:RUNNER_TEMP\install.log" $d -ErrorAction SilentlyContinue
+          Set-Location $d
+          git init -q -b ci-screens
+          git config user.name 'zentriq-ci'; git config user.email 'ci@zentriq.invalid'
+          git add -A; git commit -q -m "Console screenshots for run $env:GITHUB_RUN_ID ($env:RELEASE_TAG)"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ci-screens

@@ -824,3 +824,59 @@ input[type=file].in { height: auto; padding: 7px 10px; }
 .help-step-d label, .help-step-d .btn, .help-step-d input { color: var(--fg); }
 .help-step-d p { margin: 0; }
 .callout .help-steps { margin-top: 2px; }
+
+/* ---- Licensing: the license at a glance ---- */
+.lic-hero { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 28px; align-items: center; padding: 24px 28px; margin-bottom: 18px;
+  border-radius: 16px; border: 1px solid var(--line); overflow: hidden; color: var(--fg);
+  background: radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--accent) 16%, transparent) 0%, transparent 55%),
+              radial-gradient(90% 120% at 100% 100%, color-mix(in srgb, var(--info) 12%, transparent) 0%, transparent 60%), var(--surface);
+  box-shadow: var(--shadow); }
+.lic-hero::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 5px; background: linear-gradient(180deg, var(--accent), var(--info)); }
+.lic-hero.tone-warn::before { background: linear-gradient(180deg, var(--warn), var(--accent)); }
+.lic-hero.tone-crit::before { background: linear-gradient(180deg, var(--crit), var(--warn)); }
+.lic-hero-eyebrow { font-size: 11.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+.lic-hero-name { margin: 4px 0 2px; font-size: 26px; line-height: 1.2; font-weight: 700; letter-spacing: -.01em; color: var(--fg); }
+.lic-hero-contact { color: var(--muted); font-size: 13px; }
+.lic-hero-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px; }
+.lic-edition { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 999px; font-weight: 700; font-size: 13px;
+  background: var(--accent); color: var(--accent-fg); }
+.lic-hero-sections { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+.lic-sec { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 500;
+  border: 1px dashed var(--line-strong); color: var(--muted); background: transparent; }
+.lic-sec.on { border-style: solid; border-color: color-mix(in srgb, var(--ok) 35%, transparent); background: var(--ok-soft); color: var(--fg); }
+.lic-sec.on svg { color: var(--ok); }
+.lic-sec em { font-style: normal; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--info); margin-left: 2px; }
+.lic-hero-side { display: flex; align-items: center; gap: 22px; }
+.lic-ring { position: relative; width: 128px; height: 128px; flex: none; }
+.lic-ring svg { width: 100%; height: 100%; }
+.lic-ring circle { fill: none; stroke-width: 10; }
+.lic-ring .track { stroke: var(--surface-3); }
+.lic-ring .bar { stroke: var(--ok); stroke-linecap: round; transition: stroke-dasharray .6s ease; }
+.lic-ring.warn .bar { stroke: var(--warn); }
+.lic-ring.crit .bar { stroke: var(--crit); }
+.lic-ring-c { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
+.lic-ring-c b { font-size: 30px; line-height: 1; font-weight: 700; color: var(--fg); }
+.lic-ring-c small { font-size: 11.5px; color: var(--muted); margin-top: 3px; }
+.lic-hero-facts { margin: 0; display: grid; gap: 8px; min-width: 230px; }
+.lic-hero-facts > div { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 10px; font-size: 13px; }
+.lic-hero-facts dt { color: var(--muted); }
+.lic-hero-facts dd { margin: 0; font-weight: 600; color: var(--fg); word-break: break-all; }
+.lic-hero-facts .mono { font-weight: 500; font-size: 12px; }
+@media (max-width: 1100px) { .lic-hero { grid-template-columns: 1fr; } }
+@media (max-width: 640px) { .lic-hero-side { flex-direction: column; align-items: flex-start; } .lic-hero { padding: 20px; } }
+
+/* ---- Cloud & infrastructure: connection form with the platform guide beside it ---- */
+.modal-card.wide:has(.cl-layout) { width: min(1120px, 100%); }
+.cl-layout { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 24px; align-items: start; }
+.cl-guide { position: sticky; top: 0; display: grid; gap: 14px; padding: 18px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--line); }
+.cl-guide-h { display: flex; align-items: center; gap: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.cl-guide-h .cl-dot i { width: 28px; height: 28px; border-radius: 8px; }
+.cl-guide-h small { display: block; font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--accent); }
+.cl-guide-h b { display: block; font-size: 15px; color: var(--fg); line-height: 1.3; }
+.cl-guide .help-steps { gap: 14px; }
+.cl-guide .help-step-d { font-size: 12.5px; }
+.cl-guide-note { margin: 0; padding: 8px 10px; border-radius: 8px; background: var(--surface); border: 1px solid var(--line); font-size: 12.5px; color: var(--muted); }
+.cl-guide-foot { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; align-items: start; padding-top: 12px; border-top: 1px solid var(--line); font-size: 12px; line-height: 1.5; color: var(--muted); }
+.cl-guide-foot svg { color: var(--ok); margin-top: 2px; }
+.cl-guide-foot b { color: var(--fg); }
+@media (max-width: 980px) { .cl-layout { grid-template-columns: 1fr; } .cl-guide { position: static; order: -1; } }

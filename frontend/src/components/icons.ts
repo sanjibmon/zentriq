@@ -60,6 +60,7 @@ export const ICONS = {
   "host": "<rect x=\"3\" y=\"4\" width=\"18\" height=\"7\" rx=\"1\"/><rect x=\"3\" y=\"13\" width=\"18\" height=\"7\" rx=\"1\"/><path d=\"M7 7.5h.01M7 16.5h.01\"/>",
   "upload": "<path d=\"M12 20V8M6 14l6-6 6 6M4 4h16\"/>",
   "eye": "<path d=\"M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/>",
+  "check": "<path d=\"M5 12.5l4.5 4.5L19 7.5\"/>",
   "lock": "<rect x=\"4\" y=\"11\" width=\"16\" height=\"10\" rx=\"2\"/><path d=\"M8 11V7a4 4 0 018 0v4\"/>",
   "sun": "<circle cx=\"12\" cy=\"12\" r=\"4\"/><path d=\"M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4\"/>",
   "columns": "<rect x=\"3\" y=\"4\" width=\"18\" height=\"16\" rx=\"2\"/><path d=\"M9 4v16M15 4v16\"/>",

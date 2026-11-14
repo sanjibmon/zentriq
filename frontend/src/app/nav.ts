@@ -72,7 +72,7 @@ export const GROUP_ICON: Record<string, IconName> = {
 /** Product section of each navigation group (installed by Standard / Advanced setup, enabled by the edition). */
 export const SECTION_OF_GROUP: Record<string, string> = {
   'Overview': 'overview', 'Discovery & Inventory': 'discover', 'Remote Support': 'remote',
-  'Infrastructure': 'infrastructure', 'Secure & Remediate': 'secure', 'Security Pack': 'secure', 'Insight & Admin': 'insight',
+  'Infrastructure': 'infrastructure', 'Secure & Remediate': 'secure', 'Security Pack': 'securitypack', 'Insight & Admin': 'insight',
 };
 
 /** The navigation item and section a path belongs to (longest matching path wins). */

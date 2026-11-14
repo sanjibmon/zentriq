@@ -110,6 +110,8 @@ export const USAGE_TONE: Record<UsageState, '' | 'ok' | 'warn' | 'crit' | 'info'
 export interface UsageApp { exe: string; product: string | null; publisher: string | null; devices: number; users: number; minutes: number; launches: number; lastUsed: string; productId: string | null; productName: string | null }
 export interface UsageProduct { id: string; name: string; publisher: string | null; rules: boolean; installed: number; used: number; unused: number; recent: number; notMetered: number; unitCost: number | null }
 export interface UsageSummary { metering: boolean; unusedDays: number; days: number; meteredDevices: number; apps: UsageApp[]; products: UsageProduct[] }
+/** One run of a program: started, closed (null while running). */
+export interface ProgramRun { assetId: string; hostname: string; user: string | null; exe: string; product: string | null; startedAt: string; endedAt: string | null; lastSeenAt: string; running: boolean; minutes: number }
 export interface ProgramUse { assetId: string; hostname: string; user: string | null; minutes: number; launches: number; daysUsed: number; lastUsed: string; version: string | null; path: string }
 
 /** Minutes as "3 h 20 min". */

@@ -110,7 +110,7 @@ internal static class Experience
                         if (GetProcessTimes(h, out var c, out _, out _, out _)) started = c;
                         if (!users.TryGetValue(session, out var user)) users[session] = user = InstallerWatch.SessionUser(session);
                         if (user is null) continue;
-                        list.Add(new RunningProgram(path, user, p.Id, started));
+                        list.Add(new RunningProgram(path, user, p.Id, started, started > 0 ? new DateTimeOffset(DateTime.FromFileTimeUtc(started)) : (DateTimeOffset?)null));
                     }
                     finally { CloseHandle(h); }
                 }

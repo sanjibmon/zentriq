@@ -79,6 +79,7 @@ public static class ExperienceStore
             ins.Parameters.AddWithValue("launches", items.Select(i => i.Launches).ToArray());
             await ins.ExecuteNonQueryAsync(ct);
         }
+        await RecordSessionsAsync(conn, tx, assetId, usage.Sessions, ct);
         if (Day(usage.Since) is { } since)
         {
             await using var dev = new NpgsqlCommand("""
@@ -89,6 +90,41 @@ public static class ExperienceStore
             dev.Parameters.AddWithValue("s", since);
             await dev.ExecuteNonQueryAsync(ct);
         }
+    }
+
+    /// <summary>Each run of a program (build 142): added, or its end and last-seen time updated; runs older than 400 days are dropped.</summary>
+    private static async Task RecordSessionsAsync(NpgsqlConnection conn, NpgsqlTransaction tx, Guid assetId, List<UsageSession>? sessions, CancellationToken ct)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var runs = (sessions ?? [])
+            .Where(x => !string.IsNullOrWhiteSpace(x.Path) && x.Start > now.AddDays(-400) && x.Start <= now.AddDays(1))
+            .Select(x => (Path: T(x.Path, 1000)!, User: T(x.User, 300) ?? "", x.Start, End: x.End is { } e && e >= x.Start ? e : (DateTimeOffset?)null,
+                          Seen: x.LastSeen >= x.Start ? x.LastSeen : x.Start, Exe: T(x.Exe, 260), Product: T(x.Product, 200)))
+            .GroupBy(x => (x.Path.ToLowerInvariant(), x.User.ToLowerInvariant(), x.Start))
+            .Select(g => g.OrderByDescending(x => x.Seen).First())
+            .Take(20000).ToList();
+        if (runs.Count > 0)
+        {
+            await using var ins = new NpgsqlCommand("""
+                INSERT INTO zentriq.software_usage_sessions (asset_id, path, exe, product, user_name, started_at, ended_at, last_seen_at)
+                SELECT @a, * FROM unnest(@path, @exe, @product, @user, @start, @end, @seen)
+                ON CONFLICT (asset_id, path, user_name, started_at) DO UPDATE
+                   SET ended_at = EXCLUDED.ended_at, last_seen_at = GREATEST(zentriq.software_usage_sessions.last_seen_at, EXCLUDED.last_seen_at),
+                       product = COALESCE(EXCLUDED.product, zentriq.software_usage_sessions.product)
+                """, conn, tx);
+            ins.Parameters.AddWithValue("a", assetId);
+            ins.Parameters.AddWithValue("path", runs.Select(x => x.Path).ToArray());
+            ins.Parameters.AddWithValue("exe", runs.Select(x => x.Exe ?? System.IO.Path.GetFileName(x.Path.Replace('\\', '/'))).ToArray());
+            ins.Parameters.Add(new NpgsqlParameter("product", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = runs.Select(x => (object?)x.Product ?? DBNull.Value).ToArray() });
+            ins.Parameters.AddWithValue("user", runs.Select(x => x.User).ToArray());
+            ins.Parameters.AddWithValue("start", runs.Select(x => x.Start.UtcDateTime).ToArray());
+            ins.Parameters.Add(new NpgsqlParameter("end", NpgsqlDbType.Array | NpgsqlDbType.TimestampTz) { Value = runs.Select(x => x.End is { } e ? (object)e.UtcDateTime : DBNull.Value).ToArray() });
+            ins.Parameters.AddWithValue("seen", runs.Select(x => x.Seen.UtcDateTime).ToArray());
+            await ins.ExecuteNonQueryAsync(ct);
+        }
+        await using var old = new NpgsqlCommand("DELETE FROM zentriq.software_usage_sessions WHERE asset_id = @a AND started_at < now() - interval '400 days'", conn, tx);
+        old.Parameters.AddWithValue("a", assetId);
+        await old.ExecuteNonQueryAsync(ct);
     }
 
     private static readonly HashSet<string> Kinds = ["boot", "crash", "hang", "bugcheck", "shutdown", "service", "oom"];

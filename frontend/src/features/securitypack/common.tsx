@@ -23,8 +23,8 @@ export function useSecurityPack(): boolean {
 export function AddOnNotice() {
   return (
     <Callout tone="warn" icon="lock">
-      <b>Requires the Advanced edition.</b> Endpoint privilege management, BitLocker management and USB device control are part of the Advanced
-      edition. Your license does not include them; ask your Zentriq partner (<Link to="/licensing">Licensing</Link>).
+      <b>Not included in your license.</b> Endpoint privilege management, BitLocker management and USB device control are part of the Standard
+      and Advanced editions; your license does not include them. Ask your Zentriq partner (<Link to="/licensing">Licensing</Link>).
     </Callout>
   );
 }

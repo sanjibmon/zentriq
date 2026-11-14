@@ -238,7 +238,7 @@ public sealed class Provisioner(ProvisionInput input, ZentriqPaths paths, Report
     }
 
     /// <summary>
-    /// Standard installation: Overview, Discover &amp; inventory, Insight &amp; admin. Advanced adds the chosen optional sections
+    /// Standard installation: Overview, Discover &amp; inventory, Security Pack, Insight &amp; admin. Advanced adds the chosen optional sections
     /// (Remote support, Infrastructure, Secure &amp; remediate). The choice is stored for the console and licensing; Remote
     /// support's service only runs when its section is installed.
     /// </summary>

@@ -110,6 +110,27 @@ internal static class Experience
         return _users.TryGetValue(uid, out var n) ? n : uid.ToString(CultureInfo.InvariantCulture);
     }
 
+    private static long? _bootTime;
+
+    /// <summary>A process start (clock ticks after boot, field 22 of /proc/[pid]/stat) as a time, from the boot time in /proc/stat.</summary>
+    private static DateTimeOffset? StartedUtc(long ticks)
+    {
+        if (ticks <= 0) return null;
+        if (_bootTime is null)
+        {
+            try
+            {
+                foreach (var l in File.ReadLines("/proc/stat"))
+                    if (l.StartsWith("btime ", StringComparison.Ordinal) && long.TryParse(l[6..].Trim(), out var b)) { _bootTime = b; break; }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+            _bootTime ??= 0;
+        }
+        if (_bootTime is not > 0) return null;
+        // USER_HZ is 100 on every Linux the agent supports.
+        return DateTimeOffset.FromUnixTimeSeconds(_bootTime.Value).AddSeconds(ticks / 100.0);
+    }
+
     /// <summary>Programs of people's accounts (uid 1000–60000), not of system accounts.</summary>
     private static List<RunningProgram> Running()
     {
@@ -131,7 +152,7 @@ internal static class Experience
                 var close = stat.LastIndexOf(')');
                 var fields = close > 0 ? stat[(close + 2)..].Split(' ') : [];
                 var started = fields.Length > 19 && long.TryParse(fields[19], out var st) ? st : 0;
-                list.Add(new RunningProgram(exe, UserName(uid) ?? "", pid, started));
+                list.Add(new RunningProgram(exe, UserName(uid) ?? "", pid, started, StartedUtc(started)));
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
         }

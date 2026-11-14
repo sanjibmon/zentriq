@@ -18,21 +18,19 @@ public sealed class Release121Tests
         new(LicenseMode.Licensed, "", null, null, Editions.Expand(edition, modules), new Dictionary<string, int>(), "L1", "C", edition);
 
     [Fact]
-    public void Security_pack_is_part_of_the_advanced_edition()
+    public void Security_pack_is_part_of_both_editions()
     {
-        // Build 128: part of Advanced (before, a separately licensed add-on); not of Standard.
+        // Build 142: part of the Standard edition (and so of Advanced); build 128-141: Advanced only.
         Assert.True(Licensed(Editions.Advanced).ModuleEnabled(Modules.SecurityPack));
-        Assert.False(Licensed(Editions.Standard).ModuleEnabled(Modules.SecurityPack));
-        Assert.True(Licensed(Editions.Standard, Modules.SecurityPack).ModuleEnabled(Modules.SecurityPack));   // listed as an extra module
-        Assert.Empty(Modules.AddOns);
+        Assert.True(Licensed(Editions.Standard).ModuleEnabled(Modules.SecurityPack));
+        Assert.Equal(new[] { Modules.Remote }, Modules.AddOns);
         Assert.Contains(Modules.SecurityPack, Modules.All);
-        // The trial has it where the Secure section is installed.
+        Assert.Equal(ProductSections.SecurityPack, ProductSections.SectionOf(Modules.SecurityPack));
+        // Its own section, always installed.
         var trial = new LicenseStatus(LicenseMode.Trial, "", null, 14, ["*"], new Dictionary<string, int>(), null, null, "trial");
         Assert.True(trial.RestrictTo(ProductSections.All).ModuleEnabled(Modules.SecurityPack));
-        Assert.True(trial.RestrictTo([.. ProductSections.Standard, ProductSections.Secure]).ModuleEnabled(Modules.SecurityPack));
-        Assert.False(trial.RestrictTo(ProductSections.Standard).ModuleEnabled(Modules.SecurityPack));
-        // An Advanced license on a Standard installation: not installed, not usable.
-        Assert.False(Licensed(Editions.Advanced, Modules.SecurityPack).RestrictTo(ProductSections.Standard).ModuleEnabled(Modules.SecurityPack));
+        Assert.True(trial.RestrictTo(ProductSections.Standard).ModuleEnabled(Modules.SecurityPack));
+        Assert.True(Licensed(Editions.Advanced).RestrictTo(ProductSections.Standard).ModuleEnabled(Modules.SecurityPack));
         foreach (var p in new[] { Permissions.PrivilegeView, Permissions.PrivilegeManage, Permissions.BitLockerView, Permissions.BitLockerManage, Permissions.BitLockerRecover, Permissions.DeviceControlView, Permissions.DeviceControlManage })
             Assert.Contains(p, Permissions.All);
     }

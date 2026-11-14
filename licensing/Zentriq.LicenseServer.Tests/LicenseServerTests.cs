@@ -51,6 +51,7 @@ public sealed class IssuerTests
         Assert.Equal(500, p.Entitlements[Workloads.NonItAssets]);
         Assert.Equal(20, p.Entitlements[Workloads.CloudInstances]);
         Assert.Equal(2, p.Entitlements[Workloads.Technicians]);
+        Assert.Contains(Modules.Remote, p.Modules);   // technicians = the Remote Support add-on (build 142)
         Assert.NotNull(p.LeaseUntil);
         Assert.Equal("Acme Ltd", p.Licensee!.Company);
 

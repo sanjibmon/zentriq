@@ -275,6 +275,35 @@ public static class LicenseEndpoints
             return Results.Text(json ?? "[]", "application/json");
         });
 
+        // Each run of a program (build 142): when it was started and closed, on which device and by whom. Newest first.
+        g.MapGet("/usage/sessions", async (NpgsqlDataSource ds, string? exe, Guid? assetId, int? days, int? limit, CancellationToken ct) =>
+        {
+            if (string.IsNullOrWhiteSpace(exe) && assetId is null) return Validation.Problem("exe", "Choose a program or a device.");
+            if (exe is { Length: > 260 }) return Validation.Problem("exe", "Choose a program.");
+            var window = Math.Clamp(days ?? 30, 1, 400);
+            var max = Math.Clamp(limit ?? 500, 1, 5000);
+            await using var conn = await ds.OpenConnectionAsync(ct);
+            var json = await ScalarAsync(conn, """
+                SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY t."startedAt" DESC), '[]')::text FROM (
+                  SELECT a.id AS "assetId", COALESCE(a.hostname, host(a.primary_ip)) AS "hostname", NULLIF(s.user_name, '') AS "user",
+                         s.exe AS "exe", s.product AS "product", s.started_at AS "startedAt", s.ended_at AS "endedAt", s.last_seen_at AS "lastSeenAt",
+                         -- Still running: the agent saw it at its last report (an agent that stopped reporting closes nothing).
+                         (s.ended_at IS NULL) AS "running",
+                         GREATEST(0, round(extract(epoch FROM (COALESCE(s.ended_at, s.last_seen_at) - s.started_at)) / 60.0))::int AS "minutes"
+                    FROM zentriq.software_usage_sessions s JOIN zentriq.assets a ON a.id = s.asset_id AND a.status = 'active'
+                   WHERE (@e::text IS NULL OR lower(s.exe) = lower(@e)) AND (@a::uuid IS NULL OR s.asset_id = @a)
+                     AND COALESCE(s.ended_at, s.last_seen_at) > now() - make_interval(days => @w)
+                   ORDER BY s.started_at DESC LIMIT @max) t
+                """, c =>
+            {
+                c.Parameters.Add(new NpgsqlParameter("e", NpgsqlDbType.Text) { Value = string.IsNullOrWhiteSpace(exe) ? DBNull.Value : exe.Trim() });
+                c.Parameters.Add(new NpgsqlParameter("a", NpgsqlDbType.Uuid) { Value = assetId is { } id ? id : DBNull.Value });
+                c.Parameters.AddWithValue("w", window);
+                c.Parameters.AddWithValue("max", max);
+            }, ct);
+            return Results.Text(json ?? "[]", "application/json");
+        });
+
         // Programs used on one device (device page).
         g.MapGet("/usage/device/{assetId:guid}", async (Guid assetId, NpgsqlDataSource ds, int? days, CancellationToken ct) =>
         {

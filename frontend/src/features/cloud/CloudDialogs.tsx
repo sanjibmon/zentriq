@@ -7,44 +7,104 @@ import { Modal } from '../../components/Modal';
 import { Callout } from '../../components/ui';
 import { PROVIDERS, type CloudAccount, type Provider } from './types';
 import { HelpSteps, Step, UiBtn, UiPath, Val } from '../../components/Help';
+import { Icon } from '../../components/Icon';
 
 const err = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const list = (s: string) => s.split(/[\s,;]+/).map((x) => x.trim()).filter(Boolean);
 
 
-const HELP: Record<Provider, ReactNode> = {
-  azure: <HelpSteps>
-    <Step title="Register an app">In the Azure portal: <UiPath>Microsoft Entra ID › App registrations › New registration</UiPath>.</Step>
-    <Step title="Create a secret"><UiPath>Certificates &amp; secrets › New client secret</UiPath>.</Step>
-    <Step title="Give it read access">On each subscription: <UiPath>Access control (IAM) › Add role assignment</UiPath>, role <Val>Reader</Val>, for the app. Zentriq reads with Azure Resource Graph and changes nothing.</Step>
-  </HelpSteps>,
-  aws: <HelpSteps>
-    <Step title="Create a user">In IAM, create a user for Zentriq and attach the <Val>ReadOnlyAccess</Val> policy (or <Val>SecurityAudit</Val> plus <Val>ViewOnlyAccess</Val>).</Step>
-    <Step title="Create an access key">Use case <UiBtn>Application running outside AWS</UiBtn>. Zentriq signs requests with the key and changes nothing.</Step>
-  </HelpSteps>,
-  vmware: <>vCenter Server 6.5 or later. Create a user (for example <Val>zentriq@vsphere.local</Val>) and give it the <Val>Read-only</Val> role on the vCenter,
-    with <UiBtn>Propagate to children</UiBtn>. ESXi hosts without vCenter are not supported — use the agent or a network scan for those.</>,
-  gcp: <>
-    <HelpSteps>
-      <Step title="Create a service account">In the Google Cloud console: <UiPath>IAM &amp; Admin › Service accounts › Create</UiPath>.</Step>
-      <Step title="Give it read access">Role <Val>Viewer</Val> on each project (or on the folder / organization).</Step>
-      <Step title="Create a key"><UiPath>Keys › Add key › JSON</UiPath>, and paste the whole downloaded file below.</Step>
-    </HelpSteps>
-    Zentriq reads Compute Engine, disks, addresses, firewall rules, load balancers,
-    Cloud Storage, Cloud SQL, GKE and Cloud Functions, and changes nothing. An API that is not enabled in a project is skipped.</>,
-  nutanix: <>Prism Central (all registered clusters) or Prism Element, port 9440. Create a local user, or use a directory user, with the <Val>Viewer</Val> role.
-    Zentriq reads clusters, AHV hosts and virtual machines through the v3 REST API and changes nothing.</>,
-  proxmox: <>
-    <HelpSteps>
+/** What to prepare on each platform before adding the connection: numbered steps, then what Zentriq reads. */
+const GUIDE: Record<Provider, { steps: ReactNode; reads: string; note?: ReactNode }> = {
+  azure: {
+    steps: <HelpSteps>
+      <Step title="Register an app">Azure portal: <UiPath>Microsoft Entra ID › App registrations › New registration</UiPath>.</Step>
+      <Step title="Create a client secret"><UiPath>Certificates &amp; secrets › New client secret</UiPath>. Copy its value.</Step>
+      <Step title="Give it read access">On each subscription: <UiPath>Access control (IAM) › Add role assignment</UiPath>, role <Val>Reader</Val>, for the app.</Step>
+    </HelpSteps>,
+    reads: 'Virtual machines, disks, networks, public IPs, storage, databases, AKS and functions, through Azure Resource Graph.',
+  },
+  aws: {
+    steps: <HelpSteps>
+      <Step title="Create a user">IAM: create a user for Zentriq and attach <Val>ReadOnlyAccess</Val> (or <Val>SecurityAudit</Val> + <Val>ViewOnlyAccess</Val>).</Step>
+      <Step title="Create an access key">Use case <UiBtn>Application running outside AWS</UiBtn>. Copy the key ID and the secret.</Step>
+    </HelpSteps>,
+    reads: 'EC2 instances, volumes, addresses, security groups, load balancers, S3, RDS, EKS and Lambda in every enabled region.',
+  },
+  gcp: {
+    steps: <HelpSteps>
+      <Step title="Create a service account">Google Cloud console: <UiPath>IAM &amp; Admin › Service accounts › Create</UiPath>.</Step>
+      <Step title="Give it read access">Role <Val>Viewer</Val> on each project (or on the folder or organization).</Step>
+      <Step title="Create a JSON key"><UiPath>Keys › Add key › JSON</UiPath>. Paste the whole file in step 3.</Step>
+    </HelpSteps>,
+    reads: 'Compute Engine, disks, addresses, firewall rules, load balancers, Cloud Storage, Cloud SQL, GKE and Cloud Functions. APIs that are not enabled are skipped.',
+  },
+  vmware: {
+    steps: <HelpSteps>
+      <Step title="Create a user">In vCenter, for example <Val>zentriq@vsphere.local</Val>.</Step>
+      <Step title="Give it read access">Role <Val>Read-only</Val> on the vCenter, with <UiBtn>Propagate to children</UiBtn>.</Step>
+    </HelpSteps>,
+    reads: 'Clusters, ESXi hosts, virtual machines and datastores (vCenter Server 6.5 or later).',
+    note: <>ESXi hosts without vCenter are not supported: use the agent or a network scan for those.</>,
+  },
+  hyperv: {
+    steps: <HelpSteps>
+      <Step title="Save a Windows credential">In <UiPath>Discovery › Credentials</UiPath>, an account in <Val>Hyper-V Administrators</Val> (or an administrator) on the hosts.</Step>
+      <Step title="Open WinRM or WMI">WinRM (5985) or WMI/DCOM from the Zentriq server to every host, as for an agentless Windows scan.</Step>
+      <Step title="List every host">Each node of a failover cluster, in step 3.</Step>
+    </HelpSteps>,
+    reads: 'Hosts, virtual machines, virtual disks and switches.',
+  },
+  nutanix: {
+    steps: <HelpSteps>
+      <Step title="Choose the endpoint">Prism Central (all registered clusters) or Prism Element, port <Val>9440</Val>.</Step>
+      <Step title="Create a user">A local or directory user with the <Val>Viewer</Val> role.</Step>
+    </HelpSteps>,
+    reads: 'Clusters, AHV hosts and virtual machines, through the v3 REST API.',
+  },
+  proxmox: {
+    steps: <HelpSteps>
       <Step title="Create an API token"><UiPath>Datacenter › Permissions › API Tokens › Add</UiPath>, for example user <Val>zentriq@pve</Val>, token <Val>inventory</Val>.</Step>
       <Step title="Give it read access"><UiPath>Permissions › Add › API Token Permission</UiPath>: path <Val>/</Val>, role <Val>PVEAuditor</Val>, <UiBtn>Propagate</UiBtn>.</Step>
-    </HelpSteps>
-    One node of a cluster is enough; port 8006. Install the QEMU guest agent in the VMs to see their IP addresses and OS.</>,
-  xenserver: <>The pool master of an XCP-ng or Citrix Hypervisor (XenServer) pool, over HTTPS. Use root, or a pool user (Active Directory) with the <Val>Read Only</Val> role. Xen Orchestra is not needed. Guest tools in the VMs give their IP addresses and OS.</>,
-  ovirt: <>The engine of oVirt, Red Hat Virtualization or Oracle Linux Virtualization Manager (<Val>https://engine/ovirt-engine</Val>). A user such as <Val>zentriq@internal</Val> with a read-only role (for example <Val>ReadOnlyAdmin</Val>) on the data center. The guest agent in the VMs gives IP, FQDN and OS.</>,
-  hyperv: <>Each Hyper-V host (every node of a failover cluster). The saved Windows credential must be in <Val>Hyper-V Administrators</Val> (or an administrator) on the hosts,
-    and WinRM (5985) or WMI/DCOM must be reachable from the Zentriq server — the same as an agentless Windows scan.</>,
+    </HelpSteps>,
+    reads: 'Nodes, virtual machines, containers and storage. One node of a cluster is enough (port 8006).',
+    note: <>Install the QEMU guest agent in the VMs to see their IP addresses and operating system.</>,
+  },
+  xenserver: {
+    steps: <HelpSteps>
+      <Step title="Use the pool master">Of the XCP-ng or Citrix Hypervisor (XenServer) pool, over HTTPS. Xen Orchestra is not needed.</Step>
+      <Step title="Choose the account"><Val>root</Val>, or a pool user (Active Directory) with the <Val>Read Only</Val> role.</Step>
+    </HelpSteps>,
+    reads: 'Hosts, virtual machines and storage repositories of the pool.',
+    note: <>Guest tools in the VMs give their IP addresses and operating system.</>,
+  },
+  ovirt: {
+    steps: <HelpSteps>
+      <Step title="Use the engine">oVirt, Red Hat Virtualization or Oracle Linux Virtualization Manager: <Val>https://engine/ovirt-engine</Val>.</Step>
+      <Step title="Create a user">For example <Val>zentriq@internal</Val>, with a read-only role such as <Val>ReadOnlyAdmin</Val> on the data center.</Step>
+    </HelpSteps>,
+    reads: 'Clusters, hosts, virtual machines and storage domains.',
+    note: <>The guest agent in the VMs gives their IP address, FQDN and operating system.</>,
+  },
 };
+
+/** "Before you start" panel beside the connection form. */
+function Guide({ provider, label }: { provider: Provider; label: string }) {
+  const g = GUIDE[provider];
+  return (
+    <aside className="cl-guide" aria-label={`Prepare ${label}`}>
+      <div className="cl-guide-h">
+        <span className={`cl-dot cl-${provider}`}><i /></span>
+        <div><small>Before you start</small><b>Prepare {label}</b></div>
+      </div>
+      {g.steps}
+      {g.note && <p className="cl-guide-note">{g.note}</p>}
+      <div className="cl-guide-foot">
+        <Icon name="shield" size={14} />
+        <span><b>Read-only.</b> Zentriq reads {g.reads.charAt(0).toLowerCase() + g.reads.slice(1)} It changes nothing.</span>
+      </div>
+    </aside>
+  );
+}
 
 export function AccountDialog({ account, onClose, onDone }: { account: CloudAccount | null; onClose: () => void; onDone: (msg: string) => void }) {
   const st = account?.settings ?? {};
@@ -108,6 +168,7 @@ export function AccountDialog({ account, onClose, onDone }: { account: CloudAcco
       <button type="button" className="btn" onClick={onClose} disabled={busy}>Cancel</button>
       <button type="submit" form="cl-form" className="btn primary" disabled={busy}>{busy ? 'Saving…' : account ? 'Save' : 'Add and sync'}</button>
     </>}>
+      <div className="cl-layout">
       <form id="cl-form" className="cl-form" onSubmit={(e) => void submit(e)}>
         {error && <Callout tone="crit" icon="alert">{error}</Callout>}
 
@@ -126,7 +187,6 @@ export function AccountDialog({ account, onClose, onDone }: { account: CloudAcco
                 </div>
               </div>
             ))}
-          <div className="cl-help"><Callout icon="info">{HELP[provider]}</Callout></div>
         </Section>
 
         <Section n={2} title="Connection">
@@ -191,6 +251,8 @@ export function AccountDialog({ account, onClose, onDone }: { account: CloudAcco
           </div>
         </Section>
       </form>
+      <Guide provider={provider} label={platform.label} />
+      </div>
     </Modal>
   );
 }

@@ -3,7 +3,7 @@
 Zentriq reads your public cloud and virtualization platforms with a **read-only** account and shows every virtual machine,
 host and cloud resource next to the devices in your inventory. Nothing is started, stopped or changed on the platforms.
 
-Module: **Cloud & Infrastructure** (navigation group *Infrastructure*, Standard and Advanced editions, Standard installation).
+Module: **Cloud & Infrastructure** (navigation group *Infrastructure*, Advanced edition and Advanced installation since build 142).
 
 ## Supported platforms
 

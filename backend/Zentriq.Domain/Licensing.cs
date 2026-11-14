@@ -113,8 +113,12 @@ public static class Plans
         [Zentriq.Domain.Workloads.CloudInstances] = 5, [Zentriq.Domain.Workloads.Technicians] = 0,
     };
 
-    /// <summary>Free tier modules: the Standard edition (asset management); no remote support or security modules.</summary>
-    public static IReadOnlyList<string> FreeModules => Editions.ModulesOf(Editions.Standard);
+    /// <summary>
+    /// Free tier modules: asset management — Overview, Discovery &amp; Inventory, Infrastructure (Cloud &amp; infrastructure,
+    /// Asset lifecycle) and Insight &amp; Admin, as before build 142; no remote support or security modules.
+    /// </summary>
+    public static IReadOnlyList<string> FreeModules =>
+        ProductSections.ModulesFor([ProductSections.Overview, ProductSections.Discover, ProductSections.Infrastructure, ProductSections.Insight]);
 
     /// <summary>Non-IT asset packs; "unlimited" is a license without a non-IT limit.</summary>
     public static readonly IReadOnlyList<int> NonItPacks = [250, 500, 1000, 2000, 4000];

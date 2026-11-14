@@ -20,7 +20,7 @@ export interface LicenseSummary {
   sections?: SectionInfo[];
 }
 
-export interface SectionInfo { id: string; title: string; installed: boolean; enabled: boolean; standard: boolean }
+export interface SectionInfo { id: string; title: string; installed: boolean; enabled: boolean; standard: boolean; /** 'standard', 'advanced' or 'addon'. */ offer?: string }
 
 export interface Me {
   id: string;

@@ -98,7 +98,7 @@ public static class LicenseEvaluator
         {
             var p = lic.Payload;
             var edition = p.Edition?.ToLowerInvariant();
-            var modules = Editions.Expand(p.Edition, p.Modules);
+            var modules = Editions.Expand(p.Edition, p.Modules, p.IssuedAt);
             var perpetual = p.LicenseType == LicenseFormats.Perpetual;
             LicenseStatus Make(LicenseMode mode, string summary, DateTimeOffset? until, IReadOnlyList<string> mods, string? warning = null) =>
                 new(mode, summary, until, until is { } u ? DaysLeft(u, now) : null, mods, p.Entitlements, p.LicenseId, p.Customer, edition,

@@ -43,7 +43,7 @@ public static class LicensingEndpoints
                 mode = status.Mode.ToString(), status.Summary, status.Warning, status.ExpiresAt, status.DaysRemaining, status.FeaturesEnabled, status.Modules,
                 edition = status.Edition, editionTitle = Editions.Title(status.Edition),
                 licenseType = status.LicenseType, status.SupportUntil, activation = status.Activation, status.LeaseUntil,
-                sections = ProductSections.All.Select(x => new { id = x, title = ProductSections.Titles[x], installed = status.InstalledSections.Contains(x), enabled = status.SectionEnabled(x), standard = ProductSections.Standard.Contains(x) }),
+                sections = ProductSections.All.Select(x => new { id = x, title = ProductSections.Titles[x], installed = status.InstalledSections.Contains(x), enabled = status.SectionEnabled(x), standard = ProductSections.Standard.Contains(x), offer = ProductSections.OfferOf(x) }),
                 limits = status.Limits, usage, installationId = state?.InstallationId,
                 trial = trial is null ? null : new { trial.StartedAt, trial.ExpiresAt },
                 license = active, revoked,

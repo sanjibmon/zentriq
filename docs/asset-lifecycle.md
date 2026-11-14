@@ -1,6 +1,6 @@
 # Asset Lifecycle (IT assets)
 
-**Asset Lifecycle** (build 80, section *Infrastructure*, Standard and Advanced editions) follows every IT asset from purchase to disposal. It applies to IT assets only; non-IT assets keep their own register.
+**Asset Lifecycle** (build 80, section *Infrastructure*, Advanced edition since build 142) follows every IT asset from purchase to disposal. It applies to IT assets only; non-IT assets keep their own register.
 
 It follows ISO/IEC 19770-1 (IT asset management) and the ITIL 4 IT Asset Management practice. Stages are as in ServiceNow HAM. Disposal records data sanitisation per NIST SP 800-88.
 

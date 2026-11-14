@@ -125,10 +125,17 @@ for how long**, so licences of software nobody uses can be reclaimed.
   (metering started recently, or the agent is older).
 * **Software Usage** tab: the licensed products with installations used and unused and the possible saving (unused ×
   average licence cost), and every program used in the period (devices, users, time running, launches, last use; click
-  for the devices and users).
+  for the devices and users, and **Each launch**: when the program was started and closed, how long it ran, on which
+  device and by whom — newest first, up to 500; build 142).
+* **Each launch (build 142)**: a launch is the time a program had at least one process in a user's session, from the
+  process start (or the first sample) to the last sample with it running; several windows or processes of the program
+  are one launch, and a launch still running shows *Running*. Times are sampled once a minute, so they are accurate to
+  about a minute and programs open for less than a minute may be missed. The device keeps 35 days, the server 400 days.
+  Agents from build 142 report launches; older agents report daily totals only.
 * **Product page**: *Unused Installations* tile, *Last Used* and *Use* per installation, a filter, and **Uninstall from
   N Unused** (permission *software.uninstall*; the agent removes the software as for *Software Inventory*).
-* **Device page › Experience**: the programs used on the device in the last 30 days.
+* **Device page › Experience**: the programs used on the device in the last 30 days, and *Recent Launches* (last 7
+  days, each with its start, close and duration).
 * **Alert** (information): "Product: N installation(s) not used for 90 days", with the possible saving.
 * **Settings › Software Metering**: on by default; turning it off tells every agent at its next check-in to stop and
   to delete the totals it keeps.

@@ -14,6 +14,24 @@ public sealed class UsageReport
     /// <summary>First day the agent metered (yyyy-MM-dd): a program without use since then was not used.</summary>
     [JsonPropertyName("since")] public string Since { get; set; } = "";
     [JsonPropertyName("items")] public List<UsageItem> Items { get; set; } = new();
+    /// <summary>Each run of a program (build 142): started, closed (null while running).</summary>
+    [JsonPropertyName("sessions")] public List<UsageSession> Sessions { get; set; } = new();
+}
+
+/// <summary>
+/// One run of a program for one user: from the first sample (or the process start time) with the program running to
+/// the last sample with it running. Several windows or processes of the program are one run.
+/// </summary>
+public sealed class UsageSession
+{
+    [JsonPropertyName("path")] public string Path { get; set; } = "";
+    [JsonPropertyName("exe")] public string Exe { get; set; } = "";
+    [JsonPropertyName("product")] public string? Product { get; set; }
+    [JsonPropertyName("user")] public string User { get; set; } = "";
+    [JsonPropertyName("start")] public DateTimeOffset Start { get; set; }
+    /// <summary>Null while the program is still running.</summary>
+    [JsonPropertyName("end")] public DateTimeOffset? End { get; set; }
+    [JsonPropertyName("lastSeen")] public DateTimeOffset LastSeen { get; set; }
 }
 
 public sealed class UsageItem
@@ -70,11 +88,13 @@ public sealed class ExperienceEvent
 /// <summary>A running program seen by a sample: full path, the user of its session, its process id and start time.</summary>
 public readonly struct RunningProgram
 {
-    public RunningProgram(string path, string user, int pid, long started) { Path = path; User = user; Pid = pid; Started = started; }
+    public RunningProgram(string path, string user, int pid, long started, DateTimeOffset? startedUtc = null) { Path = path; User = user; Pid = pid; Started = started; StartedUtc = startedUtc; }
     public string Path { get; }
     public string User { get; }
     public int Pid { get; }
     public long Started { get; }
+    /// <summary>When the process started, when known (gives the run its real start time).</summary>
+    public DateTimeOffset? StartedUtc { get; }
 }
 
 /// <summary>
@@ -92,6 +112,7 @@ public sealed class ExperienceRecorder
     {
         [JsonPropertyName("since")] public string Since { get; set; } = "";
         [JsonPropertyName("usage")] public List<UsageItem> Usage { get; set; } = new();
+        [JsonPropertyName("sessions")] public List<UsageSession> Sessions { get; set; } = new();
         [JsonPropertyName("days")] public List<ExperienceDay> Days { get; set; } = new();
         [JsonPropertyName("cpuSum")] public Dictionary<string, double> CpuSum { get; set; } = new();
         [JsonPropertyName("memSum")] public Dictionary<string, double> MemSum { get; set; } = new();
@@ -158,6 +179,7 @@ public sealed class ExperienceRecorder
                     if (!first && !_seen!.Contains(id)) item.Launches++;
                 }
                 _seen = seen;
+                TrackSessions(local, programs);
             }
             if (cpu is not null || mem is not null)
             {
@@ -178,12 +200,58 @@ public sealed class ExperienceRecorder
         }
     }
 
+    /// <summary>A run continues while its program is seen at least every few minutes (a missed sample is not a close).</summary>
+    public static readonly TimeSpan SessionGap = TimeSpan.FromMinutes(3);
+
+    private void TrackSessions(DateTime local, IEnumerable<RunningProgram> programs)
+    {
+        var now = new DateTimeOffset(local.Kind == DateTimeKind.Utc ? local : local.ToUniversalTime(), TimeSpan.Zero);
+        // Programs running now, per program and user, with the earliest known process start.
+        var running = new Dictionary<string, (RunningProgram P, DateTimeOffset? Start)>(StringComparer.OrdinalIgnoreCase);
+        foreach (var p in programs)
+        {
+            if (string.IsNullOrEmpty(p.Path)) continue;
+            var key = p.Path + "|" + (p.User ?? "");
+            var st = p.StartedUtc is { } s && s <= now.AddMinutes(1) && s > now.AddDays(-30) ? s : (DateTimeOffset?)null;
+            if (!running.TryGetValue(key, out var r)) running[key] = (p, st);
+            else if (st is { } s2 && (r.Start is null || s2 < r.Start)) running[key] = (r.P, s2);
+        }
+        var continued = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var x in _store.Sessions.Where(x => x.End is null))
+        {
+            var key = x.Path + "|" + x.User;
+            // Still running: seen recently, or the same process instance as before (the agent was stopped meanwhile).
+            if (running.TryGetValue(key, out var r) && (now - x.LastSeen <= SessionGap || (r.Start is { } st && st <= x.LastSeen)))
+            {
+                x.LastSeen = now;
+                continued.Add(key);
+            }
+            else x.End = x.LastSeen;
+        }
+        foreach (var kv in running)
+        {
+            if (continued.Contains(kv.Key)) continue;
+            var p = kv.Value.P;
+            var start = kv.Value.Start ?? now;
+            // Not before the end of the previous run of the same program and user.
+            var prev = _store.Sessions.Where(x => x.End is not null && string.Equals(x.Path, p.Path, StringComparison.OrdinalIgnoreCase) && string.Equals(x.User, p.User ?? "", StringComparison.OrdinalIgnoreCase))
+                .Select(x => x.End!.Value).DefaultIfEmpty(DateTimeOffset.MinValue).Max();
+            if (start < prev) start = prev;
+            _described.TryGetValue(p.Path, out var d);
+            _store.Sessions.Add(new UsageSession { Path = p.Path, Exe = FileName(p.Path), Product = d.Product, User = p.User ?? "", Start = start, LastSeen = now });
+        }
+    }
+
     private void Prune(DateTime local)
     {
         var oldest = Day(local.AddDays(-KeepDays));
         _store.Usage.RemoveAll(u => string.CompareOrdinal(u.Day, oldest) < 0);
         _store.Days.RemoveAll(u => string.CompareOrdinal(u.Day, oldest) < 0);
         foreach (var k in _store.CpuSum.Keys.Where(k => string.CompareOrdinal(k, oldest) < 0).ToList()) { _store.CpuSum.Remove(k); _store.MemSum.Remove(k); }
+        var oldestRun = new DateTimeOffset(local.AddDays(-KeepDays).ToUniversalTime());
+        _store.Sessions.RemoveAll(x => x.End is { } e && e < oldestRun);
+        if (_store.Sessions.Count > 5000)
+            _store.Sessions = _store.Sessions.OrderByDescending(x => x.LastSeen).Take(4000).ToList();
         // A device that runs thousands of different programs: keep the most used.
         if (_store.Usage.Count > 5000)
             _store.Usage = _store.Usage.OrderByDescending(u => u.Day).ThenByDescending(u => u.Minutes).Take(4000).ToList();
@@ -212,7 +280,7 @@ public sealed class ExperienceRecorder
     /// <summary>Forgets the metering totals (metering turned off in the console).</summary>
     public void ClearUsage()
     {
-        lock (_gate) { if (_store.Usage.Count == 0 && _seen is null) return; _store.Usage.Clear(); _seen = null; _store.Since = ""; _dirty++; }
+        lock (_gate) { if (_store.Usage.Count == 0 && _store.Sessions.Count == 0 && _seen is null) return; _store.Usage.Clear(); _store.Sessions.Clear(); _seen = null; _store.Since = ""; _dirty++; }
         Save(force: true);
     }
 
@@ -227,6 +295,9 @@ public sealed class ExperienceRecorder
                 Since = _store.Since,
                 Items = _store.Usage.Where(u => string.CompareOrdinal(u.Day, from) >= 0).Select(Copy).ToList(),
             };
+            var fromRun = new DateTimeOffset(local.AddDays(-ReportDays).ToUniversalTime());
+            usage.Sessions = _store.Sessions.Where(x => x.End is null || x.End >= fromRun)
+                .Select(x => new UsageSession { Path = x.Path, Exe = x.Exe, Product = x.Product, User = x.User, Start = x.Start, End = x.End, LastSeen = x.LastSeen }).ToList();
             var days = _store.Days.Where(d => string.CompareOrdinal(d.Day, from) >= 0)
                 .Select(d => new ExperienceDay { Day = d.Day, Samples = d.Samples, CpuAvg = d.CpuAvg, CpuHigh = d.CpuHigh, MemAvg = d.MemAvg, MemHigh = d.MemHigh }).ToList();
             return (usage, days, _store.Since);
