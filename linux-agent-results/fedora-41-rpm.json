@@ -1,0 +1,1127 @@
+{
+  "schema": 1,
+  "source": "agent",
+  "collectedAt": "2026-11-14T08:10:09.0165518+00:00",
+  "collectorVersion": "1.1.2.220",
+  "device": {
+    "hostname": "b3a7c9b2fb7d",
+    "fqdn": null,
+    "domain": null,
+    "manufacturer": "Microsoft Corporation",
+    "model": "Virtual Machine",
+    "serialNumber": "0000-0017-1118-3705-2050-7525-15",
+    "sku": null,
+    "smbiosUuid": "ED797522-EDDA-4403-B870-BF0B0D13835E",
+    "chassis": "virtual",
+    "category": "server",
+    "description": null,
+    "location": null,
+    "contact": null,
+    "identifiedBy": null
+  },
+  "os": {
+    "family": "linux",
+    "name": "Fedora Linux 41 (Container Image)",
+    "version": "41",
+    "build": "7.0.0-1019-azure",
+    "architecture": "x86_64",
+    "installDate": null,
+    "lastBoot": "2026-11-14T08:03:40.6665518+00:00",
+    "isServer": true,
+    "ubr": null,
+    "displayVersion": null,
+    "installationType": "Server",
+    "editionId": "Fedora Container Image",
+    "distribution": "fedora",
+    "distributionFamily": "fedora",
+    "desktopEnvironment": null,
+    "kernel": "7.0.0-1019-azure",
+    "packageManager": "rpm",
+    "lts": null
+  },
+  "hardware": {
+    "cpuName": "AMD EPYC 7763 64-Core Processor",
+    "cpuCores": 2,
+    "cpuThreads": 4,
+    "memoryBytes": 16759439360,
+    "biosVendor": "Microsoft Corporation",
+    "biosVersion": "Hyper-V UEFI Release v4.1",
+    "biosDate": "2026-04-22T00:00:00+00:00",
+    "tpmPresent": false,
+    "tpmVersion": null,
+    "isVirtual": true,
+    "disks": [],
+    "volumes": [
+      {
+        "name": "/pkg",
+        "fileSystem": "ext4",
+        "sizeBytes": 154993672192,
+        "freeBytes": 88693567488,
+        "encrypted": null
+      }
+    ]
+  },
+  "network": [],
+  "software": [
+    {
+      "name": "libgcc",
+      "version": "14.3.1-4.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "publicsuffix-list-dafsa",
+      "version": "20250616-1.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "libssh-config",
+      "version": "0.11.3-1.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "fedora-release-identity-container",
+      "version": "41-33",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "fedora-gpg-keys",
+      "version": "41-3",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "fedora-repos",
+      "version": "41-3",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "fedora-release-common",
+      "version": "41-33",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "fedora-release-container",
+      "version": "41-33",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "setup",
+      "version": "2.15.0-8.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "filesystem",
+      "version": "3.18-23.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "basesystem",
+      "version": "11-21.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "pcre2-syntax",
+      "version": "10.44-1.fc41.1",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "ncurses-base",
+      "version": "6.5-2.20240629.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "bash",
+      "version": "5.2.32-1.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "ncurses-libs",
+      "version": "6.5-2.20240629.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "glibc-minimal-langpack",
+      "version": "2.40-28.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "glibc-common",
+      "version": "2.40-28.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "glibc",
+      "version": "2.40-28.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "zlib-ng-compat",
+      "version": "2.2.3-2.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "xz-libs",
+      "version": "5.8.1-2.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libstdc\u002B\u002B",
+      "version": "14.3.1-4.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "bzip2-libs",
+      "version": "1.0.8-19.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libzstd",
+      "version": "1.5.7-1.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "gmp",
+      "version": "6.3.0-2.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "fmt",
+      "version": "11.0.2-2.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libxml2",
+      "version": "2.12.10-1.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "popt",
+      "version": "1.19-7.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libxcrypt",
+      "version": "4.5.2-1.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libattr",
+      "version": "2.5.2-4.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libacl",
+      "version": "2.3.2-2.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "json-c",
+      "version": "0.17-4.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "pcre2",
+      "version": "10.44-1.fc41.1",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libeconf",
+      "version": "0.6.2-3.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libffi",
+      "version": "3.4.6-3.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libuuid",
+      "version": "2.40.4-1.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "gdbm-libs",
+      "version": "1.23-7.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libtasn1",
+      "version": "4.20.0-1.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "p11-kit",
+      "version": "0.25.5-4.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libunistring",
+      "version": "1.1-8.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libidn2",
+      "version": "2.3.8-1.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "crypto-policies",
+      "version": "20250707-1.git836bbee.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "libblkid",
+      "version": "2.40.4-1.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "grep",
+      "version": "3.11-9.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "elfutils-libelf",
+      "version": "0.194-1.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "sqlite-libs",
+      "version": "3.46.1-5.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "lz4-libs",
+      "version": "1.10.0-1.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libsepol",
+      "version": "3.7-2.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libselinux",
+      "version": "3.7-5.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "sed",
+      "version": "4.9-3.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libmount",
+      "version": "2.40.4-1.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libsmartcols",
+      "version": "2.40.4-1.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "lua-libs",
+      "version": "5.4.8-1.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libcom_err",
+      "version": "1.47.1-6.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "readline",
+      "version": "8.2-10.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "gdbm",
+      "version": "1.23-7.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "findutils",
+      "version": "4.10.0-4.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libpsl",
+      "version": "0.21.5-4.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "cyrus-sasl-lib",
+      "version": "2.1.28-27.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "nettle",
+      "version": "3.10-3.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "mpfr",
+      "version": "4.2.1-5.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "gawk",
+      "version": "5.3.0-4.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "file-libs",
+      "version": "5.45-7.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libcap-ng",
+      "version": "0.8.5-3.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "audit-libs",
+      "version": "4.1.1-1.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "pam-libs",
+      "version": "1.6.1-8.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libcap",
+      "version": "2.70-4.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "systemd-libs",
+      "version": "256.17-1.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "sdbus-cpp",
+      "version": "1.5.0-3.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libsemanage",
+      "version": "3.7-2.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "shadow-utils",
+      "version": "4.15.1-12.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libtool-ltdl",
+      "version": "2.4.7-12.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libgomp",
+      "version": "14.3.1-4.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "alternatives",
+      "version": "1.31-1.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "p11-kit-trust",
+      "version": "0.25.5-4.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "gnutls",
+      "version": "3.8.10-1.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "glib2",
+      "version": "2.82.5-1.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "keyutils-libs",
+      "version": "1.6.3-4.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libverto",
+      "version": "0.3.2-9.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libyaml",
+      "version": "0.2.5-16.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libbrotli",
+      "version": "1.1.0-5.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libnghttp2",
+      "version": "1.62.1-3.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "elfutils-default-yama-scope",
+      "version": "0.194-1.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "elfutils-libs",
+      "version": "0.194-1.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "vim-data",
+      "version": "9.1.1914-1.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "coreutils-common",
+      "version": "9.5-12.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "openssl-libs",
+      "version": "3.2.6-2.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "coreutils",
+      "version": "9.5-12.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "ca-certificates",
+      "version": "2024.2.69_v8.0.401-1.0.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "krb5-libs",
+      "version": "1.21.3-5.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libtirpc",
+      "version": "1.3.6-1.rc3.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "zchunk-libs",
+      "version": "1.5.1-1.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libnsl2",
+      "version": "2.0.1-2.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libssh",
+      "version": "0.11.3-1.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "gzip",
+      "version": "1.13-2.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "cracklib",
+      "version": "2.9.11-6.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libpwquality",
+      "version": "1.4.5-11.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "pam",
+      "version": "1.6.1-8.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "authselect-libs",
+      "version": "1.5.0-8.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libevent",
+      "version": "2.1.12-14.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "openldap",
+      "version": "2.6.10-1.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libcurl",
+      "version": "8.9.1-4.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "curl",
+      "version": "8.9.1-4.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "rpm-sequoia",
+      "version": "1.7.0-5.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "rpm-libs",
+      "version": "4.20.1-1.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "librepo",
+      "version": "1.20.0-1.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "rpm-build-libs",
+      "version": "4.20.1-1.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libmodulemd",
+      "version": "2.15.2-1.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libsolv",
+      "version": "0.7.35-1.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libdnf5",
+      "version": "5.2.17.0-1.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libdnf5-cli",
+      "version": "5.2.17.0-1.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "dnf5",
+      "version": "5.2.17.0-1.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "libarchive",
+      "version": "3.7.4-4.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "rpm",
+      "version": "4.20.1-1.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "dnf5-plugins",
+      "version": "5.2.17.0-1.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "sudo",
+      "version": "1.9.17-2.p1.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "authselect",
+      "version": "1.5.0-8.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "vim-minimal",
+      "version": "9.1.1914-1.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "util-linux-core",
+      "version": "2.40.4-1.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "tar",
+      "version": "1.35-4.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "zstd",
+      "version": "1.5.7-1.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "xz",
+      "version": "5.8.1-2.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "bzip2",
+      "version": "1.0.8-19.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    },
+    {
+      "name": "tzdata",
+      "version": "2025b-1.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "rootfiles",
+      "version": "8.1-37.fc41",
+      "publisher": "Fedora Project",
+      "installDate": null,
+      "architecture": "noarch",
+      "source": "rpm"
+    },
+    {
+      "name": "gpg-pubkey",
+      "version": "e99d6ad1-64d2612c",
+      "publisher": "(none)",
+      "installDate": null,
+      "architecture": "(none)",
+      "source": "rpm"
+    },
+    {
+      "name": "zentriq-agent",
+      "version": "1.1.2.220-1",
+      "publisher": "(none)",
+      "installDate": null,
+      "architecture": "x86_64",
+      "source": "rpm"
+    }
+  ],
+  "patches": [],
+  "services": [],
+  "security": {
+    "antivirus": [],
+    "firewallEnabled": false,
+    "diskEncryption": null,
+    "secureBoot": false,
+    "hardening": null,
+    "linux": {
+      "sshRootLogin": null,
+      "sshPasswordAuth": null,
+      "sshPort": null,
+      "sshServer": false,
+      "selinux": null,
+      "apparmor": true,
+      "autoUpdates": false,
+      "firewall": null,
+      "passMaxDays": 99999,
+      "extraUid0": [],
+      "auditd": null,
+      "timeSync": null,
+      "telnetServer": false,
+      "pendingUpdates": 2,
+      "pendingSecurityUpdates": 0,
+      "rebootRequired": null
+    }
+  },
+  "users": {
+    "loggedOn": null,
+    "localAdmins": [
+      "root"
+    ]
+  },
+  "errors": [],
+  "printer": null,
+  "ports": null,
+  "networkDevice": null,
+  "licenses": null,
+  "webHosts": null,
+  "productKeys": null,
+  "usage": {
+    "since": "",
+    "items": [],
+    "sessions": []
+  },
+  "experience": {
+    "since": "",
+    "days": [],
+    "events": [],
+    "systemFreePercent": 57.2,
+    "batteryHealth": null
+  }
+}

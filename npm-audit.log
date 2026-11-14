@@ -1,0 +1,104 @@
+== web console (production dependencies) ==
+found 0 vulnerabilities
+
+== remote support engine (MeshCentral) ==
+# npm audit report
+
+glob  9.0.0 - 14.0.1
+Severity: moderate
+Glob: AbortSignal cancellation bypass allows post-timeout filesystem traversal - https://github.com/advisories/GHSA-3g3m-2fjr-6pw4
+Depends on vulnerable versions of minimatch
+fix available via `npm audit fix --force`
+Will install meshcentral@1.1.12, which is a breaking change
+node_modules/glob
+  archiver-utils  >=5.0.1
+  Depends on vulnerable versions of glob
+  node_modules/archiver-utils
+    archiver  7.0.0 - 7.0.1
+    Depends on vulnerable versions of archiver-utils
+    Depends on vulnerable versions of zip-stream
+    node_modules/archiver
+      meshcentral  >=1.1.13
+      Depends on vulnerable versions of archiver
+      Depends on vulnerable versions of express
+      Depends on vulnerable versions of express-handlebars
+      node_modules/meshcentral
+    zip-stream  6.0.0 - 6.0.1
+    Depends on vulnerable versions of archiver-utils
+    node_modules/zip-stream
+  express-handlebars  7.0.0 - 9.0.2
+  Depends on vulnerable versions of glob
+  node_modules/express-handlebars
+
+minimatch  7.0.0 - 11.0.0
+Severity: moderate
+minimatch has potential denial of service via globparts amplification - https://github.com/advisories/GHSA-g3hv-75wg-m249
+fix available via `npm audit fix --force`
+Will install meshcentral@1.1.12, which is a breaking change
+node_modules/minimatch
+
+qs  2.2.5 - 6.16.0
+Severity: moderate
+qs: Denial of Service via Attacker Controlled isBuffer - https://github.com/advisories/GHSA-4mjr-xmp4-gh2g
+qs : qs.stringify with arrayFormat 'comma' throws an uncaught TypeError on array elements carrying a non-callable own toString (DoS) - https://github.com/advisories/GHSA-6pq8-jhm2-2vcw
+fix available via `npm audit fix --force`
+Will install meshcentral@1.1.12, which is a breaking change
+node_modules/qs
+  express  4.10.0 - 4.22.2 || 5.0.0-alpha.1 - 5.0.1
+  Depends on vulnerable versions of qs
+  node_modules/express
+
+9 moderate severity vulnerabilities
+
+To address issues that do not require attention, run:
+  npm audit fix
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+== latest versions on npm (for overrides) ==
+meshcentral 1.3.1
+node-forge 1.4.3
+compression 1.8.2
+express 5.3.0
+express-handlebars 9.0.6
+archiver 8.0.0
+archiver-utils 5.0.2
+zip-stream 7.0.5
+glob 14.0.6
+minimatch 11.0.8
+image-size 2.1.0
+mc@1.0.0 /home/runner/work/_temp/mc
+├── image-size@2.1.0
+└─┬ meshcentral@1.2.5
+  ├─┬ archiver@7.0.1
+  │ ├─┬ archiver-utils@5.0.2
+  │ │ └── glob@10.5.0 deduped
+  │ └─┬ readdir-glob@1.1.3
+  │   └── minimatch@5.1.9
+  ├── compression@1.8.2 overridden
+  ├─┬ express-handlebars@7.1.3
+  │ └─┬ glob@10.5.0
+  │   └── minimatch@9.0.9
+  ├─┬ express-ws@5.0.2
+  │ └── express@4.22.2 deduped
+  ├── express@4.22.2
+  └── node-forge@1.4.3 overridden
+
+
+== .NET packages (all projects, transitive) ==
+  Determining projects to restore...
+  Restored /home/runner/work/zentriq/zentriq/backend/Zentriq.Inventory/Zentriq.Inventory.csproj (in 236 ms).
+  7 of 8 projects are up-to-date for restore.
+
+The following sources were used:
+   https://api.nuget.org/v3/index.json
+
+The given project `Zentriq.Api` has no vulnerable packages given the current sources.
+The given project `Zentriq.Application` has no vulnerable packages given the current sources.
+The given project `Zentriq.Domain` has no vulnerable packages given the current sources.
+The given project `Zentriq.Infrastructure` has no vulnerable packages given the current sources.
+The given project `Zentriq.Inventory` has no vulnerable packages given the current sources.
+The given project `Zentriq.Setup` has no vulnerable packages given the current sources.
+The given project `Zentriq.Worker` has no vulnerable packages given the current sources.
+The given project `Zentriq.Tests` has no vulnerable packages given the current sources.

@@ -1,0 +1,863 @@
+{
+  "schema": 1,
+  "source": "agent",
+  "collectedAt": "2026-11-14T08:08:15.3227072+00:00",
+  "collectorVersion": "1.1.2.220",
+  "device": {
+    "hostname": "b159345e4d9c",
+    "fqdn": null,
+    "domain": null,
+    "manufacturer": "Microsoft Corporation",
+    "model": "Virtual Machine",
+    "serialNumber": "0000-0017-1118-3705-2050-7525-15",
+    "sku": null,
+    "smbiosUuid": "ED797522-EDDA-4403-B870-BF0B0D13835E",
+    "chassis": "virtual",
+    "category": "server",
+    "description": null,
+    "location": null,
+    "contact": null,
+    "identifiedBy": null
+  },
+  "os": {
+    "family": "linux",
+    "name": "Debian GNU/Linux 12 (bookworm)",
+    "version": "12",
+    "build": "7.0.0-1019-azure",
+    "architecture": "x86_64",
+    "installDate": null,
+    "lastBoot": "2026-11-14T08:03:40.2427073+00:00",
+    "isServer": true,
+    "ubr": null,
+    "displayVersion": "bookworm",
+    "installationType": "Server",
+    "editionId": "Debian Server",
+    "distribution": "debian",
+    "distributionFamily": "debian",
+    "desktopEnvironment": null,
+    "kernel": "7.0.0-1019-azure",
+    "packageManager": "dpkg",
+    "lts": null
+  },
+  "hardware": {
+    "cpuName": "AMD EPYC 7763 64-Core Processor",
+    "cpuCores": 2,
+    "cpuThreads": 4,
+    "memoryBytes": 16759439360,
+    "biosVendor": "Microsoft Corporation",
+    "biosVersion": "Hyper-V UEFI Release v4.1",
+    "biosDate": "2026-04-22T00:00:00+00:00",
+    "tpmPresent": false,
+    "tpmVersion": null,
+    "isVirtual": true,
+    "disks": [
+      {
+        "model": "Virtual Disk",
+        "serial": null,
+        "sizeBytes": 161061273600,
+        "mediaType": "HDD",
+        "interface": null
+      }
+    ],
+    "volumes": [
+      {
+        "name": "/pkg",
+        "fileSystem": "ext4",
+        "sizeBytes": 154993672192,
+        "freeBytes": 90241171456,
+        "encrypted": null
+      }
+    ]
+  },
+  "network": [],
+  "software": [
+    {
+      "name": "adduser",
+      "version": "3.134",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "all",
+      "source": "dpkg"
+    },
+    {
+      "name": "apt",
+      "version": "2.6.2",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "base-files",
+      "version": "12.4\u002Bdeb12u15",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "base-passwd",
+      "version": "3.6.1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "bash",
+      "version": "5.2.15-2\u002Bb13",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "bsdutils",
+      "version": "1:2.38.1-5\u002Bdeb12u3",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "ca-certificates",
+      "version": "20250419~deb12u2",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "all",
+      "source": "dpkg"
+    },
+    {
+      "name": "coreutils",
+      "version": "9.1-1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "dash",
+      "version": "0.5.12-2",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "debconf",
+      "version": "1.5.82",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "all",
+      "source": "dpkg"
+    },
+    {
+      "name": "debian-archive-keyring",
+      "version": "2023.3\u002Bdeb12u2",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "all",
+      "source": "dpkg"
+    },
+    {
+      "name": "debianutils",
+      "version": "5.7-0.5~deb12u1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "diffutils",
+      "version": "1:3.8-4",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "dpkg",
+      "version": "1.21.23",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "e2fsprogs",
+      "version": "1.47.0-2\u002Bb2",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "findutils",
+      "version": "4.9.0-4",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "gcc-12-base",
+      "version": "12.2.0-14\u002Bdeb12u1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "gpgv",
+      "version": "2.2.40-1.1\u002Bdeb12u2",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "grep",
+      "version": "3.8-5",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "gzip",
+      "version": "1.12-1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "hostname",
+      "version": "3.23\u002Bnmu1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "init-system-helpers",
+      "version": "1.65.2\u002Bdeb12u1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "all",
+      "source": "dpkg"
+    },
+    {
+      "name": "libacl1",
+      "version": "2.3.1-3",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libapt-pkg6.0",
+      "version": "2.6.2",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libattr1",
+      "version": "1:2.5.1-4",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libaudit-common",
+      "version": "1:3.0.9-1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "all",
+      "source": "dpkg"
+    },
+    {
+      "name": "libaudit1",
+      "version": "1:3.0.9-1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libblkid1",
+      "version": "2.38.1-5\u002Bdeb12u3",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libbz2-1.0",
+      "version": "1.0.8-5\u002Bb1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libc-bin",
+      "version": "2.36-9\u002Bdeb12u14",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libc6",
+      "version": "2.36-9\u002Bdeb12u14",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libcap-ng0",
+      "version": "0.8.3-1\u002Bb3",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libcap2",
+      "version": "1:2.66-4\u002Bdeb12u3\u002Bb1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libcom-err2",
+      "version": "1.47.0-2\u002Bb2",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libcrypt1",
+      "version": "1:4.4.33-2",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libdb5.3",
+      "version": "5.3.28\u002Bdfsg2-1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libdebconfclient0",
+      "version": "0.270",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libext2fs2",
+      "version": "1.47.0-2\u002Bb2",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libffi8",
+      "version": "3.4.4-1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libgcc-s1",
+      "version": "12.2.0-14\u002Bdeb12u1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libgcrypt20",
+      "version": "1.10.1-3\u002Bdeb12u1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libgmp10",
+      "version": "2:6.2.1\u002Bdfsg1-1.1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libgnutls30",
+      "version": "3.7.9-2\u002Bdeb12u7",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libgpg-error0",
+      "version": "1.46-1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libhogweed6",
+      "version": "3.8.1-2",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libidn2-0",
+      "version": "2.3.3-1\u002Bb1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "liblz4-1",
+      "version": "1.9.4-1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "liblzma5",
+      "version": "5.4.1-1\u002Bdeb12u2",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libmd0",
+      "version": "1.0.4-2",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libmount1",
+      "version": "2.38.1-5\u002Bdeb12u3",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libnettle8",
+      "version": "3.8.1-2",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libp11-kit0",
+      "version": "0.24.1-2",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libpam-modules",
+      "version": "1.5.2-6\u002Bdeb12u2",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libpam-modules-bin",
+      "version": "1.5.2-6\u002Bdeb12u2",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libpam-runtime",
+      "version": "1.5.2-6\u002Bdeb12u2",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "all",
+      "source": "dpkg"
+    },
+    {
+      "name": "libpam0g",
+      "version": "1.5.2-6\u002Bdeb12u2",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libpcre2-8-0",
+      "version": "10.42-1\u002Bdeb12u2",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libseccomp2",
+      "version": "2.5.4-1\u002Bdeb12u1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libselinux1",
+      "version": "3.4-1\u002Bb6",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libsemanage-common",
+      "version": "3.4-1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "all",
+      "source": "dpkg"
+    },
+    {
+      "name": "libsemanage2",
+      "version": "3.4-1\u002Bb5",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libsepol2",
+      "version": "3.4-2.1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libsmartcols1",
+      "version": "2.38.1-5\u002Bdeb12u3",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libss2",
+      "version": "1.47.0-2\u002Bb2",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libssl3",
+      "version": "3.0.22-1~deb12u2",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libstdc\u002B\u002B6",
+      "version": "12.2.0-14\u002Bdeb12u1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libsystemd0",
+      "version": "252.39-1~deb12u2",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libtasn1-6",
+      "version": "4.19.0-2\u002Bdeb12u1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libtinfo6",
+      "version": "6.4-4",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libudev1",
+      "version": "252.39-1~deb12u2",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libunistring2",
+      "version": "1.0-2",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libuuid1",
+      "version": "2.38.1-5\u002Bdeb12u3",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libxxhash0",
+      "version": "0.8.1-1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "libzstd1",
+      "version": "1.5.4\u002Bdfsg2-5",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "login",
+      "version": "1:4.13\u002Bdfsg1-1\u002Bdeb12u2",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "logsave",
+      "version": "1.47.0-2\u002Bb2",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "mawk",
+      "version": "1.3.4.20200120-3.1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "mount",
+      "version": "2.38.1-5\u002Bdeb12u3",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "ncurses-base",
+      "version": "6.4-4",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "all",
+      "source": "dpkg"
+    },
+    {
+      "name": "ncurses-bin",
+      "version": "6.4-4",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "openssl",
+      "version": "3.0.22-1~deb12u2",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "passwd",
+      "version": "1:4.13\u002Bdfsg1-1\u002Bdeb12u2",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "perl-base",
+      "version": "5.36.0-7\u002Bdeb12u4",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "sed",
+      "version": "4.9-1\u002Bdeb12u1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "sysvinit-utils",
+      "version": "3.06-4",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "tar",
+      "version": "1.34\u002Bdfsg-1.2\u002Bdeb12u1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "tzdata",
+      "version": "2026f-0\u002Bdeb12u1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "all",
+      "source": "dpkg"
+    },
+    {
+      "name": "usr-is-merged",
+      "version": "37~deb12u1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "all",
+      "source": "dpkg"
+    },
+    {
+      "name": "util-linux",
+      "version": "2.38.1-5\u002Bdeb12u3",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "util-linux-extra",
+      "version": "2.38.1-5\u002Bdeb12u3",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "zentriq-agent",
+      "version": "1.1.2.220",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    },
+    {
+      "name": "zlib1g",
+      "version": "1:1.2.13.dfsg-1",
+      "publisher": null,
+      "installDate": null,
+      "architecture": "amd64",
+      "source": "dpkg"
+    }
+  ],
+  "patches": [],
+  "services": [],
+  "security": {
+    "antivirus": [],
+    "firewallEnabled": false,
+    "diskEncryption": null,
+    "secureBoot": false,
+    "hardening": null,
+    "linux": {
+      "sshRootLogin": null,
+      "sshPasswordAuth": null,
+      "sshPort": null,
+      "sshServer": false,
+      "selinux": null,
+      "apparmor": true,
+      "autoUpdates": false,
+      "firewall": null,
+      "passMaxDays": 99999,
+      "extraUid0": [],
+      "auditd": null,
+      "timeSync": null,
+      "telnetServer": false,
+      "pendingUpdates": 0,
+      "pendingSecurityUpdates": 0,
+      "rebootRequired": null
+    }
+  },
+  "users": {
+    "loggedOn": null,
+    "localAdmins": [
+      "root"
+    ]
+  },
+  "errors": [],
+  "printer": null,
+  "ports": null,
+  "networkDevice": null,
+  "licenses": null,
+  "webHosts": null,
+  "productKeys": null,
+  "usage": {
+    "since": "",
+    "items": [],
+    "sessions": []
+  },
+  "experience": {
+    "since": "",
+    "days": [],
+    "events": [],
+    "systemFreePercent": 58.2,
+    "batteryHealth": null
+  }
+}
