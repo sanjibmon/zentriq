@@ -97,12 +97,14 @@ export function VBars({ data, onSelect, color, max, height = 170 }: { data: Slic
   return (
     <div className="chart vbars" ref={ref} onMouseLeave={hide} style={{ height }}>
       {data.map((d, i) => (
-        <button key={d.key} type="button" onClick={() => onSelect?.(d)} disabled={!onSelect} title={d.label}
+        // A div, not a button: some browser versions gave a button's bar area no width (an empty chart).
+        <div key={d.key} className={`vcol${onSelect ? ' hit' : ''}`} role={onSelect ? 'button' : undefined} tabIndex={onSelect ? 0 : undefined} title={d.label}
+          onClick={() => onSelect?.(d)} onKeyDown={(e) => { if (onSelect && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onSelect(d); } }}
           onMouseMove={(e) => show(e, <><b>{d.label}</b> · {fmtN(d.value)}</>)}>
           <span className="n">{fmtN(d.value)}</span>
           <span className="col"><i style={{ height: `${Math.max(2, (d.value / m) * 100)}%`, background: d.color ?? color ?? slotColor(i, d.key) }} /></span>
           <span className="lbl">{d.label}</span>
-        </button>
+        </div>
       ))}
       {el}
     </div>
