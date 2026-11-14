@@ -86,11 +86,11 @@ export function PatchPage() {
     <>
       <PageHead title="Patch Management" icon="patch" />
       {s && <Kpis items={[
-        { label: 'Up To Date', value: `${s.upToDate} / ${s.scanned}`, sub: `${s.devices} device(s) with the agent`, to: '/modules/patch?tab=devices' },
-        { label: 'Missing Critical / Security', value: s.urgentDevices.toLocaleString(), sub: `device(s) · ${s.urgentPatches} update(s)`, to: '/modules/patch?tab=updates' },
-        { label: 'Missing Updates', value: s.missingPatches.toLocaleString(), sub: s.missingByKind ? `${s.missingByKind.os} OS · ${s.missingByKind.microsoft + s.missingByKind.thirdparty} software` : 'Distinct updates', to: '/modules/patch?tab=updates' },
-        { label: 'Restart Pending', value: s.rebootPending.toLocaleString(), sub: 'device(s)', to: '/modules/patch?tab=devices' },
-        { label: 'Failed', value: s.failed.toLocaleString(), sub: `${s.scanFailed} scan(s) failed`, to: '/modules/patch?tab=devices' },
+        { label: 'Up To Date', value: `${s.upToDate} / ${s.scanned}`, sub: `${s.devices} device(s) with the agent`, to: '/modules/patch?tab=devices&state=uptodate' },
+        { label: 'Missing Critical / Security', value: s.urgentDevices.toLocaleString(), sub: `device(s) · ${s.urgentPatches} update(s)`, to: '/modules/patch?tab=devices&state=urgent' },
+        { label: 'Missing Updates', value: s.missingPatches.toLocaleString(), sub: s.missingByKind ? `${s.missingByKind.os} OS · ${s.missingByKind.microsoft + s.missingByKind.thirdparty} software` : 'Distinct updates', to: '/modules/patch?tab=updates&kind=&state=missing' },
+        { label: 'Restart Pending', value: s.rebootPending.toLocaleString(), sub: 'device(s)', to: '/modules/patch?tab=devices&state=reboot' },
+        { label: 'Failed', value: s.failed.toLocaleString(), sub: `${s.scanFailed} scan(s) failed`, to: '/modules/patch?tab=devices&state=failed' },
         { label: 'Installing', value: s.installing.toLocaleString(), sub: `${s.installed30d} installed (30 d)`, to: '/modules/patch?tab=deployments' },
       ]} />}
       {msg && <Callout tone={msg.tone} icon={msg.tone === 'crit' ? 'alert' : 'info'}>{msg.text}</Callout>}
@@ -153,14 +153,14 @@ const KINDS: [string, string, string][] = [
 ];
 
 function UpdatesTab({ tick, canApprove, canDeploy, changed, failed, deploy, counts }: Ctx & { counts?: Summary['missingByKind'] }) {
-  const [kind, setKind] = useSticky('PatchPage.UpdatesTab.kind', 'os');
+  const [kind, setKind] = useSticky('PatchPage.UpdatesTab.kind', 'os', 'kind');
   const [q, setQ] = useSticky('PatchPage.UpdatesTab.q', '');
   const [search, setSearch] = useSticky('PatchPage.UpdatesTab.search', '');
   const [platform, setPlatform] = useSticky('PatchPage.UpdatesTab.platform', '');
-  const [classification, setClassification] = useSticky('PatchPage.UpdatesTab.classification', '');
-  const [severity, setSeverity] = useSticky('PatchPage.UpdatesTab.severity', '');
+  const [classification, setClassification] = useSticky('PatchPage.UpdatesTab.classification', '', 'classification');
+  const [severity, setSeverity] = useSticky('PatchPage.UpdatesTab.severity', '', 'severity');
   const [approval, setApproval] = useSticky('PatchPage.UpdatesTab.approval', '');
-  const [state, setState] = useSticky('PatchPage.UpdatesTab.state', 'missing');
+  const [state, setState] = useSticky('PatchPage.UpdatesTab.state', 'missing', 'state');
   const [sel, setSel] = useState<string[]>([]);
   const [open, setOpen] = useState<Patch | null>(null);
   const list = useApi(() => api.get<Patch[]>('/patches', { q: search, platform, classification, severity, approval, state, kind }), [tick, search, platform, classification, severity, approval, state, kind]);
@@ -249,7 +249,7 @@ function PatchDevicesDialog({ patch, canDeploy, onClose, onDeploy }: { patch: Pa
 function DevicesTab({ tick, canDeploy, changed, failed, deploy, openId }: Ctx & { openId: string | null }) {
   const [q, setQ] = useSticky('PatchPage.DevicesTab.q', '');
   const [search, setSearch] = useSticky('PatchPage.DevicesTab.search', '');
-  const [state, setState] = useSticky('PatchPage.DevicesTab.state', '');
+  const [state, setState] = useSticky('PatchPage.DevicesTab.state', '', 'state');
   const [open, setOpen] = useState<string | null>(openId);
   const list = useApi(() => api.get<DeviceRow[]>('/patches/devices', { q: search, state }), [tick, search, state]);
   const rows = list.data ?? [];

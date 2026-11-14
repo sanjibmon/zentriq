@@ -12,7 +12,7 @@ export function AccountPage() {
   if (!me) return null;
   return (
     <>
-      <PageHead title="My account" desc={`${me.displayName} · ${me.email}`} />
+      <PageHead title="My account" refresh={false} desc={`${me.displayName} · ${me.email}`} />
       {msg && <Callout tone="ok" icon="info">{msg}</Callout>}
       <Panel title="Two-step verification (MFA)" right={<Pill tone={me.mfaEnabled ? 'ok' : 'warn'}>{me.mfaEnabled ? 'On' : 'Off'}</Pill>}>
         {me.mfaEnabled

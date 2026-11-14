@@ -84,6 +84,9 @@ the agent. Devices that block ping and are on another subnet cannot be detected 
   it is in the inventory.
 * Users: display name, login (sAMAccountName / UPN), e-mail, department, title, enabled/disabled, last logon,
   password last set, group memberships, OU.
+* **Export** (build 143): the type shown — Computers, Users, Groups or OUs, with the search applied — to Excel or CSV,
+  or all objects to one Excel file with a sheet per type. Computers include whether each is in the Zentriq inventory.
+  Each export is recorded in the audit log (`directory.export`).
 * Groups: name, description, e-mail; OUs: name and DN.
 
 Objects deleted from AD disappear at the next sync. *Scan computers* starts a scan of the enabled computers in that

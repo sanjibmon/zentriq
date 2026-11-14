@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 
 const PREFIX = 'zq.filter.';
 
@@ -16,9 +16,20 @@ function openedWithFilters(): boolean {
  * you clear it. A link that brings its own filters (for example from a dashboard chart) wins over the remembered ones.
  * Kept in this browser only.
  */
-export function useSticky<T>(key: string, initial: T): [T, Dispatch<SetStateAction<T>>] {
+function urlParam(name: string | undefined): string | null {
+  if (!name) return null;
+  try { return new URLSearchParams(window.location.search).get(name); } catch { return null; }
+}
+
+/**
+ * `param`: the address can set this filter (e.g. `?tab=devices&state=urgent` from a count on another page); it wins over
+ * the remembered value, also when the link is followed while the list is already open.
+ */
+export function useSticky<T>(key: string, initial: T, param?: string): [T, Dispatch<SetStateAction<T>>] {
   const first = useRef(JSON.stringify(initial));
   const [value, setValue] = useState<T>(() => {
+    const fromUrl = urlParam(param);
+    if (fromUrl !== null) return fromUrl as unknown as T;
     if (openedWithFilters()) return initial;
     try {
       const raw = localStorage.getItem(PREFIX + key);
@@ -36,5 +47,12 @@ export function useSticky<T>(key: string, initial: T): [T, Dispatch<SetStateActi
       return v;
     });
   }, [key]);
+  // A link with this filter followed while the list is open (same page, other tile).
+  const applied = useRef<string | null>(urlParam(param));
+  const search = typeof window === 'undefined' ? '' : window.location.search;
+  useEffect(() => {
+    const v = urlParam(param);
+    if (v !== null && v !== applied.current) { applied.current = v; setValue(v as unknown as T); }
+  }, [param, search]);
   return [value, set];
 }

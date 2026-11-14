@@ -3,6 +3,7 @@ import { api } from '../../api/client';
 import type { Paged } from '../../api/types';
 import { Link, useRouter } from '../../app/router';
 import { useApi } from '../../app/useApi';
+import { useSticky } from '../../app/sticky';
 import { useConfirm } from '../../components/Confirm';
 import { CopyBox } from '../../components/CopyBox';
 import { Icon } from '../../components/Icon';
@@ -94,7 +95,7 @@ function Overview({ catalog }: { catalog: Catalog }) {
         { label: 'Channels', value: `${k.channelsEnabled} / ${k.channels}`, sub: 'on / total', to: '/integrations?tab=channels' },
         { label: 'Alert rules', value: `${k.rulesEnabled} / ${k.rules}`, sub: 'on / total', to: '/integrations?tab=rules' },
         { label: 'Sent (24 h)', value: k.sent24h.toLocaleString(), sub: `${k.queued} waiting`, to: '/integrations?tab=log' },
-        { label: 'Failed (24 h)', value: <span style={{ color: k.failed24h ? 'var(--crit)' : undefined }}>{k.failed24h.toLocaleString()}</span>, sub: 'after retries', to: '/integrations?tab=log' },
+        { label: 'Failed (24 h)', value: <span style={{ color: k.failed24h ? 'var(--crit)' : undefined }}>{k.failed24h.toLocaleString()}</span>, sub: 'after retries', to: '/integrations?tab=log&status=failed' },
         { label: 'Events (24 h)', value: k.events24h.toLocaleString(), sub: 'found by the detectors', to: '/integrations?tab=log' },
         { label: 'API tokens', value: k.tokens.toLocaleString(), sub: 'active, read-only', to: '/integrations?tab=api' },
       ]} />}
@@ -402,7 +403,7 @@ function RuleDialog({ rule, catalog, channels, onClose, onSaved }: { rule: Rule 
 // ---- Delivery log -------------------------------------------------------------------------------------------
 
 function DeliveryLog() {
-  const [status, setStatus] = useState('');
+  const [status, setStatus] = useSticky('IntegrationsPage.Log.status', '', 'status');
   const [page, setPage] = useState(1);
   const d = useApi(() => api.get<Paged<Delivery>>('/integrations/deliveries', { status, page, pageSize: 50 }), [status, page]);
   const [msg, setMsg] = useState<string | null>(null);

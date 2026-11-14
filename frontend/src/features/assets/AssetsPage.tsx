@@ -6,6 +6,7 @@ import { Link, useRouter } from '../../app/router';
 import { useSticky } from '../../app/sticky';
 import { useApi } from '../../app/useApi';
 import { Callout, DataTable, ErrorBox, fmt, PageHead, Pager, Panel, Pill, statusTone, type Column, type Tone } from '../../components/ui';
+import { Icon } from '../../components/Icon';
 import { useConfirm } from '../../components/Confirm';
 import { DeployAgentDialog } from './DeployAgentDialog';
 import { useDepartments } from '../departments/Departments';
@@ -52,26 +53,26 @@ export function AssetsPage() {
   const { query } = useRouter();
   const { can } = useAuth();
   const confirm = useConfirm();
-  const [q, setQ] = useSticky('AssetsPage.AssetsPage.q', query.get('q') ?? '');
-  const [search, setSearch] = useSticky('AssetsPage.AssetsPage.search', query.get('q') ?? '');
-  const [category, setCategory] = useSticky('AssetsPage.AssetsPage.category', query.get('category') ?? '');
-  const [deviceType, setDeviceType] = useSticky('AssetsPage.AssetsPage.deviceType', query.get('deviceType') ?? '');
+  const [q, setQ] = useSticky('AssetsPage.AssetsPage.q', '', 'q');
+  const [search, setSearch] = useSticky('AssetsPage.AssetsPage.search', '', 'q');
+  const [category, setCategory] = useSticky('AssetsPage.AssetsPage.category', '', 'category');
+  const [deviceType, setDeviceType] = useSticky('AssetsPage.AssetsPage.deviceType', '', 'deviceType');
   const [adding, setAdding] = useState(false);
   const [showDups, setShowDups] = useState(false);
   const dups = useDuplicates();
   const deleteDevices = useDeleteDevices();
-  const [department, setDepartment] = useSticky('AssetsPage.AssetsPage.department', query.get('department') ?? '');
-  const [location, setLocation] = useSticky('AssetsPage.AssetsPage.location', query.get('location') ?? '');
+  const [department, setDepartment] = useSticky('AssetsPage.AssetsPage.department', '', 'department');
+  const [location, setLocation] = useSticky('AssetsPage.AssetsPage.location', '', 'location');
   const locs = useLocations();
   const [assign, setAssign] = useState(false);
   const [manageDeps, setManageDeps] = useState(false);
   const deps = useDepartments();
-  const [status, setStatus] = useSticky('AssetsPage.AssetsPage.status', '');
-  const [agent, setAgent] = useSticky('AssetsPage.AssetsPage.agent', query.get('agent') ?? '');
-  const [inventory, setInventory] = useSticky('AssetsPage.AssetsPage.inventory', query.get('inventory') ?? '');
+  const [status, setStatus] = useSticky('AssetsPage.AssetsPage.status', '', 'status');
+  const [agent, setAgent] = useSticky('AssetsPage.AssetsPage.agent', '', 'agent');
+  const [inventory, setInventory] = useSticky('AssetsPage.AssetsPage.inventory', '', 'inventory');
   const [facet, setFacet] = useState<{ facet: string; value: string; label: string } | null>(
     query.get('facet') && query.get('value') != null ? { facet: query.get('facet')!, value: query.get('value')!, label: query.get('label') ?? `${query.get('facet')}: ${query.get('value')}` } : null);
-  const [offline, setOffline] = useSticky('AssetsPage.AssetsPage.offline', query.get('offlineDays') ?? '');
+  const [offline, setOffline] = useSticky('AssetsPage.AssetsPage.offline', '', 'offlineDays');
   const [page, setPage] = useState(1);
   const [picked, setPicked] = useState<string[]>([]);
   const [msg, setMsg] = useState<{ tone: 'info' | 'crit'; text: string } | null>(null);
@@ -151,8 +152,18 @@ export function AssetsPage() {
             : <button className="btn primary" disabled={busy || !data.data?.total} onClick={() => void collect(true)}>Collect inventory now (all)</button>)}
         </>} />
       {msg && <Callout tone={msg.tone} icon={msg.tone === 'crit' ? 'alert' : 'info'}>{msg.text}</Callout>}
-      <form className="toolbar-row" onSubmit={(e) => { e.preventDefault(); reset(); setSearch(q); }}>
+      <form className="toolbar-2" onSubmit={(e) => { e.preventDefault(); reset(); setSearch(q); }}>
+        <div className="toolbar-row toolbar-main">
         <input className="in grow" placeholder="Search hostname, IP, logged-on user, serial, OS or owner…" value={q} onChange={(e) => { setQ(e.target.value); if (!e.target.value.trim()) { reset(); setSearch(''); } }} aria-label="Search assets" />
+        <button className="btn" type="submit"><Icon name="search" size={13} /> Search</button>
+        {chooser}
+        {can('settings.manage') && settings.data && (
+          <label className="row-check" title="Show IPv6 addresses in the inventory (System Settings › Display)">
+            <input type="checkbox" checked={settings.data['display.show_ipv6'] === true} onChange={(e) => void toggleV6(e.target.checked)} /> IPv6
+          </label>
+        )}
+        </div>
+        <div className="toolbar-filters" aria-label="Filters">
         <select className="in" value={category} onChange={(e) => { reset(); setCategory(e.target.value); }} aria-label="Category">
           <option value="">All categories</option>
           {CATEGORIES.map((c) => <option key={c} value={c}>{fmt.label(c)}</option>)}
@@ -190,13 +201,7 @@ export function AssetsPage() {
           <option value="retired">Retired</option>
           <option value="all">All statuses</option>
         </select>
-        <button className="btn" type="submit">Search</button>
-        {chooser}
-        {can('settings.manage') && settings.data && (
-          <label className="row-check" title="Show IPv6 addresses in the inventory (System Settings › Display)">
-            <input type="checkbox" checked={settings.data['display.show_ipv6'] === true} onChange={(e) => void toggleV6(e.target.checked)} /> IPv6
-          </label>
-        )}
+        </div>
       </form>
       {facet && (
         <div style={{ marginBottom: 10 }}>

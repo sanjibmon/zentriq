@@ -183,7 +183,105 @@ public static class DirectoryEndpoints
                 });
             return Results.Ok(new { items, total, page = Math.Max(page ?? 1, 1), pageSize = size });
         }).RequireAuthorization(Permissions.ScansRun);
+
+        // Export of the synchronised objects (Excel, or CSV with format=csv): one type, or every type on its own sheet.
+        g.MapGet("/objects/export", async (Guid connectionId, string? type, string? q, string? format, NpgsqlDataSource ds, RequestContext rc, CancellationToken ct) =>
+        {
+            await using var conn = await ds.OpenConnectionAsync(ct);
+            string? domain;
+            await using (var n = new NpgsqlCommand("SELECT coalesce(nullif(domain_name, ''), name) FROM zentriq.directory_connections WHERE id = @id", conn))
+            {
+                n.Parameters.AddWithValue("id", connectionId);
+                domain = await n.ExecuteScalarAsync(ct) as string;
+            }
+            if (domain is null) return Results.NotFound();
+            var types = type is "computers" or "users" or "groups" or "ous" ? new[] { type } : new[] { "computers", "users", "groups", "ous" };
+            var sheets = new List<Zentriq.Infrastructure.NonIt.XlsxSheet>();
+            foreach (var t in types)
+            {
+                var (cls, title, cols) = ExportColumns(t);
+                var sheet = new Zentriq.Infrastructure.NonIt.XlsxSheet(title);
+                sheet.Headings.AddRange(cols.Select(c => c.Heading));
+                sheet.Widths.AddRange(cols.Select(c => c.Width));
+                await using var cmd = new NpgsqlCommand($"""
+                    SELECT {string.Join(", ", cols.Select(c => c.Sql))}
+                      FROM zentriq.directory_objects o
+                     WHERE o.connection_id = @c AND o.object_class = @cls
+                       AND (@q::text IS NULL OR o.name ILIKE @q OR o.sam_account_name ILIKE @q OR o.display_name ILIKE @q OR o.dns_host_name ILIKE @q
+                            OR o.mail ILIKE @q OR o.user_principal_name ILIKE @q OR o.distinguished_name ILIKE @q)
+                     ORDER BY lower(coalesce(o.name, o.distinguished_name)) LIMIT 200000
+                    """, conn);
+                cmd.Parameters.AddWithValue("c", connectionId);
+                cmd.Parameters.AddWithValue("cls", cls);
+                cmd.Parameters.Add(new NpgsqlParameter("q", NpgsqlDbType.Text) { Value = string.IsNullOrWhiteSpace(q) ? DBNull.Value : $"%{q.Trim()}%" });
+                await using var r = await cmd.ExecuteReaderAsync(ct);
+                while (await r.ReadAsync(ct))
+                {
+                    var row = new object?[cols.Length];
+                    for (var i = 0; i < cols.Length; i++)
+                        row[i] = r.IsDBNull(i) ? null : r.GetValue(i) switch
+                        {
+                            bool b => b ? "Yes" : "No",
+                            DateTime d => d.ToLocalTime().ToString("yyyy-MM-dd HH:mm", System.Globalization.CultureInfo.InvariantCulture),
+                            DateTimeOffset d => d.ToLocalTime().ToString("yyyy-MM-dd HH:mm", System.Globalization.CultureInfo.InvariantCulture),
+                            string[] a => string.Join("; ", a),
+                            var v => Convert.ToString(v, System.Globalization.CultureInfo.InvariantCulture),
+                        };
+                    sheet.Rows.Add(row);
+                }
+                sheets.Add(sheet);
+            }
+            var safe = new string(domain.Select(ch => char.IsLetterOrDigit(ch) || ch is '.' or '-' ? ch : '-').ToArray());
+            var stamp = DateTime.Now.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+            var file = $"active-directory-{safe}-{(types.Length == 1 ? types[0] : "all")}-{stamp}";
+            await rc.AuditAsync("directory.export", domain, detail: new { type = types.Length == 1 ? types[0] : "all", rows = sheets.Sum(x => x.Rows.Count) });
+            if (string.Equals(format, "csv", StringComparison.OrdinalIgnoreCase))
+            {
+                var sb = new System.Text.StringBuilder();
+                foreach (var sh in sheets)
+                {
+                    if (sheets.Count > 1) sb.AppendLine(Csv(sh.Name));
+                    sb.AppendLine(string.Join(",", sh.Headings.Select(Csv)));
+                    foreach (var row in sh.Rows) sb.AppendLine(string.Join(",", row.Select(v => Csv(v as string ?? ""))));
+                    if (sheets.Count > 1) sb.AppendLine();
+                }
+                return Results.File(System.Text.Encoding.UTF8.GetPreamble().Concat(System.Text.Encoding.UTF8.GetBytes(sb.ToString())).ToArray(), "text/csv", file + ".csv");
+            }
+            return Results.File(Zentriq.Infrastructure.NonIt.XlsxBook.Write([.. sheets]), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", file + ".xlsx");
+        }).RequireAuthorization(Permissions.ScansRun);
     }
+
+    /// <summary>A CSV field: quoted when needed; a leading =, +, - or @ is prefixed so spreadsheets do not run it as a formula.</summary>
+    private static string Csv(string v)
+    {
+        if (v.Length > 0 && v[0] is '=' or '+' or '-' or '@') v = "'" + v;
+        return v.IndexOfAny([',', '"', '\n', '\r']) >= 0 ? "\"" + v.Replace("\"", "\"\"") + "\"" : v;
+    }
+
+    private sealed record ExportColumn(string Heading, string Sql, double Width);
+
+    private static (string Class, string Title, ExportColumn[] Columns) ExportColumns(string type) => type switch
+    {
+        "computers" => ("computer", "Computers", [
+            new("Name", "o.name", 22), new("DNS host name", "o.dns_host_name", 30), new("Operating system", "o.operating_system", 28),
+            new("OS version", "o.operating_system_version", 16), new("Enabled", "o.enabled", 10), new("Last logon", "o.last_logon_timestamp", 18),
+            new("Created", "o.when_created", 18), new("Description", "o.description", 30), new("OU", "o.parent_dn", 40),
+            new("In Zentriq inventory", """EXISTS (SELECT 1 FROM zentriq.assets a WHERE a.status = 'active' AND (lower(a.fqdn) = lower(o.dns_host_name) OR lower(a.hostname) = lower(o.name)))""", 14),
+            new("Distinguished name", "o.distinguished_name", 50)]),
+        "users" => ("user", "Users", [
+            new("Name", "o.name", 22), new("Display name", "o.display_name", 24), new("Login (sAMAccountName)", "o.sam_account_name", 20),
+            new("User principal name", "o.user_principal_name", 30), new("E-mail", "o.mail", 30), new("Department", "o.department", 18),
+            new("Title", "o.title", 20), new("Enabled", "o.enabled", 10), new("Last logon", "o.last_logon_timestamp", 18),
+            new("Password last set", "o.password_last_set", 18), new("Created", "o.when_created", 18), new("Member of", "o.member_of", 50),
+            new("OU", "o.parent_dn", 40), new("Distinguished name", "o.distinguished_name", 50)]),
+        "groups" => ("group", "Groups", [
+            new("Name", "o.name", 26), new("Login (sAMAccountName)", "o.sam_account_name", 22), new("Description", "o.description", 40),
+            new("E-mail", "o.mail", 26), new("Member of", "o.member_of", 40), new("Created", "o.when_created", 18), new("OU", "o.parent_dn", 40),
+            new("Distinguished name", "o.distinguished_name", 50)]),
+        _ => ("organizationalUnit", "Organizational units", [
+            new("Name", "o.name", 26), new("Description", "o.description", 40), new("Parent", "o.parent_dn", 40),
+            new("Created", "o.when_created", 18), new("Distinguished name", "o.distinguished_name", 60)]),
+    };
 
     private static DirectorySettings ToSettings(ConnectionBody b, string password) =>
         new(b.ServerHost.Trim(), string.IsNullOrWhiteSpace(b.DcName) ? null : b.DcName.Trim(), PortOf(b), b.Ldaps ?? true,

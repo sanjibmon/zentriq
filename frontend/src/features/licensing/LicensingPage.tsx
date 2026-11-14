@@ -77,12 +77,16 @@ function LicenseHero({ d, org }: { d: LicensingStatus; org: string | null }) {
   const edition = trial ? 'Trial · all sections' : free ? 'Free tier' : `${d.editionTitle ?? 'Custom'} edition`;
   const contact = [d.licensee?.contactName, d.licensee?.contactEmail, d.licensee?.contactPhone].filter(Boolean).join(' · ');
   const facts: [string, ReactNode][] = [
-    [trial ? 'Trial ends' : perpetual ? 'License' : free ? 'Runs' : 'Valid until', trial ? fmt.day(d.trial?.expiresAt ?? d.expiresAt) : perpetual ? 'Perpetual' : free ? 'No end' : fmt.day(d.expiresAt)],
+    [trial ? 'Trial period' : perpetual ? 'License' : free ? 'Runs' : 'Valid until',
+      trial ? `${fmt.day(d.trial?.startedAt ?? null)} – ${fmt.day(d.trial?.expiresAt ?? d.expiresAt)}`
+        : perpetual ? 'Perpetual' : free ? 'No end'
+        : <>{fmt.day(d.expiresAt)}{d.license?.graceDays ? <span className="muted"> (+{d.license.graceDays} days grace)</span> : null}</>],
     ...(perpetual ? [['Support until', fmt.day(d.supportUntil ?? null)] as [string, ReactNode]] : []),
     ['Type', trial ? '14-day evaluation' : free ? 'Free tier' : perpetual ? 'Perpetual + yearly support' : d.licenseType === 'subscription' ? 'Subscription' : 'License file'],
     ['Activation', d.activation === 'online' ? 'Online (daily check-in)' : d.activation === 'offline' ? 'Offline (file)' : d.license ? 'License file' : '—'],
     ...(d.license ? [['License ID', <span className="mono">{d.license.licenseId}</span>] as [string, ReactNode]] : []),
     ...(d.installationId ? [['Installation ID', <span className="mono">{d.installationId}</span>] as [string, ReactNode]] : []),
+    ...(d.releaseDate ? [['Version released', fmt.day(d.releaseDate)] as [string, ReactNode]] : []),
   ];
   return (
     <section className={`lic-hero tone-${tone}`} aria-label="License">
@@ -90,6 +94,7 @@ function LicenseHero({ d, org }: { d: LicensingStatus; org: string | null }) {
         <div className="lic-hero-eyebrow">{trial ? 'Evaluation for' : free ? 'Free tier for' : 'Licensed to'}</div>
         <h2 className="lic-hero-name">{who}</h2>
         {contact && <div className="lic-hero-contact">{contact}</div>}
+        {!plainState && d.summary && <div className="lic-hero-contact"><b>{d.summary}</b></div>}
         {d.licensee?.address && <div className="lic-hero-contact">{d.licensee.address}{d.licensee.country ? `, ${d.licensee.country}` : ''}</div>}
         <div className="lic-hero-badges">
           <span className="lic-edition"><Icon name="key" size={14} /> {edition}</span>
@@ -201,7 +206,7 @@ export function LicensingPage() {
           {d.revoked && !d.license && <Callout tone="crit" icon="alert">License {d.revoked.licenseId} ({d.revoked.customerName}) is no longer valid on this server (revoked, suspended or deactivated at the license server). Contact Zentriq, or activate another license.</Callout>}
           <LicenseHero d={d} org={org.data?.profile?.name ?? null} />
 
-          <div className="grid-2">
+          <div className="grid-2 lic-grid">
             <div className="lic-span"><Panel title="Usage" sub="What the plan counts. IT accessories are always unlimited." flush>
               <DataTable rows={metrics.map((u) => ({ ...u, id: u.workload }))} columns={[
                 { key: 'w', label: 'Counted', render: (r) => <><b>{r.title || fmt.label(r.workload)}</b><div className="faint lic-help">{METRIC_HELP[r.workload]}</div></> },
@@ -269,20 +274,6 @@ export function LicensingPage() {
               </Panel>
             )}
 
-            <Panel title="Details">
-              <dl className="dl2">
-                <dt>Summary</dt><dd>{d.summary}</dd>
-                {d.releaseDate && <><dt>This version released</dt><dd>{fmt.day(d.releaseDate)}</dd></>}
-                {d.trial && <><dt>Trial</dt><dd>{fmt.day(d.trial.startedAt)} to {fmt.day(d.trial.expiresAt)}</dd></>}
-                {d.license && <>
-                  <dt>License</dt><dd className="mono">{d.license.licenseId}</dd>
-                  <dt>Customer</dt><dd>{d.license.customerName}</dd>
-                  {d.licenseType === 'perpetual'
-                    ? <><dt>Type</dt><dd>Perpetual; support until {fmt.day(d.supportUntil ?? null)}</dd></>
-                    : <><dt>Valid until</dt><dd>{fmt.day(d.license.expiresAt)} (+{d.license.graceDays} days grace)</dd></>}
-                </>}
-              </dl>
-            </Panel>
 
 
             {d.sections && <div className="lic-span"><Panel title="Sections" sub="What is installed on this server and what your plan covers" flush>

@@ -1,5 +1,7 @@
 import type { CSSProperties, MouseEvent as ReactMouseEvent, ReactNode } from 'react';
+import { useState } from 'react';
 import { ApiError } from '../api/client';
+import { refreshPage } from '../app/useApi';
 import { NAV, type NavItem } from '../app/nav';
 import { Link, useRouter } from '../app/router';
 import { Icon } from './Icon';
@@ -33,7 +35,19 @@ export function titleCase(text: string): string {
 }
 export const tc = (x: ReactNode) => (typeof x === 'string' ? titleCase(x) : x);
 
-export function PageHead({ title, desc, actions, crumbs = true, icon }: { title: string; desc?: ReactNode; actions?: ReactNode; crumbs?: boolean; icon?: IconName }) {
+/** Reloads every list and figure on the page; spins briefly so the click is visible. */
+export function RefreshButton() {
+  const [spin, setSpin] = useState(false);
+  const [at, setAt] = useState<Date | null>(null);
+  return (
+    <button type="button" className={`btn refresh-btn${spin ? ' spin' : ''}`} title={at ? `Refreshed at ${at.toLocaleTimeString()}` : 'Reload this page\'s data'}
+      onClick={() => { refreshPage(); setAt(new Date()); setSpin(true); window.setTimeout(() => setSpin(false), 700); }}>
+      <Icon name="retry" size={13} /> Refresh
+    </button>
+  );
+}
+
+export function PageHead({ title, desc, actions, crumbs = true, icon, refresh = true }: { title: string; desc?: ReactNode; actions?: ReactNode; crumbs?: boolean; icon?: IconName; refresh?: boolean }) {
   const { path } = useRouter();
   const nav = navFor(path);
   const glyph = icon ?? nav?.item.icon;
@@ -55,7 +69,7 @@ export function PageHead({ title, desc, actions, crumbs = true, icon }: { title:
           <h1>{title}</h1>
           {desc && <p>{desc}</p>}
         </div>
-        <div className="actions">{actions}</div>
+        <div className="actions">{refresh && <RefreshButton />}{actions}</div>
       </div>
     </>
   );

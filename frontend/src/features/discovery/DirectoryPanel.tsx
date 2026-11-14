@@ -6,6 +6,7 @@ import { Link } from '../../app/router';
 import { useApi } from '../../app/useApi';
 import { Callout, DataTable, ErrorBox, fmt, Pager, Panel, Pill, statusTone } from '../../components/ui';
 import { useConfirm } from '../../components/Confirm';
+import { Icon } from '../../components/Icon';
 
 type ObjType = 'computers' | 'users' | 'groups' | 'ous';
 const OBJ_LABEL: Record<ObjType, string> = { computers: 'Computers', users: 'Users', groups: 'Groups', ous: 'Organizational units' };
@@ -16,6 +17,34 @@ export function errorText(err: unknown): string {
   if (body?.errors) return Object.values(body.errors).flat().join(' ');
   if (body?.detail) return body.detail;
   return err instanceof Error ? err.message : String(err);
+}
+
+/** Export the synchronised objects to Excel or CSV: the type shown (with the search applied) or every type. */
+function ExportMenu({ connectionId, type, q, label }: { connectionId: string; type: string; q: string; label: string }) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const get = async (scope: 'type' | 'all', format: 'xlsx' | 'csv') => {
+    setOpen(false);
+    setBusy(true);
+    try {
+      const qs = new URLSearchParams({ connectionId, format, ...(scope === 'type' ? { type } : {}), ...(scope === 'type' && q.trim() ? { q: q.trim() } : {}) });
+      await api.download(`/directory/objects/export?${qs.toString()}`, `active-directory-${scope === 'type' ? type : 'all'}.${format}`);
+    } finally { setBusy(false); }
+  };
+  return (
+    <span style={{ position: 'relative' }}>
+      <button className="btn sm" disabled={busy} onClick={() => setOpen((o) => !o)} aria-haspopup="menu" aria-expanded={open}>
+        <Icon name="down" size={12} /> {busy ? 'Exporting…' : 'Export'}
+      </button>
+      {open && (
+        <div className="popover" role="menu" style={{ right: 0, top: 'calc(100% + 4px)', minWidth: 280 }} onMouseLeave={() => setOpen(false)}>
+          <button role="menuitem" className="pop-item" onClick={() => void get('type', 'xlsx')}>{label}{q.trim() ? ' (search applied)' : ''} — Excel</button>
+          <button role="menuitem" className="pop-item" onClick={() => void get('type', 'csv')}>{label}{q.trim() ? ' (search applied)' : ''} — CSV</button>
+          <button role="menuitem" className="pop-item" onClick={() => void get('all', 'xlsx')}>All objects — Excel, one sheet per type</button>
+        </div>
+      )}
+    </span>
+  );
 }
 
 /** Active Directory: connections (DC address, name, credentials, domain/OU) and the synchronised objects. */
@@ -96,6 +125,7 @@ export function DirectoryPanel({ onScan }: { onScan: (connectionId: string) => v
           right={<div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {manage && <button className="btn sm primary" disabled={current.syncJobStatus === 'queued' || current.syncJobStatus === 'running'} onClick={() => void sync(current)}>{current.syncJobStatus === 'queued' || current.syncJobStatus === 'running' ? 'Reading…' : 'Sync now'}</button>}
             {can('scans.run') && <button className="btn sm" onClick={() => onScan(current.id)} title="Scan the enabled computers in this domain/OU for hardware and software">Scan computers</button>}
+            <ExportMenu connectionId={current.id} type={type} q={q} label={OBJ_LABEL[type]} />
             {manage && <button className="btn sm" onClick={() => setEdit(current)}>Edit</button>}
             {manage && <button className="btn sm" onClick={() => void remove(current)}>Delete</button>}
           </div>}>

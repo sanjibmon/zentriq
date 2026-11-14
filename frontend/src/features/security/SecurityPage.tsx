@@ -76,9 +76,9 @@ function Overview({ baselineId, onRule }: { baselineId: string | null; onRule: (
       {c.windowsDevices > 0 && !o.data.lastEvaluation && <Callout tone="info" icon="info">Devices have not been evaluated yet. The first evaluation runs within 30 minutes, or click <b>Evaluate now</b>.</Callout>}
       <Kpis items={[
         { label: 'Average score', value: <span style={{ color: SCORE_COLOR(k.avgScore) }}>{k.avgScore ?? '—'}</span>, sub: `${k.devices.toLocaleString()} device(s) assessed`, to: '/security?tab=devices' },
-        { label: 'Compliant devices', value: `${k.compliant.toLocaleString()} / ${k.devices.toLocaleString()}`, sub: 'no failed high-severity check', to: '/security?tab=devices' },
+        { label: 'Compliant devices', value: `${k.compliant.toLocaleString()} / ${k.devices.toLocaleString()}`, sub: 'no failed high-severity check', to: '/security?tab=devices&state=compliant' },
         { label: 'Failed checks', value: k.failedChecks.toLocaleString(), sub: `${k.failedHigh.toLocaleString()} high severity`, to: '/security?tab=checks' },
-        { label: 'Score below 70', value: <span style={{ color: k.poor ? 'var(--crit)' : undefined }}>{k.poor.toLocaleString()}</span>, sub: `${k.good.toLocaleString()} device(s) at 90 or more`, to: '/security?tab=devices' },
+        { label: 'Score below 70', value: <span style={{ color: k.poor ? 'var(--crit)' : undefined }}>{k.poor.toLocaleString()}</span>, sub: `${k.good.toLocaleString()} device(s) at 90 or more`, to: '/security?tab=devices&state=poor' },
         { label: 'Unknown results', value: k.unknown.toLocaleString(), sub: 'settings not reported' },
         { label: 'Exceptions', value: o.data.exceptions.toLocaleString(), sub: 'active, documented', to: '/security?tab=exceptions' },
       ]} />
@@ -285,12 +285,14 @@ function Devices({ baselineId }: { baselineId: string | null }) {
   const [q, setQ] = useSticky('SecurityPage.Devices.q', '');
   const [search, setSearch] = useSticky('SecurityPage.Devices.search', '');
   const [sort, setSort] = useSticky('SecurityPage.Devices.sort', 'worst');
+  const [state, setState] = useSticky('SecurityPage.Devices.state', '', 'state');
   const [page, setPage] = useState(1);
   useEffect(() => { const t = setTimeout(() => { setSearch(q); setPage(1); }, 300); return () => clearTimeout(t); }, [q]);
-  const d = useApi(() => api.get<Paged<DeviceScore>>('/security/devices', { baselineId, q: search, sort, page, pageSize: 50 }), [baselineId, search, sort, page]);
+  const d = useApi(() => api.get<Paged<DeviceScore>>('/security/devices', { baselineId, q: search, sort, state, page, pageSize: 50 }), [baselineId, search, sort, state, page]);
   return (
     <Panel flush title="Devices" sub={d.data ? `${d.data.total.toLocaleString()} assessed` : undefined} right={<div style={{ display: 'flex', gap: 8 }}>
       <input className="in" placeholder="Hostname or IP…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search devices" />
+      <select className="in" value={state} onChange={(e) => { setState(e.target.value); setPage(1); }} aria-label="Devices"><option value="">All devices</option><option value="compliant">Compliant</option><option value="noncompliant">Failed a high-severity check</option><option value="poor">Score below 70</option><option value="good">Score 90 or above</option></select>
       <select className="in" value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort"><option value="worst">Lowest score first</option><option value="best">Highest score first</option><option value="failed">Most failed</option><option value="host">Hostname</option></select>
     </div>}>
       <ErrorBox error={d.error} />

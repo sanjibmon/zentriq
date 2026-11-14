@@ -64,9 +64,9 @@ export function ScriptsPage() {
       <PageHead title="Scripts & Remediation" icon="terminal" />
       {s && <Kpis items={[
         { label: 'Scripts', value: s.scripts.toLocaleString(), sub: `${s.own} of your own`, to: '/modules/scripts?tab=library' },
-        { label: 'Runs (7 d)', value: s.runs7d.toLocaleString(), sub: `${s.running} running now`, to: '/modules/scripts?tab=runs' },
-        { label: 'Succeeded (7 d)', value: s.succeeded7d.toLocaleString(), sub: `${s.failed7d} failed`, to: '/modules/scripts?tab=runs' },
-        { label: 'Remediated (7 d)', value: s.remediated7d.toLocaleString(), sub: 'Problems fixed', to: '/modules/scripts?tab=runs' },
+        { label: 'Runs (7 d)', value: s.runs7d.toLocaleString(), sub: `${s.running} running now`, to: '/modules/scripts?tab=runs&outcome=' },
+        { label: 'Succeeded (7 d)', value: s.succeeded7d.toLocaleString(), sub: `${s.failed7d} failed`, to: '/modules/scripts?tab=runs&outcome=succeeded' },
+        { label: 'Remediated (7 d)', value: s.remediated7d.toLocaleString(), sub: 'Problems fixed', to: '/modules/scripts?tab=runs&outcome=remediated' },
         { label: 'Schedules', value: s.schedules.toLocaleString(), sub: 'On', to: '/modules/scripts?tab=schedules' },
       ]} />}
       {s && !s.settings.enabled && <Callout tone="warn" icon="alert">Running scripts is turned off for the organisation (Settings).</Callout>}
@@ -227,7 +227,14 @@ function RunDialog({ script, remediation, scripts, onClose, onDone }: { script: 
 
 function RunsTab({ tick, canRun, changed, failed, openId }: Ctx & { openId: string | null }) {
   const list = useApi(() => api.get<Run[]>('/scripts/runs'), [tick]);
-  const rows = list.data ?? [];
+  // Outcome filter (also set by the counts on the overview: succeeded, remediated, failed).
+  const [outcome, setOutcome] = useSticky('ScriptsPage.RunsTab.outcome', '', 'outcome');
+  const week = Date.now() - 7 * 86_400_000;
+  const rows = (list.data ?? []).filter((r) => !outcome
+    || (outcome === 'succeeded' && (r.succeeded > 0 || r.compliant > 0) && new Date(r.createdAt).getTime() >= week)
+    || (outcome === 'remediated' && r.remediated > 0 && new Date(r.createdAt).getTime() >= week)
+    || (outcome === 'failed' && r.failed > 0)
+    || (outcome === 'active' && r.waiting + r.running > 0));
   const [open, setOpen] = useState<string | null>(openId);
   const active = rows.some((r) => r.waiting + r.running > 0);
   useEffect(() => {
@@ -239,6 +246,12 @@ function RunsTab({ tick, canRun, changed, failed, openId }: Ctx & { openId: stri
   const current = rows.find((r) => r.id === open);
   return (
     <>
+      <div className="toolbar-row">
+        <select className="in" value={outcome} onChange={(e) => setOutcome(e.target.value)} aria-label="Runs">
+          <option value="">All runs</option><option value="active">Waiting or running</option><option value="succeeded">Succeeded (7 days)</option>
+          <option value="remediated">Remediated (7 days)</option><option value="failed">With failures</option>
+        </select>
+      </div>
       <ErrorBox error={list.error} />
       <Panel flush>
         <DataTable rows={rows} onRow={(r) => setOpen(r.id)} rowTitle="Show the output" empty={list.loading ? 'Loading…' : 'No runs yet. Choose Run on a script in the library.'} columns={[

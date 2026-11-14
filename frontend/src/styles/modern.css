@@ -935,3 +935,24 @@ input[type=file]::file-selector-button:hover { border-color: var(--accent); colo
 .vbars .vcol:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
 .vbars .vcol .col { display: flex; align-items: flex-end; flex: 1 1 auto; min-height: 90px; width: 100%; background: var(--surface-2); border-radius: 6px 6px 2px 2px; }
 .vbars .vcol .col i { display: block; width: 100%; }
+/* Page header Refresh button. */
+.refresh-btn svg { transition: transform .7s ease; }
+.refresh-btn.spin svg { transform: rotate(360deg); }
+/* Licensing: Activate and Offline activation side by side, equal width and height (no empty third column). */
+.lic-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; }
+.lic-grid > .panel { height: 100%; }
+@media (max-width: 900px) { .lic-grid { grid-template-columns: 1fr; } }
+.lic-grid:not(:has(> .panel ~ .panel)) > .panel { grid-column: 1 / -1; }
+/* Two-row toolbar: search and its buttons on the first row, every filter on one line below (narrow windows wrap). */
+.toolbar-2 { display: grid; gap: 8px; margin-bottom: 12px; }
+.toolbar-2 > .toolbar-row { margin: 0; flex-wrap: nowrap; }
+.toolbar-filters { display: flex; gap: 8px; align-items: center; }
+.toolbar-filters > select.in, .toolbar-filters > * { flex: 1 1 0; min-width: 0; }
+.toolbar-filters > select.in { text-overflow: ellipsis; }
+@media (max-width: 1100px) { .toolbar-filters { flex-wrap: wrap; } .toolbar-filters > * { flex: 1 1 160px; } .toolbar-2 > .toolbar-row { flex-wrap: wrap; } }
+/* Only tiles that open a list look clickable; information-only tiles do not react to the pointer. */
+div.kpi:hover { border-color: var(--line); }
+div.kpi:hover::before, div.kpi::before { opacity: 0 !important; }
+a.kpi { cursor: pointer; }
+a.kpi .l::after { content: '›'; margin-left: 6px; color: var(--faint); opacity: 0; transition: opacity .15s; }
+a.kpi:hover .l::after { opacity: 1; }

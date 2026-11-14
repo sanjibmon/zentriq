@@ -137,6 +137,11 @@ Complete removal (irreversible – take and export a backup first):
 
 ## Account and access
 
+* **Refresh** (build 143): every page header has a *Refresh* button that reloads the page's lists and figures without
+  leaving the page; filters, search and paging stay as they are.
+* **Counts that open lists**: a summary tile with an arrow opens the list it counts with the matching filter (for example
+  *Patch Management › Missing Critical / Security* opens the devices missing critical or security updates); tiles that
+  only inform do not react to the pointer.
 * Sign-in sessions: HttpOnly, Secure, SameSite=Strict cookie. A session ends after the inactivity time below and 12
   hours after signing in at the latest. Login attempts are rate limited.
 * **Sign out after inactivity.** *System Settings › Sign-in security › Sign out after inactivity (minutes)*: any value

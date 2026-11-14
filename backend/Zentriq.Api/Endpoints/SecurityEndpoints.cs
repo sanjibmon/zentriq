@@ -157,15 +157,24 @@ public static class SecurityEndpoints
             });
         });
 
-        g.MapGet("/devices", async (Guid? baselineId, string? q, string? sort, int? page, int? pageSize, NpgsqlDataSource ds, CancellationToken ct) =>
+        g.MapGet("/devices", async (Guid? baselineId, string? q, string? sort, string? state, int? page, int? pageSize, NpgsqlDataSource ds, CancellationToken ct) =>
         {
             var b = await ResolveBaselineAsync(ds, baselineId, ct);
             var (p, ps) = Paging.Normalize(page, pageSize);
             var order = sort switch { "host" => "2", "failed" => "s.failed DESC, s.score", "best" => "s.score DESC NULLS LAST, 2", _ => "s.score NULLS FIRST, s.failed_high DESC, 2" };
+            // The same groups as the overview tiles: compliant (no failed high-severity check), score below 70, 90 or above.
+            var stateSql = state switch
+            {
+                "compliant" => "AND s.failed_high = 0 AND s.score IS NOT NULL",
+                "noncompliant" => "AND s.failed_high > 0",
+                "poor" => "AND s.score < 70",
+                "good" => "AND s.score >= 90",
+                _ => "",
+            };
             await using var cmd = ds.CreateCommand($"""
                 SELECT a.id, COALESCE(a.hostname, zentriq.asset_ipv4(a.id), host(a.primary_ip)), a.os_name, a.category, a.criticality, s.score, s.passed, s.failed, s.failed_high, s.unknown, s.exempt, s.evaluated_at, count(*) OVER ()
                   FROM zentriq.sec_scores s JOIN zentriq.assets a ON a.id = s.asset_id
-                 WHERE a.status = 'active' AND s.baseline_id = @b AND (@q::text IS NULL OR a.hostname ILIKE '%' || @q || '%' OR host(a.primary_ip) LIKE @q || '%')
+                 WHERE a.status = 'active' AND s.baseline_id = @b AND (@q::text IS NULL OR a.hostname ILIKE '%' || @q || '%' OR host(a.primary_ip) LIKE @q || '%') {stateSql}
                  ORDER BY {order} LIMIT @l OFFSET @o
                 """);
             cmd.Parameters.Add(new NpgsqlParameter("b", NpgsqlDbType.Uuid) { Value = (object?)b ?? DBNull.Value });
