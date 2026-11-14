@@ -916,3 +916,8 @@ input[type=file]::file-selector-button:hover { border-color: var(--accent); colo
 /* Column charts always take the tile's width (a centred tile body shrank them to nothing) and columns have a minimum width. */
 .chart.vbars { width: 100%; align-self: stretch; }
 .vbars button { flex: 1 1 48px; min-width: 32px; }
+/* Column charts: the tile body may shrink the chart; keep its height and lay each column out as a flex column with a
+   bar area that always has height (it measured 0 px inside dashboard tiles). */
+.chart.vbars { flex: none; min-height: 150px; }
+.vbars button { display: flex; flex-direction: column; justify-content: flex-end; }
+.vbars .col { flex: 1 1 auto; min-height: 90px; }
