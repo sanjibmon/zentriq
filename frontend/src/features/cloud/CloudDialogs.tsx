@@ -100,7 +100,7 @@ function Guide({ provider, label }: { provider: Provider; label: string }) {
       {g.note && <p className="cl-guide-note">{g.note}</p>}
       <div className="cl-guide-foot">
         <Icon name="shield" size={14} />
-        <span><b>Read-only.</b> Zentriq reads {g.reads.charAt(0).toLowerCase() + g.reads.slice(1)} It changes nothing.</span>
+        <span><b>Read-only.</b> Zentriq reads {/^[A-Z][a-z]/.test(g.reads) ? g.reads.charAt(0).toLowerCase() + g.reads.slice(1) : g.reads} It changes nothing.</span>
       </div>
     </aside>
   );

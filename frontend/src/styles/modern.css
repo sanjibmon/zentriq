@@ -595,8 +595,8 @@ a.kpi:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* ---- Build 117: brighter, clearer rail and text; aligned fields ---- */
 :root { --rail-fg: #E1EBF1; --rail-muted: #9DB3C2; }
-@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) { --fg: #0B1922; --muted: #435563; --faint: #6A7C89; } }
-:root[data-theme="light"] { --fg: #0B1922; --muted: #435563; --faint: #6A7C89; }
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) { --fg: #0B1922; --muted: #435563; --faint: #5C6D7A; } }
+:root[data-theme="light"] { --fg: #0B1922; --muted: #435563; --faint: #5C6D7A; }
 .brand-name { color: #FFFFFF; font-size: 18px; font-weight: 700; }
 .brand-name small { color: #5ED3E2; font-size: 12px; font-weight: 600; letter-spacing: .02em; margin-top: 2px; }
 .nav-group { color: #A9C0CE; font-size: 12.5px; font-weight: 700; letter-spacing: .01em; }
@@ -807,7 +807,7 @@ input[type=file].in { height: auto; padding: 7px 10px; }
 .ui-path > i { font-style: normal; color: var(--faint); }
 .ui-path a { color: var(--accent); }
 .ui-btn { display: inline-block; border: 1px solid var(--line-strong); border-bottom-width: 2px; border-radius: 5px; padding: 0 7px; font-size: 12px; font-weight: 600; color: var(--fg); background: var(--surface); line-height: 19px; white-space: nowrap; }
-.ui-val { font-family: var(--mono); font-size: 12px; background: var(--accent-soft); color: var(--accent); border-radius: 4px; padding: 1px 5px; word-break: break-all; }
+.ui-val { font-family: var(--mono); font-size: 12px; background: var(--accent-soft); color: var(--accent); border-radius: 4px; padding: 1px 5px; overflow-wrap: anywhere; }
 .help-cmd { background: #0E1A23; color: #DCE6EC; border-radius: 8px; font-family: var(--mono); font-size: 12.5px; overflow: hidden; margin-top: 6px; border: 1px solid #1d2c37; }
 .help-cmd-h { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 5px 8px 5px 10px; background: #15242F; color: #8FA2B0; font-family: var(--font); font-size: 11.5px; }
 .help-cmd-h > span { display: inline-flex; align-items: center; gap: 6px; }
@@ -880,3 +880,39 @@ input[type=file].in { height: auto; padding: 7px 10px; }
 .cl-guide-foot svg { color: var(--ok); margin-top: 2px; }
 .cl-guide-foot b { color: var(--fg); }
 @media (max-width: 980px) { .cl-layout { grid-template-columns: 1fr; } .cl-guide { position: static; order: -1; } }
+/* A top pager inside a table toolbar: one row with the Columns button. */
+.tbl-tools > .pager { border: 0; padding: 0; margin: 0; }
+/* File pickers: a real button instead of the browser's default. */
+input[type=file].in { padding: 6px; cursor: pointer; color: var(--muted); font-size: 13px; }
+input[type=file]::file-selector-button { margin-right: 12px; padding: 6px 14px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface); color: var(--fg);
+  font: 600 13px var(--font); cursor: pointer; }
+input[type=file]::file-selector-button:hover { border-color: var(--accent); color: var(--accent); }
+/* KPI tiles: the component sets the number of columns so rows are balanced (no single tile left on a row). */
+.kpis[style*="--kpi-cols"] { grid-template-columns: repeat(var(--kpi-cols), minmax(0, 1fr)); }
+@media (max-width: 1100px) { .kpis[style*="--kpi-cols"] { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 700px) { .kpis[style*="--kpi-cols"] { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* Cloud & Infrastructure, no connection yet: the platforms as cards. */
+.cl-need-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 18px 0 20px; text-align: left; }
+.cl-need { display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--fg); cursor: pointer; text-align: left; font: inherit; }
+.cl-need:hover:not(:disabled) { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent); }
+.cl-need:disabled { cursor: default; }
+.cl-need i { width: 26px; height: 26px; border-radius: 8px; flex: none; background: var(--c6); margin-top: 1px; }
+.cl-need b { display: block; font-size: 13.5px; }
+.cl-need small { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
+.cl-azure.cl-need i { background: linear-gradient(135deg, #2a8bf2, #0b5cc4); } .cl-aws.cl-need i { background: linear-gradient(135deg, #ffb13d, #e07b00); }
+.cl-vmware.cl-need i { background: linear-gradient(135deg, #6db33f, #1d8a5a); } .cl-hyperv.cl-need i { background: linear-gradient(135deg, #3fb7e6, #5b5fc7); }
+.cl-empty { max-width: 920px; }
+@media (max-width: 900px) { .cl-need-grid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 560px) { .cl-need-grid { grid-template-columns: 1fr; } }
+/* Tab bars stay on one line (no tab left alone on a second line); a narrow window scrolls them sideways. */
+.tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: thin; }
+.tabs button { flex: none; white-space: nowrap; }
+/* Segmented switches never shrink: in a tall dialog the form's grid could squeeze one (it hid its overflow) to 8 px. */
+.seg { overflow: visible; flex-shrink: 0; min-height: max-content; }
+.form-v > * { min-height: min-content; }
+/* Light theme: status pill text dark enough for small text on its soft background (contrast 4.5:1 or more). */
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) .pill.ok { color: #15703F; } :root:not([data-theme="dark"]) .pill.warn { color: #8A5409; } :root:not([data-theme="dark"]) .pill.crit { color: #A82A22; } }
+:root[data-theme="light"] .pill.ok { color: #15703F; } :root[data-theme="light"] .pill.warn { color: #8A5409; } :root[data-theme="light"] .pill.crit { color: #A82A22; }
+/* Column charts always take the tile's width (a centred tile body shrank them to nothing) and columns have a minimum width. */
+.chart.vbars { width: 100%; align-self: stretch; }
+.vbars button { flex: 1 1 48px; min-width: 32px; }

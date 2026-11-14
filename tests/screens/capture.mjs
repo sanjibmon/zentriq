@@ -54,6 +54,11 @@ for (const scheme of ['light', 'dark']) {
       await page.goto(base + path, { waitUntil: 'networkidle', timeout: 60000 });
       await page.waitForTimeout(1500);
       await page.screenshot({ path: `${out}/${scheme}-${name}.png`, fullPage: true });
+      if (name === 'dashboard' || name === 'security') {
+        const bars = await page.evaluate(() => [...document.querySelectorAll('.vbars')].map((v) => ({ w: v.getBoundingClientRect().width,
+          cols: [...v.querySelectorAll('.col')].map((c) => { const r = c.getBoundingClientRect(); return `${Math.round(r.width)}x${Math.round(r.height)}`; }) })));
+        writeFileSync(`${out}/${scheme}-${name}-vbars.json`, JSON.stringify(bars));
+      }
       await check(name);
     } catch (e) { report.push({ scheme, page: name, error: String(e).slice(0, 300) }); }
   }

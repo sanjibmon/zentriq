@@ -71,8 +71,10 @@ function LicenseHero({ d, org }: { d: LicensingStatus; org: string | null }) {
     : perpetual ? remaining(d.license?.issuedAt, d.supportUntil)
     : free ? null : remaining(d.license?.issuedAt, d.expiresAt);
   const tone = statusTone(d.mode);
-  const ringTone = !period ? 'ok' : period.days <= 14 ? 'crit' : period.days <= 45 ? 'warn' : 'ok';
-  const edition = trial ? 'Trial' : free ? 'Free tier' : `${d.editionTitle ?? 'Custom'} edition`;
+  // Amber, then red, only as the end comes near (a new 14-day trial is green).
+  const ringTone = !period ? 'ok' : period.days <= 3 || period.part < 0.1 ? 'crit' : period.days <= 7 || period.part < 0.25 ? 'warn' : 'ok';
+  const plainState = ['Trial', 'Licensed', 'Free'].includes(d.mode);
+  const edition = trial ? 'Trial · all sections' : free ? 'Free tier' : `${d.editionTitle ?? 'Custom'} edition`;
   const contact = [d.licensee?.contactName, d.licensee?.contactEmail, d.licensee?.contactPhone].filter(Boolean).join(' · ');
   const facts: [string, ReactNode][] = [
     [trial ? 'Trial ends' : perpetual ? 'License' : free ? 'Runs' : 'Valid until', trial ? fmt.day(d.trial?.expiresAt ?? d.expiresAt) : perpetual ? 'Perpetual' : free ? 'No end' : fmt.day(d.expiresAt)],
@@ -91,7 +93,7 @@ function LicenseHero({ d, org }: { d: LicensingStatus; org: string | null }) {
         {d.licensee?.address && <div className="lic-hero-contact">{d.licensee.address}{d.licensee.country ? `, ${d.licensee.country}` : ''}</div>}
         <div className="lic-hero-badges">
           <span className="lic-edition"><Icon name="key" size={14} /> {edition}</span>
-          <Pill tone={tone}>{MODE_LABEL[d.mode] ?? fmt.label(d.mode)}</Pill>
+          {!plainState && <Pill tone={tone}>{MODE_LABEL[d.mode] ?? fmt.label(d.mode)}</Pill>}
         </div>
         {d.sections && (
           <div className="lic-hero-sections" aria-label="Sections">
@@ -270,7 +272,6 @@ export function LicensingPage() {
             <Panel title="Details">
               <dl className="dl2">
                 <dt>Summary</dt><dd>{d.summary}</dd>
-                <dt>Installation ID</dt><dd className="mono">{d.installationId ?? '—'}</dd>
                 {d.releaseDate && <><dt>This version released</dt><dd>{fmt.day(d.releaseDate)}</dd></>}
                 {d.trial && <><dt>Trial</dt><dd>{fmt.day(d.trial.startedAt)} to {fmt.day(d.trial.expiresAt)}</dd></>}
                 {d.license && <>

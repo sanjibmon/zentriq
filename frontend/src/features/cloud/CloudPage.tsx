@@ -51,6 +51,19 @@ export function CloudPage() {
 
 // ---- overview ------------------------------------------------------------------------------------------------------
 
+/** What each platform needs, in a few words (the connection dialog has the full steps). */
+const NEEDS: Record<string, string> = {
+  azure: 'App registration with the Reader role',
+  aws: 'IAM access key with ReadOnlyAccess',
+  gcp: 'Service account JSON key, Viewer role',
+  vmware: 'vCenter 6.5+ user with the Read-only role',
+  hyperv: 'Host names and a saved Windows credential',
+  nutanix: 'Prism user with the Viewer role',
+  proxmox: 'API token with the PVEAuditor role',
+  xenserver: 'Pool user with the Read Only role',
+  ovirt: 'Engine user with a read-only role',
+};
+
 function Overview({ tick, onAdd }: { tick: number; onAdd?: () => void }) {
   const s = useApi(() => api.get<CloudSummary>('/cloud/summary'), [tick]);
   if (s.error) return <ErrorBox error={s.error} />;
@@ -59,20 +72,17 @@ function Overview({ tick, onAdd }: { tick: number; onAdd?: () => void }) {
   if (d.accounts === 0) return (
     <Panel>
       <div className="cl-empty">
-        <div className="cl-empty-icons">{PROVIDERS.map((p) => <ProviderBadge key={p.id} provider={p.id} full />)}</div>
+        <span className="ico-tile xl" style={{ margin: '0 auto' }}><Icon name="cloud" size={28} /></span>
         <h3>Connect your cloud and virtualization platforms</h3>
         <p className="muted">Read-only: virtual machines, hosts, disks, networks, storage and databases, linked to your devices, with waste and exposure flagged.</p>
-        <ul className="cl-howto">
-          <li><b>Azure</b> — an app registration with the <i>Reader</i> role on the subscriptions.</li>
-          <li><b>AWS</b> — an IAM user access key with the <i>ReadOnlyAccess</i> policy.</li>
-          <li><b>Google Cloud</b> — a service account JSON key with the <i>Viewer</i> role on the projects.</li>
-          <li><b>VMware</b> — a vCenter 6.5+ user with the <i>Read-only</i> role.</li>
-          <li><b>Hyper-V</b> — the host names and a saved Windows credential (Hyper-V Administrators).</li>
-          <li><b>Nutanix</b> — a Prism Central or Prism Element user with the <i>Viewer</i> role.</li>
-          <li><b>Proxmox VE</b> — an API token with the <i>PVEAuditor</i> role.</li>
-          <li><b>XCP-ng / Citrix Hypervisor</b> — a pool user with the <i>Read Only</i> role, on the pool master.</li>
-          <li><b>oVirt / RHV / OLVM</b> — an engine user with a read-only role.</li>
-        </ul>
+        <div className="cl-need-grid">
+          {PROVIDERS.map((p) => (
+            <button key={p.id} type="button" className={`cl-need cl-${p.id}`} onClick={onAdd} disabled={!onAdd}>
+              <i />
+              <span><b>{p.label}</b><small>{NEEDS[p.id]}</small></span>
+            </button>
+          ))}
+        </div>
         {onAdd ? <button className="btn primary" onClick={onAdd}><Icon name="plus" size={13} /> Add connection</button> : <p className="muted">Ask an administrator to add a connection.</p>}
       </div>
     </Panel>

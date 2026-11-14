@@ -47,7 +47,7 @@ export function CompanyProfile() {
 
   const l = org.data?.licensee;
   return (
-    <Panel title="Company profile" sub={org.data?.profile ? `Updated ${fmt.date(org.data.profile.updatedAt)}` : undefined}>
+    <Panel title="Company profile" sub={org.data?.profile?.updatedAt && new Date(org.data.profile.updatedAt).getFullYear() > 2000 ? `Updated ${fmt.date(org.data.profile.updatedAt)}` : undefined}>
       <ErrorBox error={org.error} />
       {!org.data ? <Loading /> : (
         <form className="form-v" onSubmit={save}>

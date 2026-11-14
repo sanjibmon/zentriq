@@ -76,7 +76,7 @@ function Library() {
             : <span className="muted">—</span> },
           { key: 'l', label: 'Last run', render: (r) => r.lastRunAt ? <><Pill tone={r.lastStatus === 'succeeded' ? 'ok' : r.lastStatus === 'failed' ? 'crit' : 'warn'}>{fmt.label(r.lastStatus)}</Pill> <span className="faint">{fmt.ago(r.lastRunAt)}</span></> : <span className="muted">never</span> },
           { key: 'o', label: 'Owner', render: (r) => r.system ? 'Zentriq' : r.owner ?? '—' },
-          { key: 'a', label: '', render: (r) => <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+          { key: 'a', label: '', render: (r) => <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'nowrap', whiteSpace: 'nowrap' }}>
             <Link className="btn sm" to={`/reports/${r.id}`}>Open</Link>
             {can('reports.design') && (r.owned || can('settings.manage')) && <button className="btn sm" onClick={() => setScheduling(r)}><Icon name="clock" size={13} /> Schedule</button>}
             {can('reports.export') && <button className="btn sm" onClick={() => void send(r)}>Send now</button>}

@@ -43,6 +43,14 @@ without internet access are activated offline with the same file.
 Licenses allow a **5 % overage grace** (`licensing.overage_grace_percent`) before refusing. The trial and the free
 tier are exact. Daily usage snapshots (`license.usage_snapshot`) are kept for reconciliation.
 
+## Licensing page (build 142)
+
+At the top, the license at a glance: who it is licensed to (company, contact, address from the signed license; during
+the trial, the company profile), the edition and state, the sections it covers (✓ included, 🔒 not included or not
+installed, *add-on*), a ring with the days left (trial, subscription term, or support of a perpetual license), and the
+type, activation, license ID and installation ID. Below: usage against the limits, activation (online or offline) and
+the installed sections. The plan table and the license server address are no longer shown in the console.
+
 ## Plans
 
 | Plan | IT devices | Non-IT assets | IT accessories | Cloud / VM instances | Remote support | Sections |
@@ -113,8 +121,8 @@ Data is **never** deleted, and sign-in, viewing data, backup, restore and licens
   falls back to the free tier. A suspended license returns at the first check-in after it is resumed.
 * **Moving to another server**: *Deactivate* releases the activation on the license server; import the license file
   on the new server. A license activates on as many servers as it allows (normally one).
-* **License server address**: `https://license.zentriq.com` (*Licensing › License server*, system setting
-  `licensing.server_url`; change it only when Zentriq asks). The server's outbound proxy settings apply; port 443
+* **License server address**: `https://license.zentriq.com` (system setting `licensing.server_url`, API
+  `PUT /api/v1/licensing/server`; change it only when Zentriq asks — since build 142 the Licensing page no longer shows it). The server's outbound proxy settings apply; port 443
   must be allowed. Plain `http://` is accepted only for `localhost`.
 
 API: `POST /api/v1/licensing/import {document}` (license file: validated online; file for this server: imported),

@@ -1,4 +1,4 @@
-import type { MouseEvent as ReactMouseEvent, ReactNode } from 'react';
+import type { CSSProperties, MouseEvent as ReactMouseEvent, ReactNode } from 'react';
 import { ApiError } from '../api/client';
 import { NAV, type NavItem } from '../app/nav';
 import { Link, useRouter } from '../app/router';
@@ -14,14 +14,20 @@ function navFor(path: string): { group: string; item: NavItem } | null {
   return best;
 }
 
-/** Title Case for labels in tiles, tabs, panel headers, dialog titles and column headers: every word starts with a capital
- *  ("Found on devices" → "Found On Devices"); acronyms (WDAC, IPv4), units (24 h), file names and e-mail addresses stay as they are. */
+/** Short words that stay lowercase inside a title ("Add a Cloud or Virtualization Connection"). */
+const MINOR = new Set(['a', 'an', 'and', 'or', 'nor', 'but', 'the', 'of', 'to', 'in', 'on', 'for', 'with', 'by', 'at', 'as', 'from', 'per', 'vs', 'via']);
+
+/** Title Case for labels in tiles, tabs, panel headers, dialog titles and column headers: words start with a capital
+ *  ("Found on devices" → "Found on Devices"), short words (a, and, or, of, to…) stay lowercase except at the start or
+ *  after a colon or dash; acronyms (WDAC, IPv4), units (24 h), file names and e-mail addresses stay as they are. */
 export function titleCase(text: string): string {
   return text.replace(/[A-Za-z][A-Za-z'’]*/g, (w, at: number) => {
     if (/[A-Z]/.test(w.slice(1))) return w;                       // WDAC, IPv4, macOS
     if (w.length === 1 && w !== 'a') return w;                       // units: 24 h, 7 d
     const prev = text.slice(0, at);
     if (/[-.@/]$/.test(prev) || /\d$/.test(prev)) return w;           // up-to-date, e.g., file.exe, 10x
+    const startOfPhrase = prev.trim() === '' || /[:—–(·|]\s*$/.test(prev);
+    if (!startOfPhrase && MINOR.has(w.toLowerCase())) return w.toLowerCase();
     return w[0].toUpperCase() + w.slice(1);
   });
 }
@@ -96,8 +102,11 @@ export function Panel({ title, sub, right, children, flush }: { title?: ReactNod
 }
 
 export function Kpis({ items }: { items: { label: string; value: ReactNode; sub?: ReactNode; to?: string }[] }) {
+  // Balanced rows: up to 6 tiles in one row, more split evenly (7-8 → 4 a row), never one tile alone on a row.
+  const n = items.length;
+  const cols = n <= 6 ? n : Math.ceil(n / Math.ceil(n / 6));
   return (
-    <div className="kpis">
+    <div className="kpis" style={{ '--kpi-cols': cols } as CSSProperties}>
       {items.map((k) => {
         const body = (
           <>

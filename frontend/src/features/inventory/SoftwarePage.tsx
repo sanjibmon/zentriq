@@ -97,8 +97,7 @@ export function SoftwarePage() {
       <ErrorBox error={data.error} />
       <div className="grid-2" style={{ gridTemplateColumns: selected ? 'minmax(0,2fr) minmax(0,3fr)' : '1fr' }}>
         <Panel flush>
-          {data.data && <Pager top page={page} pageSize={pageSize} total={data.data.total} onPage={setPage} />}
-          <ChoosableTable tableId="software" rows={(data.data?.items ?? []).map((r) => ({ ...r, id: r.name }))} empty={data.loading ? 'Loading…' : 'No software inventory yet. Install agents or run a scan with credentials.'} columns={[
+          <ChoosableTable tableId="software" tools={data.data && <Pager top page={page} pageSize={pageSize} total={data.data.total} onPage={setPage} />} rows={(data.data?.items ?? []).map((r) => ({ ...r, id: r.name }))} empty={data.loading ? 'Loading…' : 'No software inventory yet. Install agents or run a scan with credentials.'} columns={[
             { key: 'n', label: 'Product', render: (r) => <button className="linkish" onClick={() => setSelected(r.name)}><b>{r.name}</b></button> },
             { key: 'p', label: 'Publisher', render: (r) => r.publisher ?? '—' },
             { key: 'i', label: 'Installs', render: (r) => r.installs.toLocaleString() },
