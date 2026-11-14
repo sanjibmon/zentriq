@@ -1,0 +1,9 @@
+﻿2026-11-14 04:01:45 WARN LicenseServer: No signing key yet: The license server is not set up yet: finish the setup at http://localhost:5080/setup on the license server.
+2026-11-14 04:01:45 WARN LicenseServer: No portal account exists. Run 'create-admin --email <email>' or set ZLS_BOOTSTRAP_EMAIL and ZLS_ADMIN_PASSPHRASE.
+2026-11-14 04:01:55 INFO LicenseServer: Signing key zentriq-ci-setup loaded and self-tested. Fingerprint SHA256:49:84:0A:9B:60:8A:7E:3D:04:EC:78:7D:1B:57:4A:6D:D9:AF:52:3B:D5:E6:C4:6B:4D:58:5A:86:E7:90:66:95
+2026-11-14 04:01:59 WARN Setup: Restarting to apply the new address settings (Windows starts the service again in a few seconds).
+2026-11-14 04:02:05 INFO LicenseServer: Signing key zentriq-ci-setup loaded and self-tested. Fingerprint SHA256:49:84:0A:9B:60:8A:7E:3D:04:EC:78:7D:1B:57:4A:6D:D9:AF:52:3B:D5:E6:C4:6B:4D:58:5A:86:E7:90:66:95
+2026-11-14 04:02:09 WARN Setup: Restarting to apply the new address settings (Windows starts the service again in a few seconds).
+2026-11-14 04:02:15 INFO LicenseServer: Signing key zentriq-ci-setup loaded and self-tested. Fingerprint SHA256:49:84:0A:9B:60:8A:7E:3D:04:EC:78:7D:1B:57:4A:6D:D9:AF:52:3B:D5:E6:C4:6B:4D:58:5A:86:E7:90:66:95
+2026-11-14 04:02:36 INFO DailyBackup: Database backup written: C:\ProgramData\Zentriq\LicenseServer\backups\zentriq_license-20261114-040236.dump
+2026-11-14 04:03:00 INFO LicenseServer: Signing key zentriq-ci-setup loaded and self-tested. Fingerprint SHA256:49:84:0A:9B:60:8A:7E:3D:04:EC:78:7D:1B:57:4A:6D:D9:AF:52:3B:D5:E6:C4:6B:4D:58:5A:86:E7:90:66:95
