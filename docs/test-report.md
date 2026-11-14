@@ -1,6 +1,38 @@
 # Test report
 
-Latest: GitHub Actions run 43554163966 (attempt 2), workflow `windows-release`, on a GitHub-hosted **Windows Server
+Latest: GitHub Actions run 43574961235, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022
+Datacenter 10.0.20348** VM set to India Standard Time plus an Ubuntu job for the Linux agent. Release:
+`v1.1.1-build.143` (pre-release, **unsigned**), package version **1.1.1.143**, commit `187e66c`. Results: unit +
+PostgreSQL integration tests **516 PASS** (518, 2 skipped); installer acceptance **93 passed, 0 failed** (10 not run:
+need hardware, a domain, a reboot or old Windows); upgrade suites **14/14** (schema 46); Linux agent on 11
+distributions **11/11**.
+
+New in build 143: a Refresh button in the header of every console page (reloads the page's lists and counts without
+a full reload); Active Directory discovered objects export (computers, users, groups and the other object types, one
+type or all, to Excel or CSV, formula-safe, audited); Licensing page without the blank space (activation facts in the
+top panel, Activate and Offline Activation side by side); IT Asset Inventory toolbar with search, Columns and IPv6 on
+one line and the filters on a second; summary tiles that look clickable now open the matching filtered list (Patch
+Management Missing Critical, Up To Date, Missing Updates, Restart Pending, Failed; Security Configuration compliant
+and poor devices; Scripts & Remediation run outcomes; Integrations failed deliveries) and tiles that only show a
+number (Software Usage) no longer look clickable.
+
+| File | SHA256 |
+|---|---|
+| Zentriq-Setup-x64.exe | `c1e12c549e5b0011f7588262e8ee27860bb3f9aeef7a682ecef5fe7535e2da0e` |
+| Zentriq.msi | `d4166d0f85a963a1bf9d065d2a26969f3ffbd5f4a1e58adfa8338d90a5904f7f` |
+| ZentriqAgent-x64.msi | `cfedab070c3aa064e33751acbb961150cf5a579a2e7895375506b4d5a1dff3ae` |
+| zentriq-agent-linux-x64.deb | `3f20938156bd807958578315b7996051681bb39041004bb4a481431db7b32987` |
+| zentriq-agent-linux-x64.rpm | `5b33cddd58998f20cc8aeef26682d8481159341218d82353b74c2b35c73a2984` |
+| zentriq-agent-linux-x64.tar.gz | `9feea749addbde0d08450e419c4d41ccc97a8132c33016a46f9aa0cc728df8d0` |
+| zentriq-agent-linux-arm64.deb | `f43c20bf0f77a9ca444f35cca0eafbb85591c1db227ab3eead1a1f6ce5e66ba3` |
+| zentriq-agent-linux-arm64.rpm | `e31d59aa96e1637bc7f918735c24d6bda2b5647f3cb37ddcd3e75f201ede577d` |
+| zentriq-agent-linux-arm64.tar.gz | `a6ae970d9995f25b9296861e14ab1de8ac130533a31026875f98e60a5c018d42` |
+| Zentriq-1.1.1-msi-offline-kit.zip | `b029753608da8a6e9a43456496b14efc7b320710933856dd36977481ef1061e8` |
+| Zentriq-1.1.1-docs.zip | `a45b645956ff424afbe289f552e07428eac513856d748de51600f78effe1e3c3` |
+
+## Build 142
+
+GitHub Actions run 43554163966 (attempt 2), workflow `windows-release`, on a GitHub-hosted **Windows Server
 2022 Datacenter 10.0.20348** VM set to India Standard Time plus an Ubuntu job for the Linux agent. Release:
 `v1.1.1-build.142` (pre-release, **unsigned**), package version **1.1.1.142**, commit `19b5838`. Results: unit +
 PostgreSQL integration tests **516 PASS** (518, 2 skipped); installer acceptance **93 passed, 0 failed** (10 not run:
