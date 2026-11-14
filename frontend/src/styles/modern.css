@@ -956,3 +956,9 @@ div.kpi:hover::before, div.kpi::before { opacity: 0 !important; }
 a.kpi { cursor: pointer; }
 a.kpi .l::after { content: '›'; margin-left: 6px; color: var(--faint); opacity: 0; transition: opacity .15s; }
 a.kpi:hover .l::after { opacity: 1; }
+/* Two-row toolbar sizing (beats the general minimum widths of inputs and selects). */
+.toolbar-2 .toolbar-main > input.in.grow { flex: 1 1 auto; min-width: 0; width: auto; }
+.toolbar-2 .toolbar-main > :not(input) { flex: none; }
+.toolbar-2 .toolbar-filters > select.in { flex: 1 1 0; min-width: 0; width: auto; max-width: none; padding-right: 26px; }
+.toolbar-2 { grid-template-columns: minmax(0, 1fr); }
+.toolbar-2 > * { min-width: 0; }
