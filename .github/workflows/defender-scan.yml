@@ -1,10 +1,14 @@
 # Microsoft Defender scan of a published release: every installer and every file inside them (bundle extracted with
 # WiX, MSIs unpacked with an administrative install) on a clean Windows VM with current Defender signatures.
-# Results (detections with file paths) go to branch ci-defender. Runs on pushes to defender/** branches.
+# Results (detections with file paths) go to branch ci-defender. Runs on pushes to defender/** branches and every
+# Monday against the newest release, so a detection added to Defender's signatures after a release is noticed.
 name: defender-scan
 on:
   push:
     branches: ['defender/**']
+  schedule:
+    - cron: '17 3 * * 1'
+  workflow_dispatch:
 permissions:
   contents: write
 jobs:
@@ -12,7 +16,6 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 60
     env:
-      RELEASE_TAG: v1.1.1-build.143
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
@@ -20,6 +23,9 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Continue'
+          $env:RELEASE_TAG = (gh api "repos/${{ github.repository }}/releases?per_page=1" | ConvertFrom-Json)[0].tag_name
+          "RELEASE_TAG=$env:RELEASE_TAG" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "Scanning $env:RELEASE_TAG"
           $out = "$env:RUNNER_TEMP\defender"; New-Item -ItemType Directory -Force $out | Out-Null
           $rel = "$env:RUNNER_TEMP\rel"; New-Item -ItemType Directory -Force $rel | Out-Null
           gh release download $env:RELEASE_TAG -R ${{ github.repository }} -p '*.exe' -p '*.msi' -p '*.zip' -D $rel
@@ -44,6 +50,7 @@ jobs:
           Get-MpThreatDetection | Select-Object ThreatID, ProcessName, @{n='Resources';e={$_.Resources -join '; '}}, InitialDetectionTime | Format-List | Out-File "$out\detections.txt"
           Get-MpThreat | Select-Object ThreatID, ThreatName, SeverityID, CategoryID | Format-List | Out-File "$out\threats.txt"
           Get-Content "$out\summary.txt", "$out\threats.txt", "$out\detections.txt"
+          if (Select-String -Path "$out\scan.log" -Pattern 'Threat\s+:' -Quiet) { Write-Error "Microsoft Defender detected threats in $env:RELEASE_TAG (see scan.log on branch ci-defender)."; exit 1 }
       - name: Publish to branch ci-defender
         if: always()
         shell: pwsh

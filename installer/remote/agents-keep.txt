@@ -2,7 +2,10 @@
 # installer is built). Windows agents, plus the macOS and Linux (x64, ARM64) agents for quick support and
 # install links (build 62). Android agents, MeshCmd, MeshCentral Router/Satellite and other helpers are left
 # out; they are not used and some antivirus products flag remote-access tools by name.
-MeshService.exe
+# Build 144: the 32-bit Windows agent (MeshService.exe) is left out too. Zentriq never offers it (the server uses the
+# 64-bit and ARM64 Windows agents), and Microsoft Defender detects it as HackTool:Win32/Meshagent.MBZ!MTB, which made
+# Defender flag Zentriq Setup during installation. The release build now scans every file with Defender and fails on
+# any detection.
 MeshService64.exe
 MeshServiceARM64.exe
 meshagent_osx-universal-64

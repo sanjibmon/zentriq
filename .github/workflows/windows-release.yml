@@ -197,6 +197,12 @@ jobs:
           Move-Item artifacts/release artifacts/release-main
           Get-Content artifacts/prereqs/prereqs.lock.json
 
+      - name: Microsoft Defender scan of every file in the installers
+        shell: pwsh
+        run: |
+          $files = Get-ChildItem artifacts/release-main -File -Include *.exe, *.msi, *.zip -Recurse | Select-Object -ExpandProperty FullName
+          ./installer/scripts/Test-Defender.ps1 -Files $files -OutDir "$env:RUNNER_TEMP/ci-logs"
+
       - name: Package upgrade target
         shell: pwsh
         run: |

@@ -93,7 +93,9 @@ $agentsDir = Join-Path $app 'node_modules\meshcentral\agents'
 $keep = Get-Content (Join-Path $remoteSrc 'agents-keep.txt') | Where-Object { $_ -and -not $_.StartsWith('#') } | ForEach-Object { $_.Trim().TrimEnd('/') }
 $removed = 0
 Get-ChildItem $agentsDir -Force | Where-Object { $keep -notcontains $_.Name } | ForEach-Object { Remove-Item $_.FullName -Recurse -Force; $removed++ }
-foreach ($k in 'MeshService64.exe', 'MeshService.exe', 'meshcore.js', 'modules_meshcore') { if (-not (Test-Path (Join-Path $agentsDir $k))) { throw "MeshCentral agent file missing after trimming: $k" } }
+foreach ($k in 'MeshService64.exe', 'MeshServiceARM64.exe', 'meshcore.js', 'modules_meshcore') { if (-not (Test-Path (Join-Path $agentsDir $k))) { throw "MeshCentral agent file missing after trimming: $k" } }
+# Never shipped (antivirus detections, not used by Zentriq): the 32-bit Windows agent, MeshCmd and the Assistant installers.
+foreach ($k in 'MeshService.exe', 'MeshCmd.exe', 'MeshCmd64.exe', 'MeshCmdARM64.exe') { if (Test-Path (Join-Path $agentsDir $k)) { throw "MeshCentral agent file must not be shipped: $k" } }
 Write-Host "MeshCentral agents: kept $($keep.Count), removed $removed unused item(s)."
 # Remove documentation and source maps (not used at run time) to keep the installer smaller.
 Get-ChildItem (Join-Path $app 'node_modules') -Recurse -File -Include '*.md', '*.map' -ErrorAction SilentlyContinue |
