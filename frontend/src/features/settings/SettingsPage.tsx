@@ -7,6 +7,7 @@ import { Icon } from '../../components/Icon';
 import { CompanyProfile } from './CompanyProfile';
 import { CompanyLogoPanel } from './CompanyLogoPanel';
 import { SecuritySettings } from './SecuritySettings';
+import { AssistantSettings } from './AssistantSettings';
 import { DataTable, ErrorBox, fmt, Loading, PageHead, Panel, Pill } from '../../components/ui';
 
 export function SettingsPage() {
@@ -21,6 +22,7 @@ export function SettingsPage() {
       <CompanyProfile />
       <CompanyLogoPanel canEdit={can('settings.manage')} />
       <SecuritySettings />
+      {can('settings.manage') && <AssistantSettings />}
       <ErrorBox error={info.error} />
       {!i ? <Loading /> : (
         <div className="grid-2">

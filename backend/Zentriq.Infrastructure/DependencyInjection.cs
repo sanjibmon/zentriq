@@ -64,6 +64,10 @@ public static class DependencyInjection
         services.AddSingleton<Zentriq.Infrastructure.Remote.RemoteSupportService>();
         services.AddSingleton<Zentriq.Infrastructure.Integrations.IntegrationStore>();
         services.AddSingleton<Zentriq.Infrastructure.Cloud.CloudStore>();
+        // Zentriq Assistant (build 145): documentation search, settings and history, and the answering service.
+        services.AddSingleton(_ => new Zentriq.Infrastructure.Assistant.AssistantKnowledge());
+        services.AddSingleton<Zentriq.Infrastructure.Assistant.AssistantStore>();
+        services.AddSingleton<Zentriq.Infrastructure.Assistant.AssistantService>();
         services.AddSingleton<Zentriq.Infrastructure.Backup.BackupStore>();
         services.AddSingleton<Zentriq.Infrastructure.Integrations.ChannelSender>();
         services.AddScoped<Zentriq.Infrastructure.Inventory.InventoryStore>();

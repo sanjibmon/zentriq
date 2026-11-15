@@ -23,6 +23,8 @@
     <EmbeddedResource Include="Resources\license-public-keys.json" LogicalName="Zentriq.Licensing.PublicKeys.json" />
     <EmbeddedResource Include="Resources\software-catalog.json" LogicalName="Zentriq.Deployment.SoftwareCatalog.json" />
     <EmbeddedResource Include="Resources\webapp-catalog.json" LogicalName="Zentriq.WebApps.Catalog.json" />
+    <!-- Zentriq Assistant (build 145): the customer documentation, searched offline and given to the AI model as context. -->
+    <EmbeddedResource Include="..\..\docs\*.md" Exclude="..\..\docs\test-report.md;..\..\docs\code-signing.md" LogicalName="Zentriq.Docs.%(Filename)%(Extension)" />
     <EmbeddedResource Include="Resources\license-catalog.json" LogicalName="Zentriq.Licenses.Catalog.json" />
   </ItemGroup>
   <ItemGroup>

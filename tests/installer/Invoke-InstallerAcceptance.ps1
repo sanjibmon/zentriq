@@ -119,7 +119,7 @@ Remove-Item $answer -Force   # contains the administrator password
 
 if (-not $installed) {
     foreach ($t in 'T02 PostgreSQL provisioning', 'T03 Database migration', 'T04 Administrator sign-in', 'T05 API and worker services', 'T06 Trial initialization',
-                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection', 'T68 Live agent connection', 'T69 Locations and IT accessories', 'T70 Manual hardware details', 'T71 Standard and Advanced installation', 'T72 Asset lifecycle', 'T73 Cloud and infrastructure', 'T74 Own asset tags, people and bulk upload', 'T75 Backup and restore', 'T76 Roles and groups', 'T77 Log retention and export', 'T78 Agent stop and disable protection', 'T79 Automatic agent update', 'T80 Agent check-in and diagnosis commands', 'T81 Licensing plans and online activation', 'T82 Software Deployment policy', 'T83 Application control on Windows', 'T84 Push deployment', 'T85 Remote support agent tamper protection', 'T86 Software licenses', 'T87 Web apps and accounts', 'T88 Network connected devices', 'T89 Warranty lookup', 'T90 Session recording', 'T91 Directory sign-in', 'T92 Patch management', 'T93 Scripts and remediation', 'T94 Tray icon and self-service', 'T95 Software metering and device experience', 'T96 Endpoint privilege management', 'T97 BitLocker management', 'T98 USB device control', 'T99 Product keys and pick lists', 'T100 Only TLS 1.2 and 1.3', 'T101 Data scope and access rules', 'T102 Sign-out after inactivity') {
+                   'T07 HTTPS', 'T08 zentriqctl verify', 'T09 Restart services', 'T10 Repair', 'T11 Backup', 'T12 Tampered license', 'T13 Upgrade', 'T14 Logs free of credentials', 'T15 Uninstall', 'T16 Reinstall', 'T22 Shortcuts', 'T23 Web console', 'T24 Trial policy', 'T25 Company profile', 'T26 Agent install', 'T27 Agent port', 'T28 Agentless WinRM', 'T29 Agent revoke/uninstall', 'T32 Leftover data folder', 'T33 Show enrollment code', 'T34 Delete scans', 'T35 MFA', 'T36 Password reset', 'T37 AD connection', 'T41 Asset type and IPv4', 'T42 Collect all', 'T43 Service via agent', 'T44 Service agentless', 'T45 Software uninstall', 'T46 Drill-down and offline', 'T47 Agent update from the console', 'T48 Reports', 'T49 Vulnerability management', 'T50 Windows vulnerabilities and workflow', 'T51 Live Microsoft data', 'T52 Report analytics and PDF', 'T53 Security configuration', 'T54 Integrations', 'T55 API tokens', 'T56 Departments', 'T57 Change history', 'T58 Company logo', 'T59 Remote support', 'T60 Remote support via agent', 'T61 Certificate follows the server', 'T62 Devices without an agent', 'T63 Network inventory', 'T64 Non-IT assets', 'T65 Remote quick support', 'T66 Non-IT groups and departments', 'T67 Agent uninstall protection', 'T68 Live agent connection', 'T69 Locations and IT accessories', 'T70 Manual hardware details', 'T71 Standard and Advanced installation', 'T72 Asset lifecycle', 'T73 Cloud and infrastructure', 'T74 Own asset tags, people and bulk upload', 'T75 Backup and restore', 'T76 Roles and groups', 'T77 Log retention and export', 'T78 Agent stop and disable protection', 'T79 Automatic agent update', 'T80 Agent check-in and diagnosis commands', 'T81 Licensing plans and online activation', 'T82 Software Deployment policy', 'T83 Application control on Windows', 'T84 Push deployment', 'T85 Remote support agent tamper protection', 'T86 Software licenses', 'T87 Web apps and accounts', 'T88 Network connected devices', 'T89 Warranty lookup', 'T90 Session recording', 'T91 Directory sign-in', 'T92 Patch management', 'T93 Scripts and remediation', 'T94 Tray icon and self-service', 'T95 Software metering and device experience', 'T96 Endpoint privilege management', 'T97 BitLocker management', 'T98 USB device control', 'T99 Product keys and pick lists', 'T100 Only TLS 1.2 and 1.3', 'T101 Data scope and access rules', 'T102 Sign-out after inactivity', 'T103 Zentriq Assistant') {
         Record $t.Substring(0, 3) $t.Substring(4) 'BLOCKED' 'installation failed'
     }
 } else {
@@ -3163,6 +3163,39 @@ if (-not $installed) {
         } finally {
             Raw102 PUT '/system/settings/security.idle_signout_minutes' @{ value = 30 } (Login) | Out-Null
         }
+    } | Out-Null
+
+    Check 'T103' 'Zentriq Assistant: on by default with documentation search; answers an agent question from the documentation with sources and live facts about a named device; settings validated; the API key is write-only; questions are in the history and the audit log' {
+        $s = Login
+        $st = Api GET '/assistant/status' -Session $s
+        Assert ($st.enabled -and $st.available -and $st.provider -eq 'offline') "status: $($st | ConvertTo-Json -Compress)"
+        Assert (@($st.suggestions).Count -ge 3) 'no suggestions'
+        $a = Api POST '/assistant/ask' @{ question = 'How do I deploy the agent with Intune?'; history = @() } -Session $s
+        Assert ($a.text -match 'Intune') "answer without Intune: $($a.text.Substring(0, [Math]::Min(300, $a.text.Length)))"
+        Assert (@($a.sources).Count -ge 1 -and (@($a.sources).anchor -join ' ') -match 'agents-and-agentless') "sources: $(@($a.sources).anchor -join ', ')"
+        Assert ($a.provider -eq 'Documentation search') "provider: $($a.provider)"
+        # A device named in the question: facts from this server.
+        $dev = (Api GET '/assets?pageSize=50' -Session $s).items | Where-Object { $_.hostname } | Select-Object -First 1
+        $b = Api POST '/assistant/ask' @{ question = "Why is $($dev.hostname) not sending inventory?"; history = @(@{ role = 'user'; text = 'hello' }, @{ role = 'assistant'; text = 'Hi' }) } -Session $s
+        Assert ($b.text -match [regex]::Escape($dev.hostname) -and $b.text -match 'On this server') "no live facts for $($dev.hostname): $($b.text.Substring(0, [Math]::Min(300, $b.text.Length)))"
+        # Settings: validation, a key that is never returned, back to offline.
+        $code = (Invoke-WebRequest "$base/api/v1/assistant/settings" -Method Put -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } -ContentType 'application/json' -Body (@{ provider = 'local'; localUrl = 'ftp://x'; localModel = 'm' } | ConvertTo-Json) -SkipHttpErrorCheck).StatusCode
+        Assert ($code -eq 400) "ftp model address accepted: $code"
+        $code = (Invoke-WebRequest "$base/api/v1/assistant/settings" -Method Put -WebSession $s -Headers @{ 'X-Zentriq-Request' = '1' } -ContentType 'application/json' -Body (@{ provider = 'anthropic'; apiKey = 'sk-ant-zentriq-acceptance-0000000000' } | ConvertTo-Json) -SkipHttpErrorCheck).StatusCode
+        Assert ($code -eq 204) "saving Claude settings: $code"
+        $cfg = Api GET '/assistant/settings' -Session $s
+        Assert ($cfg.hasKey -and $cfg.keyHint -eq '…0000' -and ($cfg | ConvertTo-Json) -notmatch 'acceptance') "key exposed or missing: $($cfg | ConvertTo-Json -Compress)"
+        # No internet to the Anthropic API from the test VM is fine: the answer falls back to the documentation and says why.
+        $c = Api POST '/assistant/ask' @{ question = 'How do I restore a backup on a new server?'; history = @() } -Session $s
+        Assert ($c.text.Length -gt 50 -and ($c.provider -match 'Claude' -or $c.notice)) "fallback: provider $($c.provider), notice $($c.notice)"
+        Api PUT '/assistant/settings' @{ provider = 'offline'; clearKey = $true } -Session $s | Out-Null
+        Assert (-not (Api GET '/assistant/settings' -Session $s).hasKey) 'key not removed'
+        $h = Api GET '/assistant/history?limit=10' -Session $s
+        Assert (@($h | Where-Object { $_.question -match 'Intune' }).Count -ge 1) 'question not in the history'
+        Assert (@($h | Where-Object { $_.question -match 'sk-ant' }).Count -eq 0) 'key text in the history'
+        $audit = Api GET '/audit?action=assistant.ask&pageSize=5' -Session $s
+        Assert (@($audit.items).Count -ge 1) 'assistant.ask not audited'
+        "documentation answer with sources ($(@($a.sources).anchor -join ', ')), live facts for $($dev.hostname), settings validated, key write-only and removed, $(@($h).Count) question(s) in the history, audited; Claude answer: $($c.provider)"
     } | Out-Null
 
     Check 'T77' 'Log retention and export: one year by default, validation, schedule every 6 months, export a period now, archive download with manifest, CSV download of the audit and activity logs' {

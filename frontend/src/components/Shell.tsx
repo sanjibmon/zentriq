@@ -3,6 +3,7 @@ import { useAuth } from '../app/auth';
 import { GROUP_ICON, NAV, SECTION_OF_GROUP } from '../app/nav';
 import { Link, useRouter } from '../app/router';
 import { Icon } from './Icon';
+import { AssistantLauncher } from './Assistant';
 import { LogoMark, PRODUCT } from './Logo';
 import { CompanyLogo } from './CompanyLogo';
 import { api } from '../api/client';
@@ -122,6 +123,7 @@ export function Shell({ children }: { children: ReactNode }) {
           </div>
         )}
         <main className="page">{children}</main>
+        <AssistantLauncher />
       </div>
     </div>
   );

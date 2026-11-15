@@ -119,6 +119,10 @@ builder.Services.AddRateLimiter(o =>
     o.AddPolicy("login", ctx => RateLimitPartition.GetFixedWindowLimiter(
         ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+    // Zentriq Assistant (build 145): 20 questions a minute per user.
+    o.AddPolicy("assistant", ctx => RateLimitPartition.GetFixedWindowLimiter(
+        ctx.User.FindFirst(Zentriq.Api.Infrastructure.ZentriqClaims.UserId)?.Value ?? ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = 20, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
     o.AddPolicy("password-reset", ctx => RateLimitPartition.GetFixedWindowLimiter(
         ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         _ => new FixedWindowRateLimiterOptions { PermitLimit = 5, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
@@ -211,6 +215,7 @@ api.MapAccessoryEndpoints();
 api.MapLifecycleEndpoints();
 api.MapWarrantyEndpoints();
 api.MapCloudEndpoints();
+api.MapAssistantEndpoints();
 api.MapDeploymentEndpoints();
 api.MapLicenseEndpoints();
 api.MapExperienceEndpoints();
