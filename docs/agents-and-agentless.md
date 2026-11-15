@@ -11,7 +11,7 @@ Devices reported by both are merged into one asset (SMBIOS UUID → serial numbe
 | Works off the LAN / over the internet | no | yes (publish port 8444 or a reverse proxy) |
 | Credentials stored in Zentriq | yes (encrypted) | none (per-device certificate) |
 | Freshness | as often as the scan schedule | live connection (online/offline within seconds), check-in every 5 min – 3 h and inventory every 30 min – 24 h (chosen at installation, changeable per agent), or *Collect now* (seconds) |
-| Platforms | Windows, Linux, macOS, SNMP devices | Windows 10/11, Windows Server 2016+ |
+| Platforms | Windows, Linux, macOS, SNMP devices | Windows 10/11, Windows Server 2016+, Linux, macOS 12+ |
 
 ## Agentless scanning
 
@@ -312,7 +312,7 @@ log is `C:\ProgramData\Zentriq\Agent\Logs\agent.log`.
 
 ### Agent limitations (this release)
 
-* The Windows agent needs .NET Framework 4.8 (not present by default on Server 2016/2019; Windows 10 1903+/11 have it). Linux servers and desktops use the [Zentriq Agent for Linux](linux-agent.md); a macOS agent is planned (remote support already works on macOS).
+* The Windows agent needs .NET Framework 4.8 (not present by default on Server 2016/2019; Windows 10 1903+/11 have it). Linux servers and desktops use the [Zentriq Agent for Linux](linux-agent.md); Macs use the [Zentriq Agent for macOS](macos-agent.md) (build 144).
 * Inventory only – the agent does not deploy software, patch or provide remote control.
 * If the server's self-signed certificate is replaced by a new self-signed one **after** the old one stopped working,
   agents must be re-enrolled; use a CA-issued certificate for internet-facing deployments.

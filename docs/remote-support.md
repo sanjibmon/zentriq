@@ -201,6 +201,14 @@ To support devices outside the LAN, see *Internet access* above (and publish 844
 
 ## Antivirus
 
+**Build 144:** Microsoft Defender detected the engine's 32-bit Windows agent (`agents\MeshService.exe`) as
+`HackTool:Win32/Meshagent.MBZ!MTB`, so Defender flagged Zentriq Setup while it wrote that file. Zentriq never used it
+(the server offers the 64-bit and ARM64 Windows agents), so it is no longer shipped. Every release build now unpacks
+Setup and every MSI and scans each file with Defender (current signatures); a detection fails the build. The newest
+release is scanned again every Monday (workflow `defender-scan`). Code-signing the Zentriq binaries (planned before
+go-live) also lowers machine-learning detections and SmartScreen warnings.
+
+
 The installer ships only the engine files Zentriq uses: the Windows, macOS and Linux agents and their core scripts (`installer/remote/agents-keep.txt`). Android agents, the command-line tool, router and satellite helpers are left out. The installer is not code-signed yet; if Microsoft Defender or another product still blocks it, note the threat name and file from *Protection history* (`Get-MpThreatDetection`) — sign the build or submit the file as a false positive.
 
 ## Troubleshooting
