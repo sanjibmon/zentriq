@@ -1,0 +1,26 @@
+screenshot shell
+screenshot add-device
+screenshot add-accessory
+screenshot add-it-assets
+screenshot patch-policy
+screenshot patch-deploy
+screenshot new-script
+screenshot new-schedule
+screenshot license-product
+screenshot license
+screenshot web-app
+screenshot deploy-rule
+screenshot deploy-package
+page error: Cannot read properties of undefined (reading 'length')
+screenshot deploy-group
+screenshot non-it-asset
+screenshot deploy-job
+screenshot deploy-offer
+screenshot deploy-decide
+screenshot experience
+screenshot device-experience
+screenshot license-usage
+screenshot license-keys
+screenshot privilege
+screenshot bitlocker
+screenshot usb
