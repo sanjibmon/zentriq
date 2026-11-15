@@ -1,6 +1,38 @@
 # Test report
 
-Latest: GitHub Actions run 43725730427, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022
+Latest: GitHub Actions run 43735391843, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022
+Datacenter 10.0.20348** VM set to India Standard Time, an Ubuntu job for the Linux agent and a macOS job for the Mac
+agent. Release: `v1.1.1-build.146` (pre-release, **unsigned**), package version **1.1.1.146**, commit `95d8c66`.
+Results: unit + PostgreSQL integration tests **539 PASS** (541, 2 skipped); installer acceptance **94 passed, 0
+failed** (10 not run: need hardware, a domain, a reboot or old Windows); upgrade suites **14/14** (schema 48);
+Linux agent on 11 distributions **11/11**; macOS agent **10/10**; Microsoft Defender scan of every file in every
+installer (signatures 1.463.315.0) **clean**.
+
+New in build 146: the Zentriq Assistant - *Ask Zentriq* at the bottom right of every console page answers questions
+about errors, settings and how-to from the built-in documentation (works offline), with Claude (the customer's own
+Anthropic API key) or a local model (Ollama, LM Studio, vLLM) as options; read-only live checks of license, devices,
+agents, scans and server health within the user's role and data scope; passwords, keys and codes removed before
+anything is sent; questions audited and kept with ratings (T103).
+
+| File | SHA256 |
+|---|---|
+| Zentriq-Setup-x64.exe | `ac67ce09703e58b4f039ca4e5c8c6babde7f2788bc17fe96bb46b0ff0bb93042` |
+| Zentriq.msi | `ba864fdefbf682c28bbdbc31b3c0285c1d9e42e5eba949e73c96c95f02e31f9a` |
+| ZentriqAgent-x64.msi | `6a2fe8cc51a1cee2c43acf701a5125d80ca4aff58fcfa10075de3eb2b56ddf03` |
+| zentriq-agent-macos-arm64.pkg | `8ef8cf4cb2b1d0f437435914a7edfef2fdfc8e33b49023fe753cef695d2a5cce` |
+| zentriq-agent-macos-x64.pkg | `5f232e4b9d0aaf13932b0c600f2aed6fcb6c54eabb67bc53ee32c35a8fe54bb3` |
+| zentriq-agent-linux-x64.deb | `85ffed7febfd377064838f4b13c0a601739527d3e74c9be02c5f5e91eeb6ef5a` |
+| zentriq-agent-linux-x64.rpm | `548c09cef4ed296c9da93fcb66017405b9f01f037b7e385cc1ef7012118fd38f` |
+| zentriq-agent-linux-x64.tar.gz | `d56ee239bd1caab3cb02165701791e9fcb61dc0b4f33e4a134d4ce7549848a5f` |
+| zentriq-agent-linux-arm64.deb | `7828be827d6b27fd1606300bf334cf674e8c00537dd0b34ce9d9a820c35543a5` |
+| zentriq-agent-linux-arm64.rpm | `85477a12301b6a02e6c50f79f1551a21980dc900880bf713be33c3c572d23ce4` |
+| zentriq-agent-linux-arm64.tar.gz | `4fe56ec3fcfaed6e6f5e696544a9e0287a92ce9fb37527d2796256ba0726592c` |
+| Zentriq-1.1.1-msi-offline-kit.zip | `93c207f304b5d5fbeaf39d993d1a4b036d83b237359b947c5e01365bb6b1b5c3` |
+| Zentriq-1.1.1-docs.zip | `60514ca3f1089b8f143dbae5c9045f6baa0d8d7fd628d6bb9983770ca93da2e5` |
+
+## Build 145
+
+GitHub Actions run 43725730427, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022
 Datacenter 10.0.20348** VM set to India Standard Time, an Ubuntu job for the Linux agent and a macOS job for the Mac
 agent. Release: `v1.1.1-build.145` (pre-release, **unsigned**), package version **1.1.1.145**, commit `9390252`.
 Results: unit + PostgreSQL integration tests **516 PASS** (518, 2 skipped); installer acceptance **93 passed, 0
