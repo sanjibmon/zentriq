@@ -41,7 +41,9 @@ env:
   ZENTRIQ_SIGN_URL: ${{ vars.ZENTRIQ_SIGN_URL }}
   ZQ_VERSION: '1.1.1'
   ZQ_UPGRADE_VERSION: '1.1.2'
-  ZQ_PREVIOUS_RELEASE: 'v1.0.2-build.11'
+  # Baseline for the upgrade suite: an older published release (v1.0.2-build.11 was deleted on 2026-11-15; build 141
+  # is two builds back and has an older database schema). Keep this release published.
+  ZQ_PREVIOUS_RELEASE: 'v1.1.1-build.141'
 
 jobs:
   # Zentriq Agent for Linux: packages for the release and the upgrade target (the server serves them), tested on
