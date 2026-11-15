@@ -1,6 +1,6 @@
 # Zentriq Assistant
 
-From build 1.1.1.145 every console page has an **Ask Zentriq** button (bottom right). The Assistant answers questions
+From build 1.1.1.146 every console page has an **Ask Zentriq** button (bottom right). The Assistant answers questions
 about Zentriq — an error message, a setting, how to do something — from the Zentriq documentation and, when allowed,
 from this installation's live state. It never changes anything: it tells you what to change and where.
 

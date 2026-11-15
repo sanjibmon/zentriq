@@ -1,6 +1,41 @@
 # Test report
 
-Latest: GitHub Actions run 43574961235, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022
+Latest: GitHub Actions run 43725730427, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022
+Datacenter 10.0.20348** VM set to India Standard Time, an Ubuntu job for the Linux agent and a macOS job for the Mac
+agent. Release: `v1.1.1-build.145` (pre-release, **unsigned**), package version **1.1.1.145**, commit `9390252`.
+Results: unit + PostgreSQL integration tests **516 PASS** (518, 2 skipped); installer acceptance **93 passed, 0
+failed** (10 not run: need hardware, a domain, a reboot or old Windows); upgrade suites **14/14** (schema 47, the
+in-place upgrade now starts from `v1.1.1-build.141`); Linux agent on 11 distributions **11/11**; macOS agent
+(Apple silicon, macOS 26) **10/10**; Microsoft Defender scan of every file in every installer (signatures
+1.463.313.0) **clean**. Build number 144 was used by a first attempt that stopped because the old upgrade baseline
+`v1.0.2-build.11` had been deleted.
+
+New in build 145: Microsoft Defender no longer flags the setup: the cause was the 32-bit MeshCentral agent
+(`MeshService.exe`, detected as `HackTool:Win32/Meshagent.MBZ!MTB`), which Zentriq never used; it and the MeshCmd
+tools are left out, the build fails if they come back, every release is scanned with Defender before it is
+published and a weekly workflow re-scans the latest release with new signatures. macOS agent for Apple silicon
+and Intel Macs (signed-package install with one command from the console, launchd daemon, inventory with
+applications, FileVault, firewall, Gatekeeper, SIP and local administrators, self-update).
+
+| File | SHA256 |
+|---|---|
+| Zentriq-Setup-x64.exe | `8f90f302e1609646a745e8f26665513a57298cf08525ebf6ea0961abf716304b` |
+| Zentriq.msi | `044c94a2fb142c137a7bcd53ab34813f2d305795fb0a272cd74596945d085ba8` |
+| ZentriqAgent-x64.msi | `c912433a6c011b956072b90668ceb5b0280a5a3e028f774f08b928662ac999cd` |
+| zentriq-agent-macos-arm64.pkg | `274d4cb9952f723bfbb80be3ec4be7c250f0fbe3a31f7e1113df3e25bd7acef3` |
+| zentriq-agent-macos-x64.pkg | `2881044057a6e9516dfbaed9238fd8211e3472032f90c1ad9937f94afcbbbb8e` |
+| zentriq-agent-linux-x64.deb | `678e5f826cfbe67daefabed4c291df50c90dbc27e6f4323135c52125e8ff13fc` |
+| zentriq-agent-linux-x64.rpm | `62c46ee4e77ebdcbe5d4a11d779eb3baafdf9f9c60fb5dcbbe9e4827b542a8f0` |
+| zentriq-agent-linux-x64.tar.gz | `96e4b28a37369626b0eeb4eaffb9706b0ced6647a124314d494ad17637de9fcf` |
+| zentriq-agent-linux-arm64.deb | `e8602aa8c35ac5102b6a22d3890782260f49b2a4208cff7c0c0b3138c0065e7d` |
+| zentriq-agent-linux-arm64.rpm | `7e3f27f6ad9e845b3f7d3ee80ba18f58d62a6c33537c64073bf596b18d1d479f` |
+| zentriq-agent-linux-arm64.tar.gz | `fd955b57791aae01efa671ebee4d86e45ee870b758d83ec6c279e4b786fc343a` |
+| Zentriq-1.1.1-msi-offline-kit.zip | `c39894f105d1a55e21c77c0934893e10ad55251833d44a1d545612f193578eda` |
+| Zentriq-1.1.1-docs.zip | `13947e9b8185e0c0c877ecafb827b9d5c92a6dd09e5cbdacc262a1b300ea298a` |
+
+## Build 143
+
+GitHub Actions run 43574961235, workflow `windows-release`, on a GitHub-hosted **Windows Server 2022
 Datacenter 10.0.20348** VM set to India Standard Time plus an Ubuntu job for the Linux agent. Release:
 `v1.1.1-build.143` (pre-release, **unsigned**), package version **1.1.1.143**, commit `187e66c`. Results: unit +
 PostgreSQL integration tests **516 PASS** (518, 2 skipped); installer acceptance **93 passed, 0 failed** (10 not run:

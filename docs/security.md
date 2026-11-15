@@ -20,7 +20,7 @@
   calls, login rate limiting, server-side RBAC on every endpoint, parameterised SQL/EF Core only, request size limits,
   ProblemDetails errors without stack traces, full audit trail.
 * **Licensing** – ECDSA P-256 signatures, verification keys compiled in, private key never shipped; see licensing.md.
-* **Antivirus check of every release (build 144)** – the release build unpacks Setup and every MSI and scans each
+* **Antivirus check of every release (build 145)** – the release build unpacks Setup and every MSI and scans each
   file with Microsoft Defender with current signatures; any detection fails the build and nothing is published. The
   newest release is re-scanned every Monday. The 32-bit MeshCentral agent that Defender flagged is no longer shipped.
 * **Supply chain** – pinned .NET SDK (global.json), central package versions with NuGet audit (build fails on

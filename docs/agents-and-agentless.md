@@ -312,7 +312,7 @@ log is `C:\ProgramData\Zentriq\Agent\Logs\agent.log`.
 
 ### Agent limitations (this release)
 
-* The Windows agent needs .NET Framework 4.8 (not present by default on Server 2016/2019; Windows 10 1903+/11 have it). Linux servers and desktops use the [Zentriq Agent for Linux](linux-agent.md); Macs use the [Zentriq Agent for macOS](macos-agent.md) (build 144).
+* The Windows agent needs .NET Framework 4.8 (not present by default on Server 2016/2019; Windows 10 1903+/11 have it). Linux servers and desktops use the [Zentriq Agent for Linux](linux-agent.md); Macs use the [Zentriq Agent for macOS](macos-agent.md) (build 145).
 * Inventory only – the agent does not deploy software, patch or provide remote control.
 * If the server's self-signed certificate is replaced by a new self-signed one **after** the old one stopped working,
   agents must be re-enrolled; use a CA-issued certificate for internet-facing deployments.

@@ -137,7 +137,7 @@ Complete removal (irreversible – take and export a backup first):
 
 ## Account and access
 
-* **Zentriq Assistant** (build 145): *Ask Zentriq* at the bottom right of every page answers questions about errors,
+* **Zentriq Assistant** (build 146): *Ask Zentriq* at the bottom right of every page answers questions about errors,
   configuration and how-to from the documentation and, read-only, from this server. Documentation search by default;
   Claude (your API key) or a local model in *System Settings › Zentriq Assistant*. See [assistant.md](assistant.md).
 * **Refresh** (build 143): every page header has a *Refresh* button that reloads the page's lists and figures without

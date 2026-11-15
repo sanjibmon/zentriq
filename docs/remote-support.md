@@ -201,7 +201,7 @@ To support devices outside the LAN, see *Internet access* above (and publish 844
 
 ## Antivirus
 
-**Build 144:** Microsoft Defender detected the engine's 32-bit Windows agent (`agents\MeshService.exe`) as
+**Build 145:** Microsoft Defender detected the engine's 32-bit Windows agent (`agents\MeshService.exe`) as
 `HackTool:Win32/Meshagent.MBZ!MTB`, so Defender flagged Zentriq Setup while it wrote that file. Zentriq never used it
 (the server offers the 64-bit and ARM64 Windows agents), so it is no longer shipped. Every release build now unpacks
 Setup and every MSI and scans each file with Defender (current signatures); a detection fails the build. The newest

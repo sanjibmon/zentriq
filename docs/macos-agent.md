@@ -1,6 +1,6 @@
 # Zentriq Agent for macOS
 
-From build 1.1.1.144 Macs run the Zentriq Agent: a launchd daemon that sends hardware, application and security
+From build 1.1.1.145 Macs run the Zentriq Agent: a launchd daemon that sends hardware, application and security
 inventory to Zentriq, keeps a live connection so the Mac shows online in the console, and updates itself from the
 server. It uses the same agent port (8444, mutual TLS), enrollment codes, certificates and schedules as the Windows and
 Linux agents (it is the Linux agent's program built for macOS).
