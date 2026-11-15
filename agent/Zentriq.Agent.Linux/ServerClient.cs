@@ -183,11 +183,11 @@ internal sealed class ServerClient : IDisposable
         PostJsonAsync<CheckinResponse>("api/agent/v1/checkin", new Dictionary<string, object?>
         {
             ["agentVersion"] = AgentVersion.Current, ["hostname"] = hostname, ["osName"] = osName, ["lastError"] = lastError, ["platform"] = Platform.Id,
-            ["capabilities"] = new[] { "service-control", "software-uninstall", "self-update", "remote-support", "schedule", "uninstall-protection", "presence", "tamper-protection", "linux", "app-control", "software-deploy", "patch-management", "scripts" },
+            ["capabilities"] = Os.Mac ? Os.MacCapabilities : new[] { "service-control", "software-uninstall", "self-update", "remote-support", "schedule", "uninstall-protection", "presence", "tamper-protection", "linux", "app-control", "software-deploy", "patch-management", "scripts" },
             ["offlineSince"] = offlineSince?.ToString("o"), ["uninstallProtected"] = uninstallProtected,
             ["events"] = events is { Count: > 0 } ? events : null,
             ["tamperProtection"] = Protection.Reported(),
-            ["appControl"] = AppControlAgent.Report(),
+            ["appControl"] = Os.Mac ? null : AppControlAgent.Report(),
             ["runningActions"] = LongActions.Running(),
         }, ct);
 
@@ -326,9 +326,5 @@ internal sealed class ServerClient : IDisposable
 /// <summary>linux-x64 or linux-arm64 (the agent package to use for updates and remote support).</summary>
 internal static class Platform
 {
-    public static string Id => System.Runtime.InteropServices.RuntimeInformation.OSArchitecture switch
-    {
-        System.Runtime.InteropServices.Architecture.Arm64 => "linux-arm64",
-        _ => "linux-x64",
-    };
+    public static string Id => (Os.Mac ? "macos-" : "linux-") + (System.Runtime.InteropServices.RuntimeInformation.OSArchitecture == System.Runtime.InteropServices.Architecture.Arm64 ? "arm64" : "x64");
 }

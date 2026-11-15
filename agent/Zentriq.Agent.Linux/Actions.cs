@@ -115,6 +115,7 @@ internal static class ServiceControl
 {
     public static void RestartSelf()
     {
+        if (Os.Mac) { MacService.Restart(); return; }
         StopGuard.Set(false);   // the agent sets the stop protection again when it starts
         Shell.Run("systemctl", ["--no-block", "restart", Paths.ServiceName + ".service"]);
     }
@@ -125,6 +126,12 @@ internal static class ServiceControl
         p.StoppedByCode = DateTime.UtcNow;
         if (p.Enabled) p.Save();
         Events.Record("control", "Agent service disabled from the Zentriq console; it stays off until 'sudo zentriq-agent --enable' on the device.");
+        if (Os.Mac)
+        {
+            Shell.Run("/bin/launchctl", ["disable", "system/" + Os.LaunchdLabel]);
+            Shell.Run("/bin/sh", ["-c", $"(sleep 1; /bin/launchctl bootout system/{Os.LaunchdLabel}) >/dev/null 2>&1 &"]);
+            return;
+        }
         StopGuard.Set(false);
         Shell.Run("systemctl", ["disable", Paths.ServiceName + ".service", Paths.ServiceName + "-watchdog.timer"]);
         Shell.Run("systemctl", ["--no-block", "stop", Paths.ServiceName + "-watchdog.timer", Paths.ServiceName + ".service"]);
@@ -134,6 +141,7 @@ internal static class ServiceControl
     {
         var p = Protection.Load();
         if (p.StoppedByCode is not null) { p.StoppedByCode = null; if (p.Enabled) p.Save(); }
+        if (Os.Mac) return MacService.Start();
         var r = Shell.Run("systemctl", ["enable", "--now", Paths.ServiceName + ".service", Paths.ServiceName + "-watchdog.timer"]);
         Console.WriteLine(r.Ok ? "The Zentriq Agent is enabled and running." : "systemctl: " + r.Text);
         return r.Ok ? 0 : 1;
@@ -147,6 +155,7 @@ internal static class ServiceControl
         p = Protection.Load();
         p.StoppedByCode = DateTime.UtcNow;
         if (p.Enabled) { p.Save(); Events.Record("control", "Agent service stopped with a code on the device; it starts again when the device restarts, or with --enable."); }
+        if (Os.Mac) return MacService.Stop();
         StopGuard.Set(false);
         var r = Shell.Run("systemctl", ["stop", Paths.ServiceName + ".service"], TimeSpan.FromSeconds(60));
         Console.WriteLine(r.Ok ? "The Zentriq Agent is stopped until the device restarts ('sudo zentriq-agent --enable' starts it now)." : "systemctl: " + r.Text);
@@ -161,6 +170,7 @@ internal static class ServiceControl
         p = Protection.Load();
         p.StoppedByCode = DateTime.UtcNow;
         if (p.Enabled) { p.Save(); Events.Record("control", "Agent service disabled with a code on the device; it stays off until 'zentriq-agent --enable'."); }
+        if (Os.Mac) { Shell.Run("/bin/launchctl", ["disable", "system/" + Os.LaunchdLabel]); return MacService.Stop(); }
         StopGuard.Set(false);
         Shell.Run("systemctl", ["disable", Paths.ServiceName + ".service", Paths.ServiceName + "-watchdog.timer"]);
         var r = Shell.Run("systemctl", ["stop", Paths.ServiceName + "-watchdog.timer", Paths.ServiceName + ".service"], TimeSpan.FromSeconds(60));
@@ -284,6 +294,7 @@ internal static class AgentUpdater
 {
     public static string InstalledFormat()
     {
+        if (Os.Mac) return "pkg";
         try { var f = File.ReadAllText(Paths.InstalledBy).Trim(); if (f is "deb" or "rpm" or "tar") return f; } catch (IOException) { }
         return Shell.Exists("dpkg-query") && Shell.Run("dpkg-query", ["-W", Paths.ServiceName]).Ok ? "deb"
              : Shell.Exists("rpm") && Shell.Run("rpm", ["-q", Paths.ServiceName]).Ok ? "rpm" : "tar";
@@ -307,10 +318,11 @@ internal static class AgentUpdater
             return (false, null, $"The server offers {targetVersion}, older than this agent ({AgentVersion.Current}); update refused.");
         var format = InstalledFormat();
         var sha = ChecksumFor(argument, format);
-        if (sha is null) return (false, null, $"The server has no {format} package checksum for {Platform.Id}; update refused (the server may not have the Linux agent packages).");
+        if (sha is null) return (false, null, $"The server has no {format} package checksum for {Platform.Id}; update refused (the server may not have the {Os.Name} agent packages).");
 
         Paths.EnsureData();
         var file = Path.Combine(Paths.Updates, $"zentriq-agent-{Safe(targetVersion)}.{(format == "tar" ? "tar.gz" : format)}");
+        var log0 = Path.Combine(Paths.Logs, $"update-{Safe(targetVersion)}.log");
         try { File.Delete(file); } catch (IOException) { }
         client.DownloadPackageAsync(file, format, ct).GetAwaiter().GetResult();
         if (!string.Equals(RemoteSupportActions.Sha256(file), sha, StringComparison.OrdinalIgnoreCase))
@@ -318,7 +330,16 @@ internal static class AgentUpdater
             try { File.Delete(file); } catch (IOException) { }
             return (false, null, "The downloaded package does not match the checksum from the server; update refused.");
         }
-        var log = Path.Combine(Paths.Logs, $"update-{Safe(targetVersion)}.log");
+        var log = log0;
+        if (Os.Mac)
+        {
+            var startedMac = $"Installing version {targetVersion} (pkg); the agent restarts and reports the new version at its next check-in.";
+            client.ReportActionAsync(actionId, true, "started", startedMac, ct).GetAwaiter().GetResult();
+            var rm = MacService.InstallPackage(file, log);
+            if (!rm.Ok) return (false, null, "The update could not be started: " + rm.Text);
+            Log.Info($"Updating the agent {AgentVersion.Current} -> {targetVersion} (pkg; log: {log}).");
+            return (true, "started", startedMac);
+        }
         var install = format switch
         {
             "deb" => $"dpkg --force-confold -i '{file}'",

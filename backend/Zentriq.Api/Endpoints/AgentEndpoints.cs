@@ -469,6 +469,12 @@ public static partial class AgentEndpoints
         {
             var (agent, error) = await AuthenticateAsync(http, ds, server, ct);
             if (agent is null) return error!;
+            if (AgentPackages.IsMac(platform))
+            {
+                var pkg = AgentPackages.Physical(env, AgentPackages.MacFile(platform!));
+                return pkg is null ? Results.Problem(statusCode: 404, title: $"No agent package for {platform} is available on this server.")
+                    : Results.File(pkg, AgentPackages.ContentType("pkg"), Path.GetFileName(pkg));
+            }
             if (AgentPackages.IsLinux(platform))
             {
                 if (format is not ("deb" or "rpm" or "tar")) return Results.Problem(statusCode: 400, title: "Choose the package format: deb, rpm or tar.");
@@ -500,6 +506,23 @@ public static partial class AgentEndpoints
 
         // Linux installation (no client certificate yet): the installer script and the packages, from the agent port the
         // devices already reach. The one-line install command fetches them trusting only the server's pinned key.
+        // macOS installation (build 144): the same, for the .pkg packages.
+        g.MapGet("/macos/install.sh", (IWebHostEnvironment env) =>
+            AgentPackages.Physical(env, AgentPackages.MacInstallScript) is { } script
+                ? Results.File(script, "text/x-shellscript; charset=utf-8", "install.sh")
+                : Results.Problem(statusCode: 404, title: "The macOS agent is not available on this server.")).AllowAnonymous();
+        g.MapGet("/macos/package", (IWebHostEnvironment env, string? platform) =>
+        {
+            if (!AgentPackages.IsMac(platform)) return Results.Problem(statusCode: 400, title: "Give platform macos-x64 or macos-arm64.");
+            var path = AgentPackages.Physical(env, AgentPackages.MacFile(platform!));
+            return path is null ? Results.Problem(statusCode: 404, title: $"No agent package for {platform} is available on this server.")
+                : Results.File(path, AgentPackages.ContentType("pkg"), Path.GetFileName(path));
+        }).AllowAnonymous();
+        g.MapGet("/macos/package.sha256", (IWebHostEnvironment env, string? platform) =>
+            AgentPackages.IsMac(platform) && AgentPackages.Physical(env, AgentPackages.MacFile(platform!)) is { } path
+                ? Results.Text(AgentPackages.Sha256(path) + "\n", "text/plain")
+                : Results.NotFound()).AllowAnonymous();
+
         g.MapGet("/linux/install.sh", (IWebHostEnvironment env) =>
             AgentPackages.Physical(env, AgentPackages.LinuxInstallScript) is { } script
                 ? Results.File(script, "text/x-shellscript; charset=utf-8", "install.sh")
@@ -971,6 +994,8 @@ public static partial class AgentEndpoints
                 linuxInstallCommand = AgentPackages.LinuxInfo(env) is null ? null : AgentPackages.LinuxInstallCommand(url, server.ServerPin, AgentCodes.Group(code), checkin, inventory),
                 package = PackageInfo(env),
                 linuxPackages = AgentPackages.LinuxInfo(env),
+                macInstallCommand = AgentPackages.MacInfo(env) is null ? null : AgentPackages.MacInstallCommand(url, server.ServerPin, AgentCodes.Group(code), checkin, inventory),
+                macPackages = AgentPackages.MacInfo(env),
             });
         }).RequireAuthorization(Permissions.AgentsManage);
 
@@ -997,6 +1022,9 @@ public static partial class AgentEndpoints
                     ? AgentPackages.LinuxInstallCommand(r.GetString(3), server.ServerPin, shown, ci, inv) : null,
                 package = PackageInfo(env),
                 linuxPackages = AgentPackages.LinuxInfo(env),
+                macInstallCommand = AgentCodes.IsShortEnrollmentCode(code) && AgentPackages.MacInfo(env) is not null
+                    ? AgentPackages.MacInstallCommand(r.GetString(3), server.ServerPin, shown, ci, inv) : null,
+                macPackages = AgentPackages.MacInfo(env),
             };
             await r.DisposeAsync();
             await rc.AuditAsync("agent.token_viewed", name);
@@ -1037,7 +1065,7 @@ public static partial class AgentEndpoints
         }).RequireAuthorization(Permissions.AgentsManage);
 
         g.MapGet("/package", (IWebHostEnvironment env, AgentServer server) =>
-            Results.Ok(new { package = PackageInfo(env), linuxPackages = AgentPackages.LinuxInfo(env), agentPort = server.Port, defaultServerUrl = server.DefaultUrl, enrollmentAvailable = server.Ca is not null }))
+            Results.Ok(new { package = PackageInfo(env), linuxPackages = AgentPackages.LinuxInfo(env), macPackages = AgentPackages.MacInfo(env), agentPort = server.Port, defaultServerUrl = server.DefaultUrl, enrollmentAvailable = server.Ca is not null }))
             .RequireAuthorization(Permissions.AssetsView);
     }
 

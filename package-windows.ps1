@@ -224,6 +224,22 @@ if (Test-Path (Join-Path $linuxSrc 'version')) {
     Write-Warning "No Linux agent packages for $PackageVersion ($linuxSrc): the server will not offer the Linux agent."
 }
 
+# ---- 4a3. Zentriq Agent for macOS (built on a Mac: agent/macos/build-packages.sh) ------------------------
+# The console serves the .pkg packages (Apple silicon and Intel) and the one-line installer from downloads/macos.
+# CI puts them in artifacts/macos-agent/<package version>.
+$macSrc = if ($env:ZQ_MACOS_AGENT_DIR) { Join-Path $env:ZQ_MACOS_AGENT_DIR $PackageVersion } else { Join-Path $art "macos-agent/$PackageVersion" }
+$macDownloads = Join-Path $downloads 'macos'
+Remove-Item $macDownloads -Recurse -Force -ErrorAction SilentlyContinue
+if (Test-Path (Join-Path $macSrc 'version')) {
+    New-Item -ItemType Directory -Force -Path $macDownloads | Out-Null
+    Copy-Item (Join-Path $macSrc 'zentriq-agent-macos-*.pkg'), (Join-Path $macSrc 'install.sh'), (Join-Path $macSrc 'version') $macDownloads
+    $macVersion = (Get-Content (Join-Path $macSrc 'version') -Raw).Trim()
+    if ($macVersion -ne $PackageVersion) { throw "macOS agent packages are version $macVersion, expected $PackageVersion" }
+    Write-Host "macOS agent packages $macVersion added: $((Get-ChildItem $macDownloads).Name -join ', ')"
+} else {
+    Write-Warning "No macOS agent packages for $PackageVersion ($macSrc): the server will not offer the macOS agent."
+}
+
 # ---- 4b. server MSI ------------------------------------------------------------------------------
 Write-Section 'Zentriq.msi'
 Remove-Item (Join-Path $art 'msi') -Recurse -Force -ErrorAction SilentlyContinue
@@ -261,6 +277,7 @@ Copy-Item $bundle $release
 Copy-Item $msi $release
 Copy-Item $agentMsi $release
 if (Test-Path $linuxDownloads) { Copy-Item (Join-Path $linuxDownloads 'zentriq-agent-linux-*') $release }
+if (Test-Path $macDownloads) { Copy-Item (Join-Path $macDownloads 'zentriq-agent-macos-*.pkg') $release }
 
 $kit = Join-Path $art 'msi-offline-kit'
 Remove-Item $kit -Recurse -Force -ErrorAction SilentlyContinue
@@ -303,7 +320,8 @@ $manifest = [ordered]@{
         'Zentriq-Setup-x64.exe: offline bootstrapper (VC++ runtime + PostgreSQL + Zentriq.msi).',
         'Zentriq.msi: Zentriq only; uses prereqs\ next to the MSI (see the offline kit) or an existing PostgreSQL server.',
         'ZentriqAgent-x64.msi: Zentriq Agent for Windows devices (also served by the console at /downloads).',
-        'zentriq-agent-linux-{x64,arm64}.{deb,rpm,tar.gz}: Zentriq Agent for Linux (also served by the server, with the one-line installer).'
+        'zentriq-agent-linux-{x64,arm64}.{deb,rpm,tar.gz}: Zentriq Agent for Linux (also served by the server, with the one-line installer).',
+        'zentriq-agent-macos-{x64,arm64}.pkg: Zentriq Agent for macOS 12+ (Intel, Apple silicon; also served by the server, with the one-line installer).'
     )
 }
 $manifest | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $release 'release-manifest.json') -Encoding UTF8

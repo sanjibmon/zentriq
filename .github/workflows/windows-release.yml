@@ -82,10 +82,43 @@ jobs:
             linux-agent-distros.log
             linux-agent-distros.md
 
+  # Zentriq Agent for macOS: .pkg packages built and signed (ad hoc) on a Mac, installed and checked on the runner.
+  macos-agent:
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Packages
+        run: |
+          set -o pipefail
+          for v in "$ZQ_VERSION" "$ZQ_UPGRADE_VERSION"; do
+            agent/macos/build-packages.sh "$v.$GITHUB_RUN_NUMBER" "macos-agent/$v.$GITHUB_RUN_NUMBER" x64 arm64 2>&1 | tee -a macos-agent-build.log
+          done
+      - name: Install and check on this Mac
+        run: tests/macos-agent/smoke.sh "macos-agent/$ZQ_VERSION.$GITHUB_RUN_NUMBER" macos-agent-tests.md 2>&1 | tee macos-agent-tests.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-agent
+          retention-days: 2
+          compression-level: 0
+          path: macos-agent
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: macos-agent-logs
+          retention-days: 14
+          path: |
+            macos-agent-build.log
+            macos-agent-tests.log
+            macos-agent-tests.md
+
   windows:
     runs-on: windows-2022
     timeout-minutes: 170
-    needs: linux-agent
+    needs: [linux-agent, macos-agent]
     steps:
       - uses: actions/checkout@v4
 
@@ -98,6 +131,16 @@ jobs:
         with:
           name: linux-agent-logs
           path: ${{ runner.temp }}/linux-agent-logs
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: macos-agent
+          path: artifacts/macos-agent
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: macos-agent-logs
+          path: ${{ runner.temp }}/macos-agent-logs
 
       # Ubuntu in WSL 1 for the Linux agent end-to-end test (T80) against the installed server.
       - uses: Vampire/setup-wsl@v7
@@ -271,6 +314,7 @@ jobs:
           if (Test-Path "$env:RUNNER_TEMP/acceptance") { Copy-Item "$env:RUNNER_TEMP/acceptance" $d -Recurse -Exclude '*.zbak' }
           if (Test-Path "$env:RUNNER_TEMP/acceptance-upgrade") { Copy-Item "$env:RUNNER_TEMP/acceptance-upgrade" $d -Recurse -Exclude '*.zbak' }
           if (Test-Path "$env:RUNNER_TEMP/linux-agent-logs") { Copy-Item "$env:RUNNER_TEMP/linux-agent-logs/*" $d }
+          if (Test-Path "$env:RUNNER_TEMP/macos-agent-logs") { Copy-Item "$env:RUNNER_TEMP/macos-agent-logs/*" $d }
           foreach ($f in 'artifacts/release-main/release-manifest.json', 'artifacts/release-main/SHA256SUMS.txt', 'artifacts/prereqs/prereqs.lock.json') { if (Test-Path $f) { Copy-Item $f $d } }
           Get-ChildItem installer -Recurse -Filter '*.log' -ErrorAction SilentlyContinue | Copy-Item -Destination $d
           "run $env:GITHUB_RUN_ID attempt $env:GITHUB_RUN_ATTEMPT commit $env:GITHUB_SHA job status ${{ job.status }}" | Set-Content (Join-Path $d 'RUN.txt')

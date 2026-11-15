@@ -60,7 +60,8 @@ internal static class Program
                     state.Save();
                     var r = new AgentWorker().RunOnce(CancellationToken.None);
                     Console.WriteLine(r.Message);
-                    if (r.Ok && Shell.Systemd) Shell.Run("systemctl", ["--no-block", "restart", Paths.ServiceName + ".service"]);
+                    if (r.Ok && Os.Mac) MacService.Restart();
+                    else if (r.Ok && Shell.Systemd) Shell.Run("systemctl", ["--no-block", "restart", Paths.ServiceName + ".service"]);
                     return r.Ok ? 0 : 1;
                 }
                 case "--once":
@@ -142,7 +143,7 @@ internal static class Program
                     return 0;
                 }
                 default:
-                    Console.WriteLine("Zentriq Agent " + AgentVersion.Current + " for Linux\n" +
+                    Console.WriteLine("Zentriq Agent " + AgentVersion.Current + " for " + Os.Name + "\n" +
                         "  --status             show enrollment and last check-in\n" +
                         "  --enroll <code> --server <address> [--checkin <min>] [--inventory <min>] [--proxy http://host:port]\n" +
                         "                       enroll with an enrollment code from the console (Agents page)\n" +
@@ -204,6 +205,7 @@ internal static class Program
         var ok = true;
         void Line(bool good, string text) { Console.WriteLine((good ? "[ OK ] " : "[FAIL] ") + text); ok &= good; }
         Line(Shell.IsRoot, Shell.IsRoot ? "running as root" : "not running as root (run with sudo)");
+        if (Os.Mac) Line(MacService.Loaded, MacService.Loaded ? "launchd daemon " + Os.LaunchdLabel + ": loaded" : "launchd daemon " + Os.LaunchdLabel + ": not loaded ('sudo zentriq-agent --enable')");
         if (Shell.Systemd)
         {
             var active = Shell.Run("systemctl", ["is-active", Paths.ServiceName + ".service"]).Output.Trim();
@@ -233,6 +235,7 @@ internal static class Program
         var format = AgentUpdater.InstalledFormat();
         var r = format switch
         {
+            "pkg" => Shell.Run("/bin/sh", ["-c", $"(sleep 1; '{Path.Combine(Paths.Install, "uninstall.sh")}') >/dev/null 2>&1 &"]),
             "deb" => Shell.Run("apt-get", ["-y", "purge", Paths.ServiceName], TimeSpan.FromMinutes(10)),
             "rpm" => Shell.Exists("dnf") ? Shell.Run("dnf", ["-y", "remove", Paths.ServiceName], TimeSpan.FromMinutes(10))
                    : Shell.Exists("zypper") ? Shell.Run("zypper", ["--non-interactive", "remove", Paths.ServiceName], TimeSpan.FromMinutes(10))
@@ -284,7 +287,7 @@ internal static class AgentService
 
     public static int Run()
     {
-        Log.Journal = true;
+        Log.Journal = !Os.Mac;
         if (!Shell.IsRoot) { Log.Error("The Zentriq Agent service must run as root."); return 1; }
         using var cts = new CancellationTokenSource();
         using var term = PosixSignalRegistration.Create(PosixSignal.SIGTERM, c => { c.Cancel = true; cts.Cancel(); });
@@ -303,11 +306,11 @@ internal static class AgentService
         if (p.StoppedByCode is not null) { p.StoppedByCode = null; if (p.Enabled) p.Save(); }
         try { File.Delete(Paths.UninstallAllowed); } catch (IOException) { }
         StopGuard.Sync(p);
-        AppControlAgent.OnServiceStart();
+        if (!Os.Mac) AppControlAgent.OnServiceStart();
         NetworkChange.NetworkAddressChanged += (_, _) => { Presence.Retry.Set(); ServerWake.Set(); };
         var presence = new Thread(() => Presence.Loop(ct)) { IsBackground = true, Name = "presence" };
         presence.Start();
-        new Thread(() => { try { Experience.Loop(ct); } catch (Exception ex) { Log.Error("Software metering and device experience stopped", ex); } }) { IsBackground = true, Name = "experience" }.Start();
+        if (!Os.Mac) new Thread(() => { try { Experience.Loop(ct); } catch (Exception ex) { Log.Error("Software metering and device experience stopped", ex); } }) { IsBackground = true, Name = "experience" }.Start();
         var worker = new AgentWorker();
         // A short random delay so a fleet restarting together does not arrive at once.
         if (WaitHandle.WaitAny([ct.WaitHandle, ServerWake], TimeSpan.FromSeconds(Random.Shared.Next(5, 30))) == 0) { presence.Join(TimeSpan.FromSeconds(5)); return; }
@@ -323,7 +326,7 @@ internal static class AgentService
                 next = DateTime.UtcNow + r.NextRun;
             }
             // Re-check the stop protection now and then (a pause ends by itself).
-            if (DateTime.UtcNow - lastProtection > TimeSpan.FromMinutes(5)) { StopGuard.Sync(Protection.Load()); RemoteGuard.Sync(); lastProtection = DateTime.UtcNow; }
+            if (DateTime.UtcNow - lastProtection > TimeSpan.FromMinutes(5)) { StopGuard.Sync(Protection.Load()); if (!Os.Mac) RemoteGuard.Sync(); lastProtection = DateTime.UtcNow; }
             var wait = next - DateTime.UtcNow;
             if (wait < TimeSpan.FromSeconds(1)) wait = TimeSpan.FromSeconds(1);
             if (wait > TimeSpan.FromMinutes(5)) wait = TimeSpan.FromMinutes(5);

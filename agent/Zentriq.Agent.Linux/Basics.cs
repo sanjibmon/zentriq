@@ -8,9 +8,9 @@ namespace Zentriq.AgentLinux;
 internal static class Paths
 {
     public const string ServiceName = "zentriq-agent";
-    public static string Install => Environment.GetEnvironmentVariable("ZENTRIQ_AGENT_HOME") ?? "/opt/zentriq-agent";
-    public static string Data => Environment.GetEnvironmentVariable("ZENTRIQ_AGENT_DATA") ?? "/var/lib/zentriq-agent";
-    public static string Logs => Environment.GetEnvironmentVariable("ZENTRIQ_AGENT_LOGS") ?? "/var/log/zentriq-agent";
+    public static string Install => Environment.GetEnvironmentVariable("ZENTRIQ_AGENT_HOME") ?? (Os.Mac ? "/Library/Zentriq/Agent" : "/opt/zentriq-agent");
+    public static string Data => Environment.GetEnvironmentVariable("ZENTRIQ_AGENT_DATA") ?? (Os.Mac ? "/Library/Application Support/Zentriq/Agent" : "/var/lib/zentriq-agent");
+    public static string Logs => Environment.GetEnvironmentVariable("ZENTRIQ_AGENT_LOGS") ?? (Os.Mac ? "/Library/Logs/Zentriq Agent" : "/var/log/zentriq-agent");
     public static string StateFile => Path.Combine(Data, "state.json");
     public static string Certificate => Path.Combine(Data, "agent.pfx");
     public static string Protection => Path.Combine(Data, "protection.json");

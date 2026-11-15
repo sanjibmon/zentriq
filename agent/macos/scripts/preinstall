@@ -1,0 +1,4 @@
+#!/bin/sh
+# Zentriq Agent for macOS: before installing or upgrading, stop the running daemon (its files are replaced).
+/bin/launchctl bootout system/com.zentriq.agent >/dev/null 2>&1 || true
+exit 0

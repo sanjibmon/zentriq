@@ -205,6 +205,10 @@ export function AgentsPage() {
               <small className="muted">It downloads the installer and the right package (.deb, .rpm or .tar.gz) from this server&apos;s agent port, trusting only this server&apos;s key, installs the <Val>zentriq-agent</Val> service and enrolls. With your own tooling: install the package from <LinuxDownloads p={created.linuxPackages} />, then run:</small>
               <Command value={`sudo zentriq-agent --enroll ${created.code} --server ${created.serverUrl}`} shell="Terminal" label="Enroll (Linux)" />
             </> : <small className="muted">Linux agent packages are not on this server.</small>}
+            {created.macInstallCommand ? <>
+              <div className="help-cmd-l">macOS: install and enroll in one line (macOS 12 or later, Apple silicon or Intel)<Command value={created.macInstallCommand} shell="Terminal (an administrator; sudo asks for the password)" label="macOS install command" /></div>
+              <small className="muted">It downloads the package for the Mac from this server&apos;s agent port, trusting only this server&apos;s key, installs the <Val>com.zentriq.agent</Val> daemon and enrolls. The macOS agent sends inventory (hardware, applications with versions, FileVault, firewall, System Integrity Protection, administrators) and keeps the Mac online in the console; device actions such as patching and scripts are for Windows and Linux.</small>
+            </> : <small className="muted">macOS agent packages are not on this server.</small>}
             <small className="muted">Devices outside your network need <Val>{created.serverUrl}</Val> to be reachable (published through your firewall). If the server&apos;s address changes, agents on the network find it again by themselves.</small>
           </div>
         </Panel>
@@ -249,7 +253,7 @@ export function AgentsPage() {
                 onChange={(e) => { const ids = pageRows.filter((x) => x.status === 'active').map((x) => x.id); setPicked(e.target.checked ? [...new Set([...picked, ...ids])] : picked.filter((x) => !ids.includes(x))); }} />,
               render: (r: AgentRow) => r.status === 'active' ? <input type="checkbox" aria-label={`Select ${r.hostname ?? r.id}`} checked={picked.includes(r.id)} onChange={() => setPicked(picked.includes(r.id) ? picked.filter((x) => x !== r.id) : [...picked, r.id])} /> : null }] : []),
             { key: 'h', label: 'Device', render: (r) => <>{r.assetId ? <Link to={`/assets/${r.assetId}`}><b>{r.hostname ?? r.id}</b></Link> : <b>{r.hostname ?? r.id}</b>}<TamperState r={r} /></> },
-            { key: 'os', label: 'Operating system', className: 'wrap', render: (r) => <>{r.osName ?? <span className="faint">—</span>}{r.platform?.startsWith('linux') && <div className="faint" style={{ fontSize: 11.5 }}>Linux agent · {r.platform === 'linux-arm64' ? 'ARM64' : 'x64'}</div>}</> },
+            { key: 'os', label: 'Operating system', className: 'wrap', render: (r) => <>{r.osName ?? <span className="faint">—</span>}{(r.platform?.startsWith('linux') || r.platform?.startsWith('macos')) && <div className="faint" style={{ fontSize: 11.5 }}>{r.platform.startsWith('macos') ? 'macOS agent · ' + (r.platform === 'macos-arm64' ? 'Apple silicon' : 'Intel') : 'Linux agent · ' + (r.platform === 'linux-arm64' ? 'ARM64' : 'x64')}</div>}</> },
             { key: 'ip', label: 'IP address', render: (r) => r.lastIp ? <span className="mono">{r.lastIp}</span> : <span className="faint">—</span> },
             { key: 's', label: 'Connection', render: (r) => r.health === 'online'
               ? <Pill tone="ok">Online</Pill>

@@ -75,8 +75,11 @@ internal sealed class AgentWorker
                 if (resp.RenewCertificate) Renew(state, client, ct);
                 if (resp.Actions is { Count: > 0 }) RunActions(client, resp.Actions, ct);
                 else AgentUpdater.CleanUp();
-                AppControlAgent.Sync(client, resp.AppControl, ct);
-                Experience.SetMetering(resp.Metering);
+                if (!Os.Mac)
+                {
+                    AppControlAgent.Sync(client, resp.AppControl, ct);
+                    Experience.SetMetering(resp.Metering);
+                }
 
                 state.LastError = null;
                 var due = forceInventory || resp.InventoryDue || state.LastInventoryUtc is null || state.LastInventoryUtc < DateTime.UtcNow.AddMinutes(-state.InventoryMinutes);
@@ -404,7 +407,8 @@ internal sealed class AgentWorker
             bool ok; string? st; string msg;
             try
             {
-                (ok, st, msg) = a.Kind switch
+                if (Os.Mac) { ok = false; st = null; msg = "This action is not available for the Zentriq Agent on macOS yet."; }
+                else (ok, st, msg) = a.Kind switch
                 {
                     "uninstall" => PackageActions.Uninstall(a.Target, a.Argument, TimeSpan.FromMinutes(20)),
                     "remote-support" => RemoteSupportActions.Run(client, a.Operation, a.Argument, ct),
@@ -447,7 +451,7 @@ internal sealed class AgentWorker
                     if (!p.Enabled) { msg = "Tamper protection is off for all agents; nothing to pause."; break; }
                     p.PausedUntil = DateTime.UtcNow.AddHours(hours); p.Save(); StopGuard.Sync(p);
                     Events.Record("control", $"Tamper protection paused for {hours} hour(s) from the Zentriq console.");
-                    msg = $"Tamper protection paused until {p.PausedUntil:yyyy-MM-dd HH:mm} UTC: the agent service can be stopped with systemctl.";
+                    msg = $"Tamper protection paused until {p.PausedUntil:yyyy-MM-dd HH:mm} UTC: the agent service can be stopped with {(Os.Mac ? "launchctl" : "systemctl")}.";
                     break;
                 case "resume":
                     p.PausedUntil = null; p.Save(); StopGuard.Sync(p);
@@ -477,8 +481,8 @@ internal sealed class AgentWorker
 
     public static InventoryDocument CollectDocument(out string summary)
     {
-        var doc = LinuxCollector.Collect();
-        Experience.AddTo(doc);
+        var doc = Os.Mac ? MacCollector.Collect() : LinuxCollector.Collect();
+        if (!Os.Mac) Experience.AddTo(doc);
         summary = $"{doc.Device.Hostname}, {doc.Os.Name} ({doc.Os.EditionId}, {doc.Os.InstallationType}), {doc.Software.Count} packages, {doc.Errors.Count} section error(s)";
         foreach (var e in doc.Errors) Log.Warn("Inventory section: " + e);
         return doc;
@@ -486,6 +490,7 @@ internal sealed class AgentWorker
 
     private static (string Host, string Os, string? Uuid) HostFacts()
     {
+        if (Os.Mac) { var (mh, mo) = MacCollector.HostFacts(); return (mh, mo, null); }
         var host = Environment.MachineName;
         try { var h = File.ReadAllText("/proc/sys/kernel/hostname").Trim(); if (h.Length > 0) host = h.Split('.')[0]; } catch (IOException) { }
         string os = "Linux";

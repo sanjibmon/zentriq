@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!--
-    Zentriq Agent for Linux: a systemd service for Linux servers and desktops (x64, ARM64; glibc distributions:
+    Zentriq Agent for Linux and macOS (build 144): a systemd service (Linux) or launchd daemon (macOS) for Linux servers and desktops (x64, ARM64; glibc distributions:
     Ubuntu, Debian, RHEL and its rebuilds, Fedora, SUSE, Amazon Linux, …). Same agent protocol as the Windows agent
     (outbound HTTPS to the agent port, mutual TLS after enrollment). Published self-contained (no .NET runtime needed
     on the device) and packaged as .deb, .rpm and .tar.gz by agent/linux/build-packages.sh.
@@ -19,7 +19,7 @@
     <Product>Zentriq Agent</Product>
     <Copyright>Copyright (c) Zentriq</Copyright>
     <Version Condition="'$(Version)' == ''">1.0.0</Version>
-    <RuntimeIdentifiers>linux-x64;linux-arm64</RuntimeIdentifiers>
+    <RuntimeIdentifiers>linux-x64;linux-arm64;osx-x64;osx-arm64</RuntimeIdentifiers>
     <SelfContained>true</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>
     <!-- Native runtime libraries stay next to the program (no extraction to a temporary folder at start). -->

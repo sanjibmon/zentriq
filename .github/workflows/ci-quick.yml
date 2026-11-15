@@ -20,6 +20,30 @@ env:
   DOTNET_CLI_TELEMETRY_OPTOUT: '1'
 
 jobs:
+  # Zentriq Agent for macOS: build the packages on a Mac and install / check them there.
+  macos-agent:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Packages, install and check
+        run: |
+          set -o pipefail
+          agent/macos/build-packages.sh "1.1.1.$GITHUB_RUN_NUMBER" macos-agent arm64 x64 2>&1 | tee macos-build.log
+          tests/macos-agent/smoke.sh macos-agent macos-agent-tests.md 2>&1 | tee macos-tests.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: macos-agent-quick
+          retention-days: 7
+          path: |
+            macos-build.log
+            macos-tests.log
+            macos-agent-tests.md
+
   quick:
     runs-on: ubuntu-latest
     timeout-minutes: 45

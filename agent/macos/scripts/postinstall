@@ -1,0 +1,14 @@
+#!/bin/sh
+# Zentriq Agent for macOS: after installing or upgrading, prepare the root-only folders and start the daemon.
+set -e
+mkdir -p "/Library/Application Support/Zentriq/Agent" "/Library/Logs/Zentriq Agent"
+chmod 700 "/Library/Application Support/Zentriq/Agent"
+chown -R root:wheel "/Library/Zentriq/Agent" /Library/LaunchDaemons/com.zentriq.agent.plist
+chmod 644 /Library/LaunchDaemons/com.zentriq.agent.plist
+chmod 755 /Library/Zentriq/Agent/zentriq-agent /Library/Zentriq/Agent/uninstall.sh
+echo pkg > /Library/Zentriq/Agent/installed-by
+# Downloaded with curl, so nothing is quarantined; clear the attribute in case the package was opened from a browser download.
+/usr/bin/xattr -dr com.apple.quarantine /Library/Zentriq/Agent >/dev/null 2>&1 || true
+/bin/launchctl enable system/com.zentriq.agent >/dev/null 2>&1 || true
+/bin/launchctl bootstrap system /Library/LaunchDaemons/com.zentriq.agent.plist >/dev/null 2>&1 || /bin/launchctl kickstart -k system/com.zentriq.agent >/dev/null 2>&1 || true
+exit 0

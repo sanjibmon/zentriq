@@ -3,20 +3,28 @@ using System.Security.Cryptography;
 namespace Zentriq.Api.Endpoints;
 
 /// <summary>
-/// The agent packages this server serves (web root, downloads/): the Windows MSI and the Linux packages
+/// The agent packages this server serves (web root, downloads/): the Windows MSI, the macOS packages (downloads/macos) and the Linux packages
 /// (downloads/linux: .deb, .rpm and .tar.gz for x64 and ARM64, the version, and install.sh, the one-line installer).
 /// </summary>
 public static class AgentPackages
 {
-    public const string Windows = "windows-x64", LinuxX64 = "linux-x64", LinuxArm64 = "linux-arm64";
-    public static readonly string[] Platforms = [Windows, LinuxX64, LinuxArm64];
+    public const string Windows = "windows-x64", LinuxX64 = "linux-x64", LinuxArm64 = "linux-arm64", MacX64 = "macos-x64", MacArm64 = "macos-arm64";
+    public static readonly string[] Platforms = [Windows, LinuxX64, LinuxArm64, MacX64, MacArm64];
+    public static readonly string[] MacPlatforms = [MacX64, MacArm64];
+    /// <summary>macOS packages (build 144): downloads/macos, zentriq-agent-macos-{x64,arm64}.pkg, version, install.sh.</summary>
+    public const string MacDir = "downloads/macos";
+    public const string MacInstallScript = MacDir + "/install.sh";
+    public static bool IsMac(string? platform) => platform is MacX64 or MacArm64;
+    public static string MacFile(string platform) => $"{MacDir}/zentriq-agent-{platform}.pkg";
+    public static string? MacVersion(IWebHostEnvironment env) =>
+        Physical(env, MacDir + "/version") is { } p ? File.ReadAllText(p).Trim() is { Length: > 0 } v ? v : null : null;
     public static readonly string[] LinuxPlatforms = [LinuxX64, LinuxArm64];
     public static readonly string[] LinuxFormats = ["deb", "rpm", "tar"];
     public const string LinuxDir = "downloads/linux";
     public const string LinuxInstallScript = LinuxDir + "/install.sh";
 
     /// <summary>Agents that do not report a platform are Windows agents (earlier builds).</summary>
-    public static string Normalize(string? platform) => platform?.Trim().ToLowerInvariant() is LinuxX64 or LinuxArm64 ? platform.Trim().ToLowerInvariant() : Windows;
+    public static string Normalize(string? platform) => platform?.Trim().ToLowerInvariant() is LinuxX64 or LinuxArm64 or MacX64 or MacArm64 ? platform.Trim().ToLowerInvariant() : Windows;
     public static bool IsLinux(string? platform) => platform is LinuxX64 or LinuxArm64;
 
     public static string LinuxFile(string platform, string format) =>
@@ -26,6 +34,7 @@ public static class AgentPackages
     {
         "deb" => "application/vnd.debian.binary-package",
         "rpm" => "application/x-rpm",
+        "pkg" => "application/octet-stream",
         _ => "application/gzip",
     };
 
@@ -40,6 +49,7 @@ public static class AgentPackages
 
     /// <summary>The version an agent on <paramref name="platform"/> can update to from this server, or null.</summary>
     public static string? Version(IWebHostEnvironment env, string platform) =>
+        IsMac(platform) ? (Physical(env, MacFile(platform)) is not null ? MacVersion(env) : null) :
         IsLinux(platform) ? (LinuxFormats.Any(f => Physical(env, LinuxFile(platform, f)) is not null) ? LinuxVersion(env) : null) : AgentEndpoints.PackageVersion(env);
 
     /// <summary>
@@ -48,6 +58,7 @@ public static class AgentPackages
     /// </summary>
     public static string? UpdateArgument(IWebHostEnvironment env, string platform)
     {
+        if (IsMac(platform)) return Physical(env, MacFile(platform)) is { } pkg ? $"pkg={Sha256(pkg)}" : null;
         if (!IsLinux(platform)) return Physical(env, AgentEndpoints.PackagePath) is { } msi ? Sha256(msi) : null;
         var parts = LinuxFormats.Select(f => Physical(env, LinuxFile(platform, f)) is { } p ? $"{f}={Sha256(p)}" : null).Where(x => x is not null).ToList();
         return parts.Count > 0 ? string.Join(';', parts) : null;
@@ -93,5 +104,25 @@ public static class AgentPackages
         var curl = pin is null ? "curl -fsSL" : $"curl -fsSLk --pinnedpubkey 'sha256//{pin}'";
         var pinArg = pin is null ? "" : $" --pin '{pin}'";
         return $"{curl} {url}/api/agent/v1/linux/install.sh | sudo sh -s -- --server {url} --code {code} --checkin {checkin} --inventory {inventory}{pinArg}";
+    }
+
+    /// <summary>The macOS packages on this server, for the console (Agents › Install on macOS).</summary>
+    public static object? MacInfo(IWebHostEnvironment env)
+    {
+        var files = (from p in MacPlatforms
+                     let path = Physical(env, MacFile(p))
+                     where path is not null
+                     select new { platform = p, format = "pkg", url = "/" + MacFile(p), size = new FileInfo(path).Length, sha256 = Sha256(path) }).ToList();
+        if (files.Count == 0) return null;
+        return new { version = MacVersion(env), files, installScript = Physical(env, MacInstallScript) is not null };
+    }
+
+    /// <summary>One line that installs and enrolls the macOS agent (same trust as the Linux command: the server's pinned key).</summary>
+    public static string MacInstallCommand(string serverUrl, string? pin, string code, int checkin, int inventory)
+    {
+        var url = serverUrl.TrimEnd('/');
+        var curl = pin is null ? "curl -fsSL" : $"curl -fsSLk --pinnedpubkey 'sha256//{pin}'";
+        var pinArg = pin is null ? "" : $" --pin '{pin}'";
+        return $"{curl} {url}/api/agent/v1/macos/install.sh | sudo sh -s -- --server {url} --code {code} --checkin {checkin} --inventory {inventory}{pinArg}";
     }
 }
