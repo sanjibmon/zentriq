@@ -1,0 +1,11 @@
+PASS M01 install the package: macOS 26.7.2, arm64
+PASS M02 launchd daemon running: com.zentriq.agent
+PASS M03 version: 1.1.1.146
+PASS M04 signature: Signature=adhoc
+PASS M05 inventory: macOS 26.7.2, Apple Apple Virtual Machine 1, Apple M1 (Virtual), 7 GB, 118 apps (116 with version), FileVault False, firewall False, SIP False, admins ['runner'], errors [] (7s)
+PASS M06 status: Zentriq Agent 1.1.1.146 (macos-arm64, installed as pkg) Status:        pending 
+PASS M07 enrollment against an unreachable server fails cleanly: The enrollment code must have 20 letters and digits (copy it from Agents > Enrollment codes).
+PASS M08 service log: ﻿2026-11-15 16:26:51Z INFO  Zentriq Agent 1.1.1.146 started (macos-arm64).
+PASS M09 reinstall (upgrade path) keeps the daemon running: 
+PASS M10 uninstall: The Zentriq Agent was removed.
+10 passed, 0 failed

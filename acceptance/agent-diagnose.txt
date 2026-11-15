@@ -1,0 +1,36 @@
+Zentriq Agent 1.1.1.146 on runnervm9zap3 — diagnosis 2026-11-15 22:51
+
+Service
+  [ OK ] ZentriqAgent service is running
+
+Enrollment
+  [ OK ] enrolled (agent ID 9c5cf5d9-bbb5-44f1-94c4-363eaf45b1c7)
+  [ OK ] certificate valid until 2027-11-15
+  [info] last check-in: 2026-11-15 22:51, last inventory: 2026-11-15 22:51
+
+Network
+  https://localhost:8444
+  [ OK ]     localhost → ::1, 127.0.0.1
+  [ OK ]     port 8444 reachable (7 ms)
+  [ OK ]     server key matches the pinned Zentriq server key
+  https://runnervm9zap3:8444
+  [ OK ]     runnervm9zap3 → fe80::6ecd:52f2:af80:3cff%14, fe80::a7f9:f2c5:4165:2ce%11, 10.1.0.13, 172.18.0.1
+  [ OK ]     port 8444 reachable (0 ms)
+  [ OK ]     server key matches the pinned Zentriq server key
+  https://10.1.0.13:8444
+  [ OK ]     10.1.0.13 → 10.1.0.13
+  [ OK ]     port 8444 reachable (0 ms)
+  [ OK ]     server key matches the pinned Zentriq server key
+  https://172.18.0.1:8444
+  [ OK ]     172.18.0.1 → 172.18.0.1
+  [ OK ]     port 8444 reachable (0 ms)
+  [ OK ]     server key matches the pinned Zentriq server key
+
+Tamper protection
+off
+
+Check-in
+Checked in.
+
+No problem found. The device should show as online in the Zentriq console.
+

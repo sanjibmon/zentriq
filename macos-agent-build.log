@@ -1,0 +1,60 @@
+== osx-x64
+/Users/runner/work/zentriq/zentriq/agent/Zentriq.Agent.Linux/Actions.cs(109,26): warning CS8619: Nullability of reference types in value of type '(bool, string?, string Output)' doesn't match target type '(bool, string, string)'. [/Users/runner/work/zentriq/zentriq/agent/Zentriq.Agent.Linux/Zentriq.Agent.Linux.csproj]
+/Users/runner/work/zentriq/zentriq/agent/Zentriq.Agent.Linux/Actions.cs(110,11): warning CS8619: Nullability of reference types in value of type '(bool, string?, string)' doesn't match target type '(bool, string, string)'. [/Users/runner/work/zentriq/zentriq/agent/Zentriq.Agent.Linux/Zentriq.Agent.Linux.csproj]
+/var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/tmp.tZapth0qTj/root-x64/Library/Zentriq/Agent/zentriq-agent: replacing existing signature
+/var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/tmp.tZapth0qTj/root-x64/Library/Zentriq/Agent/zentriq-agent: valid on disk
+/var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/tmp.tZapth0qTj/root-x64/Library/Zentriq/Agent/zentriq-agent: satisfies its Designated Requirement
+x86_64
+pkgbuild: Inferring bundle components from contents of /var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/tmp.tZapth0qTj/root-x64
+pkgbuild: Adding top-level preinstall script
+pkgbuild: Adding top-level postinstall script
+pkgbuild: Wrote package to /Users/runner/work/zentriq/zentriq/macos-agent/1.1.1.146/zentriq-agent-macos-x64.pkg
+== osx-arm64
+/Users/runner/work/zentriq/zentriq/agent/Zentriq.Agent.Linux/Actions.cs(109,26): warning CS8619: Nullability of reference types in value of type '(bool, string?, string Output)' doesn't match target type '(bool, string, string)'. [/Users/runner/work/zentriq/zentriq/agent/Zentriq.Agent.Linux/Zentriq.Agent.Linux.csproj]
+/Users/runner/work/zentriq/zentriq/agent/Zentriq.Agent.Linux/Actions.cs(110,11): warning CS8619: Nullability of reference types in value of type '(bool, string?, string)' doesn't match target type '(bool, string, string)'. [/Users/runner/work/zentriq/zentriq/agent/Zentriq.Agent.Linux/Zentriq.Agent.Linux.csproj]
+/var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/tmp.tZapth0qTj/root-arm64/Library/Zentriq/Agent/zentriq-agent: replacing existing signature
+/var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/tmp.tZapth0qTj/root-arm64/Library/Zentriq/Agent/zentriq-agent: valid on disk
+/var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/tmp.tZapth0qTj/root-arm64/Library/Zentriq/Agent/zentriq-agent: satisfies its Designated Requirement
+arm64
+pkgbuild: Inferring bundle components from contents of /var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/tmp.tZapth0qTj/root-arm64
+pkgbuild: Adding top-level preinstall script
+pkgbuild: Adding top-level postinstall script
+pkgbuild: Wrote package to /Users/runner/work/zentriq/zentriq/macos-agent/1.1.1.146/zentriq-agent-macos-arm64.pkg
+total 121280
+drwxr-xr-x  7 runner  staff       224 Nov 15 16:26 .
+drwxr-xr-x  3 runner  staff        96 Nov 15 16:25 ..
+-rw-r--r--  1 runner  staff      2877 Nov 15 16:26 install.sh
+-rw-r--r--  1 runner  staff       190 Nov 15 16:26 SHA256SUMS
+-rw-r--r--  1 runner  staff        10 Nov 15 16:26 version
+-rw-r--r--  1 runner  staff  29952275 Nov 15 16:26 zentriq-agent-macos-arm64.pkg
+-rw-r--r--  1 runner  staff  32127534 Nov 15 16:26 zentriq-agent-macos-x64.pkg
+== osx-x64
+/Users/runner/work/zentriq/zentriq/agent/Zentriq.Agent.Linux/Actions.cs(109,26): warning CS8619: Nullability of reference types in value of type '(bool, string?, string Output)' doesn't match target type '(bool, string, string)'. [/Users/runner/work/zentriq/zentriq/agent/Zentriq.Agent.Linux/Zentriq.Agent.Linux.csproj]
+/Users/runner/work/zentriq/zentriq/agent/Zentriq.Agent.Linux/Actions.cs(110,11): warning CS8619: Nullability of reference types in value of type '(bool, string?, string)' doesn't match target type '(bool, string, string)'. [/Users/runner/work/zentriq/zentriq/agent/Zentriq.Agent.Linux/Zentriq.Agent.Linux.csproj]
+/var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/tmp.9sHIOQaRPU/root-x64/Library/Zentriq/Agent/zentriq-agent: replacing existing signature
+/var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/tmp.9sHIOQaRPU/root-x64/Library/Zentriq/Agent/zentriq-agent: valid on disk
+/var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/tmp.9sHIOQaRPU/root-x64/Library/Zentriq/Agent/zentriq-agent: satisfies its Designated Requirement
+x86_64
+pkgbuild: Inferring bundle components from contents of /var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/tmp.9sHIOQaRPU/root-x64
+pkgbuild: Adding top-level preinstall script
+pkgbuild: Adding top-level postinstall script
+pkgbuild: Wrote package to /Users/runner/work/zentriq/zentriq/macos-agent/1.1.2.146/zentriq-agent-macos-x64.pkg
+== osx-arm64
+/Users/runner/work/zentriq/zentriq/agent/Zentriq.Agent.Linux/Actions.cs(109,26): warning CS8619: Nullability of reference types in value of type '(bool, string?, string Output)' doesn't match target type '(bool, string, string)'. [/Users/runner/work/zentriq/zentriq/agent/Zentriq.Agent.Linux/Zentriq.Agent.Linux.csproj]
+/Users/runner/work/zentriq/zentriq/agent/Zentriq.Agent.Linux/Actions.cs(110,11): warning CS8619: Nullability of reference types in value of type '(bool, string?, string)' doesn't match target type '(bool, string, string)'. [/Users/runner/work/zentriq/zentriq/agent/Zentriq.Agent.Linux/Zentriq.Agent.Linux.csproj]
+/var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/tmp.9sHIOQaRPU/root-arm64/Library/Zentriq/Agent/zentriq-agent: replacing existing signature
+/var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/tmp.9sHIOQaRPU/root-arm64/Library/Zentriq/Agent/zentriq-agent: valid on disk
+/var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/tmp.9sHIOQaRPU/root-arm64/Library/Zentriq/Agent/zentriq-agent: satisfies its Designated Requirement
+arm64
+pkgbuild: Inferring bundle components from contents of /var/folders/h5/t85nd63d71x27_8gl5gw3l_w0000gn/T/tmp.9sHIOQaRPU/root-arm64
+pkgbuild: Adding top-level preinstall script
+pkgbuild: Adding top-level postinstall script
+pkgbuild: Wrote package to /Users/runner/work/zentriq/zentriq/macos-agent/1.1.2.146/zentriq-agent-macos-arm64.pkg
+total 121280
+drwxr-xr-x  7 runner  staff       224 Nov 15 16:26 .
+drwxr-xr-x  4 runner  staff       128 Nov 15 16:26 ..
+-rw-r--r--  1 runner  staff      2877 Nov 15 16:26 install.sh
+-rw-r--r--  1 runner  staff       190 Nov 15 16:26 SHA256SUMS
+-rw-r--r--  1 runner  staff        10 Nov 15 16:26 version
+-rw-r--r--  1 runner  staff  29952318 Nov 15 16:26 zentriq-agent-macos-arm64.pkg
+-rw-r--r--  1 runner  staff  32127639 Nov 15 16:26 zentriq-agent-macos-x64.pkg

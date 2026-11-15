@@ -1,0 +1,451 @@
+﻿2026-11-15 17:21:19Z INFO  Zentriq Agent 1.1.1.146 starting.
+2026-11-15 17:21:19Z INFO  Enrolling with https://localhost:8444 as runnervm9zap3.
+2026-11-15 17:21:20Z INFO  Enrolled as agent 9c5cf5d9-bbb5-44f1-94c4-363eaf45b1c7; certificate D3E0A06ABECF3DB309A96E2D36A4827458981733 expires 2027-11-15; checks in every 2 min, sends inventory every 30 min.
+2026-11-15 17:21:20Z INFO  Application control policy 1: off, 0 rule(s), WDAC off.
+2026-11-15 17:21:20Z INFO  Security Pack policy 1: privilege off, BitLocker off, USB off
+2026-11-15 17:21:21Z INFO  Inventory collected: runnervm9zap3, Windows Server 2022 Datacenter, 74 software, 5 updates, 0 section error(s)
+2026-11-15 17:21:22Z INFO  Inventory uploaded (7 KB compressed).
+2026-11-15 17:21:22Z INFO  Checked in and sent inventory. Next run in 2 min.
+2026-11-15 17:21:29Z INFO  Checked in. Next run in 1 min.
+2026-11-15 17:21:39Z INFO  Tray icon started for session 2.
+2026-11-15 17:21:39Z INFO  Tamper protection is off on this device: administrators can stop or disable the agent service.
+2026-11-15 17:21:39Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:21:39Z INFO  Tamper protection: Agent service restart requested on the device.
+2026-11-15 17:21:41Z INFO  Stopping: restart requested on the device (--restart).
+2026-11-15 17:21:41Z INFO  Zentriq Agent stopped.
+2026-11-15 17:21:44Z INFO  Zentriq Agent 1.1.1.146 starting.
+2026-11-15 17:21:44Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:21:57Z INFO  Stopping: tamper protection is off.
+2026-11-15 17:21:57Z INFO  Zentriq Agent stopped.
+2026-11-15 17:21:59Z INFO  Zentriq Agent 1.1.1.146 starting.
+2026-11-15 17:21:59Z INFO  Checked in. Next run in 1 min.
+2026-11-15 17:22:19Z INFO  Tamper protection is off on this device: administrators can stop or disable the agent service.
+2026-11-15 17:22:19Z INFO  Tray icon started for session 2.
+2026-11-15 17:22:20Z INFO  Live connection to the server at https://localhost:8444.
+2026-11-15 17:22:21Z INFO  Inventory collected: runnervm9zap3, Windows Server 2022 Datacenter, 74 software, 5 updates, 0 section error(s)
+2026-11-15 17:22:21Z INFO  Inventory uploaded (7 KB compressed).
+2026-11-15 17:22:21Z INFO  Checked in and sent inventory. Next run in 2 min.
+2026-11-15 17:22:45Z INFO  Stopping: tamper protection is off.
+2026-11-15 17:22:45Z INFO  Live connection closed (agent stopping).
+2026-11-15 17:22:46Z INFO  Inventory collected: runnervm9zap3, Windows Server 2022 Datacenter, 74 software, 5 updates, 0 section error(s)
+2026-11-15 17:22:46Z WARN  Inventory queued for the next check-in: Server unreachable: no answer within 45 seconds
+2026-11-15 17:22:46Z INFO  Zentriq Agent stopped.
+2026-11-15 17:22:47Z INFO  Action restart W32Time: OK - Service restarted.
+2026-11-15 17:22:48Z INFO  Inventory collected: runnervm9zap3, Windows Server 2022 Datacenter, 74 software, 5 updates, 0 section error(s)
+2026-11-15 17:22:48Z INFO  Inventory uploaded (7 KB compressed).
+2026-11-15 17:22:53Z INFO  Zentriq Agent 1.1.1.146 starting.
+2026-11-15 17:22:54Z INFO  Stopping: tamper protection is off.
+2026-11-15 17:22:54Z INFO  Zentriq Agent stopped.
+2026-11-15 17:22:55Z INFO  Action scan scan: OK - Started on the device.
+2026-11-15 17:22:55Z INFO  Patch management: scanning with the Windows Update Agent.
+2026-11-15 17:22:56Z INFO  Inventory collected: runnervm9zap3, Windows Server 2022 Datacenter, 75 software, 5 updates, 0 section error(s)
+2026-11-15 17:22:56Z INFO  Inventory uploaded (7 KB compressed).
+2026-11-15 17:23:00Z INFO  Action uninstall CI Dummy App: OK - 'CI Dummy App 1.0' was uninstalled.
+2026-11-15 17:23:03Z INFO  Zentriq Agent 1.1.1.146 starting.
+2026-11-15 17:23:04Z INFO  Checked in. Next run in 1 min.
+2026-11-15 17:23:24Z INFO  Tamper protection is off on this device: administrators can stop or disable the agent service.
+2026-11-15 17:23:24Z INFO  Tray icon started for session 2.
+2026-11-15 17:23:29Z INFO  Live connection to the server at https://localhost:8444.
+2026-11-15 17:24:59Z INFO  Tamper protection is on: stopping, disabling or changing the agent needs a code from the Zentriq console.
+2026-11-15 17:24:59Z INFO  Uninstall protection is on: removing the agent needs a one-hour code from the Zentriq console.
+2026-11-15 17:24:59Z INFO  Action scan scan: OK - Started on the device.
+2026-11-15 17:24:59Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:24:59Z INFO  Patch management: scanning with the Windows Update Agent.
+2026-11-15 17:25:01Z INFO  Patch management: the Windows Update Agent answered after 2 s (exit code 0).
+2026-11-15 17:25:01Z INFO  Patch management: winget (App Installer) is not installed on this device, so third-party application updates are not checked.
+2026-11-15 17:25:01Z INFO  Action patch scan: OK - No missing updates.
+2026-11-15 17:25:04Z INFO  Stop requested while tamper protection is on: waiting up to 2 minutes for a code (1 dialog(s) shown).
+2026-11-15 17:25:08Z WARN  Tamper protection: Someone tried to stop the agent service (Services console, net stop or sc stop) without a code: the code dialog was cancelled. It was started again at once.
+2026-11-15 17:25:08Z INFO  The agent service starts again after this stop: stop without a code.
+2026-11-15 17:25:08Z INFO  Stopping: stop without a code (starting again).
+2026-11-15 17:25:08Z INFO  Live connection closed (agent stopping).
+2026-11-15 17:25:08Z INFO  Zentriq Agent stopped.
+2026-11-15 17:25:10Z INFO  Zentriq Agent 1.1.1.146 starting.
+2026-11-15 17:25:11Z INFO  Tamper protection is on: stopping, disabling or changing the agent needs a code from the Zentriq console.
+2026-11-15 17:25:11Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:25:12Z INFO  Live connection to the server at https://localhost:8444.
+2026-11-15 17:25:12Z INFO  New uninstall code from the console received (valid until 2026-11-15 18:25 UTC).
+2026-11-15 17:25:12Z INFO  New uninstall code from the console received (valid until 2026-11-15 18:25 UTC).
+2026-11-15 17:25:23Z INFO  Stop requested while tamper protection is on: waiting up to 2 minutes for a code (1 dialog(s) shown).
+2026-11-15 17:25:26Z WARN  Tamper protection: Wrong code entered to stop the agent service: The code is not valid for this device. Get a current code from the Zentriq console (valid for one hour).
+2026-11-15 17:25:26Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:25:26Z WARN  Tamper protection: Someone tried to stop the agent service (Services console, net stop or sc stop) without a code: the code dialog was cancelled. It was started again at once.
+2026-11-15 17:25:26Z INFO  The agent service starts again after this stop: stop without a code.
+2026-11-15 17:25:26Z INFO  Stopping: stop without a code (starting again).
+2026-11-15 17:25:26Z INFO  Live connection closed (agent stopping).
+2026-11-15 17:25:26Z INFO  Zentriq Agent stopped.
+2026-11-15 17:25:28Z INFO  Zentriq Agent 1.1.1.146 starting.
+2026-11-15 17:25:29Z INFO  Tamper protection is on: stopping, disabling or changing the agent needs a code from the Zentriq console.
+2026-11-15 17:25:29Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:25:30Z WARN  Tamper protection: Refused to stop the agent service: The code is not valid for this device. Get a current code from the Zentriq console (valid for one hour).
+2026-11-15 17:25:30Z INFO  Stop requested while tamper protection is on: waiting up to 2 minutes for a code (1 dialog(s) shown).
+2026-11-15 17:25:33Z INFO  Tamper protection: Agent service restarted with a code entered in the dialog (Services console, net stop or sc stop).
+2026-11-15 17:25:34Z INFO  The agent service starts again after this stop: restart with a code entered on the device.
+2026-11-15 17:25:34Z INFO  Stopping: restart with a code entered on the device.
+2026-11-15 17:25:34Z INFO  Zentriq Agent stopped.
+2026-11-15 17:25:36Z INFO  Zentriq Agent 1.1.1.146 starting.
+2026-11-15 17:25:37Z INFO  Tamper protection is on: stopping, disabling or changing the agent needs a code from the Zentriq console.
+2026-11-15 17:25:37Z INFO  Checked in. Next run in 1 min.
+2026-11-15 17:25:37Z INFO  Stop requested while tamper protection is on: waiting up to 2 minutes for a code (1 dialog(s) shown).
+2026-11-15 17:25:40Z INFO  Tamper protection is off on this device: administrators can stop or disable the agent service.
+2026-11-15 17:25:40Z INFO  Tamper protection: Agent service stopped with a code entered in the dialog (Services console, net stop or sc stop); it starts again when the device restarts, or with --enable.
+2026-11-15 17:25:41Z INFO  Stopping: stopped with a code entered on the device.
+2026-11-15 17:25:41Z INFO  Zentriq Agent stopped.
+2026-11-15 17:25:43Z INFO  Zentriq Agent 1.1.1.146 starting.
+2026-11-15 17:25:43Z INFO  Tamper protection: Agent service started again after it was stopped with a code.
+2026-11-15 17:25:44Z INFO  Tamper protection is on: stopping, disabling or changing the agent needs a code from the Zentriq console.
+2026-11-15 17:25:44Z INFO  Checked in. Next run in 1 min.
+2026-11-15 17:25:47Z INFO  Tamper protection is off on this device: administrators can stop or disable the agent service.
+2026-11-15 17:25:47Z INFO  Tamper protection: Agent service stopped (code entered on the device); it starts again when the device restarts or when started by hand.
+2026-11-15 17:25:48Z INFO  Stopping: stopped with a code.
+2026-11-15 17:25:48Z INFO  Zentriq Agent stopped.
+2026-11-15 17:25:50Z INFO  Zentriq Agent 1.1.1.146 starting.
+2026-11-15 17:25:50Z INFO  Tamper protection: Agent service started again after it was stopped with a code.
+2026-11-15 17:25:51Z INFO  Tamper protection is on: stopping, disabling or changing the agent needs a code from the Zentriq console.
+2026-11-15 17:25:51Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:25:51Z INFO  Tamper protection is off on this device: administrators can stop or disable the agent service.
+2026-11-15 17:25:51Z INFO  Tamper protection: Agent service disabled (code entered on the device); the device stays offline in the console until it is enabled again.
+2026-11-15 17:25:52Z INFO  Stopping: disabled with a code.
+2026-11-15 17:25:52Z INFO  Zentriq Agent stopped.
+2026-11-15 17:25:54Z INFO  Zentriq Agent 1.1.1.146 starting.
+2026-11-15 17:25:54Z INFO  Tamper protection: Agent service started again after it was disabled with a code.
+2026-11-15 17:25:55Z INFO  Tamper protection is on: stopping, disabling or changing the agent needs a code from the Zentriq console.
+2026-11-15 17:25:55Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:25:55Z INFO  Live connection to the server at https://localhost:8444.
+2026-11-15 17:26:05Z INFO  Tamper protection is off on this device: administrators can stop or disable the agent service.
+2026-11-15 17:26:05Z INFO  Tamper protection: Tamper protection paused until 2026-11-15 18:26 UTC (from the Zentriq console).
+2026-11-15 17:26:05Z INFO  Agent control pause: OK - Tamper protection is paused until 23:56. Administrators can stop or disable the agent service until then.
+2026-11-15 17:26:05Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:26:07Z INFO  Stopping: tamper protection is paused, or the agent was stopped or disabled with a code.
+2026-11-15 17:26:07Z INFO  Live connection closed (agent stopping).
+2026-11-15 17:26:07Z INFO  Zentriq Agent stopped.
+2026-11-15 17:26:07Z INFO  Zentriq Agent 1.1.1.146 starting.
+2026-11-15 17:26:08Z INFO  Tamper protection is off on this device: administrators can stop or disable the agent service.
+2026-11-15 17:26:08Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:26:11Z INFO  Live connection to the server at https://localhost:8444.
+2026-11-15 17:26:18Z INFO  Tamper protection is on: stopping, disabling or changing the agent needs a code from the Zentriq console.
+2026-11-15 17:26:18Z INFO  Tamper protection: Tamper protection resumed (from the Zentriq console).
+2026-11-15 17:26:18Z INFO  Agent control resume: OK - Tamper protection is on again.
+2026-11-15 17:26:18Z INFO  Checked in. Next run in 1 min.
+2026-11-15 17:26:20Z INFO  Stop requested while tamper protection is on: waiting up to 2 minutes for a code (1 dialog(s) shown).
+2026-11-15 17:26:24Z WARN  Tamper protection: Someone tried to stop the agent service (Services console, net stop or sc stop) without a code: the code dialog was cancelled. It was started again at once.
+2026-11-15 17:26:24Z INFO  The agent service starts again after this stop: stop without a code.
+2026-11-15 17:26:24Z INFO  Stopping: stop without a code (starting again).
+2026-11-15 17:26:24Z INFO  Live connection closed (agent stopping).
+2026-11-15 17:26:24Z INFO  Zentriq Agent stopped.
+2026-11-15 17:26:26Z INFO  Zentriq Agent 1.1.1.146 starting.
+2026-11-15 17:26:26Z INFO  Tamper protection is on: stopping, disabling or changing the agent needs a code from the Zentriq console.
+2026-11-15 17:26:26Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:26:27Z INFO  Stopping: Windows Installer is updating or removing the agent.
+2026-11-15 17:26:27Z INFO  Zentriq Agent stopped.
+2026-11-15 17:26:28Z INFO  Remote support agent protection is off on this device.
+2026-11-15 17:26:37Z INFO  Zentriq Agent 1.1.1.146 starting.
+2026-11-15 17:26:38Z INFO  Enrolling with https://localhost:8444 as runnervm9zap3.
+2026-11-15 17:26:38Z INFO  Tamper protection is on: stopping, disabling or changing the agent needs a code from the Zentriq console.
+2026-11-15 17:26:38Z INFO  Uninstall protection is on: removing the agent needs a one-hour code from the Zentriq console.
+2026-11-15 17:26:38Z INFO  Enrolled as agent e2e6b784-ce57-4209-b7f3-53d0cb88b542; certificate 9800FD9861D69B6247E7A687C65D1E881993DCB6 expires 2027-11-15; checks in every 2 min, sends inventory every 30 min.
+2026-11-15 17:26:38Z INFO  Live connection to the server at https://localhost:8444.
+2026-11-15 17:26:38Z INFO  New uninstall code from the console received (valid until 2026-11-15 18:25 UTC).
+2026-11-15 17:26:39Z INFO  Inventory collected: runnervm9zap3, Windows Server 2022 Datacenter, 73 software, 5 updates, 0 section error(s)
+2026-11-15 17:26:39Z INFO  Inventory uploaded (7 KB compressed).
+2026-11-15 17:26:39Z INFO  Checked in and sent inventory. Next run in 2 min.
+2026-11-15 17:26:48Z INFO  Tamper protection is off on this device: administrators can stop or disable the agent service.
+2026-11-15 17:26:48Z INFO  Uninstall protection turned off by the server.
+2026-11-15 17:26:48Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:26:54Z INFO  Stopping: tamper protection is off.
+2026-11-15 17:26:54Z INFO  Live connection closed (agent stopping).
+2026-11-15 17:26:54Z INFO  Zentriq Agent stopped.
+2026-11-15 17:26:54Z INFO  Zentriq Agent 1.1.1.146 starting.
+2026-11-15 17:26:54Z INFO  Live connection to the server at https://localhost:8444.
+2026-11-15 17:26:54Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:27:04Z INFO  Application control policy 5: audit, 70 rule(s), WDAC off (was off).
+2026-11-15 17:27:04Z INFO  Application control: watching for installations (audit mode).
+2026-11-15 17:27:04Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:27:14Z INFO  Tamper protection is off on this device: administrators can stop or disable the agent service.
+2026-11-15 17:27:14Z INFO  Tray icon started for session 2.
+2026-11-15 17:27:14Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:27:16Z WARN  Application control (audit): runnervm9zap3\runneradmin installs Microsoft® Windows® Operating System 10.0.20348.3451 (Microsoft Corporation), which is not approved (Not on the approved software list.).
+2026-11-15 17:27:24Z INFO  Checked in. Next run in 1 min.
+2026-11-15 17:27:34Z INFO  Application control policy 6: block, 70 rule(s), WDAC off (was audit).
+2026-11-15 17:27:34Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:27:44Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:27:47Z WARN  Application control: blocked Microsoft® Windows® Operating System 10.0.20348.3451 (Microsoft Corporation) started by runnervm9zap3\runneradmin (Not on the approved software list.).
+2026-11-15 17:27:54Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:27:56Z INFO  Application control: runnervm9zap3\runneradmin asked for approval of Microsoft® Windows® Operating System 10.0.20348.3451 (Microsoft Corporation).
+2026-11-15 17:27:56Z WARN  Application control: blocked Microsoft® Windows® Operating System 10.0.20348.3451 (Microsoft Corporation) started by runnervm9zap3\runneradmin (Not on the approved software list.); the same attempt, no new message.
+2026-11-15 17:28:02Z WARN  Application control: blocked Microsoft® Windows® Operating System 10.0.20348.3451 (Microsoft Corporation) started by runnervm9zap3\runneradmin (Not on the approved software list.).
+2026-11-15 17:28:04Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:28:09Z WARN  Application control: blocked Microsoft® Windows® Operating System 10.0.20348.3451 (Microsoft Corporation) started by runnervm9zap3\runneradmin (Not on the approved software list.); the same attempt, no new message.
+2026-11-15 17:28:14Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:28:24Z INFO  Application control policy 7: block, 71 rule(s), WDAC off.
+2026-11-15 17:28:24Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:28:30Z INFO  Application control: Microsoft® Windows® Operating System 10.0.20348.3451 (Microsoft Corporation) allowed (Approved by 'Microsoft® Windows® Operating System'.).
+2026-11-15 17:28:34Z INFO  Checked in. Next run in 1 min.
+2026-11-15 17:28:44Z INFO  Deployment: install ZQ CI Tool 1.0 (C:\ProgramData\Zentriq\Agent\Deploy\fe3ced73-4422-4d06-b3e0-608bf3a2c72b\zq-ci-tool-setup.exe /c echo deployed> "C:\ProgramData\zq-ci-deploy.txt").
+2026-11-15 17:28:44Z INFO  Action install fe3ced73-4422-4d06-b3e0-608bf3a2c72b: OK - ZQ CI Tool 1.0 installed.
+2026-11-15 17:28:44Z INFO  Application control policy 8: block, 73 rule(s), WDAC off.
+2026-11-15 17:28:44Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:28:54Z INFO  Deployment: install ZQ CI Broken 1.0 (C:\ProgramData\Zentriq\Agent\Deploy\a6aa6d84-2b21-48ab-bc93-ccbd0c014574\zq-ci-tool-setup.exe /c exit 7).
+2026-11-15 17:28:54Z INFO  Action install a6aa6d84-2b21-48ab-bc93-ccbd0c014574: FAILED - The setup program ended with exit code 7.
+2026-11-15 17:28:56Z INFO  Inventory collected: runnervm9zap3, Windows Server 2022 Datacenter, 74 software, 5 updates, 0 section error(s)
+2026-11-15 17:28:56Z INFO  Inventory uploaded (8 KB compressed).
+2026-11-15 17:28:56Z INFO  Checked in and sent inventory. Next run in 1 min.
+2026-11-15 17:29:04Z INFO  Deployment: install ZQ CI Broken 1.0 (C:\ProgramData\Zentriq\Agent\Deploy\a6aa6d84-2b21-48ab-bc93-ccbd0c014574\zq-ci-tool-setup.exe /c exit 7).
+2026-11-15 17:29:04Z INFO  Action install a6aa6d84-2b21-48ab-bc93-ccbd0c014574: FAILED - The setup program ended with exit code 7.
+2026-11-15 17:29:04Z INFO  Action uninstall fe3ced73-4422-4d06-b3e0-608bf3a2c72b: OK - 'ZQ CI Tool' is not installed on this device (already removed).
+2026-11-15 17:29:05Z INFO  Inventory collected: runnervm9zap3, Windows Server 2022 Datacenter, 74 software, 5 updates, 0 section error(s)
+2026-11-15 17:29:05Z INFO  Inventory uploaded (8 KB compressed).
+2026-11-15 17:29:05Z INFO  Checked in and sent inventory. Next run in 1 min.
+2026-11-15 17:29:14Z INFO  Application control policy 9: audit, 73 rule(s), WDAC audit (was block).
+2026-11-15 17:29:15Z INFO  WDAC: the Zentriq policy is active in audit mode (Windows logs what it would block: Event Viewer › Applications and Services › Microsoft › Windows › CodeIntegrity).
+2026-11-15 17:29:16Z INFO  Inventory collected: runnervm9zap3, Windows Server 2022 Datacenter, 74 software, 5 updates, 0 section error(s)
+2026-11-15 17:29:16Z INFO  Inventory uploaded (8 KB compressed).
+2026-11-15 17:29:16Z INFO  Checked in and sent inventory. Next run in 1 min.
+2026-11-15 17:29:24Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:29:34Z INFO  Application control policy 10: audit, 73 rule(s), WDAC off.
+2026-11-15 17:29:36Z INFO  WDAC: the Zentriq policy was removed (Windows removes it completely at the next restart).
+2026-11-15 17:29:36Z INFO  Checked in. Next run in 1 min.
+2026-11-15 17:29:44Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:29:54Z INFO  Application control policy 12: off, 73 rule(s), WDAC off (was audit).
+2026-11-15 17:29:54Z INFO  Application control is off: installations are not checked.
+2026-11-15 17:29:55Z INFO  Inventory collected: runnervm9zap3, Windows Server 2022 Datacenter, 74 software, 5 updates, 0 section error(s)
+2026-11-15 17:29:55Z INFO  Inventory uploaded (8 KB compressed).
+2026-11-15 17:29:55Z INFO  Checked in and sent inventory. Next run in 2 min.
+2026-11-15 17:30:04Z INFO  Checked in. Next run in 1 min.
+2026-11-15 17:30:14Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:30:24Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:30:34Z INFO  Checked in. Next run in 1 min.
+2026-11-15 17:30:44Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:30:54Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:31:04Z INFO  Action scan scan: OK - Started on the device.
+2026-11-15 17:31:04Z INFO  Checked in. Next run in 1 min.
+2026-11-15 17:31:04Z INFO  Patch management: scanning with the Windows Update Agent.
+2026-11-15 17:31:08Z INFO  Patch management: the Windows Update Agent answered after 3 s (exit code 0).
+2026-11-15 17:31:08Z INFO  Patch management: winget (App Installer) is not installed on this device, so third-party application updates are not checked.
+2026-11-15 17:31:08Z INFO  Action patch scan: OK - No missing updates.
+2026-11-15 17:31:14Z INFO  Checked in. Next run in 1 min.
+2026-11-15 17:31:24Z INFO  Action run f663a0d8-6098-49bc-a966-e064312dcc3a: OK - Started on the device.
+2026-11-15 17:31:24Z INFO  Checked in. Next run in 1 min.
+2026-11-15 17:31:24Z INFO  Script: running CI Hello (powershell, time limit 120 s).
+2026-11-15 17:31:25Z INFO  Action script run: FAILED - CI Hello ended with exit code 3 after 1.1 s.
+2026-11-15 17:31:34Z INFO  Action run 2a59683b-3a0f-406f-ba79-3909d9c0bc32: OK - Started on the device.
+2026-11-15 17:31:34Z INFO  Script: running Disk Space Report (powershell, time limit 60 s).
+2026-11-15 17:31:34Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:31:35Z INFO  Action script run: OK - Disk Space Report ended with exit code 0 after 1.1 s.
+2026-11-15 17:31:44Z INFO  Action run c1f56abc-7fd7-470c-8d7f-42afe65db821: OK - Started on the device.
+2026-11-15 17:31:44Z INFO  Script: running CI Detect (powershell, time limit 60 s).
+2026-11-15 17:31:44Z INFO  Checked in. Next run in 1 min.
+2026-11-15 17:31:45Z INFO  Script: running CI Fix (cmd, time limit 60 s).
+2026-11-15 17:31:45Z INFO  Script: running CI Detect (powershell, time limit 60 s).
+2026-11-15 17:31:46Z INFO  Action script run: OK - Remediated: CI Fix fixed what CI Detect found.
+2026-11-15 17:31:54Z INFO  Action run 3beccadb-18fe-4efb-a1a1-4fa2b6febc7d: OK - Started on the device.
+2026-11-15 17:31:54Z INFO  Script: running CI Detect (powershell, time limit 60 s).
+2026-11-15 17:31:54Z INFO  Checked in. Next run in 1 min.
+2026-11-15 17:31:55Z INFO  Action script run: OK - Compliant: CI Detect found nothing to fix.
+2026-11-15 17:32:04Z INFO  Action run a979c8e6-0c2e-45ee-a607-2084b8da0578: OK - Started on the device.
+2026-11-15 17:32:04Z INFO  Script: running CI Slow (powershell, time limit 10 s).
+2026-11-15 17:32:04Z INFO  Checked in. Next run in 1 min.
+2026-11-15 17:32:14Z INFO  Checked in. Next run in 1 min.
+2026-11-15 17:32:14Z INFO  Action script run: FAILED - CI Slow did not finish within 10 seconds and was stopped.
+2026-11-15 17:32:24Z INFO  Deployment: install ZQ Notepad Plus 8.6 (C:\ProgramData\Zentriq\Agent\Deploy\c06033a2-80b1-424d-9c62-cd31085531e7\zq-ss-tool-setup.exe /c echo ok> "C:\ProgramData\zq-ss-1.txt").
+2026-11-15 17:32:24Z INFO  Action install c06033a2-80b1-424d-9c62-cd31085531e7: OK - ZQ Notepad Plus 8.6 installed.
+2026-11-15 17:32:24Z INFO  Application control policy 14: off, 77 rule(s), WDAC off.
+2026-11-15 17:32:24Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:32:34Z INFO  Deployment: install ZQ Visio Viewer 2024 (C:\ProgramData\Zentriq\Agent\Deploy\8238ba22-a080-48c6-867f-6ef2f3331ac5\zq-ss-tool-setup.exe /c echo ok> "C:\ProgramData\zq-ss-2.txt").
+2026-11-15 17:32:34Z INFO  Action install 8238ba22-a080-48c6-867f-6ef2f3331ac5: OK - ZQ Visio Viewer 2024 installed.
+2026-11-15 17:32:35Z INFO  Inventory collected: runnervm9zap3, Windows Server 2022 Datacenter, 74 software, 5 updates, 0 section error(s)
+2026-11-15 17:32:35Z INFO  Inventory uploaded (8 KB compressed).
+2026-11-15 17:32:35Z INFO  Checked in and sent inventory. Next run in 2 min.
+2026-11-15 17:32:45Z INFO  Inventory collected: runnervm9zap3, Windows Server 2022 Datacenter, 74 software, 5 updates, 0 section error(s)
+2026-11-15 17:32:45Z INFO  Inventory uploaded (8 KB compressed).
+2026-11-15 17:32:45Z INFO  Checked in and sent inventory. Next run in 2 min.
+2026-11-15 17:32:54Z INFO  Checked in. Next run in 1 min.
+2026-11-15 17:33:04Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:33:14Z INFO  Checked in. Next run in 1 min.
+2026-11-15 17:33:24Z INFO  Checked in. Next run in 1 min.
+2026-11-15 17:33:34Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:33:44Z INFO  Checked in. Next run in 1 min.
+2026-11-15 17:33:54Z INFO  Checked in. Next run in 1 min.
+2026-11-15 17:34:04Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:34:14Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:34:24Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:34:34Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:34:44Z INFO  Checked in. Next run in 1 min.
+2026-11-15 17:34:54Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:35:05Z INFO  Checked in. Next run in 1 min.
+2026-11-15 17:35:15Z INFO  Checked in. Next run in 1 min.
+2026-11-15 17:35:25Z INFO  Checked in. Next run in 1 min.
+2026-11-15 17:35:36Z INFO  Inventory collected: runnervm9zap3, Windows Server 2022 Datacenter, 74 software, 5 updates, 0 section error(s)
+2026-11-15 17:35:36Z INFO  Inventory uploaded (8 KB compressed).
+2026-11-15 17:35:36Z INFO  Checked in and sent inventory. Next run in 1 min.
+2026-11-15 17:35:45Z INFO  Software metering turned off; the metering totals on this device were removed.
+2026-11-15 17:35:45Z INFO  Inventory collected: runnervm9zap3, Windows Server 2022 Datacenter, 74 software, 5 updates, 0 section error(s)
+2026-11-15 17:35:45Z INFO  Inventory uploaded (7 KB compressed).
+2026-11-15 17:35:45Z INFO  Checked in and sent inventory. Next run in 1 min.
+2026-11-15 17:35:55Z INFO  Software metering turned on.
+2026-11-15 17:35:55Z INFO  Checked in. Next run in 1 min.
+2026-11-15 17:36:05Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:36:15Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:36:25Z INFO  Security Pack policy 2: privilege enforce, BitLocker off, USB off
+2026-11-15 17:36:25Z INFO  Inventory collected: runnervm9zap3, Windows Server 2022 Datacenter, 74 software, 5 updates, 0 section error(s)
+2026-11-15 17:36:25Z INFO  Inventory uploaded (8 KB compressed).
+2026-11-15 17:36:25Z INFO  Checked in and sent inventory. Next run in 1 min.
+2026-11-15 17:36:35Z INFO  Security Pack policy 3: privilege enforce, BitLocker off, USB off
+2026-11-15 17:36:35Z INFO  Checked in. Next run in 1 min.
+2026-11-15 17:36:45Z INFO  Security Pack policy 4: privilege enforce, BitLocker off, USB off
+2026-11-15 17:36:45Z INFO  Inventory collected: runnervm9zap3, Windows Server 2022 Datacenter, 74 software, 5 updates, 0 section error(s)
+2026-11-15 17:36:45Z INFO  Inventory uploaded (8 KB compressed).
+2026-11-15 17:36:45Z INFO  Checked in and sent inventory. Next run in 1 min.
+2026-11-15 17:36:55Z INFO  Security Pack policy 7: privilege enforce, BitLocker off, USB off
+2026-11-15 17:36:55Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:37:05Z INFO  Checked in. Next run in 1 min.
+2026-11-15 17:37:15Z INFO  Security Pack policy 10: privilege off, BitLocker report, USB off
+2026-11-15 17:37:15Z INFO  Inventory collected: runnervm9zap3, Windows Server 2022 Datacenter, 74 software, 5 updates, 0 section error(s)
+2026-11-15 17:37:15Z INFO  Inventory uploaded (8 KB compressed).
+2026-11-15 17:37:15Z INFO  Checked in and sent inventory. Next run in 2 min.
+2026-11-15 17:37:25Z INFO  Security Pack policy 11: privilege off, BitLocker report, USB off
+2026-11-15 17:37:25Z INFO  BitLocker: E:: recovery password 948D4B13-6C96-411D-B744-657EC77FD25A replaced
+2026-11-15 17:37:25Z INFO  Inventory collected: runnervm9zap3, Windows Server 2022 Datacenter, 74 software, 5 updates, 0 section error(s)
+2026-11-15 17:37:25Z INFO  Inventory uploaded (8 KB compressed).
+2026-11-15 17:37:25Z INFO  Checked in and sent inventory. Next run in 2 min.
+2026-11-15 17:37:35Z INFO  Security Pack policy 12: privilege off, BitLocker enforce, USB off
+2026-11-15 17:37:35Z INFO  Inventory collected: runnervm9zap3, Windows Server 2022 Datacenter, 74 software, 5 updates, 0 section error(s)
+2026-11-15 17:37:35Z INFO  Inventory uploaded (8 KB compressed).
+2026-11-15 17:37:35Z INFO  Checked in and sent inventory. Next run in 2 min.
+2026-11-15 17:37:45Z INFO  Security Pack policy 14: privilege off, BitLocker off, USB audit
+2026-11-15 17:37:45Z INFO  Inventory collected: runnervm9zap3, Windows Server 2022 Datacenter, 74 software, 5 updates, 0 section error(s)
+2026-11-15 17:37:45Z INFO  Inventory uploaded (8 KB compressed).
+2026-11-15 17:37:45Z INFO  Checked in and sent inventory. Next run in 2 min.
+2026-11-15 17:37:46Z INFO  USB device control: recording files written to E: (Microsoft Virtual Disk).
+2026-11-15 17:37:55Z INFO  Checked in. Next run in 1 min.
+2026-11-15 17:38:05Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:38:15Z INFO  Security Pack policy 15: privilege off, BitLocker off, USB readonly
+2026-11-15 17:38:15Z INFO  Inventory collected: runnervm9zap3, Windows Server 2022 Datacenter, 74 software, 5 updates, 0 section error(s)
+2026-11-15 17:38:15Z INFO  Inventory uploaded (8 KB compressed).
+2026-11-15 17:38:15Z INFO  Checked in and sent inventory. Next run in 2 min.
+2026-11-15 17:38:25Z INFO  Security Pack policy 16: privilege off, BitLocker off, USB readonly
+2026-11-15 17:38:25Z INFO  Inventory collected: runnervm9zap3, Windows Server 2022 Datacenter, 74 software, 5 updates, 0 section error(s)
+2026-11-15 17:38:25Z INFO  Inventory uploaded (8 KB compressed).
+2026-11-15 17:38:25Z INFO  Checked in and sent inventory. Next run in 1 min.
+2026-11-15 17:38:26Z INFO  USB device control: recording files written to E: (Microsoft Virtual Disk).
+2026-11-15 17:38:35Z INFO  Security Pack policy 18: privilege off, BitLocker off, USB block
+2026-11-15 17:38:35Z INFO  Inventory collected: runnervm9zap3, Windows Server 2022 Datacenter, 74 software, 5 updates, 0 section error(s)
+2026-11-15 17:38:35Z INFO  Inventory uploaded (8 KB compressed).
+2026-11-15 17:38:35Z INFO  Checked in and sent inventory. Next run in 1 min.
+2026-11-15 17:38:45Z INFO  Checked in. Next run in 1 min.
+2026-11-15 17:38:55Z INFO  Security Pack policy 19: privilege off, BitLocker off, USB off
+2026-11-15 17:38:55Z INFO  Inventory collected: runnervm9zap3, Windows Server 2022 Datacenter, 74 software, 5 updates, 0 section error(s)
+2026-11-15 17:38:55Z INFO  Inventory uploaded (8 KB compressed).
+2026-11-15 17:38:55Z INFO  Checked in and sent inventory. Next run in 2 min.
+2026-11-15 17:39:05Z INFO  Security Pack policy 20: privilege off, BitLocker off, USB off
+2026-11-15 17:39:05Z INFO  Inventory collected: runnervm9zap3, Windows Server 2022 Datacenter, 74 software, 5 updates, 0 section error(s)
+2026-11-15 17:39:05Z INFO  Inventory uploaded (8 KB compressed).
+2026-11-15 17:39:05Z INFO  Checked in and sent inventory. Next run in 2 min.
+2026-11-15 17:39:15Z INFO  Inventory collected: runnervm9zap3, Windows Server 2022 Datacenter, 74 software, 5 updates, 0 section error(s)
+2026-11-15 17:39:15Z INFO  Inventory uploaded (8 KB compressed).
+2026-11-15 17:39:15Z INFO  Checked in and sent inventory. Next run in 2 min.
+2026-11-15 17:39:25Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:39:55Z INFO  Inventory collected: runnervm9zap3, Windows Server 2022 Datacenter, 74 software, 5 updates, 0 section error(s)
+2026-11-15 17:39:55Z INFO  Inventory uploaded (8 KB compressed).
+2026-11-15 17:39:55Z INFO  Checked in and sent inventory. Next run in 2 min.
+2026-11-15 17:39:58Z INFO  Stopping: tamper protection is off.
+2026-11-15 17:39:58Z INFO  Could not say goodbye to the server: Server returned 403: This agent has been revoked.
+2026-11-15 17:39:58Z INFO  Zentriq Agent stopped.
+2026-11-15 17:40:00Z WARN  Server refused this agent: Server returned 403: This agent has been revoked.
+2026-11-15 17:40:01Z INFO  Remote support agent protection is off on this device.
+2026-11-15 17:49:59Z INFO  Zentriq Agent 1.1.1.146 starting.
+2026-11-15 17:49:59Z INFO  Remote support agent protection is off on this device.
+2026-11-15 17:50:00Z INFO  Enrolling with https://localhost:8444 as runnervm9zap3.
+2026-11-15 17:50:00Z INFO  Enrolled as agent a95e6e26-3eb1-4438-844a-c566692489bd; certificate 01A72C401ADEE7BCDAA3157BF101C92344FEBFB8 expires 2027-11-15; checks in every 2 min, sends inventory every 30 min.
+2026-11-15 17:50:01Z INFO  Inventory collected: runnervm9zap3, Windows Server 2022 Datacenter, 75 software, 5 updates, 0 section error(s)
+2026-11-15 17:50:01Z INFO  Inventory uploaded (8 KB compressed).
+2026-11-15 17:50:01Z INFO  Checked in and sent inventory. Next run in 1 min.
+2026-11-15 17:50:10Z INFO  Live connection to the server at https://localhost:8444.
+2026-11-15 17:50:10Z INFO  Remote support agent protection is off on this device.
+2026-11-15 17:50:13Z INFO  Action uninstall Zentriq Remote Support: OK - Zentriq Remote Support removed.
+2026-11-15 17:50:13Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:50:20Z INFO  Tamper protection is off on this device: administrators can stop or disable the agent service.
+2026-11-15 17:50:20Z INFO  Tray icon started for session 2.
+2026-11-15 17:50:20Z WARN  Remote support protection (folder): C:\Program Files\Zentriq\ZentriqRemoteSupport
+2026-11-15 17:50:20Z INFO  Remote support agent protection is off on this device.
+2026-11-15 17:50:21Z INFO  Remote support agent protection is off on this device.
+2026-11-15 17:50:21Z INFO  Action install Zentriq Remote Support: OK - Zentriq Remote Support installed; the device appears online in Remote Support within a minute.
+2026-11-15 17:50:21Z INFO  Checked in. Next run in 1 min.
+2026-11-15 17:50:30Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:50:40Z INFO  Tamper protection is on: stopping, disabling or changing the agent needs a code from the Zentriq console.
+2026-11-15 17:50:40Z INFO  Uninstall protection is on: removing the agent needs a one-hour code from the Zentriq console.
+2026-11-15 17:50:40Z INFO  New uninstall code from the console received (valid until 2026-11-15 18:25 UTC).
+2026-11-15 17:50:40Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:50:50Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:51:00Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:51:10Z INFO  Checked in. Next run in 1 min.
+2026-11-15 17:51:20Z INFO  Checked in. Next run in 1 min.
+2026-11-15 17:51:30Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:51:40Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:51:50Z INFO  Checked in. Next run in 1 min.
+2026-11-15 17:52:00Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:52:10Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:52:20Z INFO  Remote support agent protected: stopping, disabling or removing it on the device needs a code from the Zentriq console.
+2026-11-15 17:52:20Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:52:30Z INFO  Tamper protection is off on this device: administrators can stop or disable the agent service.
+2026-11-15 17:52:30Z INFO  Uninstall protection turned off by the server.
+2026-11-15 17:52:30Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:52:40Z INFO  Checked in. Next run in 1 min.
+2026-11-15 17:52:50Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:53:00Z INFO  Checked in. Next run in 1 min.
+2026-11-15 17:53:10Z INFO  Checked in. Next run in 1 min.
+2026-11-15 17:53:20Z INFO  Checked in. Next run in 1 min.
+2026-11-15 17:53:30Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:53:40Z INFO  Checked in. Next run in 1 min.
+2026-11-15 17:53:50Z INFO  Checked in. Next run in 1 min.
+2026-11-15 17:54:00Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:54:11Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:54:20Z INFO  Remote support agent protection is off on this device.
+2026-11-15 17:54:21Z INFO  Checked in. Next run in 2 min.
+2026-11-15 17:54:25Z INFO  Stopping: tamper protection is off.
+2026-11-15 17:54:25Z INFO  Could not say goodbye to the server: Server returned 403: This agent has been revoked.
+2026-11-15 17:54:26Z INFO  Zentriq Agent stopped.
+2026-11-15 17:54:28Z INFO  Remote support agent protection is off on this device.
+2026-11-15 18:02:28Z INFO  Zentriq Agent 1.1.1.146 starting.
+2026-11-15 18:02:29Z INFO  Enrolling with https://localhost:8444 as runnervm9zap3.
+2026-11-15 18:02:30Z INFO  Enrolled as agent 9ff58491-a952-485a-a7b8-44d099c934fe; certificate 97D05772DFA3AAAFED9E54F18FFC46B4878355C1 expires 2027-11-15; checks in every 2 min, sends inventory every 30 min.
+2026-11-15 18:02:31Z INFO  Inventory collected: runnervm9zap3, Windows Server 2022 Datacenter, 74 software, 5 updates, 0 section error(s)
+2026-11-15 18:02:32Z INFO  Inventory uploaded (8 KB compressed).
+2026-11-15 18:02:32Z INFO  Checked in and sent inventory. Next run in 1 min.
+2026-11-15 18:02:35Z INFO  Live connection to the server at https://localhost:8444.
+2026-11-15 18:02:43Z INFO  Stopping: agent update.
+2026-11-15 18:02:43Z INFO  Live connection closed (agent stopping).
+2026-11-15 18:02:44Z INFO  Updating the agent 1.1.1.146 -> 1.1.2.146 (Windows Installer log: C:\ProgramData\Zentriq\Agent\Logs\update-1.1.2.146.log).
+2026-11-15 18:02:44Z INFO  Agent update to 1.1.2.146: started - Installing version 1.1.2.146; the agent restarts and reports the new version at its next check-in.
+2026-11-15 18:02:44Z INFO  Checked in. Next run in 1 min.
+2026-11-15 18:02:44Z INFO  Zentriq Agent stopped.
+2026-11-15 18:02:45Z INFO  Zentriq Agent 1.1.2.146 starting.
+2026-11-15 18:02:46Z INFO  Live connection to the server at https://localhost:8444.
+2026-11-15 18:02:46Z INFO  Checked in. Next run in 2 min.
+2026-11-15 18:02:51Z INFO  Stopping: tamper protection is off.
+2026-11-15 18:02:51Z INFO  Live connection closed (agent stopping).
+2026-11-15 18:02:51Z INFO  Zentriq Agent stopped.
+2026-11-15 18:02:52Z INFO  Remote support agent protection is off on this device.
+2026-11-15 18:02:54Z INFO  Zentriq Agent 1.1.1.146 starting.
+2026-11-15 18:02:54Z INFO  Enrolling with https://localhost:8444 as runnervm9zap3.
+2026-11-15 18:02:54Z INFO  Enrolled as agent 624da832-5fd2-4f78-9793-82c58bc36935; certificate 4380F7216E9F1039D80125D3CD580CA0C422EC2C expires 2027-11-15; checks in every 2 min, sends inventory every 30 min.
+2026-11-15 18:02:55Z INFO  Inventory collected: runnervm9zap3, Windows Server 2022 Datacenter, 73 software, 5 updates, 0 section error(s)
+2026-11-15 18:02:56Z INFO  Inventory uploaded (8 KB compressed).
+2026-11-15 18:02:56Z INFO  Checked in and sent inventory. Next run in 1 min.
+2026-11-15 18:03:14Z INFO  Tamper protection is off on this device: administrators can stop or disable the agent service.
+2026-11-15 18:03:14Z INFO  Tray icon started for session 2.
+2026-11-15 18:03:19Z INFO  Live connection to the server at https://localhost:8444.
+2026-11-15 18:03:23Z INFO  Stopping: agent update.
+2026-11-15 18:03:23Z INFO  Live connection closed (agent stopping).
+2026-11-15 18:03:25Z INFO  Updating the agent 1.1.1.146 -> 1.1.2.146 (Windows Installer log: C:\ProgramData\Zentriq\Agent\Logs\update-1.1.2.146.log).
+2026-11-15 18:03:25Z INFO  Agent update to 1.1.2.146: started - Installing version 1.1.2.146; the agent restarts and reports the new version at its next check-in.
+2026-11-15 18:03:25Z INFO  Checked in. Next run in 1 min.
+2026-11-15 18:03:25Z INFO  Zentriq Agent stopped.
+2026-11-15 18:03:26Z INFO  Zentriq Agent 1.1.2.146 starting.
+2026-11-15 18:03:27Z INFO  Live connection to the server at https://localhost:8444.
+2026-11-15 18:03:27Z INFO  Checked in. Next run in 1 min.
+2026-11-15 18:03:37Z INFO  Checked in. Next run in 1 min.
+2026-11-15 18:03:41Z INFO  Stopping: tamper protection is off.
+2026-11-15 18:03:41Z INFO  Live connection closed (agent stopping).
+2026-11-15 18:03:41Z INFO  Zentriq Agent stopped.
+2026-11-15 18:03:42Z INFO  Remote support agent protection is off on this device.

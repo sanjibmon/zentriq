@@ -1,0 +1,40 @@
+== linux-x64
+/home/runner/work/zentriq/zentriq/agent/Zentriq.Agent.Linux/Actions.cs(109,26): warning CS8619: Nullability of reference types in value of type '(bool, string?, string Output)' doesn't match target type '(bool, string, string)'. [/home/runner/work/zentriq/zentriq/agent/Zentriq.Agent.Linux/Zentriq.Agent.Linux.csproj]
+/home/runner/work/zentriq/zentriq/agent/Zentriq.Agent.Linux/Actions.cs(110,11): warning CS8619: Nullability of reference types in value of type '(bool, string?, string)' doesn't match target type '(bool, string, string)'. [/home/runner/work/zentriq/zentriq/agent/Zentriq.Agent.Linux/Zentriq.Agent.Linux.csproj]
+warning: absolute symlink: /usr/bin/zentriq-agent -> /opt/zentriq-agent/zentriq-agent
+== linux-arm64
+/home/runner/work/zentriq/zentriq/agent/Zentriq.Agent.Linux/Actions.cs(109,26): warning CS8619: Nullability of reference types in value of type '(bool, string?, string Output)' doesn't match target type '(bool, string, string)'. [/home/runner/work/zentriq/zentriq/agent/Zentriq.Agent.Linux/Zentriq.Agent.Linux.csproj]
+/home/runner/work/zentriq/zentriq/agent/Zentriq.Agent.Linux/Actions.cs(110,11): warning CS8619: Nullability of reference types in value of type '(bool, string?, string)' doesn't match target type '(bool, string, string)'. [/home/runner/work/zentriq/zentriq/agent/Zentriq.Agent.Linux/Zentriq.Agent.Linux.csproj]
+warning: absolute symlink: /usr/bin/zentriq-agent -> /opt/zentriq-agent/zentriq-agent
+total 178468
+drwxr-xr-x 2 runner runner     4096 Nov 15 16:26 .
+drwxr-xr-x 3 runner runner     4096 Nov 15 16:25 ..
+-rw-r--r-- 1 runner runner      576 Nov 15 16:26 SHA256SUMS
+-rw-r--r-- 1 runner runner     4107 Nov 15 16:26 install.sh
+-rw-r--r-- 1 runner runner       10 Nov 15 16:26 version
+-rw-r--r-- 1 runner runner 28983568 Nov 15 16:26 zentriq-agent-linux-arm64.deb
+-rw-r--r-- 1 runner runner 29003072 Nov 15 16:26 zentriq-agent-linux-arm64.rpm
+-rw-r--r-- 1 runner runner 30428623 Nov 15 16:26 zentriq-agent-linux-arm64.tar.gz
+-rw-r--r-- 1 runner runner 31018992 Nov 15 16:26 zentriq-agent-linux-x64.deb
+-rw-r--r-- 1 runner runner 31030516 Nov 15 16:26 zentriq-agent-linux-x64.rpm
+-rw-r--r-- 1 runner runner 32253760 Nov 15 16:26 zentriq-agent-linux-x64.tar.gz
+== linux-x64
+/home/runner/work/zentriq/zentriq/agent/Zentriq.Agent.Linux/Actions.cs(109,26): warning CS8619: Nullability of reference types in value of type '(bool, string?, string Output)' doesn't match target type '(bool, string, string)'. [/home/runner/work/zentriq/zentriq/agent/Zentriq.Agent.Linux/Zentriq.Agent.Linux.csproj]
+/home/runner/work/zentriq/zentriq/agent/Zentriq.Agent.Linux/Actions.cs(110,11): warning CS8619: Nullability of reference types in value of type '(bool, string?, string)' doesn't match target type '(bool, string, string)'. [/home/runner/work/zentriq/zentriq/agent/Zentriq.Agent.Linux/Zentriq.Agent.Linux.csproj]
+warning: absolute symlink: /usr/bin/zentriq-agent -> /opt/zentriq-agent/zentriq-agent
+== linux-arm64
+/home/runner/work/zentriq/zentriq/agent/Zentriq.Agent.Linux/Actions.cs(109,26): warning CS8619: Nullability of reference types in value of type '(bool, string?, string Output)' doesn't match target type '(bool, string, string)'. [/home/runner/work/zentriq/zentriq/agent/Zentriq.Agent.Linux/Zentriq.Agent.Linux.csproj]
+/home/runner/work/zentriq/zentriq/agent/Zentriq.Agent.Linux/Actions.cs(110,11): warning CS8619: Nullability of reference types in value of type '(bool, string?, string)' doesn't match target type '(bool, string, string)'. [/home/runner/work/zentriq/zentriq/agent/Zentriq.Agent.Linux/Zentriq.Agent.Linux.csproj]
+warning: absolute symlink: /usr/bin/zentriq-agent -> /opt/zentriq-agent/zentriq-agent
+total 178480
+drwxr-xr-x 2 runner runner     4096 Nov 15 16:27 .
+drwxr-xr-x 4 runner runner     4096 Nov 15 16:26 ..
+-rw-r--r-- 1 runner runner      576 Nov 15 16:27 SHA256SUMS
+-rw-r--r-- 1 runner runner     4107 Nov 15 16:27 install.sh
+-rw-r--r-- 1 runner runner       10 Nov 15 16:27 version
+-rw-r--r-- 1 runner runner 28987416 Nov 15 16:27 zentriq-agent-linux-arm64.deb
+-rw-r--r-- 1 runner runner 29003292 Nov 15 16:27 zentriq-agent-linux-arm64.rpm
+-rw-r--r-- 1 runner runner 30428597 Nov 15 16:27 zentriq-agent-linux-arm64.tar.gz
+-rw-r--r-- 1 runner runner 31026716 Nov 15 16:27 zentriq-agent-linux-x64.deb
+-rw-r--r-- 1 runner runner 31030372 Nov 15 16:27 zentriq-agent-linux-x64.rpm
+-rw-r--r-- 1 runner runner 32253765 Nov 15 16:27 zentriq-agent-linux-x64.tar.gz

@@ -1,0 +1,13 @@
+﻿2026-11-15T17:56:52.8798758Z INFO Running maintenance.restore 81e765e8-73a4-4724-9849-b264b6a31cbe (attempt 1/1).
+2026-11-15T17:56:52.9185102Z INFO Downloading zentriq-runnervm9zap3-20261115-175646-manual.zbak from \\localhost\ZqBackups\zentriq.
+2026-11-15T17:56:53.0183168Z INFO Taking a safety backup of the current data before restoring.
+2026-11-15T17:56:54.2145746Z INFO Data protection keys: 1 file(s), 1 secret(s) made portable.
+2026-11-15T17:56:54.3285542Z INFO Backup written: C:\ProgramData\Zentriq\Backups\zentriq-runnervm9zap3-20261115-175653-pre-restore.zbak (8117 KiB, database, configuration, certificates, MFA keys, remote support; key 9AC0B2EE19320031, password protected).
+2026-11-15T17:56:54.5301687Z INFO Stopping Zentriq services.
+2026-11-15T17:57:00.5508736Z INFO Database restored from the backup of 2026-11-15 17:56:47Z (runnervm9zap3, version 1.1.1).
+2026-11-15T17:57:00.7027641Z INFO Keeping HTTPS certificate 3F5F14DF8E8814A617731A888269C0817B094C30 (expires 2029-02-17).
+2026-11-15T17:57:00.7031102Z INFO Console certificate restored (3F5F14DF8E8814A617731A888269C0817B094C30, same key as the backed-up server).
+2026-11-15T17:57:00.7044584Z INFO Data protection keys: 0 added (MFA keeps working).
+2026-11-15T17:57:00.7354489Z INFO Remote support data restored (21 file(s)).
+2026-11-15T17:57:00.8586676Z INFO Restored backup from 2026-11-15 17:56:47Z (version 1.1.1); applied 0 migration(s).
+2026-11-15T17:57:02.8960542Z INFO Services restarted. Run 'zentriqctl verify' to confirm health.
