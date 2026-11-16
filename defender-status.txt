@@ -1,0 +1,6 @@
+
+AMProductVersion              : 4.18.26100.4
+AntivirusSignatureVersion     : 1.463.326.0
+AntivirusSignatureLastUpdated : 11/16/2026 3:06:56 AM
+RealTimeProtectionEnabled     : False
+
